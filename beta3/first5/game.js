@@ -1,0 +1,12814 @@
+'use strict';
+/* ============================================================
+   STARSPELL — word-roguelite (Corkscrew Games)
+   v0.2: Home / Campaign (3 acts) / Quick Play / Daily Hunt with
+   share + leaderboards (daily & weekly) / Profile with stats and
+   achievements / 10 constellation beasts / 24 tiered sigils / ambient
+   music and a heavy coat of star-magic. Versus: next moon.
+   ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
+   ============================================================ */
+
+const BUILD = 'STARSPELL v0.111.1';
+// Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
+// went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
+const QS = new URLSearchParams(location.search);
+/* ---- back-buffer resolution --------------------------------------------
+   Full-DPR always: the v0.32.0 adaptive ladder is DEAD. On-device evidence
+   (Wyatt's overlay screenshots) showed dpr1 running 28-49fps — a 9x pixel
+   cut bought nothing, so the game is CPU-bound, not fill-rate-bound, and
+   the ladder just reload-thrashed the phone down to mush for zero fps.
+   ?dpr= stays as a manual probe. The removeItems purge caps the ladder
+   stored on phones that ran v0.32.0. */
+localStorage.removeItem('beta3.dprCap'); localStorage.removeItem('beta3.dprCapTs');
+const DPR = QS.has('dpr')
+  ? Math.max(1, Math.min(parseFloat(QS.get('dpr')) || 1, 3))
+  : Math.min(window.devicePixelRatio || 1, 3);
+const DIAG = (m) => { if (window.SSDIAG) window.SSDIAG(m); };
+const DEMO = QS.get('demo') === '1';
+// ?lab=1 — the on-device perf bisection lab (lab.js, loaded by index.html only
+// under the flag). The lab boots and destroys its own staged Phaser games, so
+// the normal boot and the viewport machinery below stand down entirely.
+const LAB = QS.get('lab') === '1';
+
+/* ---- workload probe + renderer verdict ---------------------------------
+   The v0.33.0 fill-rate probe asked "how fast can this device fill pixels?"
+   and the afflicted iPhone answered honestly: very (gl 2212 Mpx/s — the GPU
+   is real). Yet the perf lab (v0.34.0, run fxios-…/1786853475034) showed the
+   full home scene at 6fps/154ms on WebGL and 59fps on Canvas ON THAT SAME
+   PHONE: its iOS WebKit WebGL path collapses with OBJECT COUNT (per-draw /
+   GPU-process overhead piling up per content layer), which a fill-rate
+   number can never see. So the probe now runs the workload the game actually
+   is: ~300 small tinted alpha-blended sprites, a tilesprite, a per-frame
+   text, a modest emitter — a handful of real Phaser frames on BOTH real
+   renderers at full DPR, near-invisible during boot. Better median frame
+   time wins ON THIS DEVICE. No per-browser/UA rules (Safari's Canvas2D may
+   genuinely lose; next year's WebKit may flip again) — measure, decide,
+   cache 7 days. ?rend=cv / ?rend=gl force either path; ?glprobe=1
+   re-measures. Crispness untouched: same resolution either way. */
+const SS_REND = { mode: 'auto', why: 'auto', p: null };
+window.__ssraster = SS_REND;
+function ssProbeScene() {
+  return class extends Phaser.Scene {
+    constructor() { super('probe'); }
+    create() {
+      const W = this.scale.width, H = this.scale.height, u = W / 428;
+      let t = this.textures.createCanvas('pdot', 16, 16);
+      const g = t.context.createRadialGradient(8, 8, 0, 8, 8, 8);
+      g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.4, 'rgba(255,255,255,0.5)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+      t.context.fillStyle = g; t.context.fillRect(0, 0, 16, 16); t.refresh();
+      t = this.textures.createCanvas('pnoise', 64, 64);   // POT — WebGL1 REPEAT
+      const im = t.context.createImageData(64, 64), d = im.data;
+      for (let i = 0; i < d.length; i += 4) { const v = (Math.random() * 255) | 0; d[i] = d[i + 1] = d[i + 2] = v; d[i + 3] = 255; }
+      t.context.putImageData(im, 0, 0); t.refresh();
+      // ~300 small tinted alpha sprites, a third ADD-blended, a third alpha-
+      // tweened — the meadow's composition (stars/aurora/fireflies) in miniature
+      for (let i = 0; i < 300; i++) {
+        const s = this.add.image(Math.random() * W, Math.random() * H, 'pdot')
+          .setScale((0.3 + Math.random() * 0.7) * u).setAlpha(0.08 + Math.random() * 0.3)
+          .setTint(SS_STAR_COLORS[i % SS_STAR_COLORS.length]);
+        if (i % 3 === 0) s.setBlendMode('ADD');
+        if (i % 3 === 1) this.tweens.add({ targets: s, alpha: 0.04, duration: 700 + (i % 7) * 150, yoyo: true, repeat: -1 });
+      }
+      // one full-screen tilesprite — the game's TileSprite class of work
+      this.add.tileSprite(W / 2, H / 2, W, H, 'pnoise').setAlpha(0.05);
+      // one text rewritten every frame — score count-ups, countdowns
+      const tx = this.add.text(W / 2, H * 0.8, '0', {
+        fontFamily: 'Georgia, serif', fontSize: Math.max(12, Math.round(18 * u)) + 'px', color: '#1c2350',
+      }).setOrigin(0.5).setAlpha(0.3);
+      let n = 0;
+      this.events.on('update', () => tx.setText(String(n = (n + 7) % 99999)));
+      // one modest steady emitter — the burst machinery, priced at steady state
+      this.add.particles(0, 0, 'pdot', {
+        x: { min: 0, max: W }, y: -10, quantity: 1, frequency: 90, lifespan: 2400,
+        speedY: { min: 40 * u, max: 90 * u }, scale: { start: 0.5 * u, end: 0 },
+        alpha: { start: 0.2, end: 0 }, blendMode: 'ADD', tint: 0x2a3355,
+      });
+      this.game.__pready = true;
+    }
+  };
+}
+// boots one throwaway Phaser game on `type`, samples real frame deltas, and
+// resolves {ms: median, n: frames, how, gpu} — ms -1 when the renderer failed
+// to boot/sample, and `how` says WHICH so the verdict (and the overlay) can
+// tell "this renderer is broken" from "this renderer was never tried"
+function ssProbeRun(type) {
+  // While this window is open, Phaser's async "Cannot create WebGL context"
+  // throw is the PROBE failing to sample — a verdict, not a crisis — and
+  // compat.js must not paint it at the player (ssBoot closes the window).
+  window.__ssProbing = true;
+  return new Promise((resolve) => {
+    const out = { ms: -1, n: 0, how: 'noboot', gpu: '' };
+    const f = [];                                    // sampled frame deltas
+    let g = null, fin = false, armed = false, sawBoot = false;
+    const finish = () => {
+      if (fin) return; fin = true;
+      // whatever frames we got by now ARE the answer — a 150ms/frame
+      // renderer that only managed 4 samples before the cap still reports
+      out.n = f.length;
+      if (out.ms < 0 && f.length >= 3) { f.sort((a, b) => a - b); out.ms = +f[f.length >> 1].toFixed(1); }
+      // a renderer that cannot boot, or boots but cannot paint three frames
+      // inside the failsafe, has told us something decisive — not nothing
+      // 'nosample' = it painted, just not 3 frames · 'nocreate' = the renderer
+      // came up but building the workload outlasted the failsafe · 'noboot' =
+      // no context at all. All three are verdicts against the renderer.
+      if (out.how !== 'throw') {
+        out.how = out.ms > 0 ? 'ok' : armed ? 'nosample' : sawBoot ? 'nocreate' : 'noboot';
+      }
+      let gl = null;
+      try { gl = g && g.renderer && g.renderer.gl; } catch (e) { }
+      const gone = () => {
+        try { const ext = gl && gl.getExtension('WEBGL_lose_context'); if (ext) ext.loseContext(); } catch (e) { }
+        // ⚠ strip the probe's styling BEFORE this element can be recycled.
+        // Phaser POOLS game canvases: destroy(true) frees this exact <canvas>,
+        // and the next Phaser.Game — the real one — is handed the same element
+        // back with its inline style intact (verified: same node, style
+        // preserved). v0.37.0 shipped that leak to TestFlight. The game wore
+        // the probe's `opacity:0.05` and the whole sky came up at 5% over the
+        // page's #0a0d1c: Wyatt's phone frame is the browser frame at a
+        // best-fit alpha of 0.049, under 1/255 error across 3.5M pixels.
+        // `pointer-events:none` rode along too — a dark game is a dead one.
+        try { if (g && g.canvas) g.canvas.style.cssText = ''; } catch (e) { }
+        try { if (g && g.canvas && g.canvas.parentNode) g.canvas.parentNode.removeChild(g.canvas); } catch (e) { }
+        resolve(out);
+      };
+      if (!g) return gone();
+      let done = false; const once = () => { if (!done) { done = true; gone(); } };
+      try { g.events.once('destroy', once); g.destroy(true); } catch (e) { once(); }
+      setTimeout(once, 500);
+    };
+    setTimeout(finish, 3000);                        // absolute per-renderer failsafe
+    try {
+      g = new Phaser.Game({
+        type, banner: false,
+        width: Math.round(window.innerWidth * DPR), height: Math.round(window.innerHeight * DPR),
+        backgroundColor: '#0a0d1c',
+        scale: { mode: Phaser.Scale.NONE },
+        render: { antialias: type === Phaser.CANVAS ? true : DPR < 2, powerPreference: 'high-performance' },
+        scene: [ssProbeScene()],
+      });
+    } catch (e) { out.how = 'throw'; finish(); return; }
+    const arm = () => {
+      if (fin) return;
+      if (g.isBooted) sawBoot = true;
+      if (!g.isBooted || !g.__pready) { setTimeout(arm, 30); return; }
+      armed = true;
+      try {   // near-invisible: real draws, real compositing, faint on screen
+        g.canvas.style.cssText += ';position:fixed;left:0;top:0;opacity:0.05;pointer-events:none;' +
+          'width:' + window.innerWidth + 'px;height:' + window.innerHeight + 'px';
+      } catch (e) { }
+      try {
+        const gl = g.renderer && g.renderer.gl;
+        if (gl) {
+          const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+          out.gpu = String(gl.getParameter(dbg ? dbg.UNMASKED_RENDERER_WEBGL : gl.RENDERER)).slice(0, 48);
+        }
+      } catch (e) { }
+      // the measurement cap starts HERE, not at boot — a slow renderer's 1s
+      // boot must not eat the sampling window (the failsafe above still rules)
+      setTimeout(finish, 1600);
+      let warm = 2;
+      const t0 = performance.now();
+      const onStep = () => {
+        if (warm-- > 0) return;                       // compiles/uploads stay out of the clock
+        const d = g.loop.rawDelta;
+        if (d > 0 && d < 2000) f.push(d);
+        // a handful of frames or ~900ms of sampling, whichever first — a
+        // 50ms/frame renderer still yields 12+ frames for a stable median
+        if (f.length >= 20 || performance.now() - t0 > 900) {
+          try { g.events.off('prestep', onStep); } catch (e) { }
+          finish();
+        }
+      };
+      g.events.on('prestep', onStep);
+    };
+    arm();
+  });
+}
+// the decision itself, pure and testable from two probe results — kept out of
+// the async boot chain so the harness can assert every branch without booting
+function ssVerdictFrom(gl, cv) {
+  const out = {
+    v: 4, t: Date.now(), glMs: gl.ms, cvMs: cv.ms, gpu: gl.gpu || '',
+    glN: gl.n, cvN: cv.n, glHow: gl.how, cvHow: cv.how,
+    why: 'workload', mode: 'auto',
+  };
+  // canvas must beat WebGL by >10% frame time to unseat it: status-quo bias
+  // keeps healthy devices off the shim path and stops coin-flip flip-flops.
+  if (gl.ms > 0 && cv.ms > 0 && cv.ms < gl.ms * 0.9) out.mode = 'cv';
+  // ⚠ v0.35.0 shipped this branch as "either renderer missing → AUTO", and
+  // Wyatt's phone read `gl — · cv 17 ms/f · GL (workload)` at 8fps: its GL
+  // probe never painted three frames inside the 3s failsafe, so `gl.ms > 0`
+  // was false, the comparison never ran, and AUTO handed the game straight
+  // back to the WebGL path the probe had just failed on. A renderer too
+  // broken to sample is the STRONGEST evidence against it, not a null
+  // result — so a measured renderer always beats an unmeasurable one.
+  else if (gl.ms <= 0 && cv.ms > 0) { out.mode = 'cv'; out.why = 'gl-unmeasurable'; }
+  else if (cv.ms <= 0 && gl.ms > 0) { out.mode = 'gl'; out.why = 'cv-unmeasurable'; }
+  // both unmeasurable → AUTO, and Phaser makes its own fallback as before
+  return out;
+}
+// resolves SS_REND in place (cached / forced: immediately; else ~1-1.5s probe)
+function ssRenderVerdict() {
+  const q = QS.get('rend');
+  if (q === 'cv' || q === 'canvas') { SS_REND.mode = 'cv'; SS_REND.why = 'forced'; return Promise.resolve(SS_REND); }
+  if (q === 'gl' || q === 'webgl') { SS_REND.mode = 'gl'; SS_REND.why = 'forced'; return Promise.resolve(SS_REND); }
+  if (QS.get('glprobe') !== '1') {
+    try {
+      const c = JSON.parse(localStorage.getItem('beta3.raster') || 'null');
+      // v bump = every device re-probes on next load. REQUIRED this time: the
+      // v3 records already cached on real phones hold the bad AUTO verdict for
+      // up to 7 days, so shipping the fix without the bump fixes nobody.
+      // an UNMEASURABLE verdict is a snapshot of one bad moment (Wyatt's phone,
+      // 9/21: WebGL 'nosample' pinned it to canvas for a week; a restart had
+      // it drawing crisp again) — it earns a day, a measured one a week
+      const ttl = /unmeasurable/.test(c.why || '') ? 864e5 : 7 * 864e5;
+      if (c && c.v === 4 && Date.now() - c.t < ttl) {
+        SS_REND.mode = c.mode; SS_REND.why = c.why; SS_REND.p = c;
+        return Promise.resolve(SS_REND);
+      }
+    } catch (e) { }
+  }
+  const t0 = performance.now();
+  return ssProbeRun(Phaser.WEBGL).then((gl) => ssProbeRun(Phaser.CANVAS).then((cv) => {
+    const out = ssVerdictFrom(gl, cv);
+    out.probeMs = Math.round(performance.now() - t0);
+    try { localStorage.setItem('beta3.raster', JSON.stringify(out)); } catch (e) { }
+    SS_REND.mode = out.mode; SS_REND.why = out.why; SS_REND.p = out;
+    window.__ssprobeMs = out.probeMs;
+    DIAG('workload probe gl ' + gl.ms + '/' + gl.how + ' · cv ' + cv.ms + '/' + cv.how +
+      ' ms/f → ' + out.mode + '/' + out.why + ' (' + out.probeMs + 'ms)');
+    return SS_REND;
+  }));
+}
+
+/* Canvas renderer: setTint is a silent no-op (long-standing project rule) —
+   under the canvas fallback every tinted image would draw white. Rather than
+   bake 38 call sites by hand, patch Image.setTint once: serve a cached
+   tint-multiplied copy of the texture (the ssFxTex trick, generalized).
+   Same pixel dimensions, so setDisplaySize/setScale consumers are untouched. */
+function ssCanvasTintShim() {
+  if (!game || !game.renderer || game.renderer.type !== Phaser.CANVAS) return;
+  const IP = Phaser.GameObjects.Image.prototype;
+  if (IP.__ssTintShim) return;
+  IP.__ssTintShim = true;
+  const orig = IP.setTint;
+  IP.setTint = function (t) {
+    orig.call(this, t);
+    if (typeof t !== 'number' || t === 0xffffff || arguments.length > 1 || !this.scene) return this;
+    try {
+      const base = this.__ssBaseTex || this.texture.key;
+      const tk = base + '#' + t.toString(16);
+      const T = this.scene.textures;
+      if (!T.exists(tk)) {
+        const src = T.get(base).getSourceImage();
+        if (!src || !src.width) return this;
+        const ct = T.createCanvas(tk, src.width, src.height);
+        const c = ct.context;
+        c.drawImage(src, 0, 0);
+        c.globalCompositeOperation = 'multiply';
+        c.fillStyle = '#' + t.toString(16).padStart(6, '0');
+        c.fillRect(0, 0, src.width, src.height);
+        c.globalCompositeOperation = 'destination-in';
+        c.drawImage(src, 0, 0);
+        ct.refresh();
+      }
+      const dw = this.displayWidth, dh = this.displayHeight;
+      this.__ssBaseTex = base;
+      this.setTexture(tk);
+      this.setDisplaySize(dw, dh);
+    } catch (e) { }
+    return this;
+  };
+}
+
+/* ---- frame-time probe (part of ?diag=1) --------------------------------
+   The rise and the descent are the game's signature moves and must stay
+   silky, so they self-report: start() at motion begin, stop() at motion end,
+   and every RAF-to-RAF delta in between is recorded raw (loop.rawDelta, not
+   Phaser's smoothed delta — smoothing is exactly what hides a hitch). The
+   first recorded delta is split out as `entry`: it covers the game step that
+   ran the previous scene's shutdown + this scene's create, which is where
+   texture bakes and uploads land. Summaries go to the diag box and pile up
+   on window.__ssperf so a headless run can read them programmatically.
+   Costs one array push per frame while a flight is live, nothing otherwise. */
+const PERF = {
+  rec: null,
+  // limit: auto-stop after that many frames — for flights with no natural end
+  // marker in this scene (the arrival handoff runs in the next scene's create)
+  start(label, scene, limit) {
+    if (!this.hooked) {
+      this.hooked = true;
+      const loop = scene.game.loop;
+      scene.game.events.on('prestep', () => {
+        if (!this.rec) return;
+        this.rec.f.push(loop.rawDelta);
+        if (this.rec.limit && this.rec.f.length >= this.rec.limit) this.stop();
+      });
+    }
+    this.rec = { label, f: [], limit };
+  },
+  stop() {
+    const r = this.rec;
+    this.rec = null;
+    if (!r || r.f.length < 3) return;
+    // start() runs inside a game step (create or input handler), after that
+    // step's prestep fired — so f[0] is the first delta measured AFTER the
+    // heavy entry work, i.e. it spans it. That's the shutdown+create frame.
+    const entry = r.f[0];
+    const flight = r.f.slice(1);
+    const n = flight.length, total = flight.reduce((a, b) => a + b, 0);
+    const sorted = flight.slice().sort((a, b) => b - a);
+    const sum = {
+      label: r.label, entryMs: Math.round(entry), frames: n,
+      avgMs: +(total / n).toFixed(1),
+      worst: sorted.slice(0, 4).map((v) => Math.round(v)),
+      over25: flight.filter((v) => v > 25).length,
+      over40: flight.filter((v) => v > 40).length,
+    };
+    (window.__ssperf = window.__ssperf || []).push(sum);
+    DIAG('perf ' + sum.label + ': entry ' + sum.entryMs + 'ms · ' + n + 'f avg ' + sum.avgMs +
+      ' · worst ' + sum.worst.join('/') + ' · >25ms ' + sum.over25 + ' · >40ms ' + sum.over40);
+  },
+};
+window.SSPERF = PERF;   // the headless perf harness reads/starts probes through this
+
+/* ---- fps overlay + the ladder's detector -------------------------------
+   A tiny DOM readout in the top-left (Wyatt's debugging ask): fps, worst
+   frame of the last half-second, renderer (GL/CV — a phone screenshot
+   instantly tells us if WebGL failed over to Canvas), back-buffer size and
+   dpr. DOM, not a Phaser object: zero render cost, survives scene changes.
+   OPT-IN as of v0.36.1: ?fps=1 shows it. It was default-ON through the iPhone
+   perf saga (v0.32-v0.36) and earned its place — the v0.36.0 verdict bug was
+   diagnosed entirely from one screenshot of line 2 — but that investigation is
+   closed, and it sat on top of the QUICK PLAY header for every player. The
+   measurement machinery below always runs; only the readout is gated. */
+/* (v0.37.0's five-tap footer gesture lived here so the readout was reachable
+   inside the iOS shell, which loads a fixed URL. It confirmed the TestFlight
+   build on 8/19 — 60fps/17ms on the full 1284×2778 dpr3 buffer, CV verdict,
+   brightness right — and was removed as promised the same day.) */
+let SS_FPS_EL = null;
+function ssFpsShow(on) {
+  if (on && !SS_FPS_EL) {
+    SS_FPS_EL = document.createElement('div');
+    SS_FPS_EL.style.cssText = 'position:fixed;left:4px;top:calc(env(safe-area-inset-top,0px) + 4px);' +
+      'z-index:40;pointer-events:none;font:600 10px/1.5 ui-monospace,Menlo,monospace;' +
+      'color:#7ec96f;background:rgba(6,8,20,.55);padding:2px 7px;border-radius:7px;letter-spacing:.3px;' +
+      'white-space:pre-line';
+    document.body.appendChild(SS_FPS_EL);
+  } else if (!on && SS_FPS_EL) {
+    SS_FPS_EL.remove();
+    SS_FPS_EL = null;
+  }
+  return !!SS_FPS_EL;
+}
+function ssFpsOn() {
+  // the gesture's sticky `beta3.fps` is retired with it — purge it, or a phone
+  // that toggled the readout on during the TestFlight check keeps it FOREVER
+  // with no gesture left to turn it off (Wyatt's phone was in that state)
+  try { localStorage.removeItem('beta3.fps'); } catch (e) { }
+  return QS.get('fps') === '1';
+}
+function ssPerfWatch(gm) {
+  if (ssFpsOn()) ssFpsShow(true);
+  let worst = 0;
+  gm.events.on('prestep', () => { const d = gm.loop.rawDelta; if (d > worst) worst = d; });
+  // ?prof=1: update-vs-render main-thread split, read on-device from a screenshot
+  const PROF = QS.get('prof') === '1';
+  let pT = 0, updSum = 0, rendSum = 0, pN = 0;
+  if (PROF) {
+    gm.events.on('prestep', () => { pT = performance.now(); });
+    gm.events.on('poststep', () => { updSum += performance.now() - pT; });
+    gm.events.on('prerender', () => { pT = performance.now(); });
+    gm.events.on('postrender', () => { rendSum += performance.now() - pT; pN++; });
+  }
+  // 2nd line: what the workload probe measured + which renderer won and by
+  // what ms. On the afflicted phone one screenshot names the verdict outright.
+  const P = window.__ssraster || {}, pp = P.p || {};
+  const r1 = (v) => (v > 0 ? Math.round(v * 10) / 10 : '—');
+  let verdict = 'auto';
+  if (P.why === 'forced') verdict = (P.mode === 'cv' ? 'CV' : 'GL') + ' (forced)';
+  else if (P.why === 'gl-unmeasurable') verdict = 'CV (gl ' + (pp.glHow || 'failed') + ')';
+  else if (P.why === 'cv-unmeasurable') verdict = 'GL (cv ' + (pp.cvHow || 'failed') + ')';
+  else if (P.why === 'workload') {
+    verdict = P.mode === 'cv'
+      ? 'CV (workload' + (pp.glMs > 0 && pp.cvMs > 0 ? ' −' + Math.round((pp.glMs - pp.cvMs) * 10) / 10 + 'ms' : '') + ')'
+      : 'GL (workload)';
+  }
+  // a failed probe prints its frame count, not a bare em dash — one screenshot
+  // then distinguishes "never booted" from "booted but painted nothing"
+  const pr = (ms, n) => (ms > 0 ? r1(ms) : '—(' + (n || 0) + 'f)');
+  const probeLine = (pp.glMs != null ? 'gl ' + pr(pp.glMs, pp.glN) + ' · cv ' + pr(pp.cvMs, pp.cvN) + ' ms/f · ' : '') +
+    verdict + (pp.gpu ? ' · ' + pp.gpu.slice(0, 30) : '');
+  setInterval(() => {
+    const fps = Math.round(gm.loop.actualFps);
+    const el = SS_FPS_EL;
+    if (el) {
+      el.style.color = fps >= 50 ? '#7ec96f' : fps >= 30 ? '#e6c229' : '#e74c3c';
+      let txt = fps + ' FPS · ' + Math.round(worst) + 'ms · ' +
+        (gm.renderer.type === Phaser.WEBGL ? 'GL ' : 'CV ') +
+        gm.scale.width + '×' + gm.scale.height + ' · dpr' + (Math.round(DPR * 10) / 10);
+      if (PROF && pN > 0) { txt += '\nupd ' + (updSum / pN).toFixed(1) + ' · draw ' + (rendSum / pN).toFixed(1) + 'ms'; updSum = rendSum = 0; pN = 0; }
+      txt += '\n' + probeLine;
+      el.textContent = txt;
+    }
+    worst = 0;
+  }, 500);
+}
+
+/* ---- painted art (buttons + letter tiles + meadow plate), DEFAULT ON -----
+   Everything else in this game is drawn to canvas at boot; these five files
+   are the only downloaded images (webp, ~230 KB total — the PNGs were 1.5 MB,
+   which is why default-on waited for the conversion). Buttons/tiles swap in
+   at texture-build time under the SAME texture keys, so nothing downstream
+   changes; the meadow is a landscape plate ssSkyWorld lays over the
+   procedural ground. If any file fails, is slow, or the browser predates
+   webp, ART stays off and the procedural art draws as before — and ?art=0
+   forces that fallback for debugging. */
+const ART = QS.get('art') !== '0';
+const SSART = { ready: false, img: {} };
+// sign-card art that ships (art/zod_<id>.webp) — see ssZodArtKey. The 12 MJ
+// portraits (flat-vector constellation set, art/ZODIAC-ART.md) are cut by
+// tools/zod-export.mjs from the full-res sources kept OUT of the repo;
+// swapping a frame is a pick change there + rerun, never an id change here.
+const SS_ZOD_ART = [
+  'aries', 'taurus', 'gemini', 'cancer', 'leo', 'virgo',
+  'libra', 'scorpio', 'sagittarius', 'capricorn', 'aquarius', 'pisces',
+  // THE OPEN SKY's own painted night (v0.98.0) — the deck's unsigned entry
+  // loads its plate exactly the way the twelve load theirs; if it fails,
+  // the shared 'zodsky' wash stays its fallback
+  'none',
+];
+function ssLoadArt() {
+  const names = ['btn', 'btndark', 'tile_face', 'tile_over', 'meadow'];
+  // the sign cards' art rides the same fetch, but is never required: a missing
+  // plate falls back to the asterism, and never turns the whole set off
+  const zod = SS_ZOD_ART.map((id) => 'zod_' + id);
+  // …and the first-open tutorial's hand (v0.75.0, cut by tools/make-hand-asset.py)
+  // rides the same never-required lane: absent, the finger draws procedurally
+  zod.push('hand');
+  // …and the pick sheet's painted frame rows (v0.111.0, the open-sky-sigils
+  // verdicts): absent, ssSigilCard keeps its procedural chrome
+  zod.push('sigrow_basic', 'sigrow_rare', 'sigrow_legend');
+  zod.forEach((n) => { const im = new Image(); im.onload = () => { SSART.img[n] = im; }; im.src = '../art/' + n + '.webp?v=' + encodeURIComponent(BUILD); });
+  return Promise.all(names.map((n) => new Promise((res) => {
+    const im = new Image();
+    im.onload = () => { SSART.img[n] = im; res(true); };
+    im.onerror = () => { DIAG('art MISSING ' + n); res(false); };
+    im.src = '../art/' + n + '.webp?v=' + encodeURIComponent(BUILD);
+  }))).then((r) => { SSART.ready = r.every(Boolean); DIAG('art ' + (SSART.ready ? 'loaded' : 'FAILED — procedural')); });
+}
+
+const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+const lerp = (a, b, t) => a + (b - a) * t;
+
+// seeded RNG (mulberry32); reseeded per run — daily runs share a date seed
+let _seed = Math.floor(Math.random() * 1e9);
+function setSeed(s) { _seed = s | 0; }
+function rng() {
+  _seed |= 0; _seed = (_seed + 0x6D2B79F5) | 0;
+  let t = Math.imul(_seed ^ (_seed >>> 15), 1 | _seed);
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+const rpick = (arr) => arr[Math.floor(rng() * arr.length)];
+
+/* The active gameplay pack (bag, point values, vowels, dictionary) — see
+   packs.js. Solo battles use the player's own language; a versus battle uses
+   the ROOM's language so both duelists deal from one bag against one
+   dictionary. ssUsePack flips all four globals together and falls back to
+   English as a unit if a pack's dictionary isn't resident (solo can't hit
+   that — SS_DICT.boot loads it synchronously — only a failed versus fetch). */
+let PACK, WORDSET, VALS, BAG, VOWELS;
+function ssUsePack(lang) {
+  const ok = SS_PACKS[lang] && SS_DICT.ready(lang);
+  PACK = ok ? SS_PACKS[lang] : SS_PACKS.en;
+  WORDSET = SS_DICT.set(PACK.lang);
+  VALS = PACK.vals; BAG = ssBagArr(PACK); VOWELS = PACK.vowels;
+}
+ssUsePack(ssGameLang());
+const LEN_MULT = [0, 0, 0.6, 1, 1.15, 1.35, 1.6, 1.9, 2.3];
+// THE DEW TILE (Wyatt, 8/26): the forged family's third member — orange +6,
+// blue x1.5, GREEN heals. A beast's strike leaves dew on one plain tile; it
+// heals DEW_HEAL when it rides the very next cast (use it or lose it, same
+// sweep as the others), still scoring its letter for damage. Not in versus.
+const DEW_HEAL = 6;      // the dial: hp restored per green tile in a cast word
+const DEW_CHANCE = 1.0;  // the dial: odds a landed strike leaves a dew tile
+const SERIF = 'Georgia, "Iowan Old Style", "Times New Roman", serif';
+
+/* ============================================================
+   Profile, stats, achievements (local-first; best-effort sync)
+   ============================================================ */
+/* THE LANTERN'S LAW — the two numbers the streak rules turn on. They live
+   here rather than down in the streak section because SS.load() runs during
+   module evaluation and a `const` further down the file is still in its dead
+   zone at that moment.
+   GRACE_EARN: nights hunted to walk a spent grace back. MILESTONES: the marks
+   at which the lantern itself grows (ember → true lantern → comet-crowned). */
+const SS_GRACE_EARN = 5;
+const SS_MILESTONES = [7, 30, 100];
+const SS_MS_ACH = { 7: 'flame-7', 30: 'flame-30', 100: 'flame-100' };
+
+const SS = {
+  prof: null,
+  load() {
+    let stored = null;
+    try { stored = localStorage.getItem('beta3.profile'); } catch (e) { }
+    try { this.prof = JSON.parse(stored) || {}; } catch (e) { this.prof = {}; }
+    const p = this.prof;
+    /* THE FIRST OPEN (v0.75.0, Skylar 9/2) — is this the genuinely-first
+       open of the game? Decided ONCE, the moment the question is first
+       askable, and written down on the spot (the sigil drip's grandfather
+       law): 0 = the guided first game is still owed, 1 = down forever.
+       "First" is deliberately strict — ANY stored profile closes it (even
+       one that never played: that player has already seen the meadow), so
+       does any recorded play (a restore that hands the profile over with
+       the player), and so does a device the game has run on before
+       (`starspellUid` — the iOS shell's keychain reseeds it at reinstall,
+       so a veteran reinstalling is never mistaken for a newcomer; it is
+       minted at connect(), which runs AFTER this load). The flag drops at
+       the first game's end — win, loss or abandon — in ssFtueDone(). */
+    if (typeof p.ftue !== 'number') {
+      let seen = false;
+      try { seen = !!localStorage.getItem('starspellUid'); } catch (e) { }
+      p.ftue = (stored || seen || ssSigilPlayedBefore(p)) ? 1 : 0;
+      this.save();
+    }
+    p.runs = p.runs | 0; p.wins = p.wins | 0; p.words = p.words | 0; p.beasts = p.beasts | 0;
+    p.longest = p.longest || ''; p.bigHit = p.bigHit | 0; p.bestQuick = p.bestQuick | 0;
+    p.bestCampaign = p.bestCampaign | 0;
+    p.vsWords = p.vsWords | 0; p.vsWins = p.vsWins | 0;
+    p.daily = p.daily || {}; p.ach = p.ach || {};
+    p.signs = p.signs || {};   // per-zodiac records: id → {best, clears, runs, eBest, xp, ack, hardClears, eScore, eRuns, word, hit}
+    /* SIGN LEVELS (v0.69.0): each record grows lifetime `xp` and `ack` (the
+       highest level already ANNOUNCED). THE VETERAN'S SEED, once: the
+       records already earned buy a head start — capped at the FOOT of the
+       today-band (level 20 = cum 3230), so nobody wakes past the middle
+       ground Skylar asked everyone to climb toward — and ack seeds to the
+       seeded level, so a veteran's first boot is silent, never a rite
+       storm. A record a harness plants mid-session without `xp` reads
+       level 1 through the `| 0`s at the read sites, throwing nothing. */
+    for (const k in p.signs) {
+      const sr = p.signs[k];
+      if (!sr || typeof sr !== 'object') { delete p.signs[k]; continue; }
+      if (typeof sr.xp !== 'number') {
+        sr.xp = Math.min(SS_SIGNLV.cum[20],
+          (sr.clears | 0) * 420 + Math.min(sr.runs | 0, 10) * 60 + (sr.eBest | 0) * 12);
+        sr.ack = ssSignLvFor(sr.xp);
+      }
+      sr.xp = Math.max(0, sr.xp | 0);
+      sr.ack = Math.max(1, sr.ack | 0);
+      sr.hardClears = Math.max(0, sr.hardClears | 0);   // hard-mode clears under this sign (v0.70.0)
+      /* THE SIGN PAGE's own columns (v0.85.0) — LOCAL-ONLY by Skylar's
+         stamp (nothing new syncs until the fossil verdict lands), and
+         HONEST: no veteran seed can truthfully attribute a lifetime word
+         or blow to one sign, so all four start empty and are tracked from
+         now on — the page shows an em-dash where nothing stands yet. */
+      sr.eScore = Math.max(0, sr.eScore | 0);   // endless best SCORE under this sign
+      sr.eRuns = Math.max(0, sr.eRuns | 0);     // endless climbs begun under this sign
+      sr.hit = Math.max(0, sr.hit | 0);         // mightiest single blow under this sign
+      sr.word = typeof sr.word === 'string' ? sr.word : '';   // longest word cast under this sign
+    }
+    // hard mode's per-sign tick memory (v0.70.0): the picker's box remembers
+    // each sign's choice across campaigns ('none' = THE OPEN SKY's own)
+    p.hardPick = (p.hardPick && typeof p.hardPick === 'object') ? p.hardPick : {};
+    // the deck's memory (v0.95.0): the sign each door's last climb was BEGUN
+    // under — a zodiac id or 'none' (THE OPEN SKY); anything else (a retired
+    // id, a hand-edited profile) forgets rather than breaks
+    if (!(p.lastSign === 'none' || SS_ZODIAC_BY[p.lastSign])) delete p.lastSign;
+    if (!(p.lastSignEnd === 'none' || SS_ZODIAC_BY[p.lastSignEnd])) delete p.lastSignEnd;
+    // star rating: every profile that predates it starts at the baseline
+    p.rating = Number.isFinite(p.rating) ? Math.round(p.rating) : 1000;
+    p.rhide = !!p.rhide;                                   // veil my rating from others
+    p.rday = (p.rday && typeof p.rday === 'object') ? p.rday : { d: 0, g: 0 };   // PvE daily-cap ledger
+    /* THE STREAK — consecutive days on which the daily hunt was run.
+       Stored as {n, last, best}, never a bare number: `last` is the day key
+       that was counted, so the CURRENT streak is always derivable from today
+       (a number alone can't tell a live streak from a cold one), and a later
+       grace night can forgive a one-day gap by reading the same two fields.
+       No migration will be needed for it — only new rules. */
+    if (!p.streak || typeof p.streak !== 'object') {
+      // Profiles that predate the lantern seed from the score log they already
+      // kept: those days genuinely were hunted, and the daily sheet has been
+      // showing that very number since v0.19.0. Starting everyone at zero
+      // would take something away that the game already granted.
+      const seed = ssSeedStreak(p);
+      p.streak = { n: seed.n, last: seed.last, best: seed.n };
+    }
+    p.streak.n = Math.max(0, p.streak.n | 0);
+    p.streak.last = p.streak.last | 0;
+    p.streak.best = Math.max(p.streak.best | 0, p.streak.n);
+    /* THE GRACE NIGHT (v0.40.0) — one safety net, and never more than one.
+       `g` is whether it is in hand, `gp` how many nights of the five that
+       re-earn a spent one are already walked, `gd` the day keys a grace has
+       actually bridged (the week strip draws its ◌ rings from these, so it
+       keeps a fortnight and no more). Everyone alive when this shipped — and
+       every player who ever starts fresh — wakes holding one: the net is
+       generous on day one, but it is still only ever ONE.
+       `mk` is the highest mark this run of the streak has already celebrated,
+       so a crossing rings once; `pend` is a mark that has been earned but not
+       yet honoured on the meadow (the ceremony survives an app that was
+       closed on the end screen). */
+    if (typeof p.streak.g !== 'number') { p.streak.g = 1; p.streak.gp = 0; }
+    p.streak.g = clamp(p.streak.g | 0, 0, 1);
+    p.streak.gp = clamp(p.streak.gp | 0, 0, SS_GRACE_EARN);
+    p.streak.gd = Array.isArray(p.streak.gd) ? p.streak.gd.map((k) => k | 0).filter((k) => k > 0).slice(-14) : [];
+    p.streak.pend = p.streak.pend | 0;
+    // marks already passed are seeded, not re-run: a profile arriving with a
+    // 40-night flame must not be told "SEVEN NIGHTS" on its next hunt
+    if (typeof p.streak.mk !== 'number') {
+      p.streak.mk = SS_MILESTONES.reduce((a, m) => (p.streak.n >= m ? m : a), 0);
+    }
+    p.streak.mk = p.streak.mk | 0;
+    /* THE SIGIL DRIP (v0.42.0) — see ssSigilCheck & co. The `sig` object is
+       created exactly once, and creating it is also the moment the
+       grandfather decision is made and written down: a profile with ANY prior
+       play recorded takes all twenty-four with it, a genuinely empty one
+       enters the drip with the open twelve. Saved on the spot, so the
+       decision cannot be re-made against a profile the session has since
+       changed. */
+    if (!p.sig || typeof p.sig !== 'object') {
+      p.sig = { u: {}, c: {}, pend: [] };
+      if (ssSigilPlayedBefore(p)) {
+        for (const sg of SS_SIGILS) if (sg.lock) p.sig.u[sg.id] = 1;
+        p.sig.gf = 1;
+      }
+      this.save();
+    }
+    p.sig.u = (p.sig.u && typeof p.sig.u === 'object') ? p.sig.u : {};
+    p.sig.c = (p.sig.c && typeof p.sig.c === 'object') ? p.sig.c : {};
+    p.sig.pend = Array.isArray(p.sig.pend) ? p.sig.pend.filter((id) => !!SS_SIG_BY[id]) : [];
+    /* THE ENDLESS LEDGER (v0.68.0) — how far the climb has ever gone.
+       bestLevel is the level REACHED (died on), bestScore the taxed final
+       score, runs the climbs begun; every profile that predates the mode
+       simply wakes with zeros. */
+    p.endless = (p.endless && typeof p.endless === 'object') ? p.endless : {};
+    p.endless.bestLevel = p.endless.bestLevel | 0;
+    p.endless.bestScore = p.endless.bestScore | 0;
+    p.endless.runs = p.endless.runs | 0;
+    /* THE FRONTIER FLAG's jar (v0.77.0) — the one colour this mage flies.
+       Every profile wakes holding the factory's classic green; an unknown
+       stored id (a future jar removed, a hand-edited profile) falls back
+       the same way rather than shipping an undrawable flag. */
+    p.flag = SS_FLAG_BY[p.flag] ? p.flag : SS_FLAG_DEF;
+    return p;
+  },
+  save() { try { localStorage.setItem('beta3.profile', JSON.stringify(this.prof)); } catch (e) { } },
+  sync() {
+    SSNET.syncProfile({
+      runs: this.prof.runs, wins: this.prof.wins, words: this.prof.words, beasts: this.prof.beasts,
+      longest: this.prof.longest, bigHit: this.prof.bigHit, bestQuick: this.prof.bestQuick,
+      vsWins: this.prof.vsWins,
+      achCount: Object.keys(this.prof.ach).length,
+      rating: this.prof.rating, rhide: this.prof.rhide ? 1 : 0,
+      // the flame rides along with the rest of the profile: `streakDay` is the
+      // day key it was last fed, so the number can be read back honestly (a
+      // bare count would say nothing about whether it is still burning)
+      streak: this.prof.streak.n, streakDay: this.prof.streak.last, streakBest: this.prof.streak.best,
+      // the grace in hand and the highest mark reached ride along too, so a
+      // read of the synced profile tells the whole lantern, not half of it
+      streakGrace: this.prof.streak.g, streakMark: this.prof.streak.mk,
+      // the endless climb's high-water marks (v0.68.0) and the frontier
+      // flag's jar (v0.77.0) — the rating card reads both off this row
+      endlessBest: this.prof.endless.bestLevel, endlessScore: this.prof.endless.bestScore,
+      flagColor: this.prof.flag,
+      // the deck's memory (v0.95.0) rides with the rest of prof, so the sky
+      // row keeps the last sign each door was begun under (null = never)
+      lastSign: this.prof.lastSign || null, lastSignEnd: this.prof.lastSignEnd || null,
+    });
+  },
+  has(id) { return !!this.prof.ach[id]; },
+  // `def` (v0.70.0): a family member ('hard-aries' …) has no SS_ACH row of
+  // its own — the caller mints its toast def; the recorded id is still the
+  // member's, so it fires exactly once per sign.
+  award(id, game, def) {
+    if (this.prof.ach[id]) return;
+    this.prof.ach[id] = Date.now();
+    this.save();
+    def = def || SS_ACH.find((a) => a.id === id);
+    if (def && game) game.events.emit('ss-ach', def);
+    if (SFX.ok) SFX.ach();
+  },
+};
+SS.load();
+
+/* ---- the star rating: one number for how well you weave ------------------
+   Baseline 1000, hard floor 600 — a new player can never be beaten into the
+   ground. Versus moves it Elo-style: expected-score math at K=32, so felling
+   a higher-rated rival pays big, farming a lower one pays little, and losses
+   mirror. Solo play only ever RAISES it — wins and mighty words pay a pinch
+   that diminishes to nothing as the rating climbs toward PVE_SOFT and is
+   capped per UTC day, so grinding beasts can seed a rating but never inflate
+   one past what versus play supports. Mutates SS.prof only; every call site
+   already rides an SS.save()/SS.sync() moments later. */
+const SS_RATING = {
+  BASE: 1000, FLOOR: 600, K: 32, PVE_DAY_CAP: 30, PVE_SOFT: 1250,
+  expected(mine, opp) { return 1 / (1 + Math.pow(10, (opp - mine) / 400)); },
+  // versus: standard Elo against the rival (or the field's average). score is
+  // 1 for a win, 0 for a loss. Returns the applied delta (floor-aware).
+  duel(opp, score) {
+    return this.apply(Math.round(this.K * (score - this.expected(SS.prof.rating, opp))));
+  },
+  // solo: never negative, diminishing above BASE, capped per day
+  pve(base) {
+    const p = SS.prof, today = SSNET.dayKey();
+    if (!p.rday || p.rday.d !== today) p.rday = { d: today, g: 0 };
+    const scale = clamp((this.PVE_SOFT - p.rating) / (this.PVE_SOFT - this.BASE), 0, 1);
+    const d = Math.min(Math.ceil(base * scale), Math.max(0, this.PVE_DAY_CAP - p.rday.g));
+    if (d <= 0) return 0;
+    p.rday.g += d;
+    return this.apply(d);
+  },
+  apply(d) {
+    const p = SS.prof, before = p.rating;
+    p.rating = Math.max(this.FLOOR, Math.round(p.rating + d));
+    return p.rating - before;
+  },
+};
+// the star-classes: named tiers at thresholds so the number has flavor.
+// min is inclusive; baseline 1000 wakes as a RISING STAR.
+const SS_RATING_TIERS = [
+  { min: 0, key: 'rt0', glyph: '✧', color: '#8a94c4', tint: 0x8a94c4 },
+  { min: 850, key: 'rt1', glyph: '✦', color: '#e8a87f', tint: 0xe8a87f },
+  { min: 1000, key: 'rt2', glyph: '✦', color: '#cfd8ff', tint: 0xcfd8ff },
+  { min: 1150, key: 'rt3', glyph: '✦', color: '#ffd77a', tint: 0xffd77a },
+  { min: 1300, key: 'rt4', glyph: '★', color: '#ffe9a8', tint: 0xffe9a8 },
+  { min: 1450, key: 'rt5', glyph: '★', color: '#9fe8ff', tint: 0x9fe8ff },
+  { min: 1600, key: 'rt6', glyph: '✸', color: '#fff6d8', tint: 0xfff6d8 },
+];
+function ssRatingTier(r) { let t = SS_RATING_TIERS[0]; for (const x of SS_RATING_TIERS) if (r >= x.min) t = x; return t; }
+
+/* ============================================================
+   Shared drawing helpers (textures + constellation rendering)
+   ============================================================ */
+// Texture crispness factor: box art (buttons, tiles, panels) is authored in a
+// small design-space canvas; on retina the upscale smeared every edge. Draw
+// those canvases at R x and let setDisplaySize map them 1:1-ish to device px.
+function ssTexRes(scene) {
+  return Math.min(Math.max(Math.min(scene.scale.width / 420, scene.scale.height / 800), 1), 3);
+}
+// The device's texture ceiling (WebGL MAX_TEXTURE_SIZE), cached once. An
+// upload past it silently white-boxes on WebGL1 — the two mk() factories
+// clamp against it defensively. Nothing today comes near (largest bake
+// ~1.3k px vs a 4096 floor on any real GPU), so the clamp is pure armor:
+// when it never fires, output is byte-identical.
+let SS_MAXTEX = 0;
+function ssMaxTex(scene) {
+  if (!SS_MAXTEX) {
+    try {
+      const gl = scene.game.renderer.gl;
+      SS_MAXTEX = (gl && gl.getParameter(gl.MAX_TEXTURE_SIZE)) || 8192;
+    } catch (e) { SS_MAXTEX = 8192; }
+    SS_MAXTEX = Math.max(2048, SS_MAXTEX | 0);
+  }
+  return SS_MAXTEX;
+}
+/* Run one texture painter on its canvas, and never ship half a picture.
+   Phaser registers the key the moment createCanvas returns, so a painter
+   that throws partway (a canvas API the phone's WebKit lacks — roundRect is
+   polyfilled in compat.js precisely because iOS 15 has none) used to leave a
+   registered texture with whatever was drawn before the throw, and every
+   bake queued after it never ran at all: one bad line, silently, and the
+   meadow wears it. Now the canvas is wiped, the fallback painter (if the
+   bake offers one) draws a plain stand-in, the DIAG names the key, and the
+   factory carries on to the next texture. `window.__ssBakeFail` counts them
+   for the harness. */
+function ssBake(t, key, w, h, fn, fb) {
+  const c = t.context;
+  // the factory's resolution scale, so the fallback paints in the same units
+  const base = c.getTransform ? c.getTransform() : null;
+  try { fn(c, w, h); }
+  catch (e) {
+    const m = key + ' · ' + ((e && e.message) || e);
+    DIAG('bake failed: ' + m);
+    (window.__ssBakeFail = window.__ssBakeFail || []).push(m);
+    try {
+      // a painter that threw after save()/translate()/clip()/'lighter' left
+      // all of it on the context; restore() past the stack is a no-op
+      for (let i = 0; i < 16; i++) c.restore();
+      c.globalCompositeOperation = 'source-over'; c.globalAlpha = 1; c.setLineDash([]);
+      c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, c.canvas.width, c.canvas.height);
+      if (base) c.setTransform(base);
+      if (fb) fb(c, w, h);
+    } catch (e2) { DIAG('bake fallback failed: ' + key + ' · ' + ((e2 && e2.message) || e2)); }
+  }
+  t.refresh();
+}
+function ssMakeTextures(scene) {
+  const R = ssTexRes(scene);
+  const ARTON = ART && SSART.ready;
+  const mk = (key, w, h, fn, r, fb) => {
+    if (scene.textures.exists(key)) return;
+    r = r || 1;
+    const cap = Math.min(1, ssMaxTex(scene) / Math.max(w * r, h * r));
+    const t = scene.textures.createCanvas(key, Math.round(w * r * cap), Math.round(h * r * cap));
+    t.context.scale(r * cap, r * cap);
+    ssBake(t, key, w, h, fn, fb);
+  };
+  mk('dot', 16, 16, (c, w, h) => {
+    const g = c.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
+    g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.4, 'rgba(255,255,255,0.5)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    c.fillStyle = g; c.fillRect(0, 0, w, h);
+  });
+  mk('glowbig', 256, 256, (c, w, h) => {
+    const g = c.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
+    g.addColorStop(0, 'rgba(255,255,255,0.8)'); g.addColorStop(0.55, 'rgba(255,255,255,0.18)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    c.fillStyle = g; c.fillRect(0, 0, w, h);
+  });
+  const tileTex = (key, top, bottom, edge) => mk(key, 128, 128, (c) => {
+    const r = 24;
+    c.beginPath(); c.roundRect(6, 6, 116, 116, r);
+    const g = c.createLinearGradient(0, 6, 0, 122);
+    g.addColorStop(0, top); g.addColorStop(1, bottom);
+    c.fillStyle = g; c.fill();
+    c.lineWidth = 3; c.strokeStyle = edge; c.stroke();
+    c.beginPath(); c.roundRect(12, 11, 104, 30, 16);
+    const g2 = c.createLinearGradient(0, 11, 0, 41);
+    g2.addColorStop(0, 'rgba(255,255,255,0.5)'); g2.addColorStop(1, 'rgba(255,255,255,0)');
+    c.fillStyle = g2; c.fill();
+    c.beginPath(); c.roundRect(10, 92, 108, 28, 14);
+    const g3 = c.createLinearGradient(0, 92, 0, 120);
+    g3.addColorStop(0, 'rgba(0,0,0,0)'); g3.addColorStop(1, 'rgba(60,40,10,0.22)');
+    c.fillStyle = g3; c.fill();
+  }, R);
+  // Painted tiles: one neutral glass face multiplied by the tier colour, with the gold rim
+  // composited on top untinted — a straight setTint would colour the rim too, and tint is a
+  // silent no-op under the Canvas renderer (the game boots Phaser.AUTO). Adding a bonus
+  // colour stays one line, same as the procedural path below.
+  // The 6px inset matches the procedural tile's roundRect(6,6,116,116): board and word-line
+  // gaps were tuned against that ~5% breathing room, and a full-bleed painted tile ate it —
+  // the board rows and the staged word visibly overlapped.
+  const tileArt = (key, color) => mk(key, 128, 128, (c, w, h) => {
+    const f = SSART.img.tile_face, o = SSART.img.tile_over;
+    c.drawImage(f, 6, 6, w - 12, h - 12);
+    c.globalCompositeOperation = 'multiply';
+    c.fillStyle = color; c.fillRect(0, 0, w, h);
+    c.globalCompositeOperation = 'destination-in';   // multiply floods the box; restore alpha
+    c.drawImage(f, 6, 6, w - 12, h - 12);
+    c.globalCompositeOperation = 'source-over';
+    c.drawImage(o, 6, 6, w - 12, h - 12);
+  }, R);
+  if (ARTON) {
+    tileArt('tile0', '#e2deec');   // plain
+    tileArt('tile1', '#ffcd6e');   // +6 value
+    tileArt('tile2', '#96d7ff');   // 1.5x word
+    tileArt('tile3', '#b4e698');   // dew — heals on the next cast
+    tileArt('tileblk', '#494263'); // blackout curse — the void face
+  } else {
+    tileTex('tile0', '#f7f1e2', '#dfd3b8', '#b8a67f');
+    tileTex('tile1', '#ffe9a8', '#e8b84b', '#a97c1c');
+    tileTex('tile2', '#e6f6ff', '#a8d9f2', '#5f9fc4');
+    tileTex('tile3', '#e9f8dc', '#a8e08a', '#5f9a48');
+    tileTex('tileblk', '#453f63', '#28233f', '#6b5fa8');
+  }
+  mk('veil', 8, 8, (c, w, h) => { c.fillStyle = '#060812'; c.fillRect(0, 0, w, h); });
+  // battle chrome, in the wordmark's dress: a ribbon behind the strikes line and
+  // framed troughs + gradient fills for the health bars (progress = setCrop)
+  mk('ribbon', 256, 40, (c, w, h) => {
+    c.beginPath(); c.roundRect(2, 2, w - 4, h - 4, (h - 4) / 2);
+    c.fillStyle = 'rgba(16,12,34,0.62)'; c.fill();
+    c.lineWidth = 1.5; c.strokeStyle = 'rgba(215,180,92,0.40)'; c.stroke();
+  }, R);
+  mk('bartrough', 256, 24, (c, w, h) => {
+    c.beginPath(); c.roundRect(1, 1, w - 2, h - 2, (h - 2) / 2);
+    c.fillStyle = '#10142a'; c.fill();
+    const g = c.createLinearGradient(0, 1, 0, h * 0.5);            // inner top shadow
+    g.addColorStop(0, 'rgba(0,0,0,0.5)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    c.fillStyle = g; c.fill();
+    c.lineWidth = 1.5; c.strokeStyle = 'rgba(215,180,92,0.5)'; c.stroke();
+  }, R);
+  const barFill = (key, top, bottom) => mk(key, 256, 16, (c, w, h) => {
+    c.beginPath(); c.roundRect(0, 0, w, h, h / 2);
+    const g = c.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, top); g.addColorStop(1, bottom);
+    c.fillStyle = g; c.fill();
+    c.beginPath(); c.roundRect(3, 1.5, w - 6, h * 0.4, h * 0.2);   // top sheen
+    const g2 = c.createLinearGradient(0, 0, 0, h * 0.45);
+    g2.addColorStop(0, 'rgba(255,255,255,0.45)'); g2.addColorStop(1, 'rgba(255,255,255,0)');
+    c.fillStyle = g2; c.fill();
+  }, R);
+  barFill('barfill-gold', '#ffe08d', '#b9924a');
+  barFill('barfill-rose', '#f2969b', '#b34d55');
+  // End-of-run window: midnight glass in a double gold frame. Drawn at the
+  // display aspect (~372x580) so the corners stay true when stretched.
+  mk('endpanel', 186, 290, (c, w, h) => {
+    c.beginPath(); c.roundRect(2.5, 2.5, w - 5, h - 5, 13);
+    const g = c.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, '#161d3e'); g.addColorStop(0.5, '#0f142c'); g.addColorStop(1, '#0b0f21');
+    c.fillStyle = g; c.fill();
+    c.lineWidth = 1.8; c.strokeStyle = '#c9a84c'; c.stroke();
+    c.beginPath(); c.roundRect(6, 6, w - 12, h - 12, 10);
+    c.lineWidth = 0.7; c.strokeStyle = 'rgba(215,180,92,0.45)'; c.stroke();
+    const g2 = c.createLinearGradient(0, 2.5, 0, 46);      // faint starlight sheen
+    g2.addColorStop(0, 'rgba(159,176,232,0.11)'); g2.addColorStop(1, 'rgba(159,176,232,0)');
+    c.beginPath(); c.roundRect(2.5, 2.5, w - 5, h - 5, 13); c.fillStyle = g2; c.fill();
+  }, R);
+  // the daily herald's chip — a small crimson pill with an ember rim, up in
+  // the home screen's corner where notifications live
+  mk('chipred', 128, 32, (c, w, h) => {
+    c.beginPath(); c.roundRect(1.5, 1.5, w - 3, h - 3, (h - 3) / 2);
+    const g = c.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, '#a32433'); g.addColorStop(0.55, '#7c1626'); g.addColorStop(1, '#570e1b');
+    c.fillStyle = g; c.fill();
+    c.lineWidth = 1.5; c.strokeStyle = 'rgba(255,138,110,0.6)'; c.stroke();
+    c.beginPath(); c.roundRect(6, 3.5, w - 12, h * 0.4, h * 0.22);
+    const g2 = c.createLinearGradient(0, 3, 0, h * 0.5);
+    g2.addColorStop(0, 'rgba(255,255,255,0.28)'); g2.addColorStop(1, 'rgba(255,255,255,0)');
+    c.fillStyle = g2; c.fill();
+  }, R);
+  /* THE STREAK LANTERN — the little iron-and-glass lamp that stands beside the
+     daily herald and carries the number of nights. FIVE baked textures rather
+     than one tinted image, because setTint is a silent no-op under the Canvas
+     renderer and the game boots either:
+
+       tier -1  cold          no streak — dark glass, dull iron
+       tier  0  lit           two nights and up — warm pane, ember bloom
+       tier  1  ember         SEVEN nights — embers drift up off the glass
+       tier  2  true lantern  THIRTY nights — gilded filigree, white-hot core,
+                              light spilling out in rays
+       tier  3  comet-crowned ONE HUNDRED nights — a comet arcs over the whole
+                              lamp, trailing sparks
+
+     The canvas is 60x84 for every tier and the lamp body itself is drawn into
+     the same 44x62 box at (8, 22) it always occupied — the extra margin exists
+     purely so the crowns have air to live in. Consumers display at 35x49,
+     which puts the lamp back at exactly the 26x36 it has been since v0.39.0.
+     No new art files: everything here is baked, like the rest of the game. */
+  const lantern = (key, tier) => mk(key, 60, 84, (c, W, H) => {
+    const lit = tier >= 0;
+    c.save();
+    c.translate(8, 22);                       // …into the original 44x62 box
+    const w = 44, h = 62;
+    // the iron warms as the flame grows: pewter cold, brass lit, pale gold at
+    // the marks. The cold pewter is deliberately pale: the lamp is 26x36 on a
+    // phone, against a dusk sky, and dark iron there simply disappears.
+    const iron = ['#8d96bd', '#c9a84c', '#d8b955', '#eccb6c', '#f6e08e'][tier + 1];
+    const irons = ['#4d5680', '#8a6a22', '#9b7826', '#b08c2e', '#c9a84c'][tier + 1];
+    // the ring and the hook it hangs from
+    c.lineWidth = 2.4; c.strokeStyle = iron;
+    c.beginPath(); c.arc(w / 2, 8, 4.6, Math.PI * 0.15, Math.PI * 0.85, true); c.stroke();
+    c.beginPath(); c.moveTo(w / 2 - 9, 15); c.lineTo(w / 2 + 9, 15); c.stroke();
+    // the cap
+    c.beginPath(); c.moveTo(w / 2 - 13, 20); c.lineTo(w / 2 + 13, 20); c.lineTo(w / 2 + 9, 14.5);
+    c.lineTo(w / 2 - 9, 14.5); c.closePath();
+    c.fillStyle = iron; c.fill();
+    // the glass: a tall pane between two posts
+    const gx = w / 2 - 12, gw = 24, gy = 20, gh = 30;
+    c.beginPath(); c.roundRect(gx, gy, gw, gh, 3.5);
+    if (lit) {
+      const g = c.createLinearGradient(0, gy, 0, gy + gh);
+      // each mark burns a shade whiter at the top — the same flame, fed longer
+      g.addColorStop(0, ['#fff0b8', '#fff6d2', '#fffdf0', '#ffffff'][tier]);
+      g.addColorStop(0.45, ['#ffb547', '#ffc45e', '#ffd980', '#ffe9a8'][tier]);
+      g.addColorStop(1, ['#e0761f', '#e88a26', '#f0a032', '#f6b648'][tier]);
+      c.fillStyle = g;
+    } else {
+      const g = c.createLinearGradient(0, gy, 0, gy + gh);
+      g.addColorStop(0, '#1b2140'); g.addColorStop(1, '#101534');
+      c.fillStyle = g;
+    }
+    c.fill();
+    if (!lit) {                                         // a cold pane is still GLASS: one slant of sky on it
+      c.save();
+      c.beginPath(); c.roundRect(gx, gy, gw, gh, 3.5); c.clip();
+      c.beginPath(); c.moveTo(gx + 3, gy); c.lineTo(gx + 10, gy); c.lineTo(gx + 3, gy + gh); c.lineTo(gx, gy + gh); c.closePath();
+      c.fillStyle = 'rgba(150,170,230,0.22)'; c.fill();
+      c.beginPath(); c.moveTo(gx + 13, gy); c.lineTo(gx + 16, gy); c.lineTo(gx + 9, gy + gh); c.lineTo(gx + 6, gy + gh); c.closePath();
+      c.fillStyle = 'rgba(150,170,230,0.1)'; c.fill();
+      c.restore();
+    }
+    if (lit) {                                          // the flame's bloom inside the pane
+      const b = c.createRadialGradient(w / 2, gy + gh * 0.62, 1, w / 2, gy + gh * 0.62, 15);
+      b.addColorStop(0, 'rgba(255,255,235,0.95)');
+      b.addColorStop(0.5, 'rgba(255,196,96,' + (0.45 + tier * 0.09) + ')');
+      b.addColorStop(1, 'rgba(255,150,60,0)');
+      c.beginPath(); c.roundRect(gx, gy, gw, gh, 3.5); c.fillStyle = b; c.fill();
+    }
+    c.lineWidth = 2; c.strokeStyle = iron;
+    c.beginPath(); c.roundRect(gx, gy, gw, gh, 3.5); c.stroke();
+    c.lineWidth = 1.6; c.strokeStyle = irons;           // corner posts
+    c.beginPath(); c.moveTo(gx + 1.2, gy + 1); c.lineTo(gx + 1.2, gy + gh - 1); c.stroke();
+    c.beginPath(); c.moveTo(gx + gw - 1.2, gy + 1); c.lineTo(gx + gw - 1.2, gy + gh - 1); c.stroke();
+    // the base
+    c.beginPath(); c.moveTo(w / 2 - 14, 56); c.lineTo(w / 2 + 14, 56); c.lineTo(w / 2 + 10, 49.5);
+    c.lineTo(w / 2 - 10, 49.5); c.closePath();
+    c.fillStyle = iron; c.fill();
+    // ---- tier 2+: gilded filigree on cap and base, and the light gets out ----
+    if (tier >= 2) {
+      c.lineWidth = 1.2; c.strokeStyle = '#ffe9a8';
+      for (const [cy, dir] of [[17.5, 1], [52.5, -1]]) {
+        c.beginPath();
+        c.moveTo(w / 2 - 15, cy); c.quadraticCurveTo(w / 2 - 7, cy + dir * 3.4, w / 2, cy);
+        c.quadraticCurveTo(w / 2 + 7, cy + dir * 3.4, w / 2 + 15, cy);
+        c.stroke();
+      }
+      c.save();                                          // rays of spilled light
+      c.globalCompositeOperation = 'lighter';
+      c.strokeStyle = 'rgba(255,214,132,0.4)'; c.lineWidth = 1.6;
+      for (const a of [-0.62, -0.24, 0.24, 0.62]) {
+        const dx = Math.sin(a), dy = Math.cos(a);
+        c.beginPath();
+        c.moveTo(w / 2 + dx * 15, gy + gh * 0.55 + dy * 2);
+        c.lineTo(w / 2 + dx * 27, gy + gh * 0.55 + dy * 13);
+        c.stroke();
+      }
+      c.restore();
+    }
+    c.restore();
+    /* ---- tier 1+: the lamp throws EMBERS ----
+       The first mark's whole job is to be legible at 26x36 in the corner of a
+       phone. A flame tuft on the cap was tried and failed: at that size it sat
+       inside the hanging ring and read as a smudge. Embers drifting up out of
+       the crown margin change the lamp's SILHOUETTE, which is the only thing
+       that survives being small. */
+    if (tier >= 1) {
+      c.save();
+      c.globalCompositeOperation = 'lighter';
+      const motes = [[-11, 14, 3.2, 0.85], [9, 8.5, 2.6, 0.7], [1.5, 2.8, 2.1, 0.5], [13.5, 17.5, 1.8, 0.45]];
+      for (const [dx, my, r, a] of motes.slice(0, tier >= 2 ? 4 : 3)) {
+        const ex = W / 2 + dx;
+        const g = c.createRadialGradient(ex, my, 0.2, ex, my, r);
+        g.addColorStop(0, 'rgba(255,255,236,' + a + ')');
+        g.addColorStop(0.42, 'rgba(255,196,96,' + (a * 0.62) + ')');
+        g.addColorStop(1, 'rgba(255,140,50,0)');
+        c.beginPath(); c.arc(ex, my, r, 0, Math.PI * 2); c.fillStyle = g; c.fill();
+      }
+      c.restore();
+    }
+    // ---- tier 3: the comet crown, arcing over the whole lamp ----
+    if (tier >= 3) {
+      c.save();
+      c.globalCompositeOperation = 'lighter';
+      // the tail: an arc that thins and fades as it sweeps back to the left
+      for (let i = 0; i < 26; i++) {
+        const t = i / 25;
+        const a = Math.PI * (1.06 - t * 0.62);           // left-to-right over the cap
+        const rx = 26, ry = 15;
+        const x = W / 2 + Math.cos(a) * rx, y = 27 + -Math.sin(a) * ry;
+        c.beginPath();
+        c.arc(x, y, 0.5 + t * 1.9, 0, Math.PI * 2);
+        c.fillStyle = 'rgba(255,' + Math.round(214 + t * 34) + ',' + Math.round(120 + t * 110) + ',' + (0.06 + t * 0.62) + ')';
+        c.fill();
+      }
+      // the head, with its own little bloom
+      const hx = W / 2 + Math.cos(Math.PI * 0.44) * 26, hy = 27 - Math.sin(Math.PI * 0.44) * 15;
+      const hg = c.createRadialGradient(hx, hy, 0.4, hx, hy, 6.5);
+      hg.addColorStop(0, 'rgba(255,255,255,1)'); hg.addColorStop(0.42, 'rgba(255,236,168,0.75)');
+      hg.addColorStop(1, 'rgba(255,190,90,0)');
+      c.beginPath(); c.arc(hx, hy, 6.5, 0, Math.PI * 2); c.fillStyle = hg; c.fill();
+      c.restore();
+    }
+  }, R, (c, W) => {
+    // the stand-in, should the painter above throw: straight lines only —
+    // a ring, cap, pane and base in the tier's colours, no gradients, no
+    // roundRect, nothing newer than the first canvas spec. A lamp, still.
+    const lit = tier >= 0, x = W / 2;
+    const iron = ['#8d96bd', '#c9a84c', '#d8b955', '#eccb6c', '#f6e08e'][tier + 1];
+    c.lineWidth = 2.4; c.strokeStyle = iron;
+    c.beginPath(); c.arc(x, 30, 4.6, Math.PI * 0.15, Math.PI * 0.85, true); c.stroke();
+    c.fillStyle = iron; c.fillRect(x - 13, 36.5, 26, 5.5);
+    c.fillStyle = lit ? ['#ffb547', '#ffc45e', '#ffd070', '#ffd980'][tier] : '#151a3a';
+    c.fillRect(x - 12, 42, 24, 30);
+    c.strokeStyle = iron; c.lineWidth = 2; c.strokeRect(x - 12, 42, 24, 30);
+    c.fillStyle = iron; c.fillRect(x - 14, 71.5, 28, 6.5);
+  });
+  lantern('lantern-cold', -1);
+  lantern('lantern-lit', 0);
+  lantern('lantern-m1', 1);
+  lantern('lantern-m2', 2);
+  lantern('lantern-m3', 3);
+  mk('panel', 256, 256, (c) => {
+    c.beginPath(); c.roundRect(4, 4, 248, 248, 22);
+    const g = c.createLinearGradient(0, 0, 0, 256);
+    g.addColorStop(0, '#f8f2e4'); g.addColorStop(1, '#e4d7ba');
+    c.fillStyle = g; c.fill();
+    c.lineWidth = 3; c.strokeStyle = '#a98d51'; c.stroke();
+    c.lineWidth = 1.5; c.strokeStyle = '#ffffffaa';
+    c.beginPath(); c.roundRect(8, 8, 240, 240, 18); c.stroke();
+  }, R);
+  // Painted buttons are authored 627x344, so the slot is 256x140 rather than the procedural
+  // 256x96 — that keeps the frame's vertical detail instead of pre-squashing it. Actual
+  // button consumers go through ssBtn(), which bakes an aspect-correct 9-slice per display
+  // size; this base texture remains for anything that grabs 'btn' directly.
+  if (ARTON) {
+    mk('btn', 256, 140, (c, w, h) => { c.drawImage(SSART.img.btn, 0, 0, w, h); }, R);
+    mk('btndark', 256, 140, (c, w, h) => { c.drawImage(SSART.img.btndark, 0, 0, w, h); }, R);
+  } else {
+    mk('btn', 256, 96, (c) => {
+      c.beginPath(); c.roundRect(4, 4, 248, 88, 46);
+      const g = c.createLinearGradient(0, 4, 0, 92);
+      g.addColorStop(0, '#ffdf8f'); g.addColorStop(0.5, '#f0b93e'); g.addColorStop(1, '#c98f1d');
+      c.fillStyle = g; c.fill();
+      c.lineWidth = 3; c.strokeStyle = '#8a6210'; c.stroke();
+      c.beginPath(); c.roundRect(14, 10, 228, 34, 20);
+      const g2 = c.createLinearGradient(0, 10, 0, 44);
+      g2.addColorStop(0, 'rgba(255,255,255,0.65)'); g2.addColorStop(1, 'rgba(255,255,255,0)');
+      c.fillStyle = g2; c.fill();
+    }, R);
+    mk('btndark', 256, 96, (c) => {
+      c.beginPath(); c.roundRect(4, 4, 248, 88, 46);
+      c.fillStyle = '#161d38'; c.fill();
+      c.lineWidth = 2.5; c.strokeStyle = '#4a5a8c'; c.stroke();
+    }, R);
+  }
+}
+
+// Label colour for text sitting on a 'btn'. The procedural button is light gold, the painted
+// one is dark navy — every gold-button label has to flip with it.
+const BTN_INK = () => (ART && SSART.ready ? '#f4e6bd' : '#4a3305');
+const BTN_INK2 = () => (ART && SSART.ready ? '#c9b48a' : '#7a6535');
+
+// Time until the next daily, worded by the current language. Minutes round UP
+// so the label never sits on "0m" — it reads 1m, then the sky turns over.
+// Each language owns cdHM/cdH/cdM: ja wants no space, de wants 'Std', fr spaces 'min'.
+function ssCountdown(ms) {
+  const mins = Math.max(1, Math.ceil(ms / 60000));
+  const h = Math.floor(mins / 60), m = mins % 60;
+  if (!h) return SS_T('cdM', m);
+  return m ? SS_T('cdHM', h, m) : SS_T('cdH', h);   // "1h", not "1h 0m"
+}
+
+// The live countdown for the leaderboard / daily pre-screen — same wording at
+// hour scale, but under an hour it ticks in seconds so the deadline visibly
+// moves, and above a day it speaks in days (the weekly board needs them).
+function ssCountdownLive(ms) {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const d = Math.floor(s / 86400), h = Math.floor(s / 3600) % 24, m = Math.floor(s / 60) % 60, sec = s % 60;
+  if (d) return h ? SS_T('cdDH', d, h) : SS_T('cdD', d);
+  if (h) return m ? SS_T('cdHM', h, m) : SS_T('cdH', h);
+  if (m) return SS_T('cdMS', m, sec);
+  return SS_T('cdS', sec);
+}
+
+// The daily chip's clock: bare digits, H:MM:SS — reads in every language and
+// visibly moves every second, which is the whole point of a live herald.
+function ssClock(ms) {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const p = (n) => String(n).padStart(2, '0');
+  return Math.floor(s / 3600) + ':' + p(Math.floor(s / 60) % 60) + ':' + p(s % 60);
+}
+
+/* ---- THE STREAK: the lantern's fuel ---------------------------------------
+   One number the player built, and the only thing in the game that a missed
+   night can take away. Every calendar day (SSNET.dayKey — the game's one day
+   clock, UTC, the same one that chooses the sky) on which a daily hunt run is
+   completed feeds it. Twice in a night counts once; a missed night puts it
+   out.
+   Day keys are YYYYMMDD integers, so the distance between two of them is
+   calendar arithmetic, not a subtraction — 20260901 minus 20260831 is 70. */
+function ssDayKeyMs(k) {
+  k = k | 0;
+  return Date.UTC(Math.floor(k / 10000), (Math.floor(k / 100) % 100) - 1, k % 100);
+}
+// whole days from key `a` to key `b` (negative if b is earlier). Infinity when
+// there is no `a` at all — "never hunted" is not a one-day gap.
+function ssDayGap(a, b) {
+  if (!a || !b) return Infinity;
+  return Math.round((ssDayKeyMs(b) - ssDayKeyMs(a)) / 86400000);
+}
+// the day key `d` days from `k` — calendar arithmetic again, never +/- 1 on
+// the integer (20260901 - 1 is not a date)
+function ssDayKeyStep(k, d) { return SSNET.dayKey(new Date(ssDayKeyMs(k) + d * 86400000)); }
+
+/* The streak AS IT STANDS TODAY, and how it is standing. A flame last fed
+   yesterday is still burning — tonight's sky is up, go keep it. One night
+   older and it is the GRACE NIGHT holding it up: the net is not spent by the
+   miss, it is spent by the hunt that needs it, so the lantern must show the
+   flame alive while the player still has a chance to come back for it.
+   Anything older than that is cold — grace bridges a night, never a vacation
+   — and the stored count is simply not shown (it stays put until the next
+   hunt overwrites it, which is what let the grace reach it in the first
+   place). A clock that ran backwards (gap < 0) is never punished.
+   Returns {n, grace, held, gp}: n as it should be READ tonight, grace true
+   when only the net is keeping it, held whether one is in hand, gp how far
+   along the five nights that re-earn a spent one. */
+function ssStreakState(dk) {
+  const s = SS.prof && SS.prof.streak;
+  const out = { n: 0, grace: false, held: 0, gp: 0 };
+  if (!s) return out;
+  out.held = s.g | 0; out.gp = s.gp | 0;
+  if (!(s.n > 0) || !s.last) return out;
+  const gap = ssDayGap(s.last, dk || SSNET.dayKey());
+  if (gap <= 1) out.n = s.n;
+  else if (gap === 2 && out.held > 0) { out.n = s.n; out.grace = true; }
+  return out;
+}
+function ssStreakCount(dk) { return ssStreakState(dk).n; }
+/* Tonight's hunt is done: feed the flame. Returns
+   {n, ev, grace, ms, marks, held, gp} where ev is 'lit' (the very first
+   night), 'extended', 'graced' (a missed night bridged by the safety net),
+   'relit' (a cold flame started over) or 'same' (already counted tonight —
+   playing twice is still one day); grace is true when this hunt SPENT the
+   net; ms is the mark this hunt just crossed (0 for none) and marks every
+   mark the streak now satisfies (the caller awards those, so a player who
+   arrives already deep into a streak collects what they earned). */
+function ssStreakNote() {
+  const s = SS.prof.streak, dk = SSNET.dayKey(), gap = ssDayGap(s.last, dk);
+  let ev, grace = false;
+  if (gap <= 0) ev = 'same';                                  // today, or a clock that slipped back
+  else if (gap === 1) { s.n = (s.n | 0) + 1; ev = 'extended'; }
+  else if (gap === 2 && (s.g | 0) > 0) {
+    // THE GRACE NIGHT, spent. The bridged day is written down so the week
+    // strip can own up to it — the streak survived, but not untouched.
+    const bridged = ssDayKeyStep(s.last, 1);
+    s.gd = (s.gd || []).filter((k) => k !== bridged);
+    s.gd.push(bridged); s.gd = s.gd.slice(-14);
+    s.g = 0; s.gp = 0;
+    s.n = (s.n | 0) + 1; ev = 'graced'; grace = true;
+  } else {
+    // A streak that is BORN starts holding a grace — the very first hunt ever,
+    // and equally the one that restarts a flame that went out. The night after
+    // a break is exactly when a player walks away for good, and handing the
+    // net back there is the whole point of this feature. Never two, ever: it
+    // is SET, not incremented, and a streak already holding one is unchanged.
+    ev = s.last ? 'relit' : 'lit'; s.n = 1; s.mk = 0; s.g = 1; s.gp = 0;
+  }
+  if (ev !== 'same') {
+    s.last = dk;
+    // five nights hunted walk a spent grace back. The bridging hunt itself is
+    // not one of them: the net is re-earned AFTER it saves you, not by it.
+    if (!(s.g | 0) && !grace) {
+      s.gp = (s.gp | 0) + 1;
+      if (s.gp >= SS_GRACE_EARN) { s.g = 1; s.gp = 0; }
+    }
+  }
+  if (s.n > (s.best | 0)) s.best = s.n;
+  // THE MARKS. mk is the highest one this run of the streak has celebrated,
+  // so each crossing rings exactly once — and a streak that broke may earn
+  // its marks again on the climb back up, because that climb was real too.
+  let ms = 0;
+  for (const m of SS_MILESTONES) if (s.n >= m && (s.mk | 0) < m) { ms = m; s.mk = m; }
+  if (ms) s.pend = ms;                       // honoured on the meadow, not here
+  return { n: s.n, ev, grace, ms, held: s.g | 0, gp: s.gp | 0,
+    marks: SS_MILESTONES.filter((m) => s.n >= m) };
+}
+/* THE GRACE NIGHT, in one sentence, wherever it is read — the lantern sheet,
+   the daily notice board and the end screen all borrow this so the game never
+   tells the story two ways. Three states, and the wording never pretends:
+     held    · one is in hand, a missed night will not put the flame out
+     bridge  · last night WAS missed and the net is what is holding it up
+     spent   · "grace night held — re-earned in N more hunts" */
+function ssGraceLine(st) {
+  st = st || ssStreakState();
+  if (st.grace) return { text: '◌ ' + SS_T('stkGraceBridge'), color: '#ffb457', glow: '#a8520d' };
+  if (st.held > 0) return { text: '◌ ' + SS_T('stkGraceHeld'), color: '#c9b676' };
+  const left = Math.max(1, SS_GRACE_EARN - (st.gp | 0));
+  return { text: '◌ ' + SS_T(left === 1 ? 'stkGraceSpent1' : 'stkGraceSpent', left), color: '#8a94c4' };
+}
+// a mark's own words: its name and what the lantern just grew
+function ssMarkCopy(m) {
+  return { name: SS_T('stkMs' + m), sub: SS_T('stkMsSub' + m), ach: SS_MS_ACH[m] };
+}
+/* which dress the lamp wears: -1 cold, 0 lit, 1/2/3 the marks.
+   Lit from the FIRST night. The end screen says "the lantern is lit" after
+   the very first hunt and the cold sheet promises "tonight's hunt lights it",
+   and until v0.45.0 the meadow then showed the COLD lamp for a night — at
+   phone size, half-transparent iron against the dusk is a gray rectangle
+   (TestFlight v0.43.0, Wyatt's first daily). The count in the glass still
+   starts at two; a lone "1" is not a number worth printing. */
+function ssLanternTier(n) {
+  if (!(n >= 1)) return -1;
+  let t = 0;
+  SS_MILESTONES.forEach((m, i) => { if (n >= m) t = i + 1; });
+  return t;
+}
+const SS_LANTERN_TEX = ['lantern-cold', 'lantern-lit', 'lantern-m1', 'lantern-m2', 'lantern-m3'];
+/* How the lamp is worn (the streak sheet and the mark rite draw it — the
+   meadow no longer does, v0.86.0). The texture is 60x84 with the lamp body
+   itself drawn into a 44x62 box at (8, 22); 35x49 puts that body back at
+   exactly the 26x36 it has been since v0.39.0, and the 13 units above it are
+   the crowns' room. SS_LANTERN_TY is where the glass pane's middle sits
+   relative to the IMAGE's centre, which is where the night count rides at any
+   scale. */
+const SS_LANTERN_W = 35, SS_LANTERN_H = 49, SS_LANTERN_TY = 8.75;
+/* THE LAST SEVEN NIGHTS, oldest first — what the week strip draws.
+   Each entry is {k, state} with state 'lit' (the daily log holds a score for
+   that day), 'grace' (a grace night bridged it), 'open' (tonight, still
+   unhunted — the one ring the player can still change) or 'dark'. The local
+   daily score log IS the completion list, which is why this needs nothing
+   from the network. */
+function ssStreakWeek(dk) {
+  const today = dk || SSNET.dayKey();
+  const s = (SS.prof && SS.prof.streak) || {};
+  const gd = s.gd || [];
+  const log = (SS.prof && SS.prof.daily) || {};
+  const out = [];
+  for (let i = 6; i >= 0; i--) {
+    const k = i ? ssDayKeyStep(today, -i) : today;
+    const state = log[String(k)] ? 'lit' : gd.indexOf(k) >= 0 ? 'grace' : i === 0 ? 'open' : 'dark';
+    out.push({ k, state });
+  }
+  return out;
+}
+/* ---- THE SKY WHEEL (v0.108.0) ---------------------------------------------
+   SEVEN SKIES FOR SEVEN DAYS (Skylar 9/22, build GO 9/24): each weekday the
+   daily wears a different sky — its own name, its one-line law, its own rule
+   — opening gently on Monday and climbing rung by rung to Sunday's summit.
+   THIS block is the spine the week stands on: the calendar resolver, the
+   registry, the sub-stream door, and the band/glyph dress. The seven skies
+   themselves land in their own wave cards, each seating its def below.
+   THE LAWS (the design page §II):
+   · A sky's IDENTITY is the calendar's — weekday(dayKey), pure UTC
+     arithmetic off the key itself, never the local clock (the ?daykey seam
+     steers it in tests, ssDayKeyMs already speaks pure UTC).
+   · INTERIM: a day whose sky card has not shipped resolves to NULL — the
+     stock daily, byte-for-byte; the wave cards flip their days live as they
+     land, and an unbuilt sky is never named or promised on any surface.
+   · SHARED-FAIR, UNTOUCHED: any roll a sky ever needs rides its OWN mulberry
+     stream off a dayKey-rooted seed ^ its constant (ssSkyRng — the
+     ssOfferTypes pattern); the main seeded stream is consumed exactly as
+     today, so the deal, the sigil schedule and the dew never move.
+   · ONE FLAG, ONE READER: Battle.create resolves `this.sky` ONCE beside
+     `this.hard`; the scene reads it where it reads its modifiers. No sky
+     adds a second battle scene.
+   A seated def carries: id · nameKey/lineKey (its two strings ×5, shipped
+   with ITS card) · glyph(c, s) — a canvas draw for the band's emblem, a
+   48-pt box — plus whatever rule fields its readers key on. */
+const SS_SKY_WHEEL = [null, null, null, null, null, null, null];   // Mon … Sun
+const SS_SKY_RIBBON_MS = 4000;   // how long the battle's herald ribbon speaks
+function ssSkyWeekday(dayKey) {
+  const dow = new Date(ssDayKeyMs(dayKey)).getUTCDay();   // 0 Sun … 6 Sat
+  return dow === 0 ? 7 : dow;                             // rung: 1 Mon … 7 Sun
+}
+function ssSkyToday() {
+  const rung = ssSkyWeekday(SSNET.dayKey());
+  const def = SS_SKY_WHEEL[rung - 1];
+  return def ? Object.assign({ rung }, def) : null;
+}
+// a sky's private dice: its own mulberry off the day itself — never the main
+// seeded stream (the rng-ORDER law: the shared deal must not move), never
+// Math.random (same-language hunters share one sky). Salt with the sky's own
+// constant; a per-language roll folds ssPackSeed(lang) into the salt too.
+function ssSkyRng(salt) { return ssMulberry(((SSNET.dayKey() ^ salt) >>> 0) || 1); }
+/* the band's emblem, drawn — the stock daily wears the shared sun; a seated
+   sky brings its own glyph(c, s) draw. R-scaled canvas texture, consumed via
+   setDisplaySize (the ssMedalTex rule). */
+function ssSkyGlyphTex(scene, sky) {
+  const key = 'skyglyph-' + (sky ? sky.id : 'stock');
+  if (scene.textures.exists(key)) return key;
+  const R = ssTexRes(scene), S = 48;
+  const t = scene.textures.createCanvas(key, Math.round(S * R), Math.round(S * R));
+  const c = t.context;
+  c.scale(R, R);
+  if (sky && sky.glyph) sky.glyph(c, S);
+  else {
+    // the classic sky, one sun over all: gold disc, eight rays, a faint halo
+    const cx = S / 2, cy = S / 2;
+    c.strokeStyle = 'rgba(255,215,122,0.85)'; c.lineWidth = 1.6; c.lineCap = 'round';
+    for (let i = 0; i < 8; i++) {
+      const a = i * Math.PI / 4 + Math.PI / 8;
+      c.beginPath(); c.moveTo(cx + Math.cos(a) * 13.5, cy + Math.sin(a) * 13.5);
+      c.lineTo(cx + Math.cos(a) * 19, cy + Math.sin(a) * 19); c.stroke();
+    }
+    const g = c.createLinearGradient(0, cy - 9, 0, cy + 9);
+    g.addColorStop(0, '#fff3c9'); g.addColorStop(0.55, '#ffd77a'); g.addColorStop(1, '#c9963f');
+    c.beginPath(); c.arc(cx, cy, 9, 0, Math.PI * 2); c.fillStyle = g; c.fill();
+    c.lineWidth = 1.2; c.strokeStyle = '#e6c87e'; c.stroke();
+    c.beginPath(); c.arc(cx, cy, 15.5, 0, Math.PI * 2);
+    c.strokeStyle = 'rgba(232,199,106,0.28)'; c.lineWidth = 1; c.stroke();
+  }
+  t.refresh();
+  return key;
+}
+// the sky band's ground — the sheet rules' 316 width, a whisper of gold
+function ssSkyBandTex(scene) {
+  const key = 'skyband';
+  if (scene.textures.exists(key)) return key;
+  const R = ssTexRes(scene), W = 316, H = 56;
+  const t = scene.textures.createCanvas(key, Math.round(W * R), Math.round(H * R));
+  const c = t.context;
+  c.scale(R, R);
+  c.beginPath(); c.roundRect(1, 1, W - 2, H - 2, 10);
+  const g = c.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, 'rgba(232,199,106,0.10)'); g.addColorStop(1, 'rgba(232,199,106,0.03)');
+  c.fillStyle = g; c.fill();
+  c.lineWidth = 1.4; c.strokeStyle = 'rgba(232,199,106,0.5)'; c.stroke();
+  t.refresh();
+  return key;
+}
+
+/* ---- WAVE ONE · THE GENTLE HALF (v0.109.0) --------------------------------
+   The week's first three skies take their seats — Monday's gift, Tuesday's
+   guest, Wednesday's discipline. The harsh half (Thu–Sun) seats below in its
+   own wave block (v0.110.0) — the week is whole. Each def is
+   read by the chrome above (band/ribbon/title/share) and by the battle's
+   own modifier sites; the rule fields:
+     gild    — Monday: ssSkyGildLetter() resolves the day's gold at Battle
+               create; wordDamage pays it ×3, spawnTile dresses it.
+     borrow  — Tuesday: ssSkyBorrowSign() lends the run this.sign at the
+               GUEST level (SS_SKY_SIGN_LV) — powers/emblem/toasts read it,
+               and every settle site is gated on signBorrowed (no sign XP,
+               no sign record: a guest, not a birth).
+     minLen  — Wednesday: the shortest word CAST will fly (castMinLen —
+               button, cast and solver share the one test).
+     fuseAdd — Wednesday: every beast's fuse runs this many casts longer. */
+const SS_SKY_SIGN_LV = 1;   // the borrowed sign's level — the same for every hunter (fairness IS the amendment's defense)
+// Monday's gold: one bag-weighted letter per language per day, rolled on the
+// sky's OWN stream (dayKey ^ pack salt ^ its constant — the shared deal never
+// moves). Picking a slot in the bag itself IS the bag-count weighting, so the
+// gilded letter is one you will actually meet; the digraph map keeps the roll
+// speaking the same glyphs the tiles do (q → qu).
+function ssSkyGildLetter() {
+  const r = ssSkyRng(ssPackSeed(PACK.lang) ^ 0x611d);
+  const ch = BAG[Math.floor(r() * BAG.length)];
+  return PACK.digraph[ch] || ch;
+}
+/* Tuesday's guest: ONE sign over the whole world — deliberately UNSALTED by
+   language, the communal beat is the point — walking the zodiac one sign per
+   week by pure UTC arithmetic off the dayKey itself. The walk, not a roll,
+   makes the card's promise structural: twelve DIFFERENT Tuesdays before one
+   repeats, in the wheel's own order, aries onward. (A rolled sign is one
+   line: SS_ZODIAC[Math.floor(ssSkyRng(0xb0a7)() * 12)].id — surprise over
+   certainty, repeats possible.) */
+function ssSkyBorrowSign() {
+  const w = Math.floor(ssDayKeyMs(SSNET.dayKey()) / 604800000);   // whole weeks since epoch
+  return SS_ZODIAC[((w % 12) + 12) % 12].id;
+}
+/* Monday's dress — gold leaf laid over the tile face: a warm wash, a double
+   gold ring hugging the face's own inset (roundRect(6,6,116,116) r24 is the
+   tile bake's geometry), a small pressed diamond at each edge's middle, and
+   light caught along the top. An OVERLAY, never a face: the tier beneath
+   (plain, gilded, star, dew) keeps telling its own story, and the blackout
+   simply fades the leaf away with the rest of the light. R-scaled canvas
+   texture consumed via setDisplaySize (the ssMedalTex rule). */
+function ssSkyLeafTex(scene) {
+  const key = 'skyleaf';
+  if (scene.textures.exists(key)) return key;
+  const R = ssTexRes(scene), S = 128;
+  const t = scene.textures.createCanvas(key, Math.round(S * R), Math.round(S * R));
+  const c = t.context;
+  c.scale(R, R);
+  c.beginPath(); c.roundRect(8, 8, 112, 112, 22);
+  const g = c.createLinearGradient(0, 8, 0, 120);
+  g.addColorStop(0, 'rgba(255,215,122,0.16)'); g.addColorStop(0.5, 'rgba(255,190,80,0.06)'); g.addColorStop(1, 'rgba(200,140,40,0.13)');
+  c.fillStyle = g; c.fill();
+  c.beginPath(); c.roundRect(10, 10, 108, 108, 21);
+  c.lineWidth = 5; c.strokeStyle = 'rgba(201,150,63,0.92)'; c.stroke();
+  c.beginPath(); c.roundRect(13.5, 13.5, 101, 101, 18);
+  c.lineWidth = 2; c.strokeStyle = 'rgba(255,233,168,0.9)'; c.stroke();
+  for (const [dx, dy] of [[64, 12], [64, 116], [12, 64], [116, 64]]) {
+    c.beginPath(); c.moveTo(dx, dy - 6); c.lineTo(dx + 6, dy); c.lineTo(dx, dy + 6); c.lineTo(dx - 6, dy); c.closePath();
+    c.fillStyle = '#c9963f'; c.fill();
+    c.beginPath(); c.moveTo(dx, dy - 3.2); c.lineTo(dx + 3.2, dy); c.lineTo(dx, dy + 3.2); c.lineTo(dx - 3.2, dy); c.closePath();
+    c.fillStyle = '#ffe9a8'; c.fill();
+  }
+  c.beginPath(); c.roundRect(18, 15, 92, 20, 10);
+  const g2 = c.createLinearGradient(0, 15, 0, 35);
+  g2.addColorStop(0, 'rgba(255,255,255,0.22)'); g2.addColorStop(1, 'rgba(255,255,255,0)');
+  c.fillStyle = g2; c.fill();
+  t.refresh();
+  return key;
+}
+// MONDAY · rung 1 · THE LETTERS — a pure gift that teaches the week's grammar
+SS_SKY_WHEEL[0] = {
+  id: 'gild', nameKey: 'skyGildName', lineKey: 'skyGildLine', gild: true,
+  glyph: (c, s) => {
+    // the design page's own sigil: a gilded tile haloed by eight rays
+    c.strokeStyle = '#ffd77a'; c.lineWidth = 1.4; c.lineCap = 'round';
+    for (const [x1, y1, x2, y2] of [[24, 2, 24, 7], [24, 41, 24, 46], [2, 24, 7, 24], [41, 24, 46, 24],
+      [8, 8, 11.5, 11.5], [36.5, 36.5, 40, 40], [40, 8, 36.5, 11.5], [11.5, 36.5, 8, 40]]) {
+      c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.stroke();
+    }
+    c.beginPath(); c.roundRect(10, 10, 28, 28, 6);
+    c.fillStyle = '#1a2142'; c.fill();
+    c.lineWidth = 1.6; c.strokeStyle = '#e8c76a'; c.stroke();
+    c.font = 'bold 17px Georgia'; c.textAlign = 'center'; c.fillStyle = '#ffe9a8';
+    c.fillText('A', 24, 31);
+  },
+};
+// TUESDAY · rung 2 · THE HUNTER — the whole world born under one sign
+SS_SKY_WHEEL[1] = {
+  id: 'sign', nameKey: 'skySignName', lineKey: 'skySignLine', borrow: true,
+  glyph: (c, s) => {
+    // the zodiac wheel, one tick lit: whose Tuesday is it?
+    c.strokeStyle = '#8a94c4'; c.lineWidth = 1.4;
+    c.beginPath(); c.arc(24, 24, 17, 0, Math.PI * 2); c.stroke();
+    c.lineWidth = 1.2;
+    for (let i = 0; i < 12; i++) {
+      const a = i * Math.PI / 6, ca = Math.cos(a), sa = Math.sin(a);
+      c.beginPath(); c.moveTo(24 + 14 * ca, 24 + 14 * sa); c.lineTo(24 + 17 * ca, 24 + 17 * sa); c.stroke();
+    }
+    c.strokeStyle = '#ffd77a'; c.lineWidth = 2.4; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(24, 10); c.lineTo(24, 7); c.stroke();
+    c.globalAlpha = 0.9; c.fillStyle = '#ffd77a';
+    c.beginPath(); c.arc(24, 24, 4.5, 0, Math.PI * 2); c.fill();
+    c.globalAlpha = 0.5; c.lineWidth = 0.8;
+    c.beginPath(); c.arc(24, 24, 8.5, 0, Math.PI * 2); c.stroke();
+    c.globalAlpha = 1;
+  },
+};
+// WEDNESDAY · rung 3 · WHAT MAY BE CAST — the first sky that says no
+SS_SKY_WHEEL[2] = {
+  id: 'road', nameKey: 'skyRoadName', lineKey: 'skyRoadLine', minLen: 5, fuseAdd: 1,
+  glyph: (c, s) => {
+    // five tiles rising along a dashed road toward one star
+    c.strokeStyle = '#8a94c4'; c.lineWidth = 1.2; c.setLineDash([2.5, 3]);
+    c.beginPath(); c.moveTo(5, 40); c.quadraticCurveTo(18, 34, 26, 37); c.quadraticCurveTo(34, 40, 45, 30); c.stroke();
+    c.setLineDash([]);
+    c.fillStyle = '#1a2142'; c.strokeStyle = '#e8c76a'; c.lineWidth = 1.4;
+    for (const [x, y] of [[3, 26], [12, 24], [21, 22], [30, 20], [39, 18]]) {
+      c.beginPath(); c.roundRect(x, y, 8, 8, 2); c.fill(); c.stroke();
+    }
+    c.fillStyle = '#ffd77a';
+    c.beginPath(); c.arc(43, 14, 2.2, 0, Math.PI * 2); c.fill();
+  },
+};
+
+/* ---- WAVE TWO · THE HARSH HALF (v0.110.0) ---------------------------------
+   The climb's second half — Thursday's rationing, Friday's teeth, Saturday's
+   clock, Sunday's summit. The week is whole; no seat resolves NULL any more.
+   Rule fields the battle keys on:
+     ash     — Thursday: cast cells do not refill (they cool as ash,
+               skyAshSettle/fillBoard) until the fight's beast falls — the
+               next deal is 16 fresh — or the SCRY sweeps the whole board
+               (its price untouched: it still hastens the strike).
+     dying   — Friday: each felled beast blacks out the first letter of its
+               own name (already dark → the curse walks to the name's next
+               letter). The ladder is precomputed from the day's own fight
+               list at create — fight order, no rng — so the whole world
+               darkens in the same order; spawnTile births cursed letters
+               dark and the standing blk law pays them 0.
+     clockMs — Saturday: the v0.70 strike-clock ENGINE rides the daily at
+               the sky's OWN pace (SS_SKY_FALL_MS — never a re-dial of
+               SS_HARD): this.strikeMs is the one clock truth every engine
+               site reads; everything else hard does (the ×1.5 tally, the
+               sparser cadence, the boss knobs, the boards' ⚑) stays keyed
+               on this.hard and does not ride.
+     court   — Sunday: the deal replaced wholesale ON THE SAME main-stream
+               draws (same count, different pool): four kings drawn
+               tempered, then the fixed crown. The stream stays in step;
+               the whole world shares one court. */
+const SS_SKY_FALL_MS = 12000;   // Saturday's clock — its own dial (Q3 ★: a shade kinder than hard's 10s; SS_HARD is never re-dialed)
+/* Thursday's dress — what a burned cell keeps: a low heap of cooling ash
+   where the star stood, settled dust, two embers not quite dead. Drawn low
+   in the tile box so the cell reads EMPTY at a glance (never a castable
+   face) while the board plainly remembers the word that burned there.
+   R-scaled canvas texture consumed via setDisplaySize (the ssMedalTex
+   rule); the greys are the design page's own ash inks. */
+function ssSkyAshTex(scene) {
+  const key = 'skyash';
+  if (scene.textures.exists(key)) return key;
+  const R = ssTexRes(scene), S = 128;
+  const t = scene.textures.createCanvas(key, Math.round(S * R), Math.round(S * R));
+  const c = t.context;
+  c.scale(R, R);
+  const mound = (x, y, w, h, ink) => {
+    c.beginPath(); c.moveTo(x - w / 2, y);
+    c.quadraticCurveTo(x - w * 0.22, y - h, x + w * 0.12, y - h * 0.72);
+    c.quadraticCurveTo(x + w * 0.34, y - h * 0.9, x + w / 2, y);
+    c.closePath(); c.fillStyle = ink; c.fill();
+  };
+  // the settled drift along the cell's floor, then the heaps upon it
+  c.globalAlpha = 0.85;
+  mound(64, 106, 92, 14, '#2e2940');
+  mound(46, 104, 46, 22, '#4a4358');
+  mound(80, 105, 40, 17, '#443d52');
+  mound(64, 103, 22, 26, '#57506a');
+  c.globalAlpha = 0.9; c.fillStyle = '#6a6378';
+  for (const [x, y, r] of [[34, 92, 1.6], [72, 86, 1.3], [92, 94, 1.5], [56, 82, 1.1], [83, 99, 1]]) {
+    c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
+  }
+  // two embers still breathing under the grey
+  for (const [x, y, r] of [[52, 98, 1.8], [76, 101, 1.4]]) {
+    c.beginPath(); c.arc(x, y, r * 2.4, 0, Math.PI * 2); c.fillStyle = 'rgba(255,110,60,0.18)'; c.fill();
+    c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fillStyle = '#c96a3a'; c.fill();
+  }
+  c.globalAlpha = 1;
+  t.refresh();
+  return key;
+}
+// THURSDAY · rung 4 · THE BOARD — the first genuinely thinky sky: rationing
+SS_SKY_WHEEL[3] = {
+  id: 'ash', nameKey: 'skyAshName', lineKey: 'skyAshLine', ash: true,
+  glyph: (c, s) => {
+    // the design page's own sigil: a board losing tiles, ash where they stood
+    c.strokeStyle = '#8a94c4'; c.lineWidth = 1.2; c.fillStyle = '#1a2142';
+    for (const [x, y] of [[8, 8], [20, 8], [32, 8], [8, 20], [32, 20], [20, 32]]) {
+      c.beginPath(); c.roundRect(x, y, 8, 8, 1.5); c.fill(); c.stroke();
+    }
+    c.fillStyle = '#4a4358';
+    c.beginPath(); c.moveTo(21, 21); c.lineTo(27, 21); c.lineTo(25.5, 24); c.lineTo(22, 25); c.closePath(); c.fill();
+    c.beginPath(); c.moveTo(9, 33); c.lineTo(15, 34); c.lineTo(13, 38); c.lineTo(10, 37); c.closePath(); c.fill();
+    c.beginPath(); c.moveTo(33, 33); c.lineTo(39, 33); c.lineTo(38, 37); c.lineTo(34, 37); c.closePath(); c.fill();
+    c.fillStyle = '#6a6378';
+    for (const [x, y, r] of [[24, 26.5, 0.9], [12, 38, 0.9], [36, 38.5, 0.9], [27, 23, 0.7]]) {
+      c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
+    }
+  },
+};
+// FRIDAY · rung 5 · THE BEASTS — the week's teeth: the sky loses its letters
+SS_SKY_WHEEL[4] = {
+  id: 'name', nameKey: 'skyDyingName', lineKey: 'skyDyingLine', dying: true,
+  glyph: (c, s) => {
+    // a beast's asterism struck out, its letter dead beneath it
+    c.strokeStyle = '#8a94c4'; c.lineWidth = 1;
+    for (const [x1, y1, x2, y2] of [[10, 14, 22, 10], [22, 10, 34, 16], [22, 10, 26, 24]]) {
+      c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.stroke();
+    }
+    c.fillStyle = '#ffe9c9';
+    for (const [x, y, r] of [[10, 14, 2.4], [34, 16, 2], [26, 24, 1.8]]) {
+      c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
+    }
+    c.strokeStyle = '#ff9d88'; c.lineWidth = 1.6; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(18.5, 6.5); c.lineTo(25.5, 13.5); c.stroke();
+    c.beginPath(); c.moveTo(25.5, 6.5); c.lineTo(18.5, 13.5); c.stroke();
+    c.font = '15px Georgia'; c.textAlign = 'center'; c.fillStyle = '#5b6494';
+    c.fillText('V', 17, 42);
+    c.strokeStyle = '#5b6494'; c.lineWidth = 1.1;
+    c.beginPath(); c.moveTo(24, 34); c.lineTo(30, 42); c.stroke();
+    c.beginPath(); c.moveTo(30, 34); c.lineTo(24, 42); c.stroke();
+  },
+};
+// SATURDAY · rung 6 · THE CLOCK — hard's engine under the daily's fairness
+SS_SKY_WHEEL[5] = {
+  id: 'fall', nameKey: 'skyFallName', lineKey: 'skyFallLine', clockMs: SS_SKY_FALL_MS,
+  glyph: (c, s) => {
+    // a clock face under a falling star
+    c.strokeStyle = '#8a94c4'; c.lineWidth = 1.3;
+    c.beginPath(); c.arc(24, 26, 15, 0, Math.PI * 2); c.stroke();
+    c.strokeStyle = '#ffb066'; c.lineWidth = 1.8; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(24, 26); c.lineTo(24, 15); c.stroke();
+    c.beginPath(); c.moveTo(24, 26); c.lineTo(31, 30); c.stroke();
+    c.strokeStyle = '#ffd77a'; c.lineWidth = 2;
+    c.beginPath(); c.moveTo(43, 5); c.lineTo(33, 15); c.stroke();
+    c.globalAlpha = 0.7; c.lineWidth = 1.2;
+    c.beginPath(); c.moveTo(46, 10); c.lineTo(38, 18); c.stroke();
+    c.globalAlpha = 1; c.fillStyle = '#ffd77a';
+    c.beginPath(); c.arc(32.5, 15.5, 2.6, 0, Math.PI * 2); c.fill();
+  },
+};
+// SUNDAY · rung 7 · THE COURT ITSELF — the summit: five kings, the Archer last
+SS_SKY_WHEEL[6] = {
+  id: 'court', nameKey: 'skyCourtName', lineKey: 'skyCourtLine',
+  court: {
+    kings: ['strix', 'leo', 'taurus', 'scorpius', 'draco', 'phoenix', 'centaurus'],
+    mults: [0.7, 0.8, 0.9, 1.0],   // the tempered court, fight order — Skylar's dial
+    crown: 'sagittarius',          // THE ZENITH ARCHER, fixed last (hp 200 · the five-bolt volley)
+  },
+  glyph: (c, s) => {
+    // the crown of the week
+    c.beginPath(); c.moveTo(8, 34); c.lineTo(8, 18); c.lineTo(16, 26); c.lineTo(24, 12);
+    c.lineTo(32, 26); c.lineTo(40, 18); c.lineTo(40, 34); c.closePath();
+    c.fillStyle = '#1a2142'; c.fill();
+    c.lineJoin = 'round'; c.lineWidth = 1.6; c.strokeStyle = '#e8c76a'; c.stroke();
+    c.fillStyle = '#ffd77a';
+    for (const [x, y, r] of [[8, 16, 2], [24, 9.5, 2.4], [40, 16, 2], [16, 24, 1.5], [32, 24, 1.5]]) {
+      c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
+    }
+    c.globalAlpha = 0.8;
+    c.beginPath(); c.roundRect(8, 36, 32, 3.5, 1.5); c.fillStyle = '#e8c76a'; c.fill();
+    c.globalAlpha = 1;
+  },
+};
+
+/* ---- THE SHARE CARD: the run as a spoiler-free sky -------------------------
+   What the daily's SHARE button puts on the clipboard, and what lands in a
+   group chat. Wordle's lesson is that the SHAPE of a result travels further
+   than the result itself: the beasts are stars in fight order (felled ✶,
+   left standing 🌑), and the finest word is one 🟨 tile per letter — the
+   COUNT is the hook, the letters would be the spoiler. Nothing personal is in
+   it: two hunters who walked the same sky to the same numbers copy the very
+   same card.
+   The three glyphs are chosen to read on a light chat bubble AND a dark one
+   — the star is a text glyph and takes the bubble's own ink, the two emoji
+   carry their own colour with them.
+   Line order is fixed in every language, and the streak line is simply absent
+   when there is no flame, so the card never has a hole in it. Pure and
+   argument-fed, so the end screen and the harness read the same function. */
+const SS_SHARE_URL = 'https://drbango.com/beta3/?daily=1';
+function ssShareCard(o) {
+  o = o || {};
+  const beasts = Math.max(0, o.beasts | 0);
+  const felled = Math.max(0, Math.min(beasts, o.felled | 0));
+  const tiles = Math.max(0, o.wordLen | 0);
+  const n = Math.max(0, o.streak | 0);
+  // the head names tonight's sky when one is built (THE SKY WHEEL, v0.108.0)
+  // — 'STARSPELL Daily · THE COURT OF KINGS · 2026-09-27'; a stock-interim
+  // night keeps today's exact form
+  const sky = ssSkyToday();
+  const lines = [sky
+    ? SS_T('shHeadSky', SS_T(sky.nameKey), SSNET.dayKeyISO())
+    : SS_T('shHead', SSNET.dayKeyISO())];
+  // the sky: one mark per beast, spaced so the narrow star and the wide moon
+  // still read as a row of equals rather than a ragged line
+  if (beasts) lines.push(Array.from({ length: beasts }, (_, i) => (i < felled ? '✶' : '🌑')).join(' '));
+  // one square per LETTER — which is the count the score itself pays on, so a
+  // digraph tile (qu, ch, ll, rr) shows as the two letters it spells
+  if (tiles) lines.push('🟨'.repeat(tiles));
+  lines.push(SS_T('shScore', o.score | 0) + ' · '
+    + (tiles ? SS_T(tiles === 1 ? 'shFinest1' : 'shFinest', tiles) : SS_T('shNoWord')));
+  if (n >= 1) lines.push('🔥 ' + SS_T(n === 1 ? 'shStreak1' : 'shStreak', n));
+  lines.push(SS_SHARE_URL);
+  return lines.join('\n');
+}
+/* ---- THE COPY THAT TELLS THE TRUTH ----------------------------------------
+   Every clipboard write in the game funnels through here — the daily share
+   card, versus's invite and friend links (vsShare). Two laws TestFlight
+   1.0 (1) taught the hard way:
+   1. In the WKWebView shell navigator.clipboard EXISTS but writeText REJECTS
+      (NotAllowedError). A fire-and-forget write there puts NOTHING on the
+      board while the button claims success — so the write is awaited, and any
+      refusal falls through to the textarea + execCommand path, which the
+      shell still honours inside a tap. (WebKit carries the user-gesture token
+      across the promise rejection, so the fallback still counts as gestured.)
+   2. The textarea is readonly (no keyboard flash on iOS) and its selection is
+      set explicitly — iOS ignores a bare select() on a textarea.
+   Resolves true only when a path ACTUALLY copied, so a caller can never show
+   COPIED over an empty clipboard. */
+async function ssCopyText(txt) {
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(txt);
+      return true;
+    }
+  } catch (e) { }
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = txt;
+    ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;left:-1000px;top:0;opacity:0';
+    document.body.appendChild(ta);
+    ta.select(); ta.setSelectionRange(0, txt.length);
+    const ok = document.execCommand('copy');
+    ta.remove();
+    return !!ok;
+  } catch (e) { return false; }
+}
+// One-time seed for profiles that predate the streak fields: walk the local
+// daily score log backwards from today. A log that stops at YESTERDAY still
+// seeds a live streak (same rule as ssStreakCount), one that stops earlier
+// seeds nothing. Called from SS.load(), so it must not touch SS.prof.
+function ssSeedStreak(p) {
+  try { return ssSeedStreakFrom(p); } catch (e) { return { n: 0, last: 0 }; }
+}
+function ssSeedStreakFrom(p) {
+  const log = (p && p.daily) || {};
+  const today = SSNET.dayKey();
+  let dk = log[String(today)] ? today : 0;
+  if (!dk) {
+    const y = SSNET.dayKey(new Date(ssDayKeyMs(today) - 86400000));
+    if (log[String(y)]) dk = y;
+  }
+  if (!dk) return { n: 0, last: 0 };
+  let n = 0, walk = dk;
+  while (log[String(walk)]) { n++; walk = SSNET.dayKey(new Date(ssDayKeyMs(walk) - 86400000)); }
+  return { n, last: dk };
+}
+
+/* ---- THE SIGIL DRIP: half the sky is earned -------------------------------
+   A new hunter starts with twelve of the twenty-four sigils and DISCOVERS the
+   rest by playing. Every locked sigil carries one condition (data.js, `lock`)
+   matched to what it does, and every condition is counted from play — not
+   from winning. A run that ends in defeat and advanced a condition advanced
+   it; that is the whole point of the mechanic.
+
+   The whole ledger is `prof.sig`:
+     u   · id → the timestamp it was unlocked (the only permanent record)
+     c   · the cheap counters this file feeds (w6/w7/w8/frg/scry/ovk/hit/brnk)
+     pend· unlocked but not yet ANNOUNCED — the notice survives an app closed
+           on the end screen, exactly like the lantern's `pend`
+     gf  · this profile was grandfathered (see below), kept for the record
+
+   GRANDFATHERING. Nobody who already plays loses anything: the first boot
+   after this ships reads any evidence of prior play at all and hands that
+   profile all twenty-four, permanently. Only a genuinely empty profile enters
+   the drip. This runs ONCE — `sig` existing afterwards is the record of the
+   decision, so a grandfathered player who then wipes their stats keeps their
+   sigils.
+
+   Versus is untouched by every line of this: it draws from its own pool
+   (the `vs` flag on SS_SIGILS — data.js) and always has. */
+
+// the stats a lock may name. Four are the profile's own lifetime figures; the
+// rest are counters this file keeps, fed at the moment the thing happens.
+function ssSigilStat(key) {
+  const p = SS.prof;
+  if (key === 'word') return p.words | 0;
+  if (key === 'fell') return p.beasts | 0;
+  if (key === 'wins') return p.wins | 0;
+  if (key === 'big') return p.bigHit | 0;
+  return ((p.sig && p.sig.c) || {})[key] | 0;
+}
+// a sigil with no lock has always been yours
+function ssSigilUnlocked(id) {
+  const sg = SS_SIG_BY[id];
+  if (!sg) return false;
+  if (!sg.lock) return true;
+  return !!(SS.prof.sig && SS.prof.sig.u && SS.prof.sig.u[id]);
+}
+// THE POOL every solo pick draws from — quick, campaign and daily alike
+function ssSigilOpen() { return SS_SIGILS.filter((s) => ssSigilUnlocked(s.id)); }
+// {have, need, done} for one sigil, for any surface that wants to draw it
+// (the locked gallery is the next task; this is what it will read)
+function ssSigilProgress(sg) {
+  if (!sg || !sg.lock) return { have: 1, need: 1, done: true };
+  const have = ssSigilStat(sg.lock.s);
+  return { have: Math.min(have, sg.lock.n), need: sg.lock.n, done: have >= sg.lock.n };
+}
+/* How close counts as "nearly there" (v0.67.0) — the share of a lock's goal
+   past which the skies door starts talking about it. One dial. */
+const SS_SIG_NEAR = 0.6;
+// the sigils still asleep, CLOSEST TO WAKING FIRST — the order every sleeping
+// list draws in (ties keep the roster's own order; sort is stable)
+function ssSigilAsleep() {
+  return SS_SIGILS.filter((s) => s.lock && !ssSigilUnlocked(s.id))
+    .map((s) => { const pr = ssSigilProgress(s); return { s, f: pr.need ? pr.have / pr.need : 0 }; })
+    .sort((a, b) => b.f - a.f)
+    .map((e) => e.s);
+}
+// how many of those are nearly there — the door's second number
+function ssSigilNearCount() {
+  return ssSigilAsleep().filter((s) => {
+    const pr = ssSigilProgress(s);
+    return !pr.done && pr.need > 0 && pr.have / pr.need >= SS_SIG_NEAR;
+  }).length;
+}
+/* Feed a counter. Deliberately does NOT write to storage itself: every call
+   site sits immediately in front of a save that was going to happen anyway (a
+   word cast, a beast felled) or adds one where the event is rare enough to
+   afford it (a scry, a strike weathered). The rule the call sites keep is
+   that no counter may end a battle unsaved — the whole mechanic is progress
+   ACROSS runs, and a count that dies with an abandoned run is a lie. */
+function ssSigilBump(key, n) {
+  const p = SS.prof;
+  if (!p.sig) return;
+  p.sig.c[key] = (p.sig.c[key] | 0) + (n === undefined ? 1 : n | 0);
+}
+/* Settle up: every locked sigil whose condition is now met becomes yours.
+   Called at the safe beats only (a run's end, the meadow), never mid-volley.
+   Returns the ids unlocked by THIS call; the announcement reads `pend`, which
+   also holds anything an earlier call never got to say out loud. */
+function ssSigilCheck() {
+  const p = SS.prof, fresh = [];
+  if (!p.sig) return fresh;
+  for (const sg of SS_SIGILS) {
+    if (!sg.lock || p.sig.u[sg.id]) continue;
+    if (ssSigilStat(sg.lock.s) < sg.lock.n) continue;
+    p.sig.u[sg.id] = Date.now();
+    p.sig.pend.push(sg.id);
+    fresh.push(sg.id);
+  }
+  if (fresh.length) { p.sig.pend = p.sig.pend.slice(-8); SS.save(); }
+  return fresh;
+}
+// what is waiting to be announced, as a plain array of ids
+function ssSigilPending() { return (((SS.prof || {}).sig || {}).pend || []).slice(); }
+// evidence that this profile was played before the drip existed. Deliberately
+// wide: every counter, every book, every ledger. A false positive costs a new
+// player nothing they would ever notice; a false NEGATIVE would take twelve
+// sigils off a TestFlight tester, which is the one outcome that is not allowed.
+function ssSigilPlayedBefore(p) {
+  return !!(p.runs || p.wins || p.words || p.beasts || p.longest || p.bigHit
+    || p.bestQuick || p.bestCampaign || p.vsWords || p.vsWins
+    || (p.streak && p.streak.n) || (p.rating && p.rating !== 1000)
+    || Object.keys(p.daily || {}).length || Object.keys(p.ach || {}).length
+    || Object.keys(p.signs || {}).length);
+}
+
+/* ---- THE FIRST OPEN (v0.75.0) ----
+   The guided first game: wordless open, pickerless rise, curated board,
+   the friendly finger. `prof.ftue` is decided once in SS.load (0 = owed,
+   1 = down forever); it drops here when the first game ENDS by any door —
+   endRun (win or loss) and goHome (the back-arrow abandon) both call it. */
+function ssFtuePending() { return !!SS.prof && SS.prof.ftue === 0; }
+function ssFtueDone() {
+  if (SS.prof && SS.prof.ftue !== 1) { SS.prof.ftue = 1; SS.save(); DIAG('ftue: done'); }
+}
+
+// Button texture for a given display size. The painted source is 627x344 but consumers
+// display buttons anywhere from ~3.2:1 to ~6.5:1, and a flat stretch smears the braided
+// frame corners ~3x wide. So under ?art=1 each aspect gets its own baked 9-slice
+// ('btn@300x58', created on demand): corners keep the painting's proportions, the braid
+// runs are mirror-tiled (alternate tiles flipped so the pattern joins seamlessly at the
+// cuts) rather than stretched, and only the plain face stretches. Baking beats Phaser's
+// NineSlice object here because that object is WebGL-only and the game boots Phaser.AUTO.
+// The procedural path keeps the shared 'btn'/'btndark' — its plain rounded rect never
+// minded the stretch.
+function ssBtn(scene, dark, w, h) {
+  const base = dark ? 'btndark' : 'btn';
+  if (!(ART && SSART.ready)) return base;
+  const key = base + '@' + w + 'x' + h;
+  if (scene.textures.exists(key)) return key;
+  const img = SSART.img[base], sw = img.width, sh = img.height;
+  const R = ssTexRes(scene);
+  // All dest maths in integer DEVICE pixels: at R=3 the slice boundaries land on
+  // fractions otherwise (corner height 18.5u = 55.5px), and the antialiased edges
+  // of adjacent draws let the background peek through as bright hairline seams.
+  const W = Math.round(w * R), H = Math.round(h * R);
+  const t = scene.textures.createCanvas(key, W, H);
+  const c = t.context;
+  const cs = 110;                                     // source corner block, > the 96px rim radius
+  const s = H / sh;                                   // uniform frame scale follows height
+  const CW = Math.min(Math.round(cs * s), Math.floor(W * 0.33));  // corner dest (capped: never collide)
+  const CH = Math.round(cs * s);
+  const mx = sw - 2 * cs, my = sh - 2 * cs;           // source middle spans
+  // corners — the only pieces drawn at the painting's own aspect
+  c.drawImage(img, 0, 0, cs, cs, 0, 0, CW, CH);
+  c.drawImage(img, sw - cs, 0, cs, cs, W - CW, 0, CW, CH);
+  c.drawImage(img, 0, sh - cs, cs, cs, 0, H - CH, CW, CH);
+  c.drawImage(img, sw - cs, sh - cs, cs, cs, W - CW, H - CH, CW, CH);
+  // horizontal braid runs — mirror-tiled at the corner scale (alternate tiles are
+  // flipped so the pattern joins seamlessly at the cuts), never stretched
+  const tileX = (sy, dy) => {
+    const tw = Math.max(1, Math.round(mx * s));
+    for (let x = CW, i = 0; x < W - CW; x += tw, i++) {
+      const dw = Math.min(tw, W - CW - x), sW = (dw / tw) * mx;
+      c.save();
+      if (i % 2) { c.translate(x + dw, 0); c.scale(-1, 1); c.drawImage(img, cs + mx - sW, sy, sW, cs, 0, dy, dw, CH); }
+      else c.drawImage(img, cs, sy, sW, cs, x, dy, dw, CH);
+      c.restore();
+    }
+  };
+  tileX(0, 0); tileX(sh - cs, H - CH);
+  // vertical braid runs — same treatment
+  const tileY = (sx, dx) => {
+    const th = Math.max(1, Math.round(my * s));
+    for (let y = CH, i = 0; y < H - CH; y += th, i++) {
+      const dh = Math.min(th, H - CH - y), sH = (dh / th) * my;
+      c.save();
+      if (i % 2) { c.translate(0, y + dh); c.scale(1, -1); c.drawImage(img, sx, cs + my - sH, cs, sH, dx, 0, CW, dh); }
+      else c.drawImage(img, sx, cs, cs, sH, dx, y, CW, dh);
+      c.restore();
+    }
+  };
+  tileY(0, 0); tileY(sw - cs, W - CW);
+  // the face — plain navy with a soft vignette; a stretch keeps the vignette whole
+  // where tiling would repeat its speckle clusters
+  c.drawImage(img, cs, cs, mx, my, CW, CH, W - 2 * CW, H - 2 * CH);
+  t.refresh();
+  return key;
+}
+
+function ssStarfield(scene, count) {
+  const W = scene.scale.width, H = scene.scale.height;
+  for (let i = 0; i < count; i++) {
+    const st = scene.add.image(Math.random() * W, Math.random() * H, 'dot')
+      .setScale(0.3 + Math.random() * 0.8).setAlpha(0.15 + Math.random() * 0.5).setTint(0xcfd8ff);
+    scene.tweens.add({ targets: st, alpha: 0.08 + Math.random() * 0.2, duration: 1200 + Math.random() * 2600, yoyo: true, repeat: -1, delay: Math.random() * 2000 });
+  }
+}
+
+// one shooting star, fired now — the ambient loop below uses it, and the
+// boot intro calls it directly (its 4-8s cadence would miss a 3s intro)
+function ssShootingStar(scene) {
+  if (!scene.scene.isActive()) return;
+  const W = scene.scale.width, H = scene.scale.height;
+  const x = Math.random() * W * 0.8, y = scene.cameras.main.scrollY + Math.random() * H * 0.35;
+  const s = scene.add.image(x, y, 'dot').setScale(1.1).setTint(0xfff2c9).setBlendMode('ADD').setDepth(1);
+  const trail = [];
+  for (let i = 0; i < 7; i++) trail.push(scene.add.image(x, y, 'dot').setScale(0.7 - i * 0.08).setAlpha(0.5 - i * 0.06).setTint(0xcfe0ff).setBlendMode('ADD').setDepth(1));
+  const dx = 200 + Math.random() * 240, dy = 90 + Math.random() * 120;
+  scene.tweens.add({
+    targets: s, x: x + dx, y: y + dy, alpha: 0, duration: 800, ease: 'Cubic.easeOut',
+    onUpdate: () => { for (let i = trail.length - 1; i > 0; i--) { trail[i].x = trail[i - 1].x; trail[i].y = trail[i - 1].y; } trail[0].x = s.x; trail[0].y = s.y; },
+    onComplete: () => { s.destroy(); trail.forEach((t) => t.destroy()); },
+  });
+}
+
+function ssShootingStars(scene) {
+  scene.time.addEvent({ delay: 4200 + Math.random() * 4000, loop: true, callback: () => ssShootingStar(scene) });
+}
+
+// v0.111.1: the pick veils dress as the night sky — the same stars the battle
+// wears, pushed into the pick's own items[] so they ride ABOVE the veil and
+// die with it (Skylar: "the background… should be the night sky screen")
+function ssVeilStars(scene, items, count, depth) {
+  const W = scene.scale.width, H = scene.scale.height;
+  for (let i = 0; i < count; i++) {
+    const st = scene.add.image(Math.random() * W, Math.random() * H, 'dot')
+      .setScale(0.3 + Math.random() * 0.8).setAlpha(0.15 + Math.random() * 0.5).setTint(0xcfd8ff);
+    if (depth !== undefined) st.setDepth(depth);
+    scene.tweens.add({ targets: st, alpha: 0.08 + Math.random() * 0.2, duration: 1200 + Math.random() * 2600, yoyo: true, repeat: -1, delay: Math.random() * 2000 });
+    items.push(st);
+  }
+}
+
+/* ============================================================
+   THE ASCENT — one vertical world, meadow at the bottom, the
+   battle sky at the zenith. Camera rises 2 frames (design
+   worldY 0..2400; home frame = 1600..2400; zenith = 0..800,
+   drawn at l.y(d) - 1600s so the battle handoff is invisible).
+   Spec: SKY-DESIGN.md · demo: ascent.html (curve ported 1:1).
+   ============================================================ */
+const ASC = { DIP_MS: 260, TOTAL_MS: 2600, DESCEND_MS: 1150 };
+const ssReduceMotion = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+// dip → rise → settle with overshoot; p: 0 = meadow, 1 = zenith
+function ssAscentP(ms) {
+  const easeOutSine = (t) => Math.sin(t * Math.PI / 2);
+  const quint = (t) => (t < 0.5 ? 16 * t ** 5 : 1 - Math.pow(-2 * t + 2, 5) / 2);
+  if (ms <= ASC.DIP_MS) return -0.011 * easeOutSine(ms / ASC.DIP_MS);
+  const u = Math.min(1, (ms - ASC.DIP_MS) / (ASC.TOTAL_MS - ASC.DIP_MS));
+  const q = quint(u);
+  const bump = u > 0.82 ? 0.009 * Math.sin(Math.min(1, (u - 0.82) / 0.18) * Math.PI) : 0;
+  return -0.011 * (1 - Math.min(1, u * 3)) + q + bump;
+}
+
+function ssSkyTextures(scene, dawn) {
+  const mk = (key, w, h, fn, r, fb) => {
+    if (scene.textures.exists(key)) return;
+    r = r || 1;
+    // same defensive ceiling clamp as ssMakeTextures (see ssMaxTex)
+    const cap = Math.min(1, ssMaxTex(scene) / Math.max(w * r, h * r));
+    const t = scene.textures.createCanvas(key, Math.round(w * r * cap), Math.round(h * r * cap));
+    t.context.scale(r * cap, r * cap);
+    ssBake(t, key, w, h, fn, fb);
+  };
+  const gradTex = (key, stops) => mk(key, 64, 1024, (c, w, h) => {
+    const g = c.createLinearGradient(0, 0, 0, h);
+    stops.forEach(([p, col]) => g.addColorStop(p, col));
+    c.fillStyle = g; c.fillRect(0, 0, w, h);
+    // banding law: ±1.5 RGB scanline dither — grain is what makes it look expensive
+    const im = c.getImageData(0, 0, w, h), d = im.data;
+    for (let y = 0; y < h; y++) {
+      const row = (Math.random() - 0.5) * 3;
+      for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4, px = row + (Math.random() - 0.5) * 1.5;
+        d[i] += px; d[i + 1] += px; d[i + 2] += px;
+      }
+    }
+    c.putImageData(im, 0, 0);
+  });
+  // With the painted meadow plate on, the gradient must not bake its own razor
+  // horizon (bright line + plunge to dark ground): the plate's ridge sits lower
+  // than the old procedural hills in places, and the baked edge shows above the
+  // painted forest as a straight grey band. The plate brings the ground; the
+  // gradient's tail becomes a dusk haze settling behind the painted mountains.
+  const artHz = ART && SSART.ready;
+  gradTex('skygrad', artHz ? [
+    [0, '#0a0d1c'], [0.09, '#0a0d1c'], [0.27, '#10142e'], [0.43, '#1c2350'], [0.575, '#3a3068'],
+    [0.685, '#6b4585'], [0.76, '#a05a8c'], [0.805, '#c96a8e'], [0.83, '#f0997a'], [0.846, '#ffc98a'],
+    [0.852, '#ffd095'], [0.88, '#b06080'], [0.93, '#4a3560'], [1, '#241a38']] : [
+    [0, '#0a0d1c'], [0.09, '#0a0d1c'], [0.27, '#10142e'], [0.43, '#1c2350'], [0.575, '#3a3068'],
+    [0.685, '#6b4585'], [0.76, '#a05a8c'], [0.805, '#c96a8e'], [0.83, '#f0997a'], [0.846, '#ffc98a'],
+    [0.852, '#ffe4b0'], [0.86, '#0c0918'], [1, '#070510']]);
+  // the Act III payoff sky: you rose at dusk, fought one long night,
+  // and come down at sunrise. Zenith still matches the battle bg.
+  if (dawn) gradTex('skygrad-dawn', [
+    [0, '#0a0d1c'], [0.09, '#0a0d1c'], [0.27, '#141c40'], [0.43, '#28376e'], [0.575, '#4d5da4'],
+    [0.685, '#8f7cb8'], [0.76, '#d9a0ac'], [0.805, '#f2bd9c'], [0.83, '#ffd9a0'], [0.846, '#ffedc4'],
+    [0.852, '#fff7dc'], [0.86, '#120d22'], [1, '#0b0716']]);
+  mk('grain', 128, 128, (c, w, h) => {
+    const im = c.createImageData(w, h), d = im.data;
+    for (let i = 0; i < d.length; i += 4) { const v = Math.random() * 255; d[i] = d[i + 1] = d[i + 2] = v; d[i + 3] = 255; }
+    c.putImageData(im, 0, 0);
+  });
+  mk('moon', 144, 144, (c, w, h) => {
+    c.translate(w / 2, h / 2);
+    c.fillStyle = 'rgba(247,232,200,0.07)';                       // earthshine disk
+    c.beginPath(); c.arc(0, 0, 54, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#f7e8c8';
+    c.beginPath(); c.arc(0, 0, 54, 0, Math.PI * 2); c.fill();
+    c.globalCompositeOperation = 'destination-out';                // bite = the crescent
+    c.beginPath(); c.arc(31, -24, 53, 0, Math.PI * 2); c.fill();
+    c.globalCompositeOperation = 'source-over';
+    c.fillStyle = 'rgba(247,232,200,0.06)';
+    c.beginPath(); c.arc(0, 0, 54, 0, Math.PI * 2); c.fill();
+  }, 2);
+  mk('cloudwisp', 256, 80, (c, w, h) => {
+    const blob = (cx, cy, rx, ry, col, a) => {
+      c.save(); c.translate(cx, cy); c.scale(rx / 40, ry / 40);
+      const g = c.createRadialGradient(0, 0, 0, 0, 0, 40);
+      g.addColorStop(0, col.replace('A', String(a))); g.addColorStop(1, col.replace('A', '0'));
+      c.fillStyle = g; c.beginPath(); c.arc(0, 0, 40, 0, Math.PI * 2); c.fill(); c.restore();
+    };
+    blob(128, 46, 120, 26, 'rgba(20,16,40,A)', 0.9);               // dark body
+    blob(88, 50, 70, 18, 'rgba(20,16,40,A)', 0.7);
+    blob(120, 30, 90, 12, 'rgba(255,228,176,A)', 0.16);            // moonlit top edge
+  });
+  mk('spark4', 64, 64, (c, w, h) => {                              // hero-star diffraction cross
+    const arm = (ang) => {
+      c.save(); c.translate(w / 2, h / 2); c.rotate(ang);
+      const g = c.createLinearGradient(-30, 0, 30, 0);
+      g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.5, 'rgba(255,255,255,0.95)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+      c.fillStyle = g; c.fillRect(-30, -1.2, 60, 2.4); c.restore();
+    };
+    arm(0); arm(Math.PI / 2);
+    const g = c.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, 7);
+    g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    c.fillStyle = g; c.fillRect(w / 2 - 7, h / 2 - 7, 14, 14);
+  }, 2);
+  mk('grasstrip', 512, 32, (c, w, h) => {   // 512x32: POT both ways — WebGL1 iPhones can't REPEAT an NPOT texture
+    c.fillStyle = '#050310';
+    c.beginPath(); c.moveTo(0, h);
+    for (let x = 0; x <= w; x += 9) c.lineTo(x + Math.random() * 5, 8 + Math.random() * 19);
+    c.lineTo(w, h); c.closePath(); c.fill();
+    for (let i = 0; i < 4; i++) {                                  // wildflower silhouettes
+      const x = 30 + Math.random() * (w - 60), top = 2 + Math.random() * 6;
+      c.strokeStyle = '#050310'; c.lineWidth = 1.6;
+      c.beginPath(); c.moveTo(x, h); c.quadraticCurveTo(x + 3, h - 14, x, top + 5); c.stroke();
+      c.fillStyle = '#050310'; c.beginPath(); c.arc(x, top + 4, 3.2, 0, Math.PI * 2); c.fill();
+    }
+  }, 2);   // 1024x64 — still power-of-two both ways for WebGL1 REPEAT
+}
+
+/* Film grain, dieted (perf-lab task 24): the full-screen grain TileSprite
+   cost 16fps on the afflicted iPhone — a live TileSprite keeps a full
+   back-buffer-sized internal pattern canvas and runs the tile pipeline every
+   frame for what is a completely STATIC effect at alpha 0.04. Now the tiled
+   noise is baked ONCE at half back-buffer res and drawn as a single
+   stretched Image: one plain quad per frame on both renderers, and the 2x
+   coarsening is imperceptible at 4% opacity (side-by-side verified).
+   Rebaked only when a reshape (rotation) changes the target size. */
+function ssGrainOverlay(scene, W, H) {
+  const gw = Math.max(64, Math.round(W / 2)), gh = Math.max(64, Math.round(H / 2));
+  const key = 'grainbake';
+  const ex = scene.textures.exists(key) ? scene.textures.get(key).getSourceImage() : null;
+  if (ex && (ex.width !== gw || ex.height !== gh)) scene.textures.remove(key);
+  if (!scene.textures.exists(key)) {
+    const t = scene.textures.createCanvas(key, gw, gh);
+    const src = scene.textures.get('grain').getSourceImage();
+    for (let y = 0; y < gh; y += 128) for (let x = 0; x < gw; x += 128) t.context.drawImage(src, x, y);
+    t.refresh();
+  }
+  return scene.add.image(W / 2, H / 2, key).setDisplaySize(W, H).setScrollFactor(0).setAlpha(0.04).setDepth(500);
+}
+
+const SS_STAR_COLORS = [0xcfd8ff, 0xcfd8ff, 0xcfd8ff, 0xffe9c9, 0xffd1dc, 0xc9fff2];
+// Small standalone mulberry32 — seeded skies (versus: shared seed = same sky)
+function ssMulberry(seed) {
+  let s = (seed | 0) || 1;
+  return () => {
+    s |= 0; s = (s + 0x6D2B79F5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+// opts: { dawn }        — sunrise palette, no moon/fireflies, washed stars
+//       { seed }        — deterministic star placement (shared versus sky)
+//       { zenithAtZero }— zenith frame sits at scrollY 0, meadow at +T
+//                         (for single-scene flows like versus; Home uses the
+//                          default: meadow at 0, zenith at -T)
+function ssSkyWorld(scene, opts) {
+  opts = opts || {};
+  const l = ssLayout(scene);
+  ssSkyTextures(scene, opts.dawn);
+  const T = 1600 * l.s;                                  // camera travel, px
+  // versus dress (9/9 UNDER ONE SKY, built 9/10): the menu frames this same
+  // world a touch deeper into the night — the meadow band sits 150 lower so
+  // only its crest holds the foot, the moon stays out of frame, the aurora
+  // runs colder, and six fireflies keep the crest. Home passes no flag and
+  // is byte-identical.
+  const B = opts.zenithAtZero ? 1600 : (opts.versus ? 150 : 0);   // design-unit shift
+  const my = (m, f) => l.y(m + B * (f == null ? 1 : f)); // meadow-frame coord (factor-aware)
+  const wy = (d) => l.y(d - 1600 + B);                   // worldY (0..2400) → scene y
+  const rnd = opts.seed ? ssMulberry(opts.seed) : Math.random;
+  const starDim = opts.dawn ? 0.5 : 1;
+
+  // master gradient: spans the whole column, zenith top pinned to the game bg
+  scene.add.image(l.W / 2, wy(0), opts.dawn ? 'skygrad-dawn' : 'skygrad').setOrigin(0.5, 0).setDisplaySize(l.W, 2400 * l.s);
+  // the versus hour: one navy veil deepens the same gradient into a later
+  // night (no second gradient bake — the same world, a darker hour); stars,
+  // aurora and meadow draw above it at full voice
+  if (opts.versus) scene.add.rectangle(l.W / 2, wy(0), l.W, 2400 * l.s + 240 * l.s, 0x0a0e1f, 0.58).setOrigin(0.5, 0);
+  scene.add.rectangle(l.W / 2, my(800), l.W, Math.max(1, l.H - l.y(800)) + 120 * l.s, opts.dawn ? 0x0b0716 : 0x070510).setOrigin(0.5, 0);
+
+  // aurora — lives at the zenith; one faint teal tease bleeds into the meadow
+  // sky. The versus frame swaps the warm gold mid-curtain for a cold blue.
+  for (const [tint, dx, dy, a] of (opts.versus
+    ? [[0x2fe0d0, -120, 160, 0.05], [0x8a5ae0, 130, 120, 0.05], [0x4a6ae0, 0, 640, 0.045], [0x2fe0d0, 40, 1660, 0.03]]
+    : [[0x2fe0d0, -120, 160, 0.055], [0x8a5ae0, 130, 120, 0.055], [0xd7b45c, 0, 640, 0.055], [0x2fe0d0, 40, 1660, 0.03]])) {
+    const g = scene.add.image(l.x(dx), wy(dy), 'glowbig').setScale(l.u(2.6)).setTint(tint).setAlpha(a).setBlendMode('ADD');
+    scene.tweens.add({ targets: g, x: g.x + l.u(30), y: g.y - l.u(20), scale: l.u(3.1), duration: 7000 + rnd() * 4000, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+  }
+
+  // star tiers — density ramps toward the zenith end of each parallax span
+  const tier = (f, n, s0, s1, twinkle) => {
+    const out = [], top = opts.zenithAtZero ? 0 : -T * f, span = T * f + l.H;
+    for (let i = 0; i < n; i++) {
+      const y = top + Math.pow(rnd(), 1.8) * span;
+      const sc = (s0 + rnd() * (s1 - s0)) * l.s;
+      const baseA = (0.25 + rnd() * 0.55) * starDim;
+      const st = scene.add.image(rnd() * l.W, y, 'dot')
+        .setScale(sc).setAlpha(baseA).setTint(SS_STAR_COLORS[Math.floor(rnd() * SS_STAR_COLORS.length)])
+        .setScrollFactor(1, f);
+      st.baseS = sc; st.baseA = baseA;
+      if (twinkle && rnd() < 0.5) twinkles.push(st);
+      out.push(st);
+    }
+    return out;
+  };
+  // ~90 twinkle tweens were a real slice of a create that sometimes opens a
+  // descent — starting them a beat later is invisible and off the entry frame
+  const twinkles = [];
+  scene.time.delayedCall(400, () => {
+    for (const st of twinkles)
+      scene.tweens.add({ targets: st, alpha: st.baseA * 0.35, duration: 1600 + rnd() * 2600, yoyo: true, repeat: -1, delay: rnd() * 2500 });
+  });
+  tier(0.55, 110, 0.28, 0.5, true);
+  const tierM = tier(0.70, 75, 0.42, 0.68, true);
+  const tierN = tier(0.85, 48, 0.66, 0.95, false);
+  tierN.forEach((st) => st.setBlendMode('ADD'));
+
+  // hero stars — the ones a player would wish on, in the meadow's dusk sky
+  for (let i = 0; i < 6; i++) {
+    const hsz = l.u(14 + rnd() * 10);
+    const hs = scene.add.image(l.x(-190 + rnd() * 380), my(50 + rnd() * 320, 0.85), 'spark4')
+      .setDisplaySize(hsz, hsz).setAlpha(0.6 * starDim).setBlendMode('ADD').setScrollFactor(1, 0.85);
+    scene.tweens.add({ targets: hs, angle: 360, duration: 42000 + rnd() * 40000, repeat: -1 });
+    scene.tweens.add({ targets: hs, alpha: 0.45 * starDim, duration: 2200 + rnd() * 1800, yoyo: true, repeat: -1, delay: rnd() * 2000 });
+  }
+
+  // moon — low on the horizon's left shoulder; at dawn it has already set,
+  // and the versus frame keeps it out entirely (no moon over the duel)
+  if (!opts.dawn && !opts.versus) {
+    const moon = scene.add.image(l.x(-140), my(425, 0.85), 'moon').setDisplaySize(l.u(104), l.u(104)).setAngle(24).setScrollFactor(1, 0.85);
+    const halo = scene.add.image(moon.x, moon.y, 'glowbig').setScale(l.u(0.95)).setTint(0xf7e8c8).setAlpha(0.14).setBlendMode('ADD').setScrollFactor(1, 0.85);
+    scene.tweens.add({ targets: halo, alpha: 0.1, duration: 4200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+  }
+
+  // clouds — parked in the climb band, crossed mid-flight
+  for (const [cx, cy, cw, chh] of [[-51, -650, 242, 43], [108, -475, 280, 50], [-121, -313, 229, 38]]) {
+    const c = scene.add.image(l.x(cx), my(cy), 'cloudwisp').setDisplaySize(l.u(cw), l.u(chh)).setAlpha(opts.dawn ? 0.35 : 0.55);
+    scene.tweens.add({ targets: c, x: c.x + l.u(20), duration: 6000 + rnd() * 4000, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+  }
+
+  // the meadow: hills, ground, swaying grass, fireflies
+  // (near hill raised + widened so the bright horizon band can't peek
+  //  through the saddle between the two silhouettes)
+  // painted meadow plate (?art=1, dusk only — the cut is graded for dusk): the MJ
+  // landscape with its own sky keyed out at the ridge, so the painted mountains
+  // stand against the procedural horizon glow. The procedural silhouettes and
+  // grass strip stand down — anything drawn under the ridge's feathered alpha
+  // shows through it as a phantom hump. Height is pinned (ridge ~horizon, foot
+  // just past the screen bottom so the anticipation dip can't peek under it);
+  // width follows the screen, so very wide frames stretch the painting rather
+  // than run out of it.
+  // the versus hour keeps the procedural silhouettes: the painted plate is
+  // graded for dusk (and its ridge rides too high for the crest-at-the-foot
+  // framing) — at this hour the hills are shapes against the deep sky
+  const artMeadow = ART && SSART.ready && !opts.dawn && !opts.versus;
+  if (artMeadow) {
+    if (!scene.textures.exists('meadowart')) scene.textures.addImage('meadowart', SSART.img.meadow);
+    const src = scene.textures.get('meadowart').getSourceImage();
+    const bot = Math.max(my(800), l.H + B * l.s) + l.u(30);
+    const h = bot - my(398);
+    scene.add.image(l.W / 2, bot, 'meadowart').setOrigin(0.5, 1)
+      .setDisplaySize(Math.max(l.W, h * src.width / src.height), h);
+  } else {
+    scene.add.ellipse(l.x(-108), my(545), l.u(432), l.u(250), opts.dawn ? 0x1a1430 : 0x141026);
+    scene.add.ellipse(l.x(150), my(588), l.u(620), l.u(340), opts.dawn ? 0x120d22 : 0x0c0918);
+    scene.add.rectangle(l.W / 2, my(553), l.W, Math.max(1, l.H - l.y(553)) + 120 * l.s, opts.dawn ? 0x0f0a1c : 0x0a0714).setOrigin(0.5, 0);
+    const grassY = Math.max(l.y(772), l.H - l.u(30)) + B * l.s;
+    for (const [off, ph] of [[0, 0], [l.u(5), 1300]]) {
+      const gr = scene.add.tileSprite(l.W / 2, grassY + off, l.W, l.u(32), 'grasstrip').setOrigin(0.5, 0);
+      gr.setTileScale(l.s / 2); gr.tilePositionX = off * 20;   // texture is drawn at 2x
+      scene.tweens.add({ targets: gr, x: gr.x + l.u(1.5), duration: 2600, yoyo: true, repeat: -1, delay: ph, ease: 'Sine.easeInOut' });
+    }
+  }
+  const flies = [];
+  const flyTweens = (f) => {
+    scene.tweens.add({ targets: f, alpha: 0.85, duration: 1700 + rnd() * 1700, yoyo: true, repeat: -1, delay: rnd() * 3000 });
+    scene.tweens.add({ targets: f, x: f.baseX + l.u(-14 + rnd() * 28), y: f.baseY - l.u(6 + rnd() * 10), duration: 2600 + rnd() * 2600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+  };
+  if (!opts.dawn) {
+    for (let i = 0; i < (opts.versus ? 6 : 12); i++) {
+      const f = scene.add.image(l.x(-180 + rnd() * 360), opts.versus ? my(568 + rnd() * 120, 1) : my(600 + rnd() * 165), 'dot')
+        .setScale(l.u(0.22 + rnd() * 0.14)).setTint(0xffdf8f).setBlendMode('ADD').setAlpha(0);
+      f.baseX = f.x; f.baseY = f.y;
+      flyTweens(f);
+      flies.push(f);
+    }
+  }
+
+  // film grain over everything — fixed to the camera. The rise/descent hides
+  // it: at alpha 0.04 it is invisible over a fast-scrolling sky, and it is a
+  // full back-buffer of blended fill per frame at DPR 3 — exactly the frames
+  // that must not drop. Baked static image, not a TileSprite (see ssGrainOverlay).
+  const grain = ssGrainOverlay(scene, l.W, l.H);
+
+  // camera driver: p 0 = meadow · 1 = zenith; vel drives the star-stretch
+  const setP = (p, vel) => {
+    scene.cameras.main.scrollY = opts.zenithAtZero ? (1 - p) * T : -p * T;
+    const kN = Math.min(2.2, 1 + (vel || 0) * 560), kM = Math.min(1.6, 1 + (vel || 0) * 280);
+    for (const st of tierN) { st.setScale(st.baseS, st.baseS * kN); if (kN > 1.01) st.setAlpha(Math.min(1, st.baseA + (kN - 1) * 0.17)); }
+    for (const st of tierM) st.setScale(st.baseS, st.baseS * kM);
+  };
+  const scatterFlies = () => {
+    for (const f of flies) {
+      scene.tweens.killTweensOf(f);
+      scene.tweens.add({ targets: f, y: f.y - l.u(90 + Math.random() * 80), alpha: 0, duration: 700 + Math.random() * 500, ease: 'Sine.easeOut' });
+    }
+  };
+  // the wake path (descending home without a re-create) puts them back
+  const restoreFlies = () => {
+    for (const f of flies) {
+      scene.tweens.killTweensOf(f);
+      f.setPosition(f.baseX, f.baseY).setAlpha(0);
+      flyTweens(f);
+    }
+  };
+  return { setP, scatterFlies, restoreFlies, grain, T };
+}
+
+// Assemble a constellation inside a container: stars fly in, lines fade up.
+function ssAssembleBeast(scene, cont, beast, unitScale, onDone) {
+  /* the assembly's tween ledger: every tween and timer minted below is
+     registered and dies with its sprites — swept when the next assembly
+     claims this container (the meadow showcase turns over every ~9s) or
+     when the container itself is destroyed. Without the sweep a star's
+     repeat-forever twinkle keeps ticking its destroyed target in the
+     manager for the life of the scene. */
+  let swept = false;
+  const reg = [];
+  const sweep = () => {
+    if (swept) return;
+    swept = true;
+    for (const t of reg) { try { if (t.stop) t.stop(); else t.remove(false); } catch (e) { } }
+    reg.length = 0;
+    if (cont.__ssAsmSweep === sweep) cont.__ssAsmSweep = null;
+  };
+  if (cont.__ssAsmSweep) cont.__ssAsmSweep();
+  cont.__ssAsmSweep = sweep;
+  if (!cont.__ssAsmHooked) {   // one destroy hook for the container's life, not one per assembly
+    cont.__ssAsmHooked = 1;
+    cont.once('destroy', () => { if (cont.__ssAsmSweep) cont.__ssAsmSweep(); });
+  }
+  cont.removeAll(true);
+  // scale must match ssBeastFx's, which owns star homes once it arms
+  const sc = unitScale * (beast.boss ? 1.15 : beast.tier === 'mini' ? 1.06 : 1);
+  // star magnitudes by the one resolver (sharp-sky slice 3): three classes
+  // dealt by anatomy, radii riding this surface's grade — the i%5
+  // list-position deal is retired with its whole family. A beast's bright
+  // stars are the same stars on every surface.
+  const mags = ssStarMags(beast);
+  const g = scene.add.graphics().setAlpha(0);
+  g.lineStyle(unitScale * 1.25, 0xffffff, 0.35);
+  g.fillStyle(0xffffff, 0.35);
+  // LAW 3 — the served line: ssEdgeSeg in star-units (inset r+2.5 each end,
+  // never piercing a disc), scaled by sc on the way down; round caps close
+  // the inset ends (Phaser Graphics has no linecap)
+  for (const [a, b] of beast.edges) {
+    const seg = ssEdgeSeg(beast.stars[a], beast.stars[b], SS_MAG_R[mags[a]], SS_MAG_R[mags[b]]);
+    if (!seg) continue;
+    g.lineBetween(seg.x1 * sc, seg.y1 * sc, seg.x2 * sc, seg.y2 * sc);
+    g.fillCircle(seg.x1 * sc, seg.y1 * sc, unitScale * 0.625);
+    g.fillCircle(seg.x2 * sc, seg.y2 * sc, unitScale * 0.625);
+  }
+  cont.add(g);
+  const stars = [];
+  beast.stars.forEach((p, i) => {
+    const mag = SS_MAG_R[mags[i]] * sc / SS_DOT_READ;
+    const tw = SS_MAG_TWINK[mags[i]];
+    const ang = Math.random() * Math.PI * 2, d = 260 * unitScale + Math.random() * 200;
+    const st = scene.add.image(p[0] * sc + Math.cos(ang) * d, p[1] * sc + Math.sin(ang) * d, 'dot')
+      .setScale(0.1).setAlpha(0).setTint(beast.tint).setBlendMode('ADD');
+    cont.add(st); stars.push(st);
+    reg.push(scene.tweens.add({
+      targets: st, x: p[0] * sc, y: p[1] * sc, alpha: 1, scale: mag,
+      delay: i * 40, duration: 620, ease: 'Cubic.easeOut',
+      onComplete: () => {
+        if (swept) return;
+        reg.push(scene.tweens.add({
+          targets: st, scale: mag * tw[0], alpha: tw[1],
+          duration: 700 + (i * 137) % 1100, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+        }));
+      },
+    }));
+  });
+  const eyes = [];
+  reg.push(scene.time.delayedCall(beast.stars.length * 40 + 500, () => {
+    if (swept) return;
+    reg.push(scene.tweens.add({ targets: g, alpha: 1, duration: 500 }));
+    for (const e of beast.eyes) {
+      const eye = scene.add.image(e[0] * sc, e[1] * sc, 'dot').setScale(0.9).setTint(beast.eye).setBlendMode('ADD').setAlpha(0);
+      cont.add(eye); eyes.push(eye);
+      reg.push(scene.tweens.add({ targets: eye, alpha: 1, duration: 400 }));
+      reg.push(scene.tweens.add({ targets: eye, alpha: 0.5, duration: 700, yoyo: true, repeat: -1, delay: 500 }));
+    }
+    if (SFX.ok) SFX.noise(0.7, 800, 2, 0.05, 2600);
+    if (onDone) onDone();
+  }));
+  return { lines: g, stars, eyes };
+}
+
+/* ============================================================
+   Beast presence & attack fx — ssBeastFx
+   Gives every constellation a body (nebula aura, breathing,
+   shimmering edges, traveling glints), a creature-specific idle,
+   a telegraph that charges as the strike counter fills, and a
+   signature attack. Everything is archetype-driven off the fx
+   block in SS_BEASTS (data.js) so new beasts are data-only.
+   ============================================================ */
+
+// Baked colour textures: setTint is a silent no-op under the Canvas renderer,
+// so every coloured fx sprite gets a small baked texture, cached per (kind,
+// colour). A handful of tiny canvases per beast palette, kept for the session.
+function ssFxTex(scene, kind, tint) {
+  const key = 'fx' + kind + '-' + tint.toString(16);
+  if (scene.textures.exists(key)) return key;
+  const rgb = ((tint >> 16) & 255) + ',' + ((tint >> 8) & 255) + ',' + (tint & 255);
+  const S = { dot: 32, glow: 160, ring: 192, vig: 256 }[kind];
+  const t = scene.textures.createCanvas(key, S, S), c = t.context, h = S / 2;
+  let g;
+  if (kind === 'dot') {
+    g = c.createRadialGradient(h, h, 0, h, h, h);
+    g.addColorStop(0, 'rgba(255,255,255,1)');
+    g.addColorStop(0.3, 'rgba(' + rgb + ',0.9)');
+    g.addColorStop(1, 'rgba(' + rgb + ',0)');
+  } else if (kind === 'glow') {
+    g = c.createRadialGradient(h, h, 0, h, h, h);
+    g.addColorStop(0, 'rgba(' + rgb + ',0.6)');
+    g.addColorStop(0.55, 'rgba(' + rgb + ',0.18)');
+    g.addColorStop(1, 'rgba(' + rgb + ',0)');
+  } else if (kind === 'ring') {
+    g = c.createRadialGradient(h, h, 0, h, h, h);
+    g.addColorStop(0.55, 'rgba(' + rgb + ',0)');
+    g.addColorStop(0.72, 'rgba(' + rgb + ',0.85)');
+    g.addColorStop(0.88, 'rgba(' + rgb + ',0)');
+  } else {   // vig — edge vignette: transparent centre, colour pooling at the frame
+    g = c.createRadialGradient(h, h, 0, h, h, h * 1.42);
+    g.addColorStop(0.55, 'rgba(' + rgb + ',0)');
+    g.addColorStop(1, 'rgba(' + rgb + ',0.85)');
+  }
+  c.fillStyle = g; c.fillRect(0, 0, S, S);
+  t.refresh();
+  return key;
+}
+
+// Screen-edge impact wash — the player-side "you were hit" feedback. One
+// full-screen vignette image per colour, reused across flashes.
+function ssEdgeFlash(scene, tint, peak, dur) {
+  const key = ssFxTex(scene, 'vig', tint);
+  scene._edgeVigs = scene._edgeVigs || {};
+  let v = scene._edgeVigs[key];
+  if (!v || !v.scene) {
+    v = scene._edgeVigs[key] = scene.add.image(scene.scale.width / 2, scene.scale.height / 2, key)
+      .setDisplaySize(scene.scale.width, scene.scale.height).setAlpha(0).setDepth(95);
+  }
+  scene.tweens.killTweensOf(v);
+  v.setAlpha(peak);
+  scene.tweens.add({ targets: v, alpha: 0, duration: dur || 460, ease: 'Sine.easeOut' });
+}
+
+/* ============================================================
+   THE WIN FANFARE — the celebration beat that lands BEFORE the
+   end window arrives. One helper, three sizes of triumph:
+     tier 1 · a quick or daily hunt won
+     tier 2 · a rival bested in versus
+     tier 3 · the whole campaign conquered
+   Spectacle is motion and light — a banner landing with weight,
+   blooms, expanding rings, stardust, one slow camera swell —
+   never strobing. Reduced-motion keeps only the banner's gentle
+   fade. Returns the ms the caller should wait before settling
+   the stats window into place.
+   ============================================================ */
+function ssWinFanfare(scene, tier, opts) {
+  opts = opts || {};
+  const l = scene.L || ssLayout(scene);
+  const cx = l.x(0), cy = l.y(opts.cy != null ? opts.cy : 330);
+  const D = opts.depth || 250;
+  const reduced = ssReduceMotion();
+  try { SFX.fanfare(tier); } catch (e) { }
+  window.__ssfan = { tier, text: opts.text || '', reduced, t: Date.now() };   // verification beacon
+  const hold = tier >= 3 ? 1500 : tier === 2 ? 1000 : 800;
+  const wait = hold + 420;
+  const kill = [];                        // the banner party, swept together at the exit
+
+  // the banner — the word of triumph, condensing with real weight
+  const gt = ssGoldTex(scene, opts.text || SS_T('fanWin'), tier >= 3 ? 34 : 29);
+  const bsc = Math.min(1, 344 / gt.w);
+  const bw = gt.w * bsc, bh = gt.h * bsc;
+  const glow = scene.add.image(cx, cy, 'glowbig').setDisplaySize(l.u(bw * 2.2), l.u(bh * 3.4))
+    .setTint(0xffd77a).setAlpha(0).setBlendMode('ADD').setDepth(D);
+  const banner = scene.add.image(cx, cy, gt.key).setDisplaySize(l.u(bw * 0.55), l.u(bh * 0.55)).setAlpha(0).setDepth(D + 2);
+  kill.push(glow, banner);
+  if (opts.sub) {
+    const sub = ssTxt(scene, cx, cy + l.u(bh / 2 + 20), opts.sub, l.u(13), '#ffe9a8', 'italic').setOrigin(0.5).setAlpha(0).setDepth(D + 2)
+      .setShadow(0, 0, '#c9b676', l.u(7), true, true);
+    kill.push(sub);
+    scene.tweens.add({ targets: sub, alpha: 1, duration: 320, delay: reduced ? 250 : 300, ease: 'Sine.easeOut' });
+  }
+
+  if (reduced) {
+    // stillness for sensitive eyes: the words simply glow in and pass
+    scene.tweens.add({ targets: banner, displayWidth: l.u(bw), displayHeight: l.u(bh), alpha: 1, duration: 450, ease: 'Sine.easeOut' });
+    scene.tweens.add({ targets: glow, alpha: 0.3, duration: 500, ease: 'Sine.easeOut' });
+    scene.time.delayedCall(hold + 60, () => {
+      scene.tweens.add({ targets: kill, alpha: 0, duration: 420, ease: 'Sine.easeIn', onComplete: () => kill.forEach((o) => o.destroy()) });
+    });
+    return wait;
+  }
+
+  // banner entrance — Back-eased into full size, glow swelling behind it
+  scene.tweens.add({ targets: banner, displayWidth: l.u(bw), displayHeight: l.u(bh), alpha: 1, duration: 340, ease: 'Back.easeOut' });
+  scene.tweens.add({ targets: glow, alpha: 0.55, duration: 380, ease: 'Sine.easeOut' });
+  scene.tweens.add({ targets: glow, alpha: 0.25, duration: 600, delay: 400, ease: 'Sine.easeInOut' });
+
+  // one slow golden wash pooling at the frame — a swell, not a flash
+  const vig = scene.add.image(l.W / 2, l.H / 2, ssFxTex(scene, 'vig', 0xffd77a))
+    .setDisplaySize(l.W, l.H).setAlpha(0).setDepth(D - 3);
+  scene.tweens.add({ targets: vig, alpha: tier >= 3 ? 0.4 : 0.26, duration: 480, ease: 'Sine.easeOut', yoyo: true, hold: 260, onComplete: () => vig.destroy() });
+
+  // rings of light expanding from the word — one per tier
+  for (let i = 0; i < tier; i++) {
+    const ring = scene.add.image(cx, cy, ssFxTex(scene, 'ring', 0xffe9a8)).setDisplaySize(l.u(56), l.u(56)).setAlpha(0).setDepth(D + 1);
+    scene.time.delayedCall(120 + i * 210, () => {
+      if (!ring.scene) return;
+      ring.setAlpha(0.85);
+      const rw = l.u(400 + i * 90);
+      scene.tweens.add({ targets: ring, displayWidth: rw, displayHeight: rw, alpha: 0, duration: 950, ease: 'Cubic.easeOut', onComplete: () => ring.destroy() });
+    });
+  }
+
+  // stardust kicked out radially from the landing
+  const motes = tier >= 3 ? 30 : tier === 2 ? 22 : 16;
+  for (let i = 0; i < motes; i++) {
+    const a = (i / motes) * Math.PI * 2 + rng() * 0.4, r = l.u(60 + rng() * 130) * (tier >= 3 ? 1.5 : 1);
+    const m = scene.add.image(cx, cy, 'dot').setScale(0.5 + rng() * 0.7)
+      .setTint(i % 3 ? 0xffe9a8 : 0xfff6d8).setBlendMode('ADD').setDepth(D + 1);
+    scene.tweens.add({
+      targets: m, x: cx + Math.cos(a) * r * 1.6, y: cy + Math.sin(a) * r, alpha: 0, scale: 0.1,
+      duration: 800 + rng() * 600, ease: 'Cubic.easeOut', onComplete: () => m.destroy(),
+    });
+  }
+
+  // the rival tier: two comets cross the banner — the duel written in the sky
+  if (tier === 2) for (let i = 0; i < 2; i++) {
+    const dir = i ? 1 : -1, y0 = cy + l.u(i ? 130 : -150);
+    const comet = scene.add.image(cx - dir * l.u(250), y0, 'dot').setScale(1.3).setTint(0xfff2c9).setBlendMode('ADD').setAlpha(0).setDepth(D + 1);
+    scene.time.delayedCall(260 + i * 300, () => {
+      if (!comet.scene) return;
+      comet.setAlpha(1);
+      scene.tweens.add({
+        targets: comet, x: cx + dir * l.u(250), y: y0 - dir * l.u(30), duration: 620, ease: 'Sine.easeIn',
+        onUpdate: () => {
+          if (Math.random() < 0.55) {
+            const tr = scene.add.image(comet.x, comet.y, 'dot').setScale(0.5).setTint(0xffe9a8).setBlendMode('ADD').setDepth(D);
+            scene.tweens.add({ targets: tr, alpha: 0, scale: 0.05, duration: 420, onComplete: () => tr.destroy() });
+          }
+        },
+        onComplete: () => { comet.destroy(); },
+      });
+    });
+  }
+
+  // the campaign tier: firework blooms across the sky and a rain of gold
+  if (tier >= 3) {
+    for (let b = 0; b < 5; b++) {
+      scene.time.delayedCall(340 + b * 250, () => {
+        const bx = cx + (rng() - 0.5) * l.u(300), by = cy + (rng() - 0.5) * l.u(340);
+        const pop = scene.add.image(bx, by, 'glowbig').setDisplaySize(l.u(70), l.u(70)).setTint(0xfff2c9).setBlendMode('ADD').setAlpha(0.8).setDepth(D);
+        scene.tweens.add({ targets: pop, alpha: 0, displayWidth: l.u(160), displayHeight: l.u(160), duration: 540, ease: 'Cubic.easeOut', onComplete: () => pop.destroy() });
+        for (let i = 0; i < 9; i++) {
+          const a = (i / 9) * Math.PI * 2 + rng() * 0.5, r = l.u(34 + rng() * 40);
+          const d = scene.add.image(bx, by, 'dot').setScale(0.45 + rng() * 0.4).setTint(0xffe9a8).setBlendMode('ADD').setDepth(D + 1);
+          scene.tweens.add({ targets: d, x: bx + Math.cos(a) * r, y: by + Math.sin(a) * r, alpha: 0, scale: 0.05, duration: 600 + rng() * 300, ease: 'Cubic.easeOut', onComplete: () => d.destroy() });
+        }
+        try { SFX.chime(3 + (b % 4)); } catch (e) { }
+      });
+    }
+    const rain = scene.add.particles(0, 0, 'dot', {
+      x: { min: 0, max: scene.scale.width }, y: -20,
+      speedY: { min: 140, max: 300 }, speedX: { min: -30, max: 30 },
+      lifespan: 2000, scale: { start: 0.75, end: 0.1 }, quantity: 3,
+      tint: [0xffd77a, 0xfff2c9, 0xd7b45c], blendMode: 'ADD',
+    }).setDepth(D - 1);
+    scene.time.delayedCall(1700, () => { rain.stop(); scene.time.delayedCall(2100, () => rain.destroy()); });
+  }
+
+  // one slow breath of the whole sky (returns to rest well before the window)
+  scene.tweens.add({ targets: scene.cameras.main, zoom: tier >= 3 ? 1.045 : 1.025, duration: tier >= 3 ? 600 : 400, yoyo: true, ease: 'Sine.easeInOut' });
+
+  // the banner gives way — lifts into the night as the window rises beneath it
+  scene.time.delayedCall(hold, () => {
+    scene.tweens.add({ targets: kill, y: '-=' + l.u(46), alpha: 0, duration: 480, ease: 'Sine.easeIn', onComplete: () => kill.forEach((o) => o.destroy()) });
+  });
+  return wait;
+}
+
+const ssQBez = (a, c, b, t) => ({
+  x: (1 - t) * (1 - t) * a.x + 2 * (1 - t) * t * c.x + t * t * b.x,
+  y: (1 - t) * (1 - t) * a.y + 2 * (1 - t) * t * c.y + t * t * b.y,
+});
+
+/* ---- idle archetypes -------------------------------------------------------
+   Each writes a star's offset into o (screen px via fx.k). hx/hy are the
+   star's home in beast design units, i its index — geometry-driven regioning
+   (head = top, wings = far |x|, claws = far |x| on the crab) so any beast
+   built in the same 200x160 box can borrow any idle. */
+const SS_IDLE_FX = {
+  // the fox slinks — the figure slides in a lazy S, nose leading
+  prowl(fx, T, i, hx, hy, o) {
+    o.x += (Math.sin(T * 0.8 - hx * 0.012) * 3.4 + Math.sin(T * 0.47 + 1.3) * 2.2) * fx.k;
+    o.y += Math.sin(T * 1.6 + hx * 0.02) * 1.5 * fx.k;
+  },
+  // the hare sits alert, then springs a quick double-bounce; ears flick mid-hop
+  bob(fx, T, i, hx, hy, o) {
+    o.y += Math.sin(T * 1.15) * 1.8 * fx.k;
+    const hop = T % 4.6;
+    if (hop < 0.42) {
+      const p = Math.sin((hop / 0.42) * Math.PI);
+      o.y -= p * 9 * fx.k;
+      if (hy < fx.topY) o.x += Math.sin(T * 26) * p * 1.6 * fx.k;
+    }
+  },
+  // the serpent coils — a wave travels down the star chain
+  coil(fx, T, i, hx, hy, o) {
+    o.y += Math.sin(T * 2.1 - i * 0.75) * 3.6 * fx.k;
+    o.x += Math.cos(T * 1.05 - i * 0.75) * 1.8 * fx.k;
+  },
+  // the crab works its claws and skitters its legs
+  pinch(fx, T, i, hx, hy, o) {
+    if (Math.abs(hx) > 55) {
+      const sq = 0.5 + 0.5 * Math.sin(T * 1.5 + (hx > 0 ? 0 : 1.1));
+      o.x -= Math.sign(hx) * sq * 4.5 * fx.k;
+      o.y -= sq * 1.5 * fx.k;
+    } else if (hy > 20) o.x += Math.sin(T * 3.1 + hx * 0.2) * 1.1 * fx.k;
+    else o.y += Math.sin(T * 1.5) * 0.8 * fx.k;
+  },
+  // the owl's head turns — quick swivel, long unblinking hold
+  headturn(fx, T, i, hx, hy, o) {
+    if (hy < -18) {
+      const step = T / 2.4, a = Math.floor(step), f = step - a;
+      const r = (n) => Math.sin(n * 127.1 + 311.7) * 0.9;
+      const e = f < 0.22 ? (1 - Math.cos((f / 0.22) * Math.PI)) / 2 : 1;
+      o.x += (r(a - 1) + (r(a) - r(a - 1)) * e) * 7 * fx.k;
+    } else o.y += Math.sin(T * 1.2) * 1.2 * fx.k;
+  },
+  // the bear shifts its weight paw to paw
+  lumber(fx, T, i, hx, hy, o) {
+    o.x += Math.sin(T * 0.65) * 2.6 * fx.k;
+    o.y += Math.sin(T * 1.3 + (hx > 0 ? 0 : Math.PI)) * 1.6 * fx.k;
+  },
+  // the widow's legs ripple — motion grows toward the tips
+  ripple(fx, T, i, hx, hy, o) {
+    const d = Math.min(1, Math.hypot(hx - fx.cx, hy - fx.cy) / 55);
+    o.x += Math.sin(T * 2.6 + i * 2.1) * 2.1 * d * fx.k;
+    o.y += Math.cos(T * 3.2 + i * 1.3) * 2.1 * d * fx.k;
+  },
+  // wings flex — the far spans rise and sweep together (dragon, phoenix)
+  flex(fx, T, i, hx, hy, o) {
+    const amp = fx.def.amp || 1;
+    const w = Math.max(0, Math.abs(hx) - 34) / 46;
+    if (w > 0) {
+      o.y -= Math.sin(T * 1.25) * 7.5 * w * amp * fx.k;
+      o.x -= Math.sin(T * 1.25 + 0.5) * 2.2 * w * Math.sign(hx) * fx.k;
+    } else o.y += Math.sin(T * 1.25 + 1.2) * 1.4 * fx.k;
+  },
+};
+
+/* ---- attack archetypes -----------------------------------------------------
+   Each animates the beast + projectiles, calls impact(mult) exactly once at
+   the blow's landing (Battle applies damage + player-side feedback there,
+   scaled by mult), and finish() once the beast is home again. */
+const SS_ATK_FX = {
+  // crouch and spring at the board (hops: 2 = the hare's stutter-bounce)
+  pounce(scene, fx, impact, finish) {
+    const l = scene.L, c = fx.cont, hops = fx.def.hops | 0;
+    SFX.noise(0.25, 500, 1, 0.05, 1200);
+    const drop = l.u(150);
+    const leap = (toY, dur, last, cb) => scene.tweens.add({
+      targets: c, y: toY, duration: dur, ease: last ? 'Cubic.easeIn' : 'Quad.easeOut',
+      onUpdate: () => { if (Math.random() < 0.5) scene.starBurst.emitParticleAt(c.x + (Math.random() - 0.5) * l.u(50), c.y - l.u(10), 1); },
+      onComplete: cb,
+    });
+    scene.tweens.add({
+      targets: c, scaleX: 1.07, scaleY: 0.88, y: fx.homeY + l.u(10), duration: 210, ease: 'Sine.easeOut',
+      onComplete: () => {
+        const strike = () => leap(fx.homeY + drop, 140, true, () => {
+          impact(1);
+          scene.starBurst.emitParticleAt(c.x, c.y + l.u(30), 10);
+          scene.tweens.add({ targets: c, y: fx.homeY, scaleX: 1, scaleY: 1, duration: 430, ease: 'Sine.easeOut', onComplete: finish });
+        });
+        if (hops >= 2) leap(fx.homeY + drop * 0.4, 110, false, () => leap(fx.homeY + drop * 0.22, 90, false, strike));
+        else strike();
+      },
+    });
+  },
+  // rear tall, then bring the whole weight down — shockwave on landing
+  slam(scene, fx, impact, finish) {
+    const l = scene.L, c = fx.cont;
+    SFX.noise(0.45, 200, 1, 0.06, 80);
+    scene.tweens.add({
+      targets: c, y: fx.homeY - l.u(46), scaleX: 1.05, scaleY: 1.14, duration: 340, ease: 'Sine.easeOut',
+      onComplete: () => scene.tweens.add({
+        targets: c, y: fx.homeY + l.u(150), scaleY: 0.94, duration: 130, ease: 'Quad.easeIn',
+        onComplete: () => {
+          impact(1.2);
+          const ring = scene.add.image(c.x, c.y + l.u(40), ssFxTex(scene, 'ring', fx.beast.tint))
+            .setBlendMode('ADD').setAlpha(0.8).setScale(0.3).setDepth(58);
+          scene.tweens.add({ targets: ring, scale: l.u(2.7), alpha: 0, duration: 480, ease: 'Cubic.easeOut', onComplete: () => ring.destroy() });
+          scene.starBurst.emitParticleAt(c.x, c.y + l.u(40), 14);
+          scene.tweens.add({ targets: c, y: fx.homeY, scaleX: 1, scaleY: 1, duration: 520, ease: 'Sine.easeOut', onComplete: finish });
+        },
+      }),
+    });
+  },
+  // whip a line of stars at the board (strands: the widow throws three silks)
+  lash(scene, fx, impact, finish) {
+    const l = scene.L, c = fx.cont, strands = Math.max(1, fx.def.strands | 0);
+    SFX.noise(0.3, 900, 1.4, 0.06, 2600);
+    scene.tweens.add({ targets: c, x: fx.homeX - l.u(14), duration: 90, yoyo: true, repeat: 2, ease: 'Sine.easeInOut', onComplete: () => c.setX(fx.homeX) });
+    const headE = fx.beast.eyes[0];
+    const from = { x: c.x + headE[0] * fx.sc, y: c.y + headE[1] * fx.sc };
+    const tgt = { x: l.x(0), y: l.y(470) };
+    const dotK = ssFxTex(scene, 'dot', fx.beast.tint);
+    let landed = 0;
+    for (let s = 0; s < strands; s++) {
+      const to = { x: tgt.x + (s - (strands - 1) / 2) * l.u(64), y: tgt.y + Math.abs(s - (strands - 1) / 2) * l.u(18) };
+      const ctrl = { x: (from.x + to.x) / 2 + (s % 2 ? -1 : 1) * l.u(90), y: (from.y + to.y) / 2 };
+      const dots = [];
+      for (let k = 0; k < 7; k++) dots.push(scene.add.image(from.x, from.y, dotK).setBlendMode('ADD').setDepth(58).setAlpha(0).setScale(1 - k * 0.09));
+      const pr = { t: 0 };
+      scene.tweens.add({
+        targets: pr, t: 1, delay: 160 + s * 90, duration: 300, ease: 'Cubic.easeIn',
+        onUpdate: () => dots.forEach((d, k) => {
+          const tt = clamp(pr.t * 1.35 - k * 0.055, 0, 1);
+          const p = ssQBez(from, ctrl, to, tt);
+          d.x = p.x; d.y = p.y; d.alpha = tt > 0 ? 1 - k * 0.11 : 0;
+        }),
+        onComplete: () => {
+          scene.starBurst.emitParticleAt(to.x, to.y, 6);
+          dots.forEach((d) => scene.tweens.add({ targets: d, alpha: 0, duration: 160, onComplete: () => d.destroy() }));
+          if (++landed === 1) impact(1);
+          if (landed === strands) finish();
+        },
+      });
+    }
+  },
+  // both claws sweep in from the sides and meet in a scissor of light
+  snap(scene, fx, impact, finish) {
+    const l = scene.L, c = fx.cont;
+    SFX.noise(0.22, 700, 1.6, 0.06, 1600);
+    scene.tweens.add({ targets: c, scaleX: 1.12, duration: 160, yoyo: true, ease: 'Sine.easeOut' });
+    const tgt = { x: l.x(0), y: l.y(460) };
+    const dotK = ssFxTex(scene, 'dot', fx.beast.tint);
+    let met = 0;
+    [-1, 1].forEach((side) => {
+      const from = { x: c.x + side * l.u(110), y: c.y + l.u(30) };
+      const ctrl = { x: tgt.x + side * l.u(150), y: (from.y + tgt.y) / 2 + l.u(30) };
+      const dots = [];
+      for (let k = 0; k < 5; k++) dots.push(scene.add.image(from.x, from.y, dotK).setBlendMode('ADD').setDepth(58).setAlpha(0).setScale(1.1 - k * 0.14));
+      const pr = { t: 0 };
+      scene.tweens.add({
+        targets: pr, t: 1, delay: 220, duration: 280, ease: 'Cubic.easeIn',
+        onUpdate: () => dots.forEach((d, k) => {
+          const tt = clamp(pr.t * 1.3 - k * 0.06, 0, 1);
+          const p = ssQBez(from, ctrl, tgt, tt);
+          d.x = p.x; d.y = p.y; d.alpha = tt > 0 ? 1 - k * 0.14 : 0;
+        }),
+        onComplete: () => {
+          dots.forEach((d) => scene.tweens.add({ targets: d, alpha: 0, duration: 140, onComplete: () => d.destroy() }));
+          if (++met === 2) {
+            impact(1);
+            const bg = scene.add.graphics().setDepth(58).setBlendMode('ADD');
+            bg.lineStyle(l.u(3.5), fx.beast.eye, 0.9);
+            bg.lineBetween(tgt.x - l.u(60), tgt.y - l.u(40), tgt.x + l.u(60), tgt.y + l.u(40));
+            bg.lineBetween(tgt.x - l.u(60), tgt.y + l.u(40), tgt.x + l.u(60), tgt.y - l.u(40));
+            scene.starBurst.emitParticleAt(tgt.x, tgt.y, 10);
+            scene.tweens.add({ targets: bg, alpha: 0, duration: 260, onComplete: () => bg.destroy() });
+            finish();
+          }
+        },
+      });
+    });
+  },
+  // the whole constellation dives across the board in a wing-trailed arc
+  swoop(scene, fx, impact, finish) {
+    const l = scene.L, c = fx.cont, boss = !!fx.beast.boss;
+    SFX.noise(0.5, 400, 1, 0.07, 900);
+    const tgt = { x: l.x(0), y: l.y(440) };
+    const side = Math.random() < 0.5 ? -1 : 1;
+    scene.tweens.add({
+      targets: c, y: fx.homeY - l.u(26), duration: 240, ease: 'Sine.easeOut',
+      onComplete: () => {
+        const p0 = { x: c.x, y: c.y };
+        const c1 = { x: fx.homeX + side * l.u(170), y: (fx.homeY + tgt.y) / 2 };
+        const pr = { t: 0 };
+        scene.tweens.add({
+          targets: pr, t: 1, duration: 380, ease: 'Quad.easeIn',
+          onUpdate: () => {
+            const p = ssQBez(p0, c1, tgt, pr.t);
+            c.x = p.x; c.y = p.y;
+            if (Math.random() < 0.6) scene.starBurst.emitParticleAt(c.x - side * l.u(30), c.y - l.u(16), 1);
+          },
+          onComplete: () => {
+            impact(boss ? 1.25 : 1);
+            scene.starBurst.emitParticleAt(c.x, c.y + l.u(20), boss ? 14 : 8);
+            const c2 = { x: fx.homeX - side * l.u(170), y: (fx.homeY + tgt.y) / 2 + l.u(30) };
+            const back = { t: 0 };
+            scene.tweens.add({
+              targets: back, t: 1, duration: 520, ease: 'Sine.easeOut',
+              onUpdate: () => { const p = ssQBez(tgt, c2, { x: fx.homeX, y: fx.homeY }, back.t); c.x = p.x; c.y = p.y; },
+              onComplete: finish,
+            });
+          },
+        });
+      },
+    });
+  },
+  // the dragon rears and pours a comet stream onto the board
+  breath(scene, fx, impact, finish) {
+    const l = scene.L, c = fx.cont;
+    SFX.noise(0.5, 300, 1, 0.07, 1500);
+    const headE = fx.beast.eyes[0];
+    scene.tweens.add({
+      targets: c, y: fx.homeY - l.u(22), rotation: -0.05, scaleX: 1.05, scaleY: 1.05, duration: 320, ease: 'Sine.easeOut',
+      onComplete: () => {
+        SFX.noise(1.0, 600, 0.9, 0.09, 150);
+        const tgt = { x: l.x(0), y: l.y(480) };
+        const dotK = ssFxTex(scene, 'dot', fx.beast.eye);
+        const dot2K = ssFxTex(scene, 'dot', fx.beast.tint);
+        const N = 16;
+        for (let k = 0; k < N; k++) {
+          scene.time.delayedCall(k * 42, () => {
+            if (fx.dead) return;
+            const f = { x: c.x + headE[0] * fx.sc, y: c.y + headE[1] * fx.sc };
+            const to = { x: tgt.x + (Math.random() - 0.5) * l.u(120), y: tgt.y + (Math.random() - 0.5) * l.u(60) };
+            const ctrl = { x: (f.x + to.x) / 2 + l.u(40), y: f.y - l.u(30) };
+            const d = scene.add.image(f.x, f.y, k % 3 ? dotK : dot2K).setBlendMode('ADD').setDepth(58).setScale(0.8 + Math.random() * 0.7);
+            const pr = { t: 0 };
+            scene.tweens.add({
+              targets: pr, t: 1, duration: 230, ease: 'Quad.easeIn',
+              onUpdate: () => { const p = ssQBez(f, ctrl, to, pr.t); d.x = p.x; d.y = p.y; },
+              onComplete: () => {
+                scene.starBurst.emitParticleAt(d.x, d.y, 2);
+                d.destroy();
+                if (k === 9) impact(1.35);
+                else if (k % 4 === 0) scene.cameras.main.shake(50, 0.002);
+              },
+            });
+          });
+        }
+        scene.time.delayedCall(N * 42 + 300, () => scene.tweens.add({
+          targets: c, y: fx.homeY, rotation: 0, scaleX: 1, scaleY: 1, duration: 420, ease: 'Sine.easeOut', onComplete: finish,
+        }));
+      },
+    });
+  },
+  // rear back, then gallop low across the board — hoofbeat bob, a stardust
+  // wake, and a trampling ground-ring (unicorn, bull; amp = the centaur's cut)
+  charge(scene, fx, impact, finish) {
+    const l = scene.L, c = fx.cont, amp = fx.def.amp || 1;
+    SFX.noise(0.5, 220, 1, 0.07, 260);
+    const side = Math.random() < 0.5 ? -1 : 1;
+    const tgt = { x: l.x(0), y: l.y(452) };
+    scene.tweens.add({
+      targets: c, y: fx.homeY - l.u(30), scaleX: 1.06, scaleY: 1.06, duration: 300, ease: 'Sine.easeOut',
+      onComplete: () => {
+        SFX.noise(0.7, 160, 1.1, 0.08, 90);
+        const p0 = { x: c.x, y: c.y };
+        const c1 = { x: fx.homeX + side * l.u(150), y: (fx.homeY + tgt.y) / 2 + l.u(20) };
+        const pr = { t: 0 };
+        scene.tweens.add({
+          targets: pr, t: 1, duration: 420, ease: 'Quad.easeIn',
+          onUpdate: () => {
+            const p = ssQBez(p0, c1, tgt, pr.t);
+            c.x = p.x;
+            c.y = p.y - Math.abs(Math.sin(pr.t * Math.PI * 3)) * l.u(10);   // gallop bob
+            if (Math.random() < 0.7) scene.starBurst.emitParticleAt(c.x - side * l.u(26), c.y + l.u(24), 1);
+          },
+          onComplete: () => {
+            impact(amp > 1 ? 1.3 : 1.15);
+            const ring = scene.add.image(c.x, c.y + l.u(30), ssFxTex(scene, 'ring', fx.beast.tint))
+              .setBlendMode('ADD').setAlpha(0.85).setScale(0.3).setDepth(58);
+            scene.tweens.add({ targets: ring, scale: l.u(2.4), alpha: 0, duration: 460, ease: 'Cubic.easeOut', onComplete: () => ring.destroy() });
+            scene.starBurst.emitParticleAt(c.x, c.y + l.u(26), 12);
+            scene.cameras.main.shake(120, 0.004);
+            const c2 = { x: fx.homeX - side * l.u(170), y: (fx.homeY + tgt.y) / 2 };
+            const back = { t: 0 };
+            scene.tweens.add({
+              targets: back, t: 1, duration: 540, ease: 'Sine.easeOut',
+              onUpdate: () => { const p = ssQBez(tgt, c2, { x: fx.homeX, y: fx.homeY }, back.t); c.x = p.x; c.y = p.y; },
+              onComplete: finish,
+            });
+          },
+        });
+      },
+    });
+  },
+  // draw and hold... then a fan of light-arrows streaks onto the board, each
+  // with its own thud (the archer's signature; the peacock's feather-darts)
+  volley(scene, fx, impact, finish) {
+    const l = scene.L, c = fx.cont, bolts = Math.max(3, fx.def.bolts | 0);
+    SFX.noise(0.35, 1200, 1.6, 0.05, 3000);
+    const headE = fx.beast.eyes[0];
+    scene.tweens.add({ targets: c, y: fx.homeY - l.u(14), scaleX: 0.965, duration: 340, ease: 'Sine.easeOut' });
+    const dotK = ssFxTex(scene, 'dot', fx.beast.eye);
+    const tgt = { x: l.x(0), y: l.y(470) };
+    let flown = 0;
+    for (let k = 0; k < bolts; k++) {
+      scene.time.delayedCall(430 + k * 120, () => {
+        if (fx.dead) return;
+        SFX.noise(0.12, 1800, 2.2, 0.03, 4200);
+        const f = { x: c.x + headE[0] * fx.sc, y: c.y + headE[1] * fx.sc };
+        const to = { x: tgt.x + (k - (bolts - 1) / 2) * l.u(52), y: tgt.y + Math.abs(k - (bolts - 1) / 2) * l.u(14) };
+        const darts = [];
+        for (let j = 0; j < 4; j++) darts.push(scene.add.image(f.x, f.y, dotK).setBlendMode('ADD').setDepth(58).setScale(1 - j * 0.18).setAlpha(0));
+        const pr = { t: 0 };
+        scene.tweens.add({
+          targets: pr, t: 1, duration: 170, ease: 'Linear',
+          onUpdate: () => darts.forEach((d, j) => {
+            const tt = clamp(pr.t - j * 0.07, 0, 1);
+            d.x = f.x + (to.x - f.x) * tt; d.y = f.y + (to.y - f.y) * tt;
+            d.alpha = tt > 0 ? 1 - j * 0.2 : 0;
+          }),
+          onComplete: () => {
+            darts.forEach((d) => scene.tweens.add({ targets: d, alpha: 0, duration: 120, onComplete: () => d.destroy() }));
+            scene.starBurst.emitParticleAt(to.x, to.y, 4);
+            scene.cameras.main.shake(60, 0.0024);
+            if (++flown === 1) impact(fx.beast.boss ? 1.3 : 1.05);
+            if (flown === bolts) scene.tweens.add({ targets: c, y: fx.homeY, scaleX: 1, duration: 380, ease: 'Sine.easeOut', onComplete: finish });
+          },
+        });
+      });
+    }
+  },
+  // the phoenix rises, whitens, and detonates in rings of dawn-fire
+  nova(scene, fx, impact, finish) {
+    const l = scene.L, c = fx.cont;
+    SFX.noise(0.9, 250, 1, 0.07, 2400);
+    scene.tweens.add({
+      targets: c, y: fx.homeY - l.u(46), scaleX: 1.1, scaleY: 1.1, duration: 430, ease: 'Sine.easeOut',
+      onComplete: () => {
+        const ringK = ssFxTex(scene, 'ring', fx.beast.eye);
+        const dotK = ssFxTex(scene, 'dot', fx.beast.tint);
+        scene.cameras.main.flash(360, 255, 200, 120, false);
+        for (let w = 0; w < 2; w++) {
+          const ring = scene.add.image(c.x, c.y, ringK).setBlendMode('ADD').setAlpha(0.85 - w * 0.25).setScale(0.3).setDepth(58);
+          scene.tweens.add({ targets: ring, scale: l.u(3.6 + w * 0.8), alpha: 0, delay: w * 130, duration: 620, ease: 'Cubic.easeOut', onComplete: () => ring.destroy() });
+        }
+        for (let k = 0; k < 22; k++) {
+          const a = (k / 22) * Math.PI * 2;
+          const d = scene.add.image(c.x, c.y, dotK).setBlendMode('ADD').setDepth(58).setScale(0.7 + Math.random() * 0.6);
+          scene.tweens.add({ targets: d, x: c.x + Math.cos(a) * l.u(240), y: c.y + Math.sin(a) * l.u(240), alpha: 0, duration: 560 + Math.random() * 200, ease: 'Cubic.easeOut', onComplete: () => d.destroy() });
+        }
+        scene.time.delayedCall(210, () => impact(1.5));
+        scene.tweens.add({ targets: c, y: fx.homeY, scaleX: 1, scaleY: 1, delay: 420, duration: 480, ease: 'Sine.easeOut', onComplete: finish });
+      },
+    });
+  },
+};
+
+// The factory. asm = ssAssembleBeast's return. opts.lite (home showcase):
+// presence only — no threat, no attacks, dimmer aura, no boss fanfare.
+function ssBeastFx(scene, cont, beast, unitScale, asm, opts) {
+  opts = opts || {};
+  const sc = unitScale * (beast.boss ? 1.15 : beast.tier === 'mini' ? 1.06 : 1);
+  const def = beast.fx || {};
+  const stars = asm.stars, eyes = asm.eyes, g = asm.lines;
+  const xs = beast.stars.map((p) => p[0]), ys = beast.stars.map((p) => p[1]);
+  const homes = beast.stars.map((p) => ({ x: p[0] * sc, y: p[1] * sc }));
+  const minX = Math.min.apply(null, xs), maxX = Math.max.apply(null, xs);
+  const minY = Math.min.apply(null, ys), maxY = Math.max.apply(null, ys);
+  const fx = {
+    scene, cont, beast, sc, stars, def, k: sc, ready: false, dead: false, attacking: false,
+    threat: 0, bright: 0, charged: false, armT: Infinity,
+    cx: (minX + maxX) / 2, cy: (minY + maxY) / 2, topY: minY + (maxY - minY) * 0.3,
+    homeX: cont.x, homeY: cont.y,
+  };
+  const idles = String(def.idle || '').split('+').map((n) => SS_IDLE_FX[n]).filter(Boolean);
+  const lw = unitScale * 1.25;
+  // the served line rides the live redraw too (slice 3): px-space inset radii
+  // for ssEdgeSeg — the helper adds a flat 2.5, so the radius carries the
+  // rest of (SS_MAG_R + 2.5)·sc and the inset lands scaled, exactly the
+  // chart's unit-space law at this surface's grade
+  const mags = ssStarMags(beast);
+  const insR = mags.map((m) => SS_MAG_R[m] * sc + 2.5 * (sc - 1));
+
+  // eyes ride the idle field of their nearest star
+  const eyeMeta = beast.eyes.map((e) => {
+    let bi = 0, bd = 1e9;
+    beast.stars.forEach((p, i) => {
+      const dx = p[0] - e[0], dy = p[1] - e[1], d = dx * dx + dy * dy;
+      if (d < bd) { bd = d; bi = i; }
+    });
+    return { hx: e[0], hy: e[1], i: bi, x0: e[0] * sc, y0: e[1] * sc };
+  });
+
+  // ---- the nebula body: soft glow blobs behind the lines, breathing slowly
+  const glowKey = ssFxTex(scene, 'glow', beast.tint);
+  const anchors = [{ x: fx.cx, y: fx.cy, s: 1.25 }];
+  const stepN = Math.max(2, Math.floor(beast.stars.length / (beast.boss ? 4 : 5)));
+  for (let i = 0; i < beast.stars.length; i += stepN) anchors.push({ x: xs[i], y: ys[i], s: 0.62 });
+  const baseA = (opts.lite ? 0.07 : beast.boss ? 0.13 : beast.tier === 'mini' ? 0.115 : 0.1);
+  const aura = anchors.map((a, i) => {
+    const im = scene.add.image(a.x * sc, a.y * sc, glowKey).setBlendMode('ADD').setAlpha(0);
+    im.hx = a.x * sc; im.hy = a.y * sc;
+    im.baseS = 0.69 * a.s * sc * (beast.boss ? 1.3 : 1);
+    im.baseA = baseA * (i === 0 ? 1.4 : 1);
+    im.w = 0.55 + (i * 0.37) % 0.6; im.ph = i * 1.93;
+    cont.addAt(im, 0);
+    return im;
+  });
+  // bosses wear a slow-turning halo ring — the tier marker
+  let halo = null;
+  if (beast.boss && !opts.lite) {
+    halo = scene.add.image(fx.cx * sc, fx.cy * sc, ssFxTex(scene, 'ring', beast.tint)).setBlendMode('ADD').setAlpha(0);
+    halo.baseS = 1.5 * sc;
+    cont.addAt(halo, 0);
+  }
+
+  // ---- traveling glints: starlight running along the edges
+  const glints = [];
+  const spawnGlint = () => {
+    if (fx.dead || !fx.ready || glints.length >= (beast.boss ? 3 : 2)) return;
+    const e = beast.edges[Math.floor(Math.random() * beast.edges.length)];
+    const gi = scene.add.image(stars[e[0]].x, stars[e[0]].y, 'dot').setBlendMode('ADD').setScale(0.45).setAlpha(0);
+    cont.add(gi); glints.push(gi);
+    const pr = { t: 0 };
+    scene.tweens.add({
+      targets: pr, t: 1, duration: 420 + Math.random() * 260, ease: 'Sine.easeInOut',
+      onUpdate: () => {
+        const a = stars[e[0]], b = stars[e[1]];
+        gi.x = a.x + (b.x - a.x) * pr.t; gi.y = a.y + (b.y - a.y) * pr.t;
+        gi.alpha = Math.sin(pr.t * Math.PI) * 0.9;
+      },
+      onComplete: () => { glints.splice(glints.indexOf(gi), 1); gi.destroy(); },
+    });
+  };
+  const glintTimer = scene.time.addEvent({
+    delay: 640, loop: true,
+    callback: () => { if (Math.random() < 0.35 + fx.threat * 0.5 + (beast.boss ? 0.2 : 0)) spawnGlint(); },
+  });
+
+  // ---- arm once the assembly finishes (fly-in tweens own the stars until then)
+  const armTimer = scene.time.delayedCall(beast.stars.length * 40 + 760, () => {
+    fx.ready = true; fx.armT = scene.time.now;
+    scene.tweens.killTweensOf(g); g.setAlpha(1);   // fx owns line alpha per-edge now
+    if (beast.boss && !opts.lite) {                // the boss announces its tier
+      scene.cameras.main.flash(300, 60, 50, 90);
+      SFX.noise(0.8, 120, 1, 0.08, 50);
+      const rk = scene.add.image(cont.x, cont.y, ssFxTex(scene, 'ring', beast.tint))
+        .setBlendMode('ADD').setDepth(55).setAlpha(0.7).setScale(0.4 * sc);
+      scene.tweens.add({ targets: rk, scale: 2.6 * sc, alpha: 0, duration: 700, ease: 'Cubic.easeOut', onComplete: () => rk.destroy() });
+    }
+  });
+
+  // ---- per-frame: idle field, live line redraw (shimmer), aura breath
+  const upd = (time, delta) => {
+    if (fx.dead) return;
+    const T = time / 1000;
+    fx.bright *= Math.exp(-(delta || 16) / 150);
+    const gain = clamp((time - fx.armT) / 900, 0, 1);
+    const heat = 1 + fx.threat * 1.1 + fx.bright * 1.6;
+    for (let i = 0; i < aura.length; i++) {
+      const b = aura[i];
+      b.alpha = Math.min(0.5, gain * b.baseA * (0.7 + 0.3 * Math.sin(T * b.w + b.ph)) * heat);
+      b.setScale(b.baseS * (1 + 0.08 * Math.sin(T * b.w * 1.3 + b.ph)));
+      b.x = b.hx + Math.sin(T * 0.4 + b.ph) * 3 * sc;
+      b.y = b.hy + Math.cos(T * 0.31 + b.ph) * 2 * sc;
+    }
+    if (halo) {
+      halo.alpha = Math.min(0.6, gain * (0.16 + fx.threat * 0.2 + fx.bright * 0.3) * (0.8 + 0.2 * Math.sin(T * 0.9)));
+      halo.rotation = T * 0.12;
+      halo.setScale(halo.baseS * (1 + 0.06 * Math.sin(T * 0.7)));
+    }
+    if (!fx.ready) return;
+    // idle: creature-specific offsets over the authored homes
+    for (let i = 0; i < stars.length; i++) {
+      const o = { x: 0, y: 0 };
+      for (let f = 0; f < idles.length; f++) idles[f](fx, T, i, xs[i], ys[i], o);
+      stars[i].x = homes[i].x + o.x * gain;
+      stars[i].y = homes[i].y + o.y * gain;
+    }
+    for (let i = 0; i < eyeMeta.length; i++) {
+      const em = eyeMeta[i], eye = eyes[i];
+      if (!eye) continue;
+      const o = { x: 0, y: 0 };
+      for (let f = 0; f < idles.length; f++) idles[f](fx, T, em.i, em.hx, em.hy, o);
+      eye.x = em.x0 + o.x * gain; eye.y = em.y0 + o.y * gain;
+      if (fx.charged) eye.setScale(0.9 + Math.max(0, Math.sin(T * 7)) * 0.5);
+    }
+    // edges redrawn from live star positions — starlight shimmer, per edge,
+    // each segment still the served line: inset off the breathing endpoints
+    // every frame, round caps closing the ends (a line never pierces a star)
+    g.clear();
+    for (let ei = 0; ei < beast.edges.length; ei++) {
+      const e = beast.edges[ei], a = stars[e[0]], b = stars[e[1]];
+      const seg = ssEdgeSeg([a.x, a.y], [b.x, b.y], insR[e[0]], insR[e[1]]);
+      if (!seg) continue;
+      const al = clamp(0.3 + Math.sin(T * 1.35 + ei * 1.71) * 0.13 + fx.threat * 0.18 + fx.bright * 0.6, 0.12, 1);
+      g.lineStyle(lw, 0xffffff, al);
+      g.lineBetween(seg.x1, seg.y1, seg.x2, seg.y2);
+      g.fillStyle(0xffffff, al);
+      g.fillCircle(seg.x1, seg.y1, lw / 2);
+      g.fillCircle(seg.x2, seg.y2, lw / 2);
+    }
+    // the body breathes (container scale) unless an attack owns the transform
+    if (!fx.attacking) {
+      const s = 0.5 + 0.5 * Math.sin(T * 1.96);
+      cont.setScale(1 + s * 0.035, 1 - s * 0.028);
+    }
+  };
+  scene.events.on('update', upd);
+
+  // ---- api ----
+  fx.setThreat = (v) => {
+    fx.threat = clamp(v || 0, 0, 1);
+    const ch = fx.threat >= 0.999;
+    if (ch && !fx.charged) {
+      fx.charged = true;
+      fx.bright = Math.max(fx.bright, 0.5);
+      SFX.noise(0.6, 160, 1.1, 0.05, 60);   // low rumble — the sky tenses
+    } else if (!ch && fx.charged) {
+      fx.charged = false;
+      eyes.forEach((e) => e.setScale(0.9));
+    }
+  };
+  fx.hitFlash = () => { fx.bright = 1; };
+  fx.attack = (onImpact) => {
+    const name = SS_ATK_FX[def.atk] ? def.atk : 'pounce';
+    window.__SSFX = window.__SSFX || { atk: {} };
+    window.__SSFX.atk[name] = (window.__SSFX.atk[name] | 0) + 1;
+    fx.attacking = true;
+    let hit = false;
+    const impact = (mult) => { if (!hit) { hit = true; onImpact(mult || 1); } };
+    // watchdog: a strike must always land — a stalled archetype ends the run's turn
+    scene.time.delayedCall(2600, () => impact(1));
+    SS_ATK_FX[name](scene, fx, impact, () => {
+      fx.attacking = false;
+      if (!fx.dead) { cont.setPosition(fx.homeX, fx.homeY); cont.setRotation(0); }
+    });
+  };
+  fx.die = () => {
+    if (fx.dead) return;
+    fx.dead = true;
+    glintTimer.remove();
+    const parts = halo ? aura.concat([halo]) : aura;
+    parts.forEach((b) => scene.tweens.add({
+      targets: b, x: fx.cx * sc, y: fx.cy * sc, alpha: 0, scale: b.baseS * 0.2, duration: 550, ease: 'Cubic.easeIn',
+    }));
+  };
+  fx.destroy = () => {
+    fx.dead = true;
+    scene.events.off('update', upd);
+    glintTimer.remove();
+    if (armTimer) armTimer.remove(false);
+  };
+  scene.events.once('shutdown', fx.destroy);
+  return fx;
+}
+
+/* ---- tappable sky signs (v0.76.0, re-aimed v0.81.0) -----------------------
+   Skylar (9/2): "if you tap on the horse star sign when it's on the screen,
+   it does a little animation where the horse is rearing." — and (9/3): the
+   horse signs he meant are CENTAURUS and SAGITTARIUS, and "Sagittarius
+   should shoot a shooting star when you click on his constellation if it
+   pops up on the main page." So: CENTAURUS rears, SAGITTARIUS looses a
+   shooting star, and monoceros returns to pure presence. SS_SKY_TAPS maps
+   beast id → flourish(scene, fx); the meadow showcase (buildMeadowUi's
+   cycle) arms ONE tap zone while a registered sign stands, so another
+   sign becomes tappable by adding an entry here. A flourish is a sky
+   gesture, not an attack: it stays in the sky, never dives at the meadow,
+   never shakes the camera. It borrows the container the way battle
+   attacks do (fx.attacking parks the breath) and leaves through
+   fx.skyDone(), which always restores the transform — the 9s cycle calls
+   fx.skyDone(true) before tearing the standing sign down, so a fade that
+   catches a flourish mid-beat can neither orphan its sprites nor hand the
+   next sign's fx a deformed home capture. */
+// shared plumbing: the tween/sprite ledgers and the skyDone contract
+function ssSkyBeat(scene, fx) {
+  const live = [], sprites = [];
+  const done = fx.skyDone = (cut) => {
+    if (fx.skyDone !== done) return;   // once — natural end and cycle cut may race
+    fx.skyDone = null;
+    for (const t of live) { try { t.stop(); } catch (e) { } }
+    for (const g of sprites) { try { g.destroy(); } catch (e) { } }
+    if (!fx.dead) { fx.cont.setPosition(fx.homeX, fx.homeY); fx.cont.setRotation(0); }
+    fx.attacking = false;
+    if (cut) window.__SSSKY.cut++; else window.__SSSKY.done++;
+  };
+  // rotate the figure about a container-local pivot: home + p − R(r)·p —
+  // stars, edges, eyes and aura ride as one, and the idle keeps breathing
+  // through the stars, which is what keeps it a living thing and not a
+  // turning decal
+  const pose = (px, py, r) => {
+    const cos = Math.cos(r), sin = Math.sin(r);
+    fx.cont.setRotation(r);
+    fx.cont.x = fx.homeX + px - (px * cos - py * sin);
+    fx.cont.y = fx.homeY + py - (px * sin + py * cos);
+  };
+  const tw = (pr, px, py, to, dur, ease, extra, cb) => {
+    const t = scene.tweens.add(Object.assign({
+      targets: pr, r: to, duration: dur, ease, onUpdate: () => pose(px, py, pr.r), onComplete: cb,
+    }, extra || {}));
+    live.push(t);
+    return t;
+  };
+  fx.attacking = true;
+  return { live, sprites, done, pose, tw };
+}
+// THE FIRSTBORN CENTAUR rears: the horse-half pivots up on the hind hooves
+// (the hind-leg chain bottoms out at [46,54]); positive rotation swings the
+// head side — the left — up at the sky, and BOTH drawn forelegs (hooves
+// [-36,52] and [-16,54]) paw sparks on the way.
+function ssSkyRearCentaur(scene, fx) {
+  const c = fx.cont, sc = fx.sc;
+  const B = ssSkyBeat(scene, fx), px = 48 * sc, py = 52 * sc;
+  // a forehoof paws: one glint flicks down-forward off the striking leg
+  const flick = (hx, hy) => {
+    const gi = scene.add.image(hx * sc, hy * sc, 'dot').setBlendMode('ADD').setScale(0.55).setAlpha(0.95);
+    c.add(gi); B.sprites.push(gi);
+    B.live.push(scene.tweens.add({
+      targets: gi, x: (hx - 17) * sc, y: (hy + 14) * sc, alpha: 0, scale: 0.2,
+      duration: 210, ease: 'Cubic.easeOut',
+    }));
+    SFX.noise(0.1, 1600, 1, 0.025, 2600);
+  };
+  const pr = { r: 0 };
+  const tw = (to, dur, ease, extra, cb) => B.tw(pr, px, py, to, dur, ease, extra, cb);
+  SFX.noise(0.3, 230, 1, 0.04, 650);              // hooves gather — a boss's weight
+  tw(-0.05, 160, 'Sine.easeOut', null, () => {    // a breath of crouch — anticipation
+    fx.hitFlash();                                 // the figure flares as it goes up
+    SFX.noise(0.6, 170, 1.1, 0.06, 600);           // the rise
+    tw(0.32, 450, 'Back.easeOut', null, () => {
+      // at the top the body rocks and the forelegs paw at the sky — the
+      // two drawn legs strike in turn
+      tw(0.26, 200, 'Sine.easeInOut', {
+        yoyo: true, repeat: 1,
+        onYoyo: () => { flick(-36, 52); scene.time.delayedCall(90, () => { if (fx.skyDone === B.done) flick(-16, 54); }); },
+      }, () => {
+        tw(-0.026, 250, 'Quad.easeIn', null, () => {   // the forehooves drop…
+          SFX.noise(0.2, 110, 1, 0.05, 60);            // …and land, softly
+          fx.bright = Math.max(fx.bright, 0.5);        // touchdown shimmer
+          tw(0, 200, 'Sine.easeOut', null, () => B.done());
+        });
+      });
+    });
+  });
+}
+// THE ZENITH ARCHER looses a shooting star: his own chart draws the bow
+// (stars [-44,-58]·[-56,-38]·[-48,-16]) and the nocked arrow (the line from
+// [-30,-38] out to the head at [-70,-44]) — the aim lifts as he leans back
+// on the hind hooves, a glint draws the string, and the star flies his
+// authored arrow line: one of the meadow sky's own shooting stars
+// (ssShootingStar's head-and-chained-trail, quoted exactly) made deliberate.
+function ssSkyLooseStar(scene, fx) {
+  const c = fx.cont, sc = fx.sc;
+  const B = ssSkyBeat(scene, fx), px = 64 * sc, py = 56 * sc;
+  const pr = { r: 0 };
+  const tw = (to, dur, ease, extra, cb) => B.tw(pr, px, py, to, dur, ease, extra, cb);
+  fx.hitFlash();                                   // the tap is answered at once
+  SFX.noise(0.5, 340, 1.2, 0.035, 130);            // the draw — tension, falling pitch
+  // the drawstring glint: the nock pulls back along the arrow's own line
+  const nock = scene.add.image(-30 * sc, -38 * sc, 'dot').setBlendMode('ADD').setScale(0.5).setAlpha(0);
+  c.add(nock); B.sprites.push(nock);
+  B.live.push(scene.tweens.add({ targets: nock, x: -16 * sc, y: -36 * sc, alpha: 0.95, duration: 430, ease: 'Sine.easeOut' }));
+  let waits = 2;   // the archer's settle AND the star's flight both land before done
+  const part = () => { if (--waits === 0) B.done(); };
+  tw(0.06, 480, 'Sine.easeOut', null, () => {      // the aim lifts skyward…
+    tw(0.06, 160, 'Linear', null, () => {          // …and steadies. loose!
+      const r0 = 0.06, cos = Math.cos(r0), sin = Math.sin(r0);
+      // arrowhead + aim line in world space, under the lifted pose
+      const ax = -70 * sc, ay = -44 * sc;
+      const sx = c.x + ax * cos - ay * sin, sy = c.y + ax * sin + ay * cos;
+      const dx = -0.976, dy = -0.146;               // the chart's own arrow direction
+      const ndx = dx * cos - dy * sin, ndy = dx * sin + dy * cos;
+      const l = ssLayout(scene), D = l.u(370);
+      SFX.noise(0.25, 900, 1, 0.06, 3200);          // the whoosh
+      fx.bright = Math.max(fx.bright, 0.7);         // the constellation flares as it leaves
+      nock.setAlpha(0);
+      window.__SSSKY.stars++; window.__SSSKY.sx = sx;   // the beacon sees the spawn, not just the frames
+      const head = scene.add.image(sx, sy, 'dot').setScale(1.25).setTint(0xfff2c9).setBlendMode('ADD').setDepth(1);
+      const trail = [];
+      for (let i = 0; i < 7; i++) trail.push(scene.add.image(sx, sy, 'dot').setScale(0.75 - i * 0.08).setAlpha(0.55 - i * 0.06).setTint(0xcfe0ff).setBlendMode('ADD').setDepth(1));
+      B.sprites.push(head); for (const t of trail) B.sprites.push(t);
+      B.live.push(scene.tweens.add({
+        targets: head, x: sx + ndx * D, y: sy + ndy * D, alpha: 0, duration: 700, ease: 'Cubic.easeOut',
+        onUpdate: () => {
+          window.__SSSKY.sx = head.x;
+          for (let i = trail.length - 1; i > 0; i--) { trail[i].x = trail[i - 1].x; trail[i].y = trail[i - 1].y; }
+          trail[0].x = head.x; trail[0].y = head.y;
+        },
+        onComplete: () => {                          // burnout — a small wish of sparks
+          SFX.noise(0.25, 2400, 1, 0.02, 500);
+          for (let i = 0; i < 3; i++) {
+            const w = scene.add.image(head.x, head.y, 'dot').setBlendMode('ADD').setScale(0.5).setAlpha(0.9).setDepth(1);
+            B.sprites.push(w);
+            B.live.push(scene.tweens.add({
+              targets: w, x: head.x + (i - 1) * l.u(9), y: head.y + (i % 2 ? -1 : 1) * l.u(7),
+              alpha: 0, scale: 0.15, duration: 300, ease: 'Cubic.easeOut',
+            }));
+          }
+          scene.time.delayedCall(320, () => { if (fx.skyDone === B.done) part(); });
+        },
+      }));
+      tw(0.075, 90, 'Sine.easeOut', null, () => {   // the string's kick…
+        tw(0, 330, 'Sine.easeOut', null, () => part());   // …and the archer settles
+      });
+    });
+  });
+}
+// the registry — Skylar's two horse signs; a new line here is a new tappable sign
+const SS_SKY_TAPS = { centaurus: ssSkyRearCentaur, sagittarius: ssSkyLooseStar };
+// what the harness reads: the armed sign, raw zone contacts, taps the guards
+// turned away, flourishes played, natural finishes, cycle cuts, stars loosed
+// (sx = the flying star's live x, sampled by the suite to prove travel)
+window.__SSSKY = { armed: null, taps: 0, blocked: 0, plays: 0, done: 0, cut: 0, stars: 0, sx: 0 };
+
+/* ---- tile glyph cache ----------------------------------------------------
+   Board tiles used to carry two live Text objects each — 32 fresh canvas
+   rasters + GPU uploads landing in the single frame that builds a board,
+   the biggest slice of the arrival hitch at the top of the rise (and a
+   smaller one on every mid-battle refill and word-line tap). Letters and
+   values bake once per (glyph, ink) into small canvas textures — idle-
+   prewarmed from the meadow — and tiles just point images at them.
+   Box is 64x48 design units with the letter at font 36 (Qu at 30); consumers
+   scale the box, so the word-line's font-20 look is the same texture at
+   20/36 scale. */
+const SS_TILE_INK = ['#3a3020', '#5a3c05', '#1d4a66', '#1f4d22'];    // letter ink per tier (3 = dew)
+// value ink per tier — deliberately near the letter ink's darkness: the old
+// pale inks made the worth unreadable at arm's length (Wyatt's call)
+const SS_TILE_VINK = ['#655636', '#5f420a', '#215a7c', '#22572a'];
+// …and the ink when a held sigil raises the letter (Skylar 9/1: the board must
+// show the true worth, not just the cast): the same darkness a shade WARMER on
+// the plain and gilded faces, and every raised chip wears a small spark
+// (ssGlyphVal's 4th argument) — the quiet tell that reads "this S is worth 3
+// because of my River Runes". The star tile's blue face keeps its ink (warm
+// brown muddies on blue glass); the spark carries the tell alone there. The
+// dew chip is never raised — ♥6 stands, the heal is that tile's worth.
+const SS_BUFF_VINK = ['#7d4a10', '#6e3c03', '#215a7c', '#22572a'];
+// per-letter sigil bonuses, data-driven off SS_SIGILS `lb` entries — the ONE
+// place the chip, the CAST preview, the blackout's weighing and every damage
+// loop (solo, versus, and the rival engine, which passes its room's own
+// vowels) all read, so the printed tile can never drift from the damage math.
+// First character decides, exactly as the damage loop always has (RR rides an
+// `r` rune; Qu is q).
+// `tiers` (v0.66.0) is the run's id → tier map: a strengthened choir/runes
+// pays its tier's lb through the same one lookup. Callers with no tiers
+// (versus, the rival engine, the profile) read tier I — today's numbers.
+function ssSigilLetterAdd(sigils, ch, vowels, tiers) {
+  let add = 0;
+  const c0 = ch[0], vw = vowels || VOWELS;
+  for (const id of sigils) {
+    const lb = ssSigilVal(id, 'lb', tiers ? tiers[id] : 1);
+    if (!lb) continue;
+    if ((lb.letters && lb.letters.includes(c0)) || (lb.vowels && vw.includes(c0))) add += lb.add;
+  }
+  return add;
+}
+// per-battle allowance sigils, data-driven off SS_SIGILS `charges` — Comet
+// Trail's free-scry count lives on the def; the tier ladder turns it
+// (base 1, rare 2, legendary 3) and nothing here moves. The battle grants
+// the count at every startFight and spends it scry by scry. Bare calls
+// (no tier) read tier I — exactly the pre-tier behavior.
+function ssSigilCharges(id, tier) {
+  const c = ssSigilVal(id, 'charges', tier || 1);
+  return c ? Math.max(0, c | 0) : 0;
+}
+// the dew's value chip is ♥6, never the letter's points — orange↔green is the
+// classic colorblind pair and the heart is the tell (SS_TILE_VINK[3] ink)
+const SS_DEW_CHIP = () => '♥' + DEW_HEAL;
+// the blackout curse: inked letters read in pale ash on the void face —
+// still legible, clearly cursed, and the flat 0 says what they're worth
+const SS_BLK_INK = '#b9b0d8';
+const SS_TIER_GLOW = [0xffd77a, 0xffd77a, 0x9fd8ff, 0xa8e88a];   // bloom tint per tier
+const SS_BLK_VINK = '#9a90c4';
+const SS_LINE_GREEN = '#1d6a35';                          // word-line "valid" ink
+function ssGlyph(scene, ch, color) {
+  const key = 'gl-' + ch + '-' + color;
+  if (!scene.textures.exists(key)) {
+    // multi-letter tiles (Qu, and CH/LL/RR in Spanish) drop to 30 to fit the
+    // box; accented caps (Ñ Ä Ö Ü Ç) drop to 32 with no downward nudge so the
+    // tilde/umlaut keeps headroom instead of clipping at the canvas top
+    const R = ssTexRes(scene), acc = ch.length === 1 && /[ñäöüç]/.test(ch);
+    const fs = ch.length > 1 ? 30 : acc ? 32 : 36;
+    const t = scene.textures.createCanvas(key, Math.round(64 * R), Math.round(48 * R));
+    const c = t.context;
+    c.scale(R, R);
+    c.font = 'bold ' + fs + 'px ' + SERIF;
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillStyle = color;
+    // caps sit a touch above the em middle in serifs — nudge to optical centre
+    c.fillText(ch === 'qu' ? 'Qu' : ch.toUpperCase(), 32, 24 + fs * (acc ? 0.02 : 0.06));
+    t.refresh();
+  }
+  return key;
+}
+function ssGlyphVal(scene, v, color, spark) {
+  // the spark is part of the key — a raised chip and a plain chip that happen
+  // to print the same number are different textures
+  const key = 'gv-' + v + '-' + color + (spark ? '-s' : '');
+  if (!scene.textures.exists(key)) {
+    const R = ssTexRes(scene);
+    const t = scene.textures.createCanvas(key, Math.round(30 * R), Math.round(20 * R));
+    const c = t.context;
+    c.scale(R, R);
+    // 15px, up from 12 — the point value has to read at arm's length on a
+    // phone without shouldering the main letter aside
+    c.font = 'bold 15px ' + SERIF;
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillStyle = color;
+    c.fillText(String(v), 15, 10.7);
+    if (spark) {
+      // a held sigil raised this letter: a small four-point spark in the
+      // number's own ink, riding the chip's upper-right corner (clear of a
+      // two-digit value — 20 is the widest chip the game can mint)
+      c.beginPath();
+      for (let i = 0; i < 8; i++) {
+        const a = i * Math.PI / 4 - Math.PI / 2, r = i % 2 ? 1.1 : 3.1;
+        c[i ? 'lineTo' : 'moveTo'](26.5 + Math.cos(a) * r, 4.7 + Math.sin(a) * r);
+      }
+      c.closePath(); c.fill();
+    }
+    t.refresh();
+  }
+  return key;
+}
+function ssPrewarmGlyphs(scene) {
+  const jobs = [];
+  // a standing climb's letter-bonus sigils (River Runes, the Choir) mean the
+  // resume deals RAISED chips — prewarm those variants too, or the board
+  // build at the top of the rise bakes them all in one frame
+  let held = [], heldT = {};
+  try {
+    const cp = JSON.parse(localStorage.getItem('beta3.campaign')) || {};
+    held = cp.sigils || []; heldT = cp.tiers || {};
+  } catch (e) { }
+  if (!Array.isArray(held)) held = [];
+  for (const base of Object.keys(PACK.bag)) {
+    const ch = PACK.digraph[base] || base;
+    const add = ssSigilLetterAdd(held, ch, undefined, heldT);
+    for (let tier = 0; tier < 4; tier++) {
+      const v = tier === 3 ? SS_DEW_CHIP() : (VALS[ch] || VALS[ch[0]] || 1) + (tier === 1 ? 6 : 0);
+      jobs.push(() => { ssGlyph(scene, ch, SS_TILE_INK[tier]); ssGlyphVal(scene, v, SS_TILE_VINK[tier]); });
+      if (add > 0 && tier < 3) jobs.push(() => ssGlyphVal(scene, v + add, SS_BUFF_VINK[tier], true));
+    }
+    jobs.push(() => ssGlyph(scene, ch, SS_LINE_GREEN));
+  }
+  // a few per tick — baking all ~130 in one frame would itself hitch the idle
+  const ev = scene.time.addEvent({
+    delay: 40, loop: true, callback: () => {
+      for (let i = 0; i < 6 && jobs.length; i++) jobs.shift()();
+      if (!jobs.length) ev.remove();
+    },
+  });
+}
+
+function ssTxt(scene, x, y, str, size, color, style) {
+  // shadow stays tight — a soft wide black blur turned small text to smear on
+  // gold buttons at retina; a crisp 1px-ish drop keeps contrast without mush
+  return scene.add.text(x, y, str, {
+    fontFamily: SERIF, fontSize: size + 'px', color: color || '#f0e8d2', fontStyle: style || 'bold',
+  }).setShadow(0, Math.max(1, size * 0.05), 'rgba(0,0,0,0.45)', size * 0.09);
+}
+
+/* ---- ONE LINE PER TEXT -----------------------------------------------------
+   TestFlight v0.43.0 (8/21): FIRST LIGHT, BLOOD INK and LEYLINE ROOTS reached
+   Wyatt's phone with their effect text BLANK — and v0.38's MOONWARD before
+   them. Every victim is a desc that WRAPS TO A SECOND LINE; every one-line
+   desc renders. A Phaser multi-line wrapped-italic bake produces an inkless
+   canvas on iOS WebKit for these strings, every time, and the healer's
+   RE-bake fails the same way — so the fix is to never ask Phaser to bake a
+   multi-line Text on these surfaces at all. Phaser's own wrap measurement is
+   still used (so the breaks land exactly where wordWrap put them), but each
+   line becomes its OWN single-line Text object, stacked at the same
+   lineSpacing. Single-line bakes are proven good on his device.
+   Scripts: the shipped five (en/es/fr/pt/de — the v0.71.0 cut) all break at
+   spaces, but CONTENT can still carry CJK glyphs (a rival's player-typed
+   name, say), which wrap without spaces — the sniff below keeps char-level
+   (advanced) wrap for those strings. A word that cannot break inside the
+   width shrinks the whole block's font (to 70%) rather than ever baking a
+   multi-line Text.
+   Returns { lines, size } — the line strings and the font size that fit. */
+function ssWrapLines(scene, str, style, wrapW) {
+  const s = String(str == null ? '' : str);
+  const cjk = /[぀-ヿ㐀-鿿]/.test(s);
+  const size0 = parseFloat(style.fontSize) || 12;
+  let size = size0, lines = [s];
+  for (let tries = 0; tries < 12; tries++) {
+    const probe = scene.make.text({
+      text: s, style: Object.assign({}, style, { fontSize: size + 'px', wordWrap: { width: wrapW, useAdvancedWrap: cjk } }),
+    }, false);
+    let fits = true;
+    try {
+      const w = probe.getWrappedText(s);
+      lines = Array.isArray(w) ? w.slice() : String(w).split('\n');
+      probe.style.syncFont(probe.canvas, probe.context);
+      for (const ln of lines) if (probe.context.measureText(ln).width > wrapW + 0.5) { fits = false; break; }
+    } catch (e) { fits = true; }
+    probe.destroy();
+    if (fits || size <= size0 * 0.7) break;
+    size = Math.max(size0 * 0.7, size - Math.max(0.5, size0 * 0.06));
+  }
+  return { lines, size };
+}
+// A wrapped paragraph as a container of single-line Texts. `o` carries the
+// Text style (fontSize/color/fontStyle, SERIF by default) plus wrapW (px),
+// lineSpacing (px), align ('left'|'center'), ox/oy (origin), shadow (the
+// ssTxt drop) and sf (scrollFactor 0 on EVERY child — inside a container the
+// camera consults the child's, see tools/README.md). Sizes itself so
+// `.height` reads like a Text's for the rite's measured ladder; `.lines` are
+// the children, `setBlockText` rebuilds them in place. No child ever holds
+// a newline: that is the law the suites pin.
+function ssTextBlock(scene, x, y, str, o) {
+  const c = scene.add.container(x, y);
+  c.setData('textBlock', true);
+  c.lines = [];
+  c.blockOpts = o;
+  const build = (txt) => {
+    for (const t of c.lines) t.destroy();
+    c.lines = [];
+    const style = { fontFamily: o.fontFamily || SERIF, fontSize: o.fontSize, color: o.color, fontStyle: o.fontStyle || 'normal' };
+    const wrapW = o.wrapW, sp = o.lineSpacing || 0, ox = o.ox || 0, oy = o.oy || 0;
+    const r = ssWrapLines(scene, txt, style, wrapW);
+    style.fontSize = r.size + 'px';
+    const made = r.lines.map((ln) => {
+      const t = scene.add.text(0, 0, ln, style);
+      if (o.shadow) t.setShadow(0, Math.max(1, r.size * 0.05), 'rgba(0,0,0,0.45)', r.size * 0.09);
+      if (o.sf) t.setScrollFactor(0);
+      return t;
+    });
+    const lh = made.length ? made[0].height : 0;
+    const n = made.length, totalH = n * lh + Math.max(0, n - 1) * sp;
+    const blockW = Math.max(wrapW || 0, ...made.map((t) => t.width));
+    made.forEach((t, k) => {
+      const ly = -oy * totalH + k * (lh + sp);
+      if (o.align === 'center') t.setOrigin(0.5, 0).setPosition((0.5 - ox) * blockW, ly);
+      else t.setOrigin(0, 0).setPosition(-ox * blockW, ly);
+      c.add(t);
+    });
+    c.lines = made;
+    c.setSize(blockW, totalH);
+    c.text = txt;
+  };
+  c.setBlockText = (txt) => { if (c.active) build(String(txt == null ? '' : txt)); return c; };
+  // the Text verbs call sites already use, so a wrapped label can swap in
+  c.setText = c.setBlockText;
+  c.setColor = (col) => { o.color = col; return c.setBlockText(c.text); };
+  if (o.sf) c.setScrollFactor(0);
+  build(String(str == null ? '' : str));
+  return c;
+}
+
+/* ---- blank-text self-healing ---------------------------------------------
+   TestFlight, 8/19: a rare sigil card reached Wyatt's screen with its rarity
+   ribbon painted and its effect text BLANK — the one Text object on the card
+   that drew nothing, unreproducible in headless Chrome AND real WebKit (both
+   renderers, notch insets and all). Every Phaser Text bakes its string into a
+   private canvas ONCE and blits that canvas each frame, so a single failed or
+   purged bake (iOS reclaims canvas backing stores under pressure and in the
+   background) is INVISIBLE to the game and permanent on screen. This sweeps a
+   scene's live Texts, samples each canvas's alpha, and re-bakes any that hold
+   a non-empty string but zero ink. Runs after the surfaces where a silent
+   blank costs the player information (sigil cards, inspector, end screen) and
+   whenever the app returns to the foreground. DIAG counts every save. */
+function ssHasInk(o) {
+  const cw = o.canvas.width, ch = o.canvas.height;
+  if (!cw || !ch) return false;
+  const ctx = o.context || o.canvas.getContext('2d');
+  const d = ctx.getImageData(0, 0, Math.min(cw, 512), Math.min(ch, 256)).data;
+  for (let i = 3; i < d.length; i += 32) if (d[i] > 8) return true;
+  return false;
+}
+/* A heal is only a heal once the RE-bake has been checked for ink too. On
+   Wyatt's phone (v0.43.0) this sweep was "healing" the two-line sigil descs
+   on every pick and shipping blanks, because the re-bake failed exactly as
+   the first bake had; now a Text that stays inkless is reported as
+   `unhealable: <first words>` instead of counted, so the DIAG tells the
+   truth and the next bug has a name. */
+function ssHealBlankTexts(scene, tag) {
+  let healed = 0;
+  const stuck = [];
+  const walk = (list) => list.forEach((o) => {
+    if (o.list) walk(o.list);
+    if (o.type !== 'Text' || !o.canvas || !o.visible || !(o.text || '').trim()) return;
+    try {
+      if (ssHasInk(o)) return;
+      o.updateText();
+      if (ssHasInk(o)) healed++;
+      else stuck.push(String(o.text).replace(/\s+/g, ' ').trim().split(' ').slice(0, 4).join(' '));
+    } catch (e) { }
+  });
+  if (scene && scene.children) walk(scene.children.list);
+  if (healed) DIAG('healed ' + healed + ' blank text(s) · ' + (tag || '?'));
+  for (const s of stuck) DIAG('unhealable: ' + s + ' · ' + (tag || '?'));
+  return healed;
+}
+// a return from the background is when iOS is most likely to have purged
+// canvas backing stores — sweep every live scene as the game wakes
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible' || !window.game || !game.isBooted) return;
+  try { for (const sc of game.scene.getScenes(true)) ssHealBlankTexts(sc, 'wake'); } catch (e) { }
+});
+
+/* ---------- THE ACTIVE-PLAY CLOCK (v0.61.0) ----------
+   A run's clock counts only what is actually played. run.playMs accumulates
+   one frame at a time in Battle.update, gated three ways: the page must be
+   visible, it must be focused, and the run must be live (the end screen
+   never ticks; the meadow and the profile never tick because the battle
+   scene itself is stopped there). A locked phone or a switched-away app
+   freezes the RAF loop, so the whole absence lands as ONE giant delta on
+   the way back — the heartbeat drops any step past SS_CLOCK_STEP_MAX rather
+   than back-fill a gap (iOS WebKit does not promise a visibilitychange on
+   lock; the frozen loop is the one signal that never lies). Focus is
+   tracked by EVENTS, and a false document.hasFocus() is never trusted to
+   stop the clock: headless boots and some webviews report false with the
+   player right there — only a real blur event stops it, and a live true
+   read heals a missed focus event. */
+const SS_CLOCK_STEP_MAX = 4000;
+const SS_CLOCK = { foc: true, gone: false };
+function ssPageActive() {
+  if (SS_CLOCK.gone || document.visibilityState === 'hidden') return false;
+  if (!SS_CLOCK.foc && document.hasFocus()) SS_CLOCK.foc = true;
+  return SS_CLOCK.foc;
+}
+// every stop signal folds the count into the campaign checkpoint on the way
+// out — a climb finished over three nights must read as minutes, not days
+function ssClockPersist() {
+  try {
+    if (!window.game || !game.isBooted) return;
+    const b = game.scene.getScene('battle');
+    if (b && b.sys.isActive() && b.clockPersist) b.clockPersist();
+  } catch (e) { }
+}
+window.addEventListener('blur', () => { SS_CLOCK.foc = false; ssClockPersist(); });
+window.addEventListener('focus', () => { SS_CLOCK.foc = true; });
+window.addEventListener('pagehide', () => { SS_CLOCK.gone = true; ssClockPersist(); });
+window.addEventListener('pageshow', () => { SS_CLOCK.gone = false; });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') ssClockPersist(); });
+/* what a resumed checkpoint's playMs is worth: a pre-v0.61 save counted
+   wall-clock between save points (a phone parked on the map rode in whole),
+   so an unversioned value is capped at a generous active-play bound; a
+   clockV 2 save is already honest and trusted as written. The storage copy
+   wins when newer — a resize restart replays the ORIGINAL resume data, and
+   the stop-event persists above may have moved the checkpoint on since. */
+function ssClockInherit(resume, key) {
+  if (!resume) return 0;
+  let ms = Math.max(0, resume.playMs | 0);
+  if ((resume.clockV | 0) < 2) ms = Math.min(ms, ((resume.fightIdx | 0) + 1) * 15 * 60000);
+  try {
+    const ck = JSON.parse(localStorage.getItem(key || 'beta3.campaign'));
+    if (ck && (ck.fightIdx | 0) === (resume.fightIdx | 0) && (ck.clockV | 0) >= 2) ms = Math.max(ms, ck.playMs | 0);
+  } catch (e) { }
+  return ms;
+}
+
+// The title wordmark — live text drawn once into a canvas texture in the palette
+// of the painted set. Latin titles get the hand-set treatment (gentle arch,
+// bookend letters a touch larger, tight tracking, per-letter tilt along the
+// curve); a non-Latin title (none ships since the v0.71.0 cut to five Latin
+// languages — the guard is content-driven) falls back to a single run,
+// because per-letter transforms would break complex-script shaping. Layers, in paint
+// order: warm halo · letterpress drop · outer gold hairline · navy rim ·
+// per-letter gold gradient · inner bevel · dust speckle · top sheen.
+// Returns { key, w, h, anchors } in design units; anchors are letter-tip
+// points (relative to the texture centre) where the home scene sets sparkles.
+function ssTitleTex(scene) {
+  const R = Math.max(2, ssTexRes(scene));
+  const key = 'title@' + SS_LANG;
+  const text = SS_T('title'), px = 46 * R;
+  const font = (s) => '900 ' + Math.round(s) + 'px ' + SERIF;
+  if (scene.textures.exists(key)) {
+    const tex = scene.textures.get(key), f = tex.getSourceImage();
+    return { key, w: f.width / R, h: f.height / R, anchors: tex.ssAnchors || [] };
+  }
+  const latin = !/[^\u0000-ɏ\s]/.test(text);
+  const meas = document.createElement('canvas').getContext('2d');
+  const A = latin ? px * 0.16 : 0;             // arch height
+  let letters = null, tw = 0, asc = 0, desc = 0;
+  if (latin) {
+    letters = [];
+    const n = text.length;
+    let x = 0;
+    for (let i = 0; i < n; i++) {
+      const lt = n > 1 ? (i / (n - 1)) * 2 - 1 : 0;      // -1 .. 1 across the word
+      const sc = 1 + 0.09 * lt * lt;                     // bookends slightly larger
+      meas.font = font(px * sc);
+      const m = meas.measureText(text[i]);
+      letters.push({ ch: text[i], x, lw: m.width, sc, lt });
+      x += m.width - px * 0.015;                         // tight tracking
+      asc = Math.max(asc, Math.ceil(m.actualBoundingBoxAscent || px * 0.8));
+      desc = Math.max(desc, Math.ceil(m.actualBoundingBoxDescent || px * 0.05));
+    }
+    tw = x + px * 0.015;
+  } else {
+    meas.font = font(px);
+    const m = meas.measureText(text);
+    tw = m.width;
+    asc = Math.ceil(m.actualBoundingBoxAscent || px * 0.8);
+    desc = Math.ceil(m.actualBoundingBoxDescent || px * 0.25);
+  }
+  const padX = Math.ceil(px * 0.42), padY = Math.ceil(px * 0.40);
+  const W = Math.ceil(tw) + padX * 2, H = Math.ceil(asc + desc + A) + padY * 2;
+  const t = scene.textures.createCanvas(key, W, H);
+  const c = t.context, by = padY + A + asc;    // baseline of an unarched letter
+  c.textBaseline = 'alphabetic';
+  // each(fn) walks the word with the arch transform applied; every layer below
+  // paints through it, so the layers stay registered. fn draws at (0,0) on the
+  // letter's baseline centre and gets that letter's scale for local gradients.
+  const each = (fn) => {
+    if (!latin) {
+      c.save(); c.translate(W / 2, by);
+      c.font = font(px); c.textAlign = 'center';
+      fn(text, 1);
+      c.restore(); return;
+    }
+    for (const L of letters) {
+      c.save();
+      c.translate(padX + L.x + L.lw / 2, by - A * (1 - L.lt * L.lt));
+      c.rotate(Math.atan((2 * A * L.lt) / (tw / 2)) * 0.8);   // tilt along the curve
+      c.font = font(px * L.sc); c.textAlign = 'center';
+      fn(L.ch, L.sc);
+      c.restore();
+    }
+  };
+  // warm halo
+  c.shadowColor = 'rgba(201,169,79,0.5)'; c.shadowBlur = px * 0.28;
+  c.fillStyle = '#c9a94f';
+  each((ch) => { c.fillText(ch, 0, 0); c.fillText(ch, 0, 0); });
+  c.shadowColor = 'transparent'; c.shadowBlur = 0;
+  // letterpress drop
+  c.fillStyle = 'rgba(16,12,34,0.85)';
+  each((ch) => c.fillText(ch, 0, px * 0.05));
+  // outer gold hairline, then the navy rim the buttons taught us
+  c.lineJoin = 'round';
+  c.strokeStyle = '#e6c87e'; c.lineWidth = px * 0.085;
+  each((ch) => c.strokeText(ch, 0, 0));
+  c.strokeStyle = '#241c40'; c.lineWidth = px * 0.055;
+  each((ch) => c.strokeText(ch, 0, 0));
+  // gold gradient fill, per letter so the tone is uniform along the arch
+  each((ch, sc) => {
+    const g = c.createLinearGradient(0, -asc * sc, 0, desc + px * 0.04);
+    g.addColorStop(0, '#fff7dc'); g.addColorStop(0.35, '#ffe08d');
+    g.addColorStop(0.62, '#d7b45c'); g.addColorStop(1, '#9c7a28');
+    c.fillStyle = g;
+    c.fillText(ch, 0, 0);
+  });
+  // inner bevel — clipped strokes: light under the top edges, shade above the bottom
+  c.globalCompositeOperation = 'source-atop';
+  c.strokeStyle = 'rgba(255,252,240,0.28)'; c.lineWidth = px * 0.03;
+  each((ch) => c.strokeText(ch, 0, px * 0.014));
+  c.strokeStyle = 'rgba(60,32,4,0.30)';
+  each((ch) => c.strokeText(ch, 0, -px * 0.014));
+  // dust speckle, like the button faces wear
+  if (latin) {
+    for (const L of letters) {
+      const cx = padX + L.x + L.lw / 2, cy = by - A * (1 - L.lt * L.lt);
+      for (let i = 0; i < 9; i++) {
+        const dark = i % 3 === 0;
+        c.fillStyle = dark ? 'rgba(50,30,6,0.22)' : 'rgba(255,246,220,0.20)';
+        c.beginPath();
+        c.arc(cx + (Math.random() - 0.5) * L.lw * 0.8, cy - Math.random() * asc * L.sc * 0.9 + Math.random() * desc,
+          px * (0.008 + Math.random() * 0.014), 0, Math.PI * 2);
+        c.fill();
+      }
+    }
+  }
+  // top sheen across the whole mark
+  const sh = c.createLinearGradient(0, by - A - asc, 0, by - A - asc + (asc + desc + A) * 0.42);
+  sh.addColorStop(0, 'rgba(255,255,255,0.34)'); sh.addColorStop(1, 'rgba(255,255,255,0)');
+  c.fillStyle = sh;
+  c.fillRect(0, 0, W, H);
+  c.globalCompositeOperation = 'source-over';
+  t.refresh();
+  // sparkle anchors: letter-tip points, so the sky feels like it owns the mark
+  let anchors = [];
+  if (latin && letters.length > 2) {
+    const n = letters.length;
+    const pick = [[1, 0.8, -1], [Math.round(n * 0.55), 0.5, -1], [n - 1, 0.9, 0.35]];
+    anchors = pick.map(([i, fx, fy]) => {
+      const L = letters[Math.min(i, n - 1)];
+      const cy = by - A * (1 - L.lt * L.lt);
+      return { x: (padX + L.x + L.lw * fx - W / 2) / R, y: (cy + (fy < 0 ? fy * asc * L.sc : fy * desc + px * 0.04) - H / 2) / R };
+    });
+  }
+  t.ssAnchors = anchors;
+  return { key, w: W / R, h: H / R, anchors };
+}
+
+// The divider under the title. With the painted art on it is a strip of the
+// actual button braid — the title and the buttons literally share material —
+// with a ✦ set in the middle; the procedural build gets a plain gold hairline
+// so the layout doesn't jump between modes. Both ends fade out.
+function ssBraidTex(scene) {
+  const key = 'titlebraid';
+  const R = Math.max(2, ssTexRes(scene));
+  if (scene.textures.exists(key)) {
+    const f = scene.textures.get(key).getSourceImage();
+    return { key, w: f.width / R, h: f.height / R };
+  }
+  const W = Math.round(250 * R), H = Math.round(16 * R);
+  const t = scene.textures.createCanvas(key, W, H);
+  const c = t.context, mid = W / 2, gap = 13 * R;
+  if (ART && SSART.ready) {
+    const img = SSART.img.btn;
+    const bh = 7 * R, byy = (H - bh) / 2;
+    // the button's top braid run, between the corners
+    c.drawImage(img, 130, 10, img.width - 260, 30, 0, byy, mid - gap / 2, bh);
+    c.save(); c.translate(W, 0); c.scale(-1, 1);       // mirrored right half
+    c.drawImage(img, 130, 10, img.width - 260, 30, 0, byy, mid - gap / 2, bh);
+    c.restore();
+  } else {
+    const line = (x0, x1) => {
+      const g = c.createLinearGradient(x0, 0, x1, 0);
+      g.addColorStop(0, 'rgba(215,180,92,0)'); g.addColorStop(1, 'rgba(215,180,92,0.9)');
+      c.fillStyle = g; c.fillRect(Math.min(x0, x1), H / 2 - R * 0.6, Math.abs(x1 - x0), R * 1.2);
+    };
+    line(0, mid - gap / 2); line(W, mid + gap / 2);
+  }
+  // fade the outer ends
+  for (const [x0, x1] of [[0, 26 * R], [W, W - 26 * R]]) {
+    const g = c.createLinearGradient(x0, 0, x1, 0);
+    g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    c.globalCompositeOperation = 'destination-out';
+    c.fillStyle = g; c.fillRect(Math.min(x0, x1), 0, Math.abs(x1 - x0), H);
+    c.globalCompositeOperation = 'source-over';
+  }
+  // the ✦, in the same gold-on-navy dress as the letters
+  c.font = '900 ' + Math.round(11 * R) + 'px serif';
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.lineJoin = 'round'; c.lineWidth = 2.2 * R; c.strokeStyle = '#241c40';
+  c.strokeText('✦', mid, H / 2 + R * 0.5);
+  const g = c.createLinearGradient(0, H / 2 - 6 * R, 0, H / 2 + 6 * R);
+  g.addColorStop(0, '#fff7dc'); g.addColorStop(0.6, '#ffe08d'); g.addColorStop(1, '#c9a057');
+  c.fillStyle = g;
+  c.fillText('✦', mid, H / 2 + R * 0.5);
+  t.refresh();
+  return { key, w: W / R, h: H / R };
+}
+
+// Small gold-lettered texture in the wordmark's dress — single run, no arch:
+// beast nameplates, flying damage numbers. Cached by text+size; battle removes
+// its number textures on shutdown so a long session doesn't hoard canvases.
+function ssGoldTex(scene, text, sizeU) {
+  const R = Math.max(2, ssTexRes(scene));
+  const key = 'gold@' + sizeU + '@' + text;
+  if (scene.textures.exists(key)) {
+    const f = scene.textures.get(key).getSourceImage();
+    return { key, w: f.width / R, h: f.height / R };
+  }
+  const px = sizeU * R;
+  const meas = document.createElement('canvas').getContext('2d');
+  meas.font = '900 ' + Math.round(px) + 'px ' + SERIF;
+  const m = meas.measureText(text);
+  const asc = Math.ceil(m.actualBoundingBoxAscent || px * 0.8), desc = Math.ceil(m.actualBoundingBoxDescent || px * 0.25);
+  const padX = Math.ceil(px * 0.30), padY = Math.ceil(px * 0.26);
+  const W = Math.ceil(m.width) + padX * 2, H = asc + desc + padY * 2;
+  const t = scene.textures.createCanvas(key, W, H);
+  const c = t.context, bx = W / 2, by = padY + asc;
+  c.font = meas.font; c.textAlign = 'center'; c.textBaseline = 'alphabetic'; c.lineJoin = 'round';
+  c.shadowColor = 'rgba(201,169,79,0.45)'; c.shadowBlur = px * 0.22;
+  c.fillStyle = '#c9a94f'; c.fillText(text, bx, by);
+  c.shadowColor = 'transparent'; c.shadowBlur = 0;
+  c.fillStyle = 'rgba(16,12,34,0.85)'; c.fillText(text, bx, by + px * 0.05);
+  c.strokeStyle = '#e6c87e'; c.lineWidth = px * 0.085; c.strokeText(text, bx, by);
+  c.strokeStyle = '#241c40'; c.lineWidth = px * 0.055; c.strokeText(text, bx, by);
+  const g = c.createLinearGradient(0, by - asc, 0, by + desc + px * 0.04);
+  g.addColorStop(0, '#fff7dc'); g.addColorStop(0.35, '#ffe08d');
+  g.addColorStop(0.62, '#d7b45c'); g.addColorStop(1, '#9c7a28');
+  c.fillStyle = g; c.fillText(text, bx, by);
+  c.globalCompositeOperation = 'source-atop';
+  const sh = c.createLinearGradient(0, by - asc, 0, by - asc + (asc + desc) * 0.42);
+  sh.addColorStop(0, 'rgba(255,255,255,0.34)'); sh.addColorStop(1, 'rgba(255,255,255,0)');
+  c.fillStyle = sh; c.fillRect(0, 0, W, H);
+  c.globalCompositeOperation = 'source-over';
+  t.refresh();
+  return { key, w: W / R, h: H / R };
+}
+
+/* ---- leaderboard medals -------------------------------------------------
+   Gold / silver / bronze medallions for the podium — a metallic disc in the
+   sigil-medallion's language (rim, inner hairline, compass points), with rays
+   baked around the gold. The rank numeral is drawn over it by the scene in
+   the matching ink. Consumed via setDisplaySize (R-scaled texture rule). */
+const SS_MEDAL_INK = ['#3a2a08', '#2c3350', '#3a2408'];
+function ssMedalTex(scene, tier) {
+  const key = 'lbmedal' + tier;
+  if (scene.textures.exists(key)) return key;
+  const R = ssTexRes(scene), S = 96;
+  const t = scene.textures.createCanvas(key, Math.round(S * R), Math.round(S * R));
+  const c = t.context;
+  c.scale(R, R);
+  const cx = S / 2, cy = S / 2, r = S / 2 - 10;
+  const M = [
+    { hi: '#fff3c9', mid: '#ffd77a', lo: '#9c7a28', rim: '#e6c87e', faint: 'rgba(255,215,122,' },
+    { hi: '#f4f7ff', mid: '#c9d4e8', lo: '#6a7590', rim: '#dfe6f4', faint: 'rgba(201,212,232,' },
+    { hi: '#ffd9b0', mid: '#d29a5f', lo: '#7a4d20', rim: '#e8b57f', faint: 'rgba(232,181,127,' },
+  ][tier];
+  if (tier === 0) {                                  // the champion's rays
+    c.strokeStyle = M.faint + '0.35)'; c.lineWidth = 1.4;
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2 + 0.26;
+      c.beginPath(); c.moveTo(cx + Math.cos(a) * (r + 2), cy + Math.sin(a) * (r + 2));
+      c.lineTo(cx + Math.cos(a) * (r + 9), cy + Math.sin(a) * (r + 9)); c.stroke();
+    }
+  }
+  const g = c.createLinearGradient(0, cy - r, 0, cy + r);
+  g.addColorStop(0, M.hi); g.addColorStop(0.5, M.mid); g.addColorStop(1, M.lo);
+  c.beginPath(); c.arc(cx, cy, r, 0, Math.PI * 2); c.fillStyle = g; c.fill();
+  c.lineWidth = 3; c.strokeStyle = M.rim; c.stroke();
+  c.lineWidth = 1.2; c.strokeStyle = 'rgba(16,12,34,0.4)';
+  c.beginPath(); c.arc(cx, cy, r - 5.5, 0, Math.PI * 2); c.stroke();
+  c.fillStyle = M.rim;                               // compass points on the ring
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    c.beginPath(); c.arc(cx + Math.cos(a) * (r - 5.5), cy + Math.sin(a) * (r - 5.5), 1.5, 0, Math.PI * 2); c.fill();
+  }
+  const sh = c.createLinearGradient(0, cy - r, 0, cy);   // top sheen
+  sh.addColorStop(0, 'rgba(255,255,255,0.4)'); sh.addColorStop(1, 'rgba(255,255,255,0)');
+  c.beginPath(); c.arc(cx, cy, r - 2, 0, Math.PI * 2); c.fillStyle = sh; c.fill();
+  t.refresh();
+  return key;
+}
+
+/* ---- THE FRONTIER FLAG (v0.77.0) ----------------------------------------
+   Skylar's locked shape (REV C, 9/3, from his two reference photos): a
+   banner about 2:1 with the V-notch cut into the FLY edge only, SOLID
+   colour with nothing on it but the name, flying from the VERY TOP of a
+   LONG slim stick — a sliver of point above the cloth, the handle running
+   well below — with a gentle hand-placed tilt and a little star-ledge at
+   its foot. Baked per colour (ten GVT jars, SS_FLAG_COLORS) because
+   setTint is a silent no-op under the Canvas renderer — the lantern's own
+   law. Geometry lives in the mock's 260×236 box; consumed via
+   setDisplaySize (R-scaled texture rule). */
+function ssFlagTex(scene, colorId) {
+  const col = SS_FLAG_BY[colorId] ? colorId : SS_FLAG_DEF;
+  const key = 'flag-' + col;
+  if (scene.textures.exists(key)) return key;
+  const R = ssTexRes(scene);
+  const t = scene.textures.createCanvas(key, Math.round(260 * R), Math.round(236 * R));
+  const c = t.context;
+  c.scale(R, R);
+  // the star-ledge and its shadow — the flag is PLANTED, never floating
+  c.fillStyle = 'rgba(0,0,0,0.35)';
+  c.beginPath(); c.ellipse(34, 222, 30, 6, 0, 0, Math.PI * 2); c.fill();
+  c.beginPath(); c.moveTo(12, 220); c.lineTo(56, 220); c.lineTo(48, 210); c.lineTo(20, 210); c.closePath();
+  c.fillStyle = '#242a4a'; c.fill();
+  c.lineWidth = 1; c.strokeStyle = '#3a4166'; c.stroke();
+  // the stick: long, slim, a bare point above where the cloth attaches
+  c.fillStyle = '#c9b676';
+  c.fillRect(30, 14, 5, 204);
+  c.fillStyle = 'rgba(255,255,255,0.3)';
+  c.fillRect(30, 14, 1.8, 204);
+  c.fillStyle = '#c9b676';
+  c.beginPath(); c.moveTo(30, 15); c.lineTo(35, 15); c.lineTo(32.5, 4); c.closePath(); c.fill();
+  // the banner at the top: ~2:1, fly-edge notch, the slight hand-placed lift
+  const banner = () => {
+    c.beginPath(); c.moveTo(36, 18); c.lineTo(226, 12); c.lineTo(201, 60);
+    c.lineTo(226, 108); c.lineTo(36, 114); c.closePath();
+  };
+  banner();
+  c.fillStyle = SS_FLAG_BY[col].hex; c.fill();
+  c.lineWidth = 2.4; c.lineJoin = 'round'; c.strokeStyle = 'rgba(6,8,18,0.5)'; c.stroke();
+  // a soft sheen so the cloth reads as paper, not a swatch
+  c.save();
+  banner(); c.clip();
+  const g = c.createLinearGradient(0, 12, 0, 114);
+  g.addColorStop(0, 'rgba(255,255,255,0.5)'); g.addColorStop(0.5, 'rgba(255,255,255,0)');
+  g.addColorStop(1, 'rgba(0,0,0,0.4)');
+  c.globalAlpha = 0.3; c.fillStyle = g; c.fillRect(0, 0, 260, 236);
+  c.restore();
+  t.refresh();
+  return key;
+}
+/* One planted flag, ready to stand anywhere: cloth in the owner's jar, the
+   NAME across it (the whole point of the moment is reading who stood here),
+   an optional gold level roundel below the banner. The returned container
+   is anchored at the LEDGE's ground point, so placing it is planting it.
+   The name sizes to the cloth then steps 12.5% down (Skylar's exact call);
+   ink follows the contrast law (SS_FLAG_INK). A tiny flag (a profile-row
+   mark) skips the unreadable name rather than shipping ant-print. */
+function ssFlag(scene, o) {
+  const l = ssLayout(scene);
+  const s = (o.w || 130) / 260;
+  const u = (n) => l.u(n * s);
+  const col = SS_FLAG_BY[o.color] ? o.color : SS_FLAG_DEF;
+  const c = scene.add.container(o.x || 0, o.y || 0);
+  c.add(scene.add.image(0, 0, ssFlagTex(scene, col)).setOrigin(34 / 260, 222 / 236)
+    .setDisplaySize(l.u(260 * s), l.u(236 * s)));
+  const name = String(o.name || '').toUpperCase();
+  const fs = Math.min(20, (136 / Math.max(4, name.length)) * 1.55) * 0.875;
+  if (name && fs * s >= 4.2) {
+    const nm = ssTxt(scene, u(117 - 34), u(66 - 222), name, l.u(fs * s), SS_FLAG_INK(col))
+      .setOrigin(0.5).setRotation(-0.035);
+    if (nm.width > u(178)) nm.setScale(u(178) / nm.width);
+    c.add(nm);
+  }
+  if (o.level && (o.w || 130) >= 60) {
+    const coin = scene.add.image(0, u(134 - 222), ssMedalTex(scene, 0)).setDisplaySize(u(36), u(36));
+    const lt = ssTxt(scene, 0, u(134 - 222), String(o.level), l.u((o.level > 99 ? 11.5 : 13.5) * s), SS_MEDAL_INK[0]).setOrigin(0.5);
+    lt.setShadow(0, 0, 'rgba(0,0,0,0)', 0);
+    c.add(coin); c.add(lt);
+  }
+  // alive, gently — the whole pick sways on a slow breath; paper doesn't
+  // ripple. Math.random on purpose: cosmetics never consume the seeded rng.
+  if (o.sway && !ssReduceMotion()) {
+    c.rotation = -0.012;
+    scene.tweens.add({ targets: c, rotation: 0.014, duration: 2600 + Math.random() * 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+  }
+  return c;
+}
+
+/* ---- sigil rarity dress ------------------------------------------------
+   Three tiers, unmistakable at a glance: basic wears the house gold, rare a
+   cool gem-blue frame with an icy glow, legendary a gold radiance with rays
+   baked around its medallion (the scene adds particles and an arrival flash
+   on top). Card chrome is baked per tier+size like ssBtn's slices. */
+const SS_RARITY = [
+  { glow: 0xd7b45c, ink: '#e6d9ac', shadow: '#c9b676', label: null, labelColor: '' },
+  { glow: 0x6fa8ff, ink: '#d4e4ff', shadow: '#6fa8ff', label: 'rarityRare', labelColor: '#9fc8ff' },
+  { glow: 0xffd77a, ink: '#ffe9a8', shadow: '#ffc94d', label: 'rarityLegendary', labelColor: '#ffdf8f' },
+];
+
+/* ---- the upgrade GRADES (v0.66.0) --------------------------------------
+   Skylar's common→rare→epic→legendary ladder names tier POSITIONS on a
+   held sigil's own ladder, never drop rarities — EPIC exists only here.
+   Roman numerals name the GRADE SLOT, not the step count: SS_GRADE_SLOTS
+   maps a ladder's length to the slots its steps occupy, so a 3-step ladder
+   reads I · II · IV with the epic slot visibly skipped (comet's precedent:
+   "base one, rare two, skip epic, legendary three") and IV always means
+   "at its legendary height". Slot 1 wears no dress — the numeral alone. */
+const SS_GRADE = [null,
+  { key: 'rarityRare', color: '#9fc8ff', glow: 0x6fa8ff },
+  { key: 'rarityEpic', color: '#d9a8ff', glow: 0xba6be0 },
+  { key: 'rarityLegendary', color: '#ffdf8f', glow: 0xffd77a },
+];
+const SS_ROMAN = ['I', 'II', 'III', 'IV'];
+const SS_GRADE_SLOTS = { 1: [1], 2: [1, 4], 3: [1, 2, 4], 4: [1, 2, 3, 4] };
+function ssGradeSlot(id, step) { return (SS_GRADE_SLOTS[ssSigilMaxT(id)] || [1])[step - 1] || 1; }
+
+// Baked card chrome: midnight glass, tier frame + hairline, corner ornaments,
+// and a medallion socket on the left for the glyph. Returns { key, mx, mr } —
+// medallion centre/radius in design units (recomputed on cache hits).
+function ssSigilCardTex(scene, tier, w, h) {
+  const mr = Math.min(h * 0.30, 40), mx = Math.max(mr + 14, h * 0.42);
+  const key = 'sigcard' + tier + '@' + w + 'x' + h;
+  if (scene.textures.exists(key)) return { key, mx, mr };
+  const R = ssTexRes(scene);
+  const t = scene.textures.createCanvas(key, Math.round(w * R), Math.round(h * R));
+  const c = t.context;
+  c.scale(R, R);
+  const frame = ['#c9a84c', '#7fb4ff', '#ffd77a'][tier];
+  const faint = ['rgba(215,180,92,', 'rgba(127,180,255,', 'rgba(255,215,122,'][tier];
+  const rad = Math.min(16, h * 0.2);
+  const rr = (inset, r) => { c.beginPath(); c.roundRect(inset, inset, w - inset * 2, h - inset * 2, r); };
+  // midnight glass — cooler for rare, a warmer dusk-violet for legendary
+  rr(2.5, rad);
+  const g = c.createLinearGradient(0, 0, 0, h);
+  if (tier === 1) { g.addColorStop(0, '#152247'); g.addColorStop(0.55, '#0e1530'); g.addColorStop(1, '#0a0f24'); }
+  else if (tier === 2) { g.addColorStop(0, '#2a2142'); g.addColorStop(0.55, '#171129'); g.addColorStop(1, '#100c1e'); }
+  else { g.addColorStop(0, '#171d3c'); g.addColorStop(0.55, '#10142c'); g.addColorStop(1, '#0b0f21'); }
+  c.fillStyle = g; c.fill();
+  const g2 = c.createLinearGradient(0, 2.5, 0, h * 0.4);        // starlight sheen
+  g2.addColorStop(0, tier === 2 ? 'rgba(255,224,141,0.13)' : 'rgba(159,176,232,0.11)');
+  g2.addColorStop(1, 'rgba(159,176,232,0)');
+  rr(2.5, rad); c.fillStyle = g2; c.fill();
+  c.lineWidth = 2; c.strokeStyle = frame; rr(2.5, rad); c.stroke();
+  c.lineWidth = 0.8; c.strokeStyle = faint + '0.5)'; rr(6.5, rad * 0.72); c.stroke();
+  // corner ornaments: a small diamond with two trailing ticks, mirrored 4x
+  const orn = (x, y, sx, sy) => {
+    c.save(); c.translate(x, y); c.scale(sx, sy);
+    c.fillStyle = frame;
+    c.beginPath(); c.moveTo(11, 15); c.lineTo(15, 11); c.lineTo(19, 15); c.lineTo(15, 19); c.closePath(); c.fill();
+    c.strokeStyle = faint + '0.7)'; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(15, 19); c.lineTo(15, 26); c.moveTo(19, 15); c.lineTo(26, 15); c.stroke();
+    c.restore();
+  };
+  orn(0, 0, 1, 1); orn(w, 0, -1, 1); orn(0, h, 1, -1); orn(w, h, -1, -1);
+  // the medallion socket
+  const my = h / 2;
+  if (tier === 2) {                                              // legendary rays
+    c.strokeStyle = 'rgba(255,215,122,0.20)'; c.lineWidth = 1.2;
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2 + 0.26;
+      c.beginPath(); c.moveTo(mx + Math.cos(a) * (mr + 3), my + Math.sin(a) * (mr + 3));
+      c.lineTo(mx + Math.cos(a) * (mr + 12), my + Math.sin(a) * (mr + 12)); c.stroke();
+    }
+  }
+  const rg = c.createRadialGradient(mx, my, 2, mx, my, mr);
+  rg.addColorStop(0, faint + '0.30)'); rg.addColorStop(0.75, faint + '0.10)'); rg.addColorStop(1, faint + '0)');
+  c.beginPath(); c.arc(mx, my, mr, 0, Math.PI * 2); c.fillStyle = rg; c.fill();
+  c.lineWidth = 1.6; c.strokeStyle = frame; c.beginPath(); c.arc(mx, my, mr, 0, Math.PI * 2); c.stroke();
+  c.lineWidth = 0.8; c.strokeStyle = faint + '0.5)'; c.beginPath(); c.arc(mx, my, mr - 3.5, 0, Math.PI * 2); c.stroke();
+  c.fillStyle = frame;                                           // compass points on the ring
+  for (const [dx, dy] of [[0, -mr], [0, mr], [-mr, 0], [mr, 0]]) {
+    c.beginPath(); c.arc(mx + dx, my + dy, 1.6, 0, Math.PI * 2); c.fill();
+  }
+  t.refresh();
+  return { key, mx, mr };
+}
+
+/* The sleeping card (v0.43.0): the same chrome, asleep. Slate glass instead
+   of midnight, a dashed frame instead of the tier's gold hairline, and an
+   EMPTY socket — the silhouette must give away the rarity dress and nothing
+   else, so a player can want a sigil without having been shown it. Same
+   {key, mx, mr} contract as the waking card, so both draw off one layout. */
+function ssSleepCardTex(scene, w, h) {
+  const mr = Math.min(h * 0.30, 40), mx = Math.max(mr + 14, h * 0.42);
+  const key = 'sigsleep@' + w + 'x' + h;
+  if (scene.textures.exists(key)) return { key, mx, mr };
+  const R = ssTexRes(scene);
+  const t = scene.textures.createCanvas(key, Math.round(w * R), Math.round(h * R));
+  const c = t.context;
+  c.scale(R, R);
+  const rad = Math.min(16, h * 0.2);
+  const rr = (inset, r) => { c.beginPath(); c.roundRect(inset, inset, w - inset * 2, h - inset * 2, r); };
+  rr(2.5, rad);
+  const g = c.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, '#111634'); g.addColorStop(0.55, '#0c1027'); g.addColorStop(1, '#080b1c');
+  c.fillStyle = g; c.fill();
+  c.lineWidth = 1.4; c.strokeStyle = 'rgba(90,99,144,0.55)';
+  c.setLineDash([5, 5]); rr(2.5, rad); c.stroke(); c.setLineDash([]);
+  // the empty socket: a dim ring with a soft hollow, no compass points
+  const my = h / 2;
+  const rg = c.createRadialGradient(mx, my, 2, mx, my, mr);
+  rg.addColorStop(0, 'rgba(90,99,144,0.16)'); rg.addColorStop(1, 'rgba(90,99,144,0)');
+  c.beginPath(); c.arc(mx, my, mr, 0, Math.PI * 2); c.fillStyle = rg; c.fill();
+  c.lineWidth = 1.3; c.strokeStyle = 'rgba(90,99,144,0.6)';
+  c.setLineDash([3, 4]);
+  c.beginPath(); c.arc(mx, my, mr, 0, Math.PI * 2); c.stroke();
+  c.setLineDash([]);
+  t.refresh();
+  return { key, mx, mr };
+}
+
+/* ---- the painted pick rows (v0.111.0) -------------------------------------
+   Skylar's open-sky-sigils verdicts (9/30): the pick sheet wears the MJ
+   banner frames — carved wood (basic) / THE SWIRL (rare) / the ember
+   legendary — as full-bleed 2.45:1 rows, NO glyph roundel, name + effect
+   centered in each frame's own dark panel. Plates ride ssLoadArt's
+   never-required lane; a missing plate returns null here and the card
+   falls back to the procedural chrome below (the zod-art law). The epic
+   (amethyst) frame waits for the grade surfaces — picks carry only the
+   three drop tiers. */
+/* v0.111.1: each frame's dark panel measured on its own plate (fractions of
+   the card): cx = panel center x, t = panel top, ph = panel height, pw =
+   usable width. The wood's panel sits LOW (y .33–.70) while the swirl's is
+   tall and a touch right of center — one shared position rode the wood's
+   top rail on Skylar's phone. Text lays out INSIDE these rects, self-fit. */
+const SS_ROW_INK = [
+  { ink: '#f4e6bd', cx: 0.500, t: 0.33, ph: 0.37, pw: 0.62 },   // warm parchment on the carved wood
+  { ink: '#d9e7ff', cx: 0.530, t: 0.26, ph: 0.48, pw: 0.66 },   // frost ink on the sapphire swirl
+  { ink: '#ffedc0', cx: 0.505, t: 0.28, ph: 0.43, pw: 0.63 },   // ember ink, the page's ruling (not gold)
+];
+function ssSigilRowKey(scene, tier, w, h) {
+  const name = ['sigrow_basic', 'sigrow_rare', 'sigrow_legend'][tier];
+  const im = ART && SSART.img[name];
+  if (!im) return null;
+  const key = name + '@' + w + 'x' + h;
+  if (scene.textures.exists(key)) return key;
+  const R = ssTexRes(scene);
+  const W = Math.round(w * R), H = Math.round(h * R);
+  try {
+    const t = scene.textures.createCanvas(key, W, H);
+    const c = t.context;
+    const rad = Math.min(16, h * 0.2) * R;
+    c.beginPath(); c.roundRect(0, 0, W, H, rad); c.clip();
+    // cover-fit: plates are 2.45:1; crop any overflow evenly on both sides
+    const iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height;
+    const s = Math.max(W / iw, H / ih), dw = iw * s, dh = ih * s;
+    c.drawImage(im, (W - dw) / 2, (H - dh) / 2, dw, dh);
+    t.refresh();
+  } catch (e) {
+    if (scene.textures.exists(key)) scene.textures.remove(key);
+    return null;
+  }
+  return key;
+}
+
+// One pick card: the painted frame row when its plate is home (name + effect
+// centered, no roundel), else the baked procedural chrome — glyph in the
+// medallion, gold-letterpress nameplate, rarity ribbon, italic desc.
+// Interactive container, w x h design units; on the procedural path heights
+// under 100 lay out as the compact (versus) one-liner.
+function ssSigilCard(scene, l, sg, w, h) {
+  const tier = sg.rarity | 0;
+  const RC = SS_RARITY[tier];
+  const loc = SS_SIG(sg);
+  const c = scene.add.container(0, 0);
+  const rowKey = ssSigilRowKey(scene, tier, w, h);
+  if (rowKey) {
+    const IK = SS_ROW_INK[tier];
+    c.add(scene.add.image(0, 0, rowKey).setDisplaySize(l.u(w), l.u(h)));
+    const small = h < 120;                       // the versus rows
+    const px = (IK.cx - 0.5) * w;                // the panel's own center
+    const panelW = Math.min(0.66, IK.pw - 0.02) * w;
+    // the desc wraps at the OLD card's measure (0.63w ≈ the procedural card's
+    // 212.7u at solo size) so the phone-verified line splits desc-check pins
+    // (FIRST LIGHT / BLOOD INK / LEYLINE ROOTS / MOONWARD at 2 lines) ride
+    // the measure, not the dress — narrowed only where a panel demands it
+    const wrapW = Math.min(0.63, IK.pw - 0.02) * w;
+    const nm = ssTxt(scene, l.u(px), 0, loc.name, l.u(small ? 12 : 15), IK.ink)
+      .setOrigin(0.5).setLetterSpacing(l.u(2));
+    const ns = Math.min(1, l.u(panelW) / Math.max(1, nm.width));
+    if (ns < 1) nm.setScale(ns);
+    // self-fit: build the desc, measure it, centre the name+desc stack inside
+    // THIS frame's panel; a stack the shallow wood can't hold rebuilds a notch
+    // smaller WITH THE WRAP SCALED ALONGSIDE — same characters per line, so
+    // the phone-verified splits (FIRST LIGHT's two-liner on the wood) survive
+    // the shrink instead of refolding to one line
+    const fs0 = small ? 10 : 12.5;
+    const mkDesc = (fs) => ssTextBlock(scene, l.u(px), 0, loc.desc, {
+      fontSize: l.u(fs) + 'px', color: IK.ink, fontStyle: 'italic',
+      wrapW: l.u(wrapW * (fs / fs0)), lineSpacing: l.u(1), align: 'center', ox: 0.5,
+    }).setData('sigilDesc', sg.id);
+    let desc = mkDesc(fs0);
+    let gap = l.u(small ? 3 : 4);
+    const avail = l.u(IK.ph * h) - l.u(4);
+    if (nm.displayHeight + gap + desc.height > avail) {
+      desc.destroy();
+      desc = mkDesc(small ? 9 : 11);
+      nm.setScale(Math.min(ns, 1) * 0.9);
+      gap = l.u(small ? 2 : 3);
+    }
+    const stackH = nm.displayHeight + gap + desc.height;
+    const top = l.u((IK.t + IK.ph / 2 - 0.5) * h) - stackH / 2;   // panel centre
+    nm.setY(top + nm.displayHeight / 2);
+    desc.setY(top + nm.displayHeight + gap);
+    c.add(nm);
+    c.add(desc);
+    c.setSize(l.u(w), l.u(h)).setInteractive({ useHandCursor: true });
+    c.setData('sigilCard', true);
+    return c;
+  }
+  const tex = ssSigilCardTex(scene, tier, w, h);
+  c.add(scene.add.image(0, 0, tex.key).setDisplaySize(l.u(w), l.u(h)));
+  const gx = -w / 2 + tex.mx;
+  c.add(ssTxt(scene, l.u(gx), 0, sg.icon, l.u(tex.mr * 0.98), RC.ink).setOrigin(0.5)
+    .setShadow(0, 0, RC.shadow, l.u(5), true, true));
+  const lx = gx + tex.mr + 14, maxW = w / 2 - lx - 12;
+  const compact = h < 100;
+  const gk = ssGoldTex(scene, loc.name, compact ? 12 : 15);
+  const nsc = Math.min(1, maxW / gk.w);
+  const nameY = compact ? -h / 2 + 16 : (RC.label ? -h / 2 + 42 : -h / 2 + 52);
+  c.add(scene.add.image(l.u(lx), l.u(nameY), gk.key).setOrigin(0, 0.5)
+    .setDisplaySize(l.u(gk.w * nsc), l.u(gk.h * nsc)));
+  if (RC.label) {
+    const lab = compact
+      ? ssTxt(scene, l.u(w / 2 - 24), l.u(-h / 2 + 19), SS_T(RC.label), l.u(9), RC.labelColor).setOrigin(1, 0.5)
+      : ssTxt(scene, l.u(lx), l.u(nameY + 19), '✦ ' + SS_T(RC.label) + ' ✦', l.u(10), RC.labelColor).setOrigin(0, 0.5);
+    c.add(lab.setLetterSpacing(l.u(2)).setShadow(0, 0, RC.shadow, l.u(6), true, true));
+  }
+  const descY = compact ? 0 : (RC.label ? nameY + 30 : nameY + 15);
+  c.add(ssTextBlock(scene, l.u(lx), l.u(descY), loc.desc, {
+    fontSize: l.u(compact ? 10 : 12.5) + 'px', color: '#c3c6da', fontStyle: 'italic',
+    wrapW: l.u(maxW + 4), lineSpacing: l.u(2),
+  }).setData('sigilDesc', sg.id));
+  c.setSize(l.u(w), l.u(h)).setInteractive({ useHandCursor: true });
+  c.setData('sigilCard', true);
+  return c;
+}
+
+/* ---- the sigil inspector -------------------------------------------------
+   Powers must be readable in a proper box, never text floating over the game.
+   One panel serves solo and versus: a midnight/gold window (the end screens'
+   language) listing the birth sign and every held sigil — icon in its
+   medallion, gold nameplate, rarity ribbon, full effect text. The veil
+   beneath is interactive, so every tap on the board under the window dies at
+   the veil; tapping it (or ✕) minimizes the panel back to the compact dock.
+   Drag-scrolls when a long run has collected more than one window holds.
+   Returns { c, close } — callers stash it and may force-close on battle end. */
+function ssSigilPanel(scene, opts) {
+  const l = ssLayout(scene);
+  // depth 95 rides over play; the end screen (overlayC, 100) needs the panel
+  // above itself, so callers may raise it
+  const c = scene.add.container(0, 0).setDepth(opts.depth || 95);
+  const veil = scene.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setInteractive();
+  scene.tweens.add({ targets: veil, alpha: 0.72, duration: 200 });
+  c.add(veil);
+  const close = () => {
+    if (c.getData('closed') || !c.active) return;
+    c.setData('closed', true);
+    scene.tweens.add({ targets: c, alpha: 0, duration: 150, onComplete: () => { if (c.active) c.destroy(); } });
+    if (opts.onClose) opts.onClose();
+  };
+  veil.on('pointerdown', () => { SFX.ui(); close(); });
+
+  /* Rows are heterogeneous now (v0.43.0): the birth sign, the sigils you
+     hold, then — when the caller asks for it — a STILL SLEEPING section, the
+     locked half of the sky drawn as silhouettes with the bar that is filling
+     toward each one. Heights differ per kind, so the layout runs off a
+     prefix sum rather than k * (RH + GAP); the mask and the drag-scroll below
+     read contentH exactly as they always did.
+     THE LAW: a sigil is in ONE state or the other, never both. `asleep` is
+     computed from ssSigilUnlocked, which is the same truth ssSigilOpen()
+     draws the pick boards from, so the moment a rite hands one over it leaves
+     this list and appears above it on the next open. */
+  const RW = 340, RH = 84, GAP = 8, HEAD = 56, FOOT = 30, HDR = 44, SH = 74;
+  const rows = [];
+  if (opts.sign) rows.push({ sign: opts.sign, h: RH });
+  for (const id of opts.sigils || []) {
+    const sg = SS_SIG_BY[id] || SS_SIGILS.find((s) => s.id === id);
+    if (sg) rows.push({ sg, h: RH });
+  }
+  if (opts.sleeping) {
+    // closest to waking first (v0.67.0) — the bar you are chasing tops the list
+    const asleep = ssSigilAsleep();
+    rows.push({ head: 1, n: asleep.length, h: HDR });
+    for (const sg of asleep) rows.push({ sg, sleep: 1, h: SH });
+  }
+  const ys = [];
+  let acc = 0;
+  for (const r of rows) { ys.push(acc + r.h / 2); acc += r.h + GAP; }
+  const contentH = Math.max(0, acc - GAP);
+  const viewH = Math.min(contentH, 552);
+  const winH = HEAD + viewH + FOOT;
+  const top = 400 - winH / 2;
+
+  // the window rides in its own container so it can rise in as one piece
+  const wc = scene.add.container(0, 0);
+  const win = scene.add.image(l.x(0), l.y(top + winH / 2), 'endpanel')
+    .setDisplaySize(l.u(372), l.u(winH)).setInteractive();
+  wc.add(win);
+  // a caller may name someone in the title (the rival's powers, 9/8 card 03)
+  const tk = ssGoldTex(scene, SS_T(opts.title || 'inspTitle', opts.titleArg), 16);
+  const tsc = Math.min(1, 250 / tk.w);
+  wc.add(scene.add.image(l.x(-6), l.y(top + 30), tk.key).setDisplaySize(l.u(tk.w * tsc), l.u(tk.h * tsc)));
+  const xT = ssTxt(scene, l.x(164), l.y(top + 29), '✕', l.u(17), '#8a94c4').setOrigin(0.5);
+  const xZ = scene.add.zone(l.x(164), l.y(top + 29), l.u(46), l.u(46)).setOrigin(0.5).setInteractive({ useHandCursor: true });
+  xZ.on('pointerdown', () => { SFX.ui(); close(); });
+  wc.add([xT, xZ]);
+  wc.add(ssTxt(scene, l.x(0), l.y(top + winH - 15), SS_T('inspSub'), l.u(9.5), '#5a6390', 'italic').setOrigin(0.5));
+
+  // rows live in a masked container; dragging the window scrolls them
+  const rc = scene.add.container(0, 0);
+  rows.forEach((r, k) => {
+    const yk = top + HEAD + ys[k];
+    // ---- the section rule: what is still out there, and how much of it ----
+    if (r.head) {
+      rc.add(ssTxt(scene, l.x(0), l.y(yk - 6), '—  ' + SS_T('slpHead') + '  —', l.u(11), '#8a94c4')
+        .setOrigin(0.5).setLetterSpacing(l.u(2)));
+      rc.add(ssTxt(scene, l.x(0), l.y(yk + 12), r.n ? SS_T(r.n === 1 ? 'slpSub1' : 'slpSub', r.n) : SS_T('slpNone'),
+        l.u(9.5), r.n ? '#5a6390' : '#c9b676', 'italic').setOrigin(0.5));
+      return;
+    }
+    // ---- a sleeping sigil: a silhouette, its condition, and its bar ----
+    if (r.sleep) {
+      const tex = ssSleepCardTex(scene, RW, SH);
+      rc.add(scene.add.image(l.x(0), l.y(yk), tex.key).setDisplaySize(l.u(RW), l.u(SH)));
+      const gx = -RW / 2 + tex.mx;
+      rc.add(ssTxt(scene, l.x(gx), l.y(yk), '?', l.u(tex.mr * 1.05), '#4a5480').setOrigin(0.5, 0.56));
+      const lx = gx + tex.mr + 14, maxW = RW / 2 - lx - 16;
+      const RCs = SS_RARITY[r.sg.rarity | 0];
+      if (RCs.label) {
+        rc.add(ssTxt(scene, l.x(RW / 2 - 16), l.y(yk - SH / 2 + 15), SS_T(RCs.label), l.u(8), RCs.labelColor)
+          .setOrigin(1, 0.5).setLetterSpacing(l.u(1.5)).setAlpha(0.42));
+      }
+      // the condition sits on the row's own centre line, so a one-line English
+      // sentence and a two-line German one both hang level over the bar
+      rc.add(ssTextBlock(scene, l.x(lx), l.y(yk - 12), SS_SIG_HOW(r.sg), {
+        fontSize: l.u(11.5) + 'px', color: '#9aa3cc', fontStyle: 'italic',
+        wrapW: l.u(maxW - (RCs.label ? 58 : 6)), lineSpacing: l.u(1.5), oy: 0.5,
+      }).setData('sigilHow', r.sg.id));
+      /* the bar: a dim track with a gold run across it, and the plain count.
+         barW leaves 72 design units at the right for "100 / 400" — and the
+         panel's mask ends at x 186, so a bar wider than the row does not just
+         look wrong, it is CUT by the mask at the window's edge. */
+      const pr = ssSigilProgress(r.sg);
+      const frac = Math.max(0, Math.min(1, pr.need ? pr.have / pr.need : 0));
+      const barW = Math.max(40, maxW - 72), by = yk + SH / 2 - 16;
+      rc.add(scene.add.rectangle(l.x(lx), l.y(by), l.u(barW), l.u(3.5), 0x2b3157, 1).setOrigin(0, 0.5));
+      if (frac > 0) {
+        const fill = scene.add.rectangle(l.x(lx), l.y(by), l.u(Math.max(2, barW * frac)), l.u(3.5), 0xd7b45c, 1).setOrigin(0, 0.5);
+        rc.add(fill);
+        if (frac > 0.04) {
+          rc.add(scene.add.image(l.x(lx + barW * frac), l.y(by), 'glowbig').setDisplaySize(l.u(26), l.u(16))
+            .setTint(0xffd77a).setAlpha(0.30).setBlendMode('ADD'));
+        }
+      }
+      rc.add(ssTxt(scene, l.x(RW / 2 - 16), l.y(by), pr.have + ' / ' + pr.need, l.u(9.5), '#8a94c4')
+        .setOrigin(1, 0.5));
+      return;
+    }
+    // ---- what is already yours ----
+    const tier = r.sg ? (r.sg.rarity | 0) : 0;
+    const RC = SS_RARITY[tier];
+    const tex = ssSigilCardTex(scene, tier, RW, RH);
+    rc.add(scene.add.image(l.x(0), l.y(yk), tex.key).setDisplaySize(l.u(RW), l.u(RH)));
+    const gx = -RW / 2 + tex.mx;
+    let name, desc, ribbon, ribbonColor, ribbonShadow;
+    if (r.sg) {
+      rc.add(ssTxt(scene, l.x(gx), l.y(yk), r.sg.icon, l.u(tex.mr * 0.95), RC.ink).setOrigin(0.5)
+        .setShadow(0, 0, RC.shadow, l.u(5), true, true));
+      // the held copy's TIER (v0.66.0): the desc speaks at its strength, and
+      // a strengthened sigil trades the drop ribbon for its grade's — the
+      // numeral names the slot, so a skipped epic reads II then IV
+      const ht = opts.tiers ? Math.max(1, Math.min((opts.tiers[r.sg.id] | 0) || 1, ssSigilMaxT(r.sg.id))) : 1;
+      const loc = SS_SIG(r.sg, ht);
+      name = loc.name; desc = loc.desc;
+      const slot = ht >= 2 ? ssGradeSlot(r.sg.id, ht) : 1;
+      if (slot >= 2) {
+        const GD = SS_GRADE[slot - 1];
+        ribbon = SS_ROMAN[slot - 1] + ' · ' + SS_T(GD.key); ribbonColor = GD.color; ribbonShadow = GD.color;
+      } else {
+        ribbon = RC.label ? SS_T(RC.label) : ''; ribbonColor = RC.labelColor;
+      }
+    } else {
+      const g = ssZodiacGlyph(scene, r.sign, l.u(0.145), l.x(gx), l.y(yk));
+      rc.add(g);
+      // the sign row speaks at its LEVEL (v0.69.0): the battle passes the
+      // run's held level; a bare panel reads the profile's standing one
+      const slv = (opts.signLv | 0) || ssSignLv(r.sign.id);
+      const loc = SS_ZOD(r.sign, slv);
+      name = r.sign.name + ' · ' + loc.title + ' · ' + SS_T('svLevel', slv); desc = loc.desc;
+      // a borrowed sign is a guest, not a birth — its ribbon says which
+      ribbon = SS_T(opts.signBorrowed ? 'skyBorrowed' : 'inspSign'); ribbonColor = '#ffdf8f';
+    }
+    const lx = gx + tex.mr + 14, maxW = RW / 2 - lx - 12;
+    const gk = ssGoldTex(scene, name, 13);
+    const nsc = Math.min(1, (maxW - (ribbon ? 66 : 0)) / gk.w);
+    rc.add(scene.add.image(l.x(lx), l.y(yk - RH / 2 + 19), gk.key).setOrigin(0, 0.5)
+      .setDisplaySize(l.u(gk.w * nsc), l.u(gk.h * nsc)));
+    if (ribbon) rc.add(ssTxt(scene, l.x(RW / 2 - 30), l.y(yk - RH / 2 + 19), ribbon, l.u(8.5), ribbonColor)
+      .setOrigin(1, 0.5).setLetterSpacing(l.u(1.5)).setShadow(0, 0, ribbonShadow || RC.shadow, l.u(6), true, true));
+    rc.add(ssTextBlock(scene, l.x(lx), l.y(yk - RH / 2 + 31), desc, {
+      fontSize: l.u(12) + 'px', color: '#c9ccde', fontStyle: 'italic',
+      wrapW: l.u(maxW + 6), lineSpacing: l.u(1.5),
+    }).setData('sigilDesc', r.sg ? r.sg.id : 'sign'));
+  });
+  wc.add(rc);
+
+  const maxOff = Math.max(0, l.u(contentH - viewH));
+  if (maxOff > 0) {
+    const mg = scene.make.graphics();
+    mg.fillRect(l.x(-186), l.y(top + HEAD), l.u(372), l.u(viewH));
+    rc.setMask(mg.createGeometryMask());
+    // a slim gold thumb tracks where you are in the list
+    const trackH = l.u(viewH), thumbH = trackH * (l.u(viewH) / l.u(contentH));
+    const thumb = scene.add.rectangle(l.x(172), l.y(top + HEAD) + thumbH / 2, l.u(3), thumbH, 0xd7b45c, 0.45).setOrigin(0.5);
+    wc.add(thumb);
+    let drag = null, off = 0;
+    win.on('pointerdown', (p) => { drag = { y: p.y, off }; });
+    const mv = (p) => {
+      if (!drag) return;
+      if (!p.isDown) { drag = null; return; }
+      off = clamp(drag.off + (drag.y - p.y), 0, maxOff);
+      rc.y = -off;
+      thumb.y = l.y(top + HEAD) + thumbH / 2 + (off / maxOff) * (trackH - thumbH);
+    };
+    const up = () => { drag = null; };
+    scene.input.on('pointermove', mv);
+    scene.input.on('pointerup', up);
+    c.once('destroy', () => { scene.input.off('pointermove', mv); scene.input.off('pointerup', up); mg.destroy(); });
+  }
+
+  c.add(wc);
+  wc.y = l.u(14); wc.alpha = 0;
+  scene.tweens.add({ targets: wc, y: 0, alpha: 1, duration: 240, ease: 'Cubic.easeOut' });
+  SFX.ui();
+  ssHealBlankTexts(scene, 'sigil-panel');
+  return { c, close };
+}
+
+// The dock's vertical glass pill, baked per height like the card chrome.
+function ssDockTex(scene, hU) {
+  const key = 'sigdock@' + Math.round(hU);
+  if (scene.textures.exists(key)) return key;
+  const R = ssTexRes(scene), w = 34;
+  const t = scene.textures.createCanvas(key, Math.round(w * R), Math.round(hU * R));
+  const c = t.context;
+  c.scale(R, R);
+  c.beginPath(); c.roundRect(1.5, 1.5, w - 3, hU - 3, (w - 3) / 2);
+  const g = c.createLinearGradient(0, 0, 0, hU);
+  g.addColorStop(0, 'rgba(22,29,62,0.92)'); g.addColorStop(1, 'rgba(11,15,33,0.92)');
+  c.fillStyle = g; c.fill();
+  c.lineWidth = 1.2; c.strokeStyle = 'rgba(201,168,76,0.55)'; c.stroke();
+  t.refresh();
+  return key;
+}
+
+// Layout: 420 x 800 design space, scaled + centered
+/* ---- safe-area insets ---------------------------------------------------
+   In a browser the chrome absorbs the notch and the home indicator, so the
+   layout never had to know they exist. In a full-screen WKWebView shell it
+   does: index.html already sets viewport-fit=cover + apple-mobile-web-app-
+   capable, so the canvas owns EVERY pixel. Measured at 393x852 (iPhone 14/15
+   Pro) the 420x800 design box landed 7px under the Dynamic Island, and on a
+   no-notch SE — where the box is height-bound and fills the screen exactly —
+   the daily chip and the profile chip sat squarely beneath the status bar,
+   both of them tappable. Read once at boot from CSS env(); `?inset=T,B` forces
+   values so the harness can prove this without a device (headless reports 0).
+   Values are CSS px; the design box works in buffer px, hence the DPR. */
+const SS_INSET = { top: 0, bottom: 0 };
+function ssReadInsets() {
+  const q = QS.get('inset');
+  if (q) {
+    const p = String(q).split(',').map(parseFloat);
+    if (isFinite(p[0])) SS_INSET.top = Math.max(0, p[0]);
+    if (isFinite(p[1])) SS_INSET.bottom = Math.max(0, p[1]);
+    return SS_INSET;
+  }
+  try {
+    const d = document.createElement('div');
+    d.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;' +
+      'padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)';
+    document.body.appendChild(d);
+    const cs = getComputedStyle(d);
+    SS_INSET.top = parseFloat(cs.paddingTop) || 0;
+    SS_INSET.bottom = parseFloat(cs.paddingBottom) || 0;
+    d.remove();
+  } catch (e) { }
+  return SS_INSET;
+}
+/* The design box is 420x800 and used to centre in the raw viewport. It now
+   centres in the SAFE band instead, so nothing authored at the top or bottom
+   of the box can land under the hardware. With zero insets — every desktop
+   browser, and every phone with browser chrome — the arithmetic is identical
+   to before, which is why this does not move a single existing layout. */
+function ssLayout(scene) {
+  const W = scene.scale.width, H = scene.scale.height;
+  const it = SS_INSET.top * DPR, ib = SS_INSET.bottom * DPR;
+  const availH = Math.max(1, H - it - ib);
+  const s = Math.min(W / 420, availH / 800);
+  const cy = it + availH / 2;
+  return { W, H, s, x: (d) => W / 2 + d * s, y: (d) => cy + (d - 400) * s, u: (d) => d * s };
+}
+
+/* ---- tap targets: the 44-pt law (v0.50.1) --------------------------------
+   tools/crisp-check.mjs walked eight phones and found fingers meeting hit
+   areas far under Apple's 44 pt: the 🔊/🌐 glyphs at 13×15, the ‹ back at
+   8×23, the ✕ closes, the profile chip / rating pill / daily chip, and — on
+   the narrow phones, where the 420-wide design box scales to 0.83–0.94 css
+   px per design pt — every 44- and 46-pt button. The ART keeps its size;
+   only the hit RECTANGLE grows: setInteractive() is wrapped so every
+   rectangular hit area is padded, centred, to at least 44 css pt on each
+   axis (local space, origin handled by the input plugin; the first rect is
+   kept on the object so a re-pad is never cumulative). Custom shapes and
+   pixel-perfect areas are left alone. ssHitPad(o, css, anchor) re-pads a
+   single object, optionally with an anchor — 'up' keeps the bottom edge and
+   grows upward, 'down' the reverse — for stacked pairs where centred growth
+   would let the lower one steal the upper one's taps (the meadow's old
+   chip-over-rating-pill stack was the shape that earned it; the pill left
+   in v0.78.0 and today every caller pads centred). */
+/* the settings gear — the meadow footer's one door (v0.96.0). Baked canvas
+   art in the swords' palette (no-emoji-as-game-art law: the face is drawn,
+   never a glyph). Eight teeth on a ring, a hub the night shows through. */
+function ssGearTex(scene) {
+  const key = 'ssgear', D = 44;
+  if (scene.textures.exists(key)) return key;
+  const R = ssTexRes(scene);
+  const t = scene.textures.createCanvas(key, Math.round(D * R), Math.round(D * R));
+  t.context.scale(R, R);
+  ssBake(t, key, D, D, (c) => {
+    c.clearRect(0, 0, D, D);
+    c.save(); c.translate(D / 2, D / 2);
+    const teeth = 8, ro = 17.4, ri = 13.6, hub = 5.4, step = Math.PI * 2 / teeth;
+    c.beginPath();
+    for (let i = 0; i < teeth; i++) {
+      const a = i * step;
+      c.arc(0, 0, ro, a, a + step * 0.46);          // the tooth's crown
+      c.arc(0, 0, ri, a + step * 0.54, a + step);   // the valley between
+    }
+    c.closePath();
+    c.moveTo(hub, 0);
+    c.arc(0, 0, hub, 0, Math.PI * 2, true);         // reverse winding: the hub is a hole
+    c.fillStyle = '#ead9a4'; c.fill('evenodd');
+    c.lineWidth = 1.4; c.strokeStyle = '#8a6210'; c.stroke();
+    // a quiet inner ring line, the way the blades carry a fuller
+    c.beginPath(); c.arc(0, 0, (ri + hub) / 2, 0, Math.PI * 2);
+    c.lineWidth = 1; c.strokeStyle = 'rgba(138,98,16,0.45)'; c.stroke();
+    c.restore();
+  }, (c) => {
+    // fallback: a plain ring — still drawn, no teeth, no tricks
+    c.clearRect(0, 0, D, D);
+    c.beginPath(); c.arc(D / 2, D / 2, 15, 0, Math.PI * 2);
+    c.moveTo(D / 2 + 6, D / 2); c.arc(D / 2, D / 2, 6, 0, Math.PI * 2, true);
+    c.fillStyle = '#e0c878'; c.fill('evenodd');
+  });
+  return key;
+}
+function ssHitPad(o, minCss, anchor) {
+  try {
+    const ha = o && o.input && o.input.hitArea;
+    if (!ha || !(ha instanceof Phaser.Geom.Rectangle) || o.input.customHitArea) return o;
+    // a swapped texture (the lantern lighting up) brings a new frame size and a
+    // new display scale: the base rect is the frame again, not the old pad
+    const fw = o.frame ? o.frame.realWidth : 0, fh = o.frame ? o.frame.realHeight : 0;
+    if (o.__ha0 && fw && (o.__ha0.fw !== fw || o.__ha0.fh !== fh)) o.__ha0 = { x: 0, y: 0, w: fw, h: fh, fw, fh };
+    if (!o.__ha0) o.__ha0 = { x: ha.x, y: ha.y, w: ha.width, h: ha.height, fw, fh };
+    const h0 = o.__ha0, need = (minCss || 44) * DPR;
+    const sx = Math.abs(o.scaleX) || 1, sy = Math.abs(o.scaleY) || 1;
+    const w = Math.max(h0.w, need / sx), h = Math.max(h0.h, need / sy);
+    const x = h0.x + (h0.w - w) * (anchor === 'left' ? 0 : anchor === 'right' ? 1 : 0.5);
+    const y = h0.y + (h0.h - h) * (anchor === 'down' ? 0 : anchor === 'up' ? 1 : 0.5);
+    if (w !== ha.width || h !== ha.height || x !== ha.x || y !== ha.y) ha.setTo(x, y, w, h);
+  } catch (e) { }
+  return o;
+}
+(function () {
+  const P = Phaser.GameObjects.GameObject.prototype, orig = P.setInteractive;
+  P.setInteractive = function (a, b, c) {
+    const r = orig.call(this, a, b, c);
+    // a caller's own shape (a circle, a polygon, a callback) is its own law
+    if (this.input && !(a && typeof a === 'object' && (a.hitArea || a.pixelPerfect)) && !(a && a.type !== undefined && !(a instanceof Phaser.Geom.Rectangle)) && !(b && typeof b === 'function' && b !== Phaser.Geom.Rectangle.Contains)) ssHitPad(this, 44);
+    return r;
+  };
+})();
+
+/* ---- the campaign star chart --------------------------------------------
+   v0.80.0 (Skylar, 9/2): the chart is its OWN ENTIRE SCREEN — no window, no
+   meadow showing through. A full-bleed night holds one uncompressed
+   serpentine road, big enough that it no longer fits one screen (that is
+   the point): it scrolls freely, and the camera knows two rides. At
+   campaign entry it opens on the final boss at the summit and travels the
+   road down past every waiting beast to the fight you are up to; between
+   fights it glides from the felled beast up to the next one. Beasts not yet
+   felled hang NAMELESS in the dark; the one you face next stands bigger
+   with its name beneath it (the name pops in as the camera lands); felled
+   beasts keep their names for the scroll back down — "this run" rides
+   fightIdx, so a resumed climb keeps its history and a new campaign starts
+   nameless. The header (mapTitle · act · fight) anchors to the top of the
+   screen on the topmost layer over a semi-black band, invisible until the
+   camera settles. Data-driven off any acts array. Returns { c }; the
+   container carries the tappable current-node zone as data 'mapZone' — the
+   zone is BORN when the camera settles (the demo driver and the harnesses
+   poll for it), enters on the pointer UP under an 8-unit drag threshold so
+   a scroll starting on the beast never enters the fight, and a bare
+   synthetic emit('pointerdown') (the demo driver's voice) enters at once.
+   A tap mid-ride skips to the landing (armed 380ms — the launching tap
+   must never skip its own ride); ?ride=0 and prefers-reduced-motion snap
+   straight to the settled frame. Beacon: window.__ssmap. */
+/* Campaign roster — the drawn sky. Each campaign rolls its acts' open slots
+   from the tier pools in SS_ACTS (fixed ids stay fixed) and the draw is
+   pinned in localStorage, so the chart, the battles, and a resumed
+   checkpoint all march the same road. It lives and dies with the
+   checkpoint (ssClearCampaign wipes both). */
+function ssRollRoster(seed) {
+  const r = ssMulberry(seed);
+  const used = new Set();
+  const roster = [];
+  for (const act of SS_ACTS) {
+    const local = new Set();
+    for (const sl of act.slots) {
+      let id = sl;
+      if (sl === 'b' || sl === 'm' || sl === 'B') {
+        const pool = sl === 'b' ? act.basics : sl === 'm' ? act.minis : act.bosses;
+        // prefer beasts this campaign has not drawn yet, then at least
+        // beasts this act has not drawn yet
+        let cand = pool.filter((p) => !local.has(p) && !used.has(p));
+        if (!cand.length) cand = pool.filter((p) => !local.has(p));
+        if (!cand.length) cand = pool;
+        id = cand[Math.floor(r() * cand.length)];
+      }
+      local.add(id); used.add(id);
+      roster.push(id);
+    }
+  }
+  return roster;
+}
+function ssCampaignLen() { return SS_ACTS.reduce((a, act) => a + act.slots.length, 0); }
+function ssCampaignRoster() {
+  try {
+    const r = JSON.parse(localStorage.getItem('beta3.camproster'));
+    if (Array.isArray(r) && r.length === ssCampaignLen() && r.every((id) => SS_BEASTS[id])) return r;
+  } catch (e) { }
+  const roster = ssRollRoster(Math.floor(Math.random() * 1e9));
+  try { localStorage.setItem('beta3.camproster', JSON.stringify(roster)); } catch (e) { }
+  return roster;
+}
+function ssClearCampaign() {
+  localStorage.removeItem('beta3.campaign');
+  localStorage.removeItem('beta3.camproster');
+  localStorage.removeItem('beta3.campsign');
+  localStorage.removeItem('beta3.camphard');
+}
+
+/* ---- the endless ladder (v0.68.0) ----------------------------------------
+   Levels built as fights, n at a time, from ONE seeded stream consumed in
+   level order — so ssEndlessFights(seed, 400) and (seed, 800) agree on their
+   first 400 rungs exactly, a resumed run rebuilds the identical ladder from
+   the checkpoint's seed, and the ladder can extend itself mid-run without
+   moving a single level already climbed. Every dial lives on SS_ENDLESS
+   (data.js): boss every 5th, lvl-banded pools, minis thickening, the umbral
+   dress mixing in past umbralFrom, deep bosses cursed, the strike clock cut.
+   actIdx groups levels in bands of five so the cadence's actBoss law pays
+   every boss, exactly as the campaign's act-closers do. */
+function ssEndlessFights(seed, n) {
+  const E = SS_ENDLESS;
+  const r = ssMulberry((seed >>> 0) || 1);
+  const fights = [];
+  let prev = null;
+  for (let i = 0; i < n; i++) {
+    const level = i + 1;
+    const boss = level % E.bossEvery === 0;
+    let pool;
+    if (boss) {
+      const cap = Math.max(1, E.bossLvlCap(level));
+      pool = E.pools.bosses.filter((id) => (SS_BEASTS[id].lvl || 1) <= cap);
+    } else {
+      const cap = E.lvlCap(level);
+      const src = r() < E.pMini(level) ? E.pools.minis : E.pools.basics;
+      pool = src.filter((id) => (SS_BEASTS[id].lvl || 1) <= cap);
+      if (!pool.length) pool = E.pools.basics.filter((id) => (SS_BEASTS[id].lvl || 1) <= cap);
+    }
+    let cand = pool.filter((id) => id !== prev);
+    if (!cand.length) cand = pool;
+    const id = cand[Math.floor(r() * cand.length)];
+    prev = id;
+    const f = {
+      id, actIdx: Math.floor(i / E.bossEvery), level,
+      mult: E.hpMult(level), atkAdd: E.atkAdd(level),
+      umbral: level >= E.umbralFrom && r() < E.pUmbral(level),
+    };
+    const tc = E.timerCut(level);
+    if (tc) f.tcut = tc;
+    if (boss && level >= E.curseFrom) { f.curse = 'blackout'; f.ink = level >= E.curseDeep ? 3 : 2; }
+    fights.push(f);
+  }
+  return fights;
+}
+/* The endless run's pinned sign — chosen on the same picker the campaign
+   uses, living and dying with the climb (its checkpoint clears both). */
+function ssEndSign() {
+  const v = localStorage.getItem('beta3.endsign');
+  return SS_ZODIAC_BY[v] ? v : null;
+}
+function ssClearEndless() {
+  localStorage.removeItem('beta3.endless');
+  localStorage.removeItem('beta3.endsign');
+}
+
+/* ---- the sigil cadence (v0.65.0) -----------------------------------------
+   Skylar (9/1): offers every 2-3 fights, not every fight. ssSigilPlan walks
+   the mode's SS_CADENCE row once per run and returns the Set of fight
+   indices whose WIN pays an offer: the opening hook, then every gap[0..1]
+   fights on seeded jitter, the fight that closes an act always paying (a
+   due offer landing one fight before it folds in, so offers never come
+   back to back), and never the run's final fight — that win ends the run.
+   The seed is stable where it must be: the campaign hashes its pinned
+   roster (a resumed climb recomputes the same schedule — no new checkpoint
+   field), the daily draws from its shared day seed (every hunter meets
+   offers at the same fights), quick rolls fresh each run. Battle keeps the
+   result as this.sigPlan — a harness may pin it directly, like the drip's
+   profile seam. Campaign pays 7-9 offers per full 20-fight climb
+   (typically 8, was 19); quick and the daily pay 2 across their 5. */
+function ssStrSeed(str) {
+  let h = 0x811c9dc5;                                   // FNV-1a, 32-bit
+  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+  return h >>> 0;
+}
+function ssSigilPlan(mode, fights, seed, hard) {
+  const row = SS_CADENCE[mode] || SS_CADENCE.quick;
+  const pays = new Set();
+  if (!row || !row.gap) return pays;                    // a row with no fight cadence (versus)
+  // HARD (v0.70.0): the modifier row stretches the mode's gap band, so a
+  // hard run meets new sigils AND upgrades rarer — same laws, longer road
+  const add = hard && SS_CADENCE.hard ? (SS_CADENCE.hard.gapAdd | 0) : 0;
+  const gap = add ? [row.gap[0] + add, row.gap[1] + add] : row.gap;
+  const rnd = ssMulberry((seed >>> 0) || 1);
+  const draw = () => gap[0] + Math.floor(rnd() * (gap[1] - gap[0] + 1));
+  const last = fights.length - 1;
+  const closes = (i) => i === last || fights[i + 1].actIdx !== fights[i].actIdx;
+  const bossPays = (i) => !!row.actBoss && i < last && closes(i);
+  let next = row.first | 0;
+  for (let i = 0; i < last; i++) {                      // the final win ends the run — never an offer
+    if (bossPays(i) || (i >= next && !bossPays(i + 1))) { pays.add(i); next = i + draw(); }
+  }
+  return pays;
+}
+/* Which KIND each paying fight offers (v0.66.0): pre-rolled once per run
+   from the plan itself, on the plan seed XOR a constant — its OWN mulberry
+   stream, so the main seeded rng is consumed exactly as before (the daily's
+   shared deal and sigil rolls don't move), a resumed campaign recomputes
+   the identical intents from its roster hash, and the daily's intents are
+   shared-fair (every hunter meets the upgrade offer at the same fight).
+   The run's FIRST paying fight is always 'sigil' — you hold nothing at the
+   hook. `up` is the mode's upgrade share (SS_CADENCE). A fight a harness
+   pins into sigPlan AFTER create has no entry here — payOffer then falls
+   to the row's own type, the comet-check seam unchanged. */
+function ssOfferTypes(mode, plan, seed) {
+  const row = SS_CADENCE[mode] || SS_CADENCE.quick, m = new Map();
+  const rnd = ssMulberry(((seed >>> 0) ^ 0x9e3779b9) || 1);
+  let first = true;
+  for (const i of [...plan].sort((a, b) => a - b)) {
+    m.set(i, !first && rnd() < (row.up || 0) ? 'upgrade' : (row.type || 'sigil'));
+    first = false;
+  }
+  return m;
+}
+
+/* ---- the zodiac ----------------------------------------------------------
+   The campaign's birth sign is chosen on the picker sheet and pinned in
+   localStorage alongside the roster — it lives and dies with the campaign
+   (ssClearCampaign wipes all three). 'none' = the player chose the classic,
+   unsigned climb; an ABSENT key means the picker has not been answered yet. */
+function ssCampSign() {
+  const v = localStorage.getItem('beta3.campsign');
+  return SS_ZODIAC_BY[v] ? v : null;
+}
+function ssCampSignChosen() { return localStorage.getItem('beta3.campsign') != null; }
+/* THE DECK REMEMBERS (v0.95.0, Skylar 9/10): the sign a climb is BEGUN under
+   outlives the climb. endRun's books wipe the door pins with the checkpoint
+   (ssClearCampaign / ssClearEndless) — which is exactly why a finished
+   campaign used to forget — so the memory lives in prof instead: one small
+   field per door (lastSign / lastSignEnd), written at the picker's BEGIN,
+   riding the normal profile sync. The picker OPENS standing on the
+   remembered card; 'none' (THE OPEN SKY) is a remembered choice too and
+   opens on the open-sky card at the deck's far end (since 9/17 the twelve
+   lead and the sky closes the deck; a never-begun profile opens the front). */
+function ssRememberSign(forMode, id) {
+  const key = forMode === 'endless' ? 'lastSignEnd' : 'lastSign';
+  if (SS.prof[key] === id) return;
+  SS.prof[key] = id;
+  SS.save();
+}
+
+/* ---- HARD MODE (v0.70.0) -------------------------------------------------
+   The campaign's hard pin — set by the picker's tick box at BEGIN, living
+   and dying with the campaign (ssClearCampaign wipes it), so a resumed
+   climb stays hard; the checkpoint carries `hard` too and is the truth on
+   resume. Hard is a MODIFIER the Battle scene reads (this.hard) — endless
+   accepts it later by pinning a sibling key and reading it in create. */
+function ssCampHard() { return localStorage.getItem('beta3.camphard') === '1'; }
+/* A hard campaign CLEAR under a sign: the ledger (prof.signs[id].hardClears)
+   moves, the sign's own 'hard-<id>' achievement rings ONCE with a toast
+   naming the sign (the def is minted here — SS_ACH displays the family as
+   one templated row), and the full zodiac crowns 'hard-zodiac'. The open
+   sky ('none') climbs unsigned — nothing to crown, by design. */
+function ssHardAward(sign, game) {
+  const z = SS_ZODIAC_BY[sign];
+  if (!z) return;
+  const sr = SS.prof.signs[sign] || (SS.prof.signs[sign] = { best: 0, clears: 0, runs: 0, xp: 0, ack: 1 });
+  sr.hardClears = (sr.hardClears | 0) + 1;
+  SS.save();
+  const fam = SS_ACH.find((a) => a.id === 'hard-sign') || {};
+  SS.award('hard-' + sign, game, { icon: fam.icon || '⚑', name: (fam.name || 'EMBER-SWORN') + ' · ' + z.name, desc: fam.desc || '' });
+  if (fam.crown && SS_ZODIAC.every((s) => !!SS.prof.ach['hard-' + s.id])) SS.award(fam.crown.id, game, fam.crown);
+}
+
+/* SIGN LEVELS (v0.69.0): the standing level of a sign — the profile's
+   lifetime xp through the curve. 1 for null/unknown/unplayed, so a bare
+   read is always lawful (the ssSigilVal default-1 law). */
+function ssSignLv(id) {
+  const sr = id && SS.prof && SS.prof.signs && SS.prof.signs[id];
+  return sr ? ssSignLvFor(sr.xp | 0) : 1;
+}
+/* The level-ups not yet said out loud: every signed record whose level has
+   climbed past `ack` (the announce ledger), in roster order. The rite
+   spends ack as it SHOWS, so two crossings in one run are announced once
+   at the level reached — and a run whose end screen was never seen is
+   announced at the next end screen or on the meadow, never lost, never
+   twice. */
+function ssSignPending() {
+  const out = [];
+  const signs = (SS.prof && SS.prof.signs) || {};
+  for (const z of SS_ZODIAC) {
+    const sr = signs[z.id];
+    if (!sr) continue;
+    const lv = ssSignLvFor(sr.xp | 0);
+    if (lv > Math.max(1, sr.ack | 0)) out.push({ id: z.id, lv });
+  }
+  return out;
+}
+
+// A sign's constellation, drawn small — picker cells, the battle emblem, the
+// profile strip. Signs that share a beast draw the beast's own stars; k maps
+// star units (±100 box) to css px.
+function ssZodiacGlyph(scene, z, k, x, y, tint, alpha) {
+  const src = z.stars ? z : SS_BEASTS[z.beast];
+  const col = tint != null ? tint : SS_ELEMENTS[z.el];
+  const a = alpha == null ? 1 : alpha;
+  const g = scene.add.graphics({ x, y });
+  g.lineStyle(Math.max(1, k * 6.5), col, 0.5 * a);
+  for (const [e1, e2] of src.edges) {
+    g.lineBetween(src.stars[e1][0] * k, src.stars[e1][1] * k, src.stars[e2][0] * k, src.stars[e2][1] * k);
+  }
+  g.fillStyle(col, Math.min(1, 0.95 * a));
+  // the one magnitude system at icon grade (sharp-sky slice 3): the i%3
+  // list-position deal retires with its family. An icon at k ≈ 0.14 needs
+  // fatter discs than the sky's 4.2u to stay legible, so the anchor keeps
+  // the glyph's old 10u presence and the classes ride SS_MAG_R's own ratios
+  // beneath it — the same stars burn bright here as on every other surface.
+  const mags = ssStarMags(src);
+  for (let i = 0; i < src.stars.length; i++) {
+    g.fillCircle(src.stars[i][0] * k, src.stars[i][1] * k, Math.max(0.8, k * SS_MAG_R[mags[i]] * (10 / SS_MAG_R[1])));
+  }
+  return g;
+}
+
+/* A sign badge's glass shield (v0.78.0): midnight glass in a rounded
+   escutcheon, rimmed gold once the sign is cleared, dim iron while it
+   waits — baked once per dress like every other card chrome (setTint is
+   a Canvas no-op; two keys, not a tint). */
+function ssZodBadgeTex(scene, gold) {
+  const key = 'zbadge' + (gold ? '-g' : '');
+  if (scene.textures.exists(key)) return key;
+  const R = ssTexRes(scene), w = 118, h = 106;
+  const t = scene.textures.createCanvas(key, Math.round(w * R), Math.round(h * R));
+  const c = t.context;
+  c.scale(R, R);
+  c.beginPath(); c.roundRect(1.5, 1.5, w - 3, h - 3, 14);
+  const g = c.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, 'rgba(24,31,66,0.88)'); g.addColorStop(0.55, 'rgba(15,20,44,0.9)'); g.addColorStop(1, 'rgba(10,14,31,0.92)');
+  c.fillStyle = g; c.fill();
+  c.lineWidth = 1.3;
+  c.strokeStyle = gold ? 'rgba(201,168,76,0.62)' : 'rgba(74,84,128,0.4)';
+  c.stroke();
+  if (gold) {   // a hairline inner halo so a cleared shield reads lit, not loud
+    c.beginPath(); c.roundRect(4, 4, w - 8, h - 8, 11);
+    c.lineWidth = 1; c.strokeStyle = 'rgba(255,215,122,0.16)'; c.stroke();
+  }
+  t.refresh();
+  return key;
+}
+
+/* ---- zodiac card art: the seam (v0.57.0) ------------------------------
+   The sign cards ask for texture `zod_<id>` — Wyatt's MJ card art
+   (art/ZODIAC-ART.md, portrait 2:3). SS_ZOD_ART lists the ids whose
+   art/zod_<id>.webp ships; ssLoadArt fetches them beside the other plates and
+   ssZodArtKey hands the card a texture key, or null → the card draws the
+   sign's asterism large on the night-sky wash. Dropping real art in is one
+   id per line here plus the webp. */
+function ssZodArtKey(scene, id) {
+  const key = 'zod_' + id;
+  if (scene.textures.exists(key)) return key;
+  const im = SSART.img[key];
+  if (!im) return null;
+  // bake the plate behind the placeholder's rounded corners (6 units on a
+  // 160-wide region) so the full-bleed webp sits in the same frame — the
+  // shipped files carry no alpha of their own
+  try {
+    const W = im.naturalWidth || im.width, H = im.naturalHeight || im.height;
+    const t = scene.textures.createCanvas(key, W, H);
+    const c = t.context;
+    c.beginPath(); c.roundRect(0, 0, W, H, W * (6 / 160)); c.clip();
+    c.drawImage(im, 0, 0, W, H);
+    t.refresh();
+  } catch (e) {
+    if (scene.textures.exists(key)) scene.textures.remove(key);
+    scene.textures.addImage(key, im);
+  }
+  return key;
+}
+// the placeholder art: the game's own twilight gradient with a scatter of
+// faint stars, baked once at texture res — rounded, portrait 2:3
+function ssZodSkyTex(scene) {
+  const key = 'zodsky';
+  if (scene.textures.exists(key)) return key;
+  const R = Math.max(2, ssTexRes(scene));
+  const W = Math.round(160 * R), H = Math.round(240 * R);
+  const t = scene.textures.createCanvas(key, W, H);
+  const c = t.context;
+  c.beginPath(); c.roundRect(0, 0, W, H, 6 * R);
+  const g = c.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, '#0c1030'); g.addColorStop(0.42, '#2a2558'); g.addColorStop(0.72, '#4d3a72'); g.addColorStop(0.92, '#7a4a7c'); g.addColorStop(1, '#9a5f7e');
+  c.fillStyle = g; c.fill();
+  c.save(); c.clip();
+  let s = 7;
+  const rnd = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
+  for (let i = 0; i < 46; i++) {
+    const x = rnd() * W, y = rnd() * H * 0.9, r = (0.5 + rnd() * 1.1) * R;
+    c.fillStyle = 'rgba(232,226,255,' + (0.18 + rnd() * 0.5).toFixed(2) + ')';
+    c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
+  }
+  // the meadow's dark ridge along the foot of the sky
+  c.fillStyle = '#0e0c22';
+  c.beginPath(); c.moveTo(0, H);
+  for (let x = 0; x <= W; x += W / 16) c.lineTo(x, H - (10 + 5 * Math.sin(x / W * 9.4) + 3 * Math.cos(x / W * 21)) * R);
+  c.lineTo(W, H); c.closePath(); c.fill();
+  c.restore();
+  t.refresh();
+  return key;
+}
+/* the full-bleed card's reading scrims (v0.79.0): ONE baked alpha gradient —
+   deep navy rising from clear — worn straight at the card's foot under the
+   power cluster and flipped, faded, at the crown under the name. Baked
+   because setTint is a Canvas no-op (the lantern's law). */
+function ssZodScrimTex(scene) {
+  const key = 'zodscrim';
+  if (scene.textures.exists(key)) return key;
+  const R = Math.max(2, ssTexRes(scene));
+  const W = Math.round(8 * R), H = Math.round(252 * R);
+  const t = scene.textures.createCanvas(key, W, H);
+  const c = t.context;
+  const g = c.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, 'rgba(7,10,26,0)');
+  g.addColorStop(0.45, 'rgba(7,10,26,0.44)');
+  g.addColorStop(1, 'rgba(7,10,26,0.94)');
+  c.fillStyle = g; c.fillRect(0, 0, W, H);
+  t.refresh();
+  return key;
+}
+/* THE OPEN SKY comes alive (v0.84.0, Skylar 9/3; re-dialed v0.98.0 to the
+   9/13 review's approved spec): the unsigned card's night was a stale
+   static wash — this hangs a small living layer over it, card-local so the
+   deck's mask clips it and a slide carries it: a seeded field of stars
+   breathing on their own rhythms, and every so often a shooting star
+   crossing the card (the meadow's own head-and-chained-trail, quoted in
+   the card's coordinates). Since v0.98.0 the card stands on its own
+   painted plate (art/zod_none.webp, ground born unlit) and the field is
+   DOUBLED (44 dots + 6 heroes) but confined to the plate's SKY BAND — the
+   painted ridge starts ≈59.7% down the frame, so dots keep above 54% of
+   the card and heroes above 49% — the twinkle breathes DEEP (bright to
+   near-gone on 0.9–2.2s cycles), crossings come oftener (first 2.2–4.8s,
+   then 3.5–7s), and every flight is CLAMPED above the ridge: the law of
+   this card is that a crossing may NEVER pass over the ground. Sprites
+   only — the per-card Graphics census is pinned by suite — all parented
+   into the returned container, so a deck turn or the sheet's close sweeps
+   the lot; tweens and timers are tracked and stopped on the layer's
+   destroy. The field is SEEDED: every rebuild (each deck turn recycles all
+   three cards) deals the very same sky. The shared 'zodsky' texture is
+   never re-baked — it stays the not-loaded fallback here, and a sign card
+   whose art fails borrows it exactly as still as before. ?twinkle=0 (the
+   ?ride=0 pattern) or reduced motion keeps the field and drops all the
+   movement. Beacon: window.__ssopensky. */
+function ssOpenSkyAlive(scene, l, CW, CH) {
+  const lay = scene.add.container(0, 0);
+  const still = QS.get('twinkle') === '0' || ssReduceMotion();
+  const bcn = window.__ssopensky;
+  const tws = [], evs = [];
+  const tw = (cfg) => { const t = scene.tweens.add(cfg); tws.push(t); return t; };
+  let sd = 13;
+  const rnd = () => { sd = (sd * 16807) % 2147483647; return sd / 2147483647; };
+  // the field (9/13 spec — double v0.84.0's): 44 small stars + 6 slow-
+  // turning hero sparks, confined to the painted plate's SKY BAND — the
+  // unlit ridge starts ≈59.7% down the frame, so dots deal no lower than
+  // 54% of the card and heroes no lower than 49%. The reading scrims ride
+  // above the whole layer, so the name and the power bands keep their
+  // ground. The breathing starts in ONE batch a beat after the build (the
+  // ascent sky's recipe — a card is built mid-swipe-settle, and tween
+  // setup is a real slice of that).
+  const breathe = [];
+  let n = 0;
+  for (let i = 0; i < 44; i++, n++) {
+    const sz = l.u(2.2 + rnd() * 3.2);
+    const x = l.u((rnd() - 0.5) * (CW - 24)), y = l.u(-CH / 2 + 16 + rnd() * (CH * 0.54 - 16));
+    // the deep twinkle — "the stars should twinkle more": bright deals
+    // (.45–.95) breathing down .55–.85 to near-gone, on quick 0.9–2.2s
+    // cycles; the .04 floor keeps every star faintly THERE at the trough
+    const baseA = 0.45 + rnd() * 0.5;
+    const tint = SS_STAR_COLORS[Math.floor(rnd() * SS_STAR_COLORS.length)];
+    const dim = Math.max(0.04, baseA - 0.55 - rnd() * 0.3), dur = 900 + rnd() * 1300, dly = rnd() * 2200;
+    const st = scene.add.image(x, y, 'dot').setDisplaySize(sz, sz).setAlpha(baseA).setTint(tint);
+    st.__ssAlive = 1;   // the layer's own mark — the suite's orphan scan reads it
+    lay.add(st);
+    breathe.push(() => tw({ targets: st, alpha: dim, duration: dur, yoyo: true, repeat: -1, delay: dly }));
+  }
+  for (let i = 0; i < 6; i++, n++) {
+    const hsz = l.u(11 + rnd() * 6);
+    const x = l.u((rnd() - 0.5) * (CW - 60)), y = l.u(-CH / 2 + 40 + rnd() * (CH * 0.49 - 40));
+    const baseA = 0.4 + rnd() * 0.18;
+    const spin = 46000 + rnd() * 34000, dur = 2200 + rnd() * 1800, dly = rnd() * 2000;
+    const hs = scene.add.image(x, y, 'spark4').setDisplaySize(hsz, hsz).setAlpha(baseA).setBlendMode('ADD');
+    hs.__ssAlive = 1;
+    lay.add(hs);
+    breathe.push(() => { tw({ targets: hs, angle: 360, duration: spin, repeat: -1 }); tw({ targets: hs, alpha: baseA * 0.72, duration: dur, yoyo: true, repeat: -1, delay: dly }); });
+  }
+  // one shooting star, card-local: the flight sprites join the layer, so the
+  // card's mask clips the crossing and a mid-flight rebuild sweeps it
+  const loose = () => {
+    if (!lay.active || !scene.scene.isActive()) return;
+    bcn.shots++;
+    /* THE GROUND CLAMP — the law of this card (Skylar 9/13: "The shooting
+       stars should never pass over the ground"): spawn in the upper sky,
+       fly right-and-down at 24–38°, and cap the distance so the ENTIRE
+       flight — head and chained trail — ends above the painted ridge
+       (≈59.7% down the card; the cap line is 56%, margin kept). */
+    const x0 = (0.02 + Math.random() * 0.45) * CW, y0 = (0.03 + Math.random() * 0.3) * CH;
+    const ang = (24 + Math.random() * 14) * Math.PI / 180;
+    let dist = CW * (0.5 + Math.random() * 0.35);
+    dist = Math.min(dist, (0.56 * CH - y0) / Math.sin(ang));
+    const sx = l.u(x0 - CW / 2), sy = l.u(y0 - CH / 2);
+    const head = scene.add.image(sx, sy, 'dot').setDisplaySize(l.u(8.5), l.u(8.5)).setTint(0xfff2c9).setBlendMode('ADD');
+    head.__ssAlive = 1;
+    lay.add(head);
+    const trail = [];
+    for (let i = 0; i < 7; i++) {
+      const ts = l.u(6.4 - i * 0.6);
+      const tr = scene.add.image(sx, sy, 'dot').setDisplaySize(ts, ts).setAlpha(0.62 - i * 0.07).setTint(0xcfe0ff).setBlendMode('ADD');
+      tr.__ssAlive = 1;
+      lay.add(tr); trail.push(tr);
+    }
+    // per-property eases: the travel front-loads (easeOut) while the shine
+    // holds and dies late (easeIn) — one ease for both leaves the head dim
+    // for most of its crossing over this brighter wash
+    const t = tw({
+      targets: head, duration: 900 + Math.random() * 420,
+      x: { value: sx + l.u(Math.cos(ang) * dist), ease: 'Cubic.easeOut' },
+      y: { value: sy + l.u(Math.sin(ang) * dist), ease: 'Cubic.easeOut' },
+      alpha: { value: 0, ease: 'Quad.easeIn' },
+      onUpdate: () => { for (let i = trail.length - 1; i > 0; i--) { trail[i].x = trail[i - 1].x; trail[i].y = trail[i - 1].y; } trail[0].x = head.x; trail[0].y = head.y; },
+      onComplete: () => { const ix = tws.indexOf(t); if (ix >= 0) tws.splice(ix, 1); head.destroy(); trail.forEach((g) => g.destroy()); },
+    });
+  };
+  // the cadence (9/13: "more shooting stars in the sky"): a first crossing
+  // a couple of breaths after the card lands, then one every 3.5–7s —
+  // still Math.random, a rhythm and not a metronome
+  let nextEv = null;
+  const arm = (ms) => { nextEv = scene.time.delayedCall(ms, () => { if (!lay.active) return; loose(); arm(3500 + Math.random() * 3500); }); };
+  if (!still) {
+    evs.push(scene.time.delayedCall(400, () => { if (!lay.active) return; for (const b of breathe) b(); }));
+    arm(2200 + Math.random() * 2600);
+  }
+  bcn.builds++; bcn.stars = n; bcn.still = still;
+  bcn.poke = still ? null : loose;
+  const kill = () => {
+    for (const t of tws) { try { t.stop(); } catch (e) { } }
+    for (const e2 of evs) { try { e2.remove(false); } catch (e) { } }
+    if (nextEv) { try { nextEv.remove(false); } catch (e) { } }
+    tws.length = evs.length = 0;
+    if (bcn.poke === loose) bcn.poke = null;
+  };
+  lay.once('destroy', kill);
+  return lay;
+}
+// what the harness reads: sprites dealt on the last-built layer, layer
+// builds, stars loosed (poked or natural), the stilled state, and the
+// manual door (null while stilled or while no open-sky card stands)
+window.__ssopensky = { stars: 0, builds: 0, shots: 0, still: false, poke: null };
+
+/* The chart's own night — a baked vertical gradient stretched over the whole
+   screen (setTint is a Canvas no-op, so the hues live in the texture). Dark
+   zenith at the top falling to a faint indigo glow at the foot: the same
+   family as the battle sky, one shade deeper so gold reads. */
+function ssMapSkyTex(scene) {
+  const key = 'mapsky';
+  if (scene.textures.exists(key)) return key;
+  const t = scene.textures.createCanvas(key, 4, 512);
+  const g = t.context.createLinearGradient(0, 0, 0, 512);
+  g.addColorStop(0, '#05081a'); g.addColorStop(0.38, '#0b102a');
+  g.addColorStop(0.74, '#131a3c'); g.addColorStop(1, '#1a2350');
+  t.context.fillStyle = g; t.context.fillRect(0, 0, 4, 512);
+  t.refresh();
+  return key;
+}
+
+/* ============================================================
+   THE SHARP SKY (sharp-sky round four, slice 1 of 3) — the crisp
+   chart render. The blob was the RENDER, not the shapes: discs were
+   dealt 9.5/6.4 star-units by list position (s%3) against pair
+   spacings down to 4.5 — 44 fused star-pairs on the live sky.
+   Magnitude radii fuse ZERO pairs on either shape set, so the crisp
+   render ships on the live shapes before any 9/3 shape verdict.
+   ONE magnitude system for every surface; slice 1 wired the campaign
+   chart, slice 2 re-pitched the road, and slice 3 retired the
+   battle/showcase/versus list-position deals (i%5, and the glyph's
+   i%3) through the same resolver — the whole accident family is gone.
+   All sizes in star-units so every law is scale-invariant.
+   ============================================================ */
+// LAW 6 — the surface grades (star-unit × screen-unit). The chart consumes
+// its triple below; the assembly call sites read their own rows (slice 3).
+// versus grades grew with the v0.105.0 marquee panel (multi 0.20→0.22, 1v1
+// 0.35→0.56): the rival's figure stands tall in the filled top
+const SS_STAR_GRADES = { versus: [0.22, 0.56], chart: [0.38, 0.44, 0.52], showcase: 0.80, battle: 1.15 };
+// LAW 1 — disc radii by magnitude class: m1 anchor · m2 joint · m3 companion
+const SS_MAG_R = { 1: 4.2, 2: 2.8, 3: 1.9 };
+// …and the authored override table {beastId: {starIdx: mag}}. EMPTY today by
+// the round's own machine-checked data: on the LIVE shapes pure line-degree
+// IS the approved assignment (gen-data magsLive, proven equal for all 26).
+// The sharp-extras MAGS entries (Aldebaran/Elnath/Deneb/Regulus/Antares m1,
+// Orion's Belt locked m2, strix eye-rings receded, cancer demoted) index the
+// 9/3 PROPOSED shapes and ride in with that gated data card, through here.
+const SS_MAG_OVR = {};
+// LAW 5 — states speak in light, never size: per-state fill/alpha tables;
+// radii come from SS_MAG_R whatever the state
+const SS_MAG_A = {
+  won: { 1: 0.96, 2: 0.9, 3: 0.8 },
+  now: { 1: 1, 2: 0.96, 3: 0.86 },
+  far: { 1: 0.65, 2: 0.5, 3: 0.34 },
+};
+const SS_MAG_CORE_A = { lit: { 1: 0.95, 2: 0.55 }, far: { 1: 0.55, 2: 0.3 } };
+const SS_MAG_LINE_A = { won: 0.38, now: 0.55, far: 0.22 };
+const SS_MAG_CORE = 0xfff6dd;   // the white-hot heart — brightness reads as heat, not width
+// The assembly surfaces (battle · showcase · versus emblem) keep their soft
+// ADD sprites; only the SIZES change (slice 3). The 16px 'dot' texture reads
+// as a disc of ~4px at scale 1 on the night field (alpha .5 by 3.2px, gone
+// by 8), so a law-1 radius lands in sprite scale as SS_MAG_R·sc / SS_DOT_READ
+// — at the battle grade the envelope is the old deal's (m1 1.21 vs the old
+// 1.18 top · m3 0.55 vs the old 0.5 floor), and every surface rides its grade.
+const SS_DOT_READ = 4;
+// …and the twinkle amplitude runs by class, not by scale threshold: anchors
+// burn steadier (the old steady pair, kept), companions breathe deep (the
+// old deep pair), joints between. [scale factor at the trough, alpha there].
+const SS_MAG_TWINK = { 1: [0.78, 0.85], 2: [0.7, 0.7], 3: [0.6, 0.55] };
+
+/* — THE ROAD LAWS (sharp-sky round four, slice 2 of 3) —
+   THE PITCH LAW: consecutive road nodes keep ≥34 star-units of open sky
+   between star-bounds, sized for the worst case — either neighbor may be
+   the ×1.5 current fight. Pitch derives from the roster, never from
+   progress, so the sky stays put between visits. Half-heights are the
+   round's machine-checked table (the proposed shapes' bounds — the road is
+   already roomy for the shapes the gated 9/3 data card will bring). */
+const SS_ROAD_GAP = 34;
+const SS_ROAD_HALF = {
+  vulpes: 50, lepus: 62, serpens: 64, delphinus: 58, columba: 66, lacerta: 72,
+  cygnus: 70, pavo: 74, cancer: 60, corvus: 68, ursa: 60, aranea: 74,
+  aquila: 74, lupus: 46, monoceros: 72, cassiopeia: 70, cetus: 56, orion: 75,
+  strix: 72, leo: 54, taurus: 66, scorpius: 72, draco: 64, phoenix: 74,
+  centaurus: 70, sagittarius: 74,
+};
+// how much a gap's base pitch must grow so the rim gap stays ≥34 with either
+// neighbor worn ×1.5 (the summit already wears its ×1.35): 12 of 19 gaps on
+// the pinned roster, +5…+53, the road +252u — the page's machine-checked rows
+function ssRoadAdd(fights, i, base) {
+  const gr = SS_STAR_GRADES.chart;
+  const hh = (j) => {
+    const b = SS_BEASTS[fights[j].id];
+    return SS_ROAD_HALF[b.id] * (b.boss ? gr[2] : b.tier === 'mini' ? gr[1] : gr[0]) * (j === fights.length - 1 ? 1.35 : 1);
+  };
+  const hA = hh(i), hB = hh(i + 1);
+  return Math.max(0, Math.ceil(SS_ROAD_GAP + Math.max(hA * 1.5 + hB, hA + hB * 1.5) - base));
+}
+
+// the resolver: line-degree (3+ lines → m1 · 2 → m2 · chain-end → m3) + the
+// authored overrides; cached on the beast (static data for the session)
+function ssStarMags(b) {
+  if (b.__mags && b.__mags.length === b.stars.length) return b.__mags;
+  const deg = b.stars.map(() => 0);
+  for (const [a, c] of b.edges) { deg[a]++; deg[c]++; }
+  const m = deg.map((d) => (d >= 3 ? 1 : d === 2 ? 2 : 3));
+  const ovr = SS_MAG_OVR[b.id];
+  if (ovr) for (const k in ovr) m[+k] = ovr[k];
+  return (b.__mags = m);
+}
+
+// LAW 3 — the served line: endpoints inset r+2.5 from each disc's center so
+// a segment never pierces a star; null when the span leaves nothing to draw.
+// The shared door: the chart strokes with it now, the assembly in slice 3.
+function ssEdgeSeg(a, b, ra, rb) {
+  const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1;
+  const i1 = ra + 2.5, i2 = rb + 2.5;
+  if (L <= i1 + i2 + 1) return null;
+  return { x1: a[0] + dx / L * i1, y1: a[1] + dy / L * i1, x2: b[0] - dx / L * i2, y2: b[1] - dy / L * i2 };
+}
+
+// class tints lean toward white, never a new palette (canvas-safe number math)
+function ssTintUp(c, t) {
+  const r = (c >> 16) & 255, g = (c >> 8) & 255, b = c & 255;
+  return (Math.round(r + (255 - r) * t) << 16) | (Math.round(g + (255 - g) * t) << 8) | Math.round(b + (255 - b) * t);
+}
+
+function ssStarChart(scene, opts) {
+  const l = ssLayout(scene);
+  const acts = opts.acts || SS_ACTS;
+  const roster = opts.roster || ssCampaignRoster();
+  const fightIdx = opts.fightIdx | 0;
+  const home = opts.door === 'home';
+  const c = scene.add.container(0, 0);
+  const fights = [];   // flattened in the exact order Battle marches them
+  let ri = 0;
+  acts.forEach((act, ai) => act.slots.forEach((sl, fi) => fights.push({ id: roster[ri++], actIdx: ai, fi, len: act.slots.length, umbral: act.umbral, boss: fi === act.slots.length - 1 })));
+  const N = fights.length;
+  const complete = fightIdx >= N;
+  const cur = complete ? null : fights[fightIdx];
+
+  // THE NIGHT ITSELF — an opaque full-bleed sky: the chart owns the whole
+  // screen, and the interactive plate keeps taps off whatever lies beneath
+  c.add(scene.add.image(l.W / 2, l.H / 2, ssMapSkyTex(scene)).setDisplaySize(l.W, l.H).setInteractive());
+
+  // the road: one uncompressed serpentine, summit at the top. Nothing is
+  // squeezed to fit — the road is ~three screens tall and the camera walks it.
+  const STEP = 96, ACT_GAP = 64, TOP = 190, SETTLE = 430;
+  const wob = [0, 22, -16, 10];                       // organic jitter on the sweep
+  const pos = [];
+  const roadAdds = [];   // per-gap widenings — the beacon carries them for the suites
+  let ry = 0;
+  for (let i = 0; i < N; i++) {
+    const f = fights[i];
+    if (i > 0) {
+      // THE PITCH LAW — STEP stays 96 (plus the act gap at a seam); a gap
+      // widens only where its two beasts demand the 34u of open sky
+      const seam = f.actIdx !== fights[i - 1].actIdx;
+      if (seam) ry -= ACT_GAP;   // breathing room for the act label
+      const add = ssRoadAdd(fights, i - 1, STEP + (seam ? ACT_GAP : 0));
+      roadAdds.push(add);
+      ry -= add;
+    }
+    const dir = f.actIdx % 2 === 0 ? 1 : -1;
+    let x = 0;
+    if (!f.boss) {
+      const t = f.len > 2 ? f.fi / (f.len - 2) : 0;
+      x = (-112 + t * 206 + wob[f.fi % 4]) * dir;
+    }
+    pos.push({ x, y: ry });
+    ry -= STEP;
+  }
+  const shift = TOP - pos[N - 1].y;
+  pos.forEach((p) => { p.y += shift; });
+
+  // the camera's book: offMin frames the summit, offMax hugs the road's
+  // foot (a fresh campaign's settle frame may reach a little further so the
+  // first beast can hold the settle line), and the settle line seats the
+  // current fight with its name beneath
+  const offMin = pos[N - 1].y - 300;
+  const rawSettle = complete ? offMin : pos[fightIdx].y - SETTLE;
+  const offMax = Math.max(offMin, Math.max(rawSettle, pos[0].y - 570));
+  const settleOff = clamp(rawSettle, offMin, offMax);
+  const bea = window.__ssmap = {
+    door: home ? 'home' : 'battle', settled: false, skipped: false, off: 0,
+    offMin: Math.round(offMin), offMax: Math.round(offMax), settleOff: Math.round(settleOff), zone: false,
+    road: { adds: roadAdds, dots: 0, culled: 0 },   // the road-law census (slice 2)
+  };
+
+  // parallax dust: two thin star fields drifting slower than the road
+  const span = Math.max(1, offMax - offMin);
+  const rnd = ssMulberry(7);
+  const dustB = scene.add.container(0, 0), dustA = scene.add.container(0, 0);
+  [[dustB, 0.14, 16], [dustA, 0.32, 20]].forEach(([dc, f, n]) => {
+    const reach = l.H + l.u(span * f);
+    for (let i = 0; i < n; i++) {
+      const sz = l.u(1.2 + rnd() * 2.0);
+      // plain fills only — the glow whitelist (LAW 4) is the aura, the summit
+      // beacon and the eye pinpricks; the dust drifts unlit
+      const d = scene.add.image(rnd() * l.W, rnd() * reach, 'dot').setDisplaySize(sz, sz).setAlpha(0.08 + rnd() * 0.22);
+      dc.add(d);
+    }
+  });
+  c.add(dustB); c.add(dustA);
+
+  // the road container — everything that scrolls
+  const rc = scene.add.container(0, 0);
+  c.add(rc);
+
+  // one number moves the road and both dust fields
+  const setOff = (v) => {
+    bea.off = Math.round(v);
+    rc.y = -l.u(v);
+    dustA.y = -l.u((v - offMin) * 0.32);
+    dustB.y = -l.u((v - offMin) * 0.14);
+  };
+
+  // every node's drawn star-bounds, one place: grade × summit × the current
+  // ×1.5 — the path and the name seats consult these, and the node loop
+  // below draws with the same numbers
+  const nb = fights.map((f, i) => {
+    const b = SS_BEASTS[f.id];
+    const state = i < fightIdx ? 'won' : i === fightIdx ? 'now' : 'far';
+    const gr = SS_STAR_GRADES.chart;   // LAW 6 — the chart's grade triple
+    // the one you face next renders BIGGER than the rest (the ×1.5)
+    const sc = (b.boss ? gr[2] : b.tier === 'mini' ? gr[1] : gr[0]) * (i === N - 1 ? 1.35 : 1) * (state === 'now' ? 1.5 : 1);
+    let mxX = 0, mxY = 0;
+    for (const s of b.stars) { mxX = Math.max(mxX, Math.abs(s[0])); mxY = Math.max(mxY, Math.abs(s[1])); }
+    return { sc, mxX, mxY, hw: mxX * sc, hh: mxY * sc };
+  });
+
+  // the path: dotted starlight between nodes — gold where you have walked.
+  // THE PATH LAW — dots r 1.3, α .35 walked / .2 ahead, and none inside any
+  // node's star-bounds +8: the road hands you from beast to beast, it never
+  // stitches through a body. The dot stays under every m3 star (1.3 < 1.9).
+  const pathG = scene.add.graphics();
+  for (let i = 0; i < N - 1; i++) {
+    const a = pos[i], b = pos[i + 1];
+    const walked = i < fightIdx;
+    pathG.fillStyle(walked ? 0xd7b45c : 0x4a5480, walked ? 0.35 : 0.2);
+    const dist = Math.hypot(b.x - a.x, b.y - a.y);
+    const n = Math.max(4, Math.round(dist / 12));
+    for (let k = 1; k <= n - 1; k++) {
+      const t = k / n;
+      const x = a.x + (b.x - a.x) * t, y = a.y + (b.y - a.y) * t;
+      if ((Math.abs(x - a.x) < nb[i].hw + 8 && Math.abs(y - a.y) < nb[i].hh + 8)
+        || (Math.abs(x - b.x) < nb[i + 1].hw + 8 && Math.abs(y - b.y) < nb[i + 1].hh + 8)) { bea.road.culled++; continue; }
+      bea.road.dots++;
+      pathG.fillCircle(l.x(x), l.y(y), l.u(1.3));
+    }
+  }
+  rc.add(pathG);
+
+  // act names ride the gaps where the road crosses into a new act
+  acts.forEach((act, ai) => {
+    if (ai === 0) return;
+    const first = fights.findIndex((f) => f.actIdx === ai);
+    const gy = (pos[first].y + pos[first - 1].y) / 2;
+    const gx = -Math.sign(pos[first].x || 1) * 92;
+    rc.add(ssTxt(scene, l.x(gx), l.y(gy), SS_ACT_N(act), l.u(10.5), '#6a74a4').setOrigin(0.5).setAlpha(0.9));
+  });
+  // act I signs the road's foot — low enough that the first fight's own
+  // name (beneath its beast at the settle line) never collides with it
+  rc.add(ssTxt(scene, l.x(0), l.y(pos[0].y + 96), SS_ACT_N(acts[0]), l.u(10.5), '#6a74a4').setOrigin(0.5).setAlpha(0.9));
+
+  // the nodes: constellations in the beasts' own stars, drawn big.
+  // Names obey the run: felled beasts keep theirs, the beast you face next
+  // waits for the camera, and everything above hangs nameless in the dark.
+  const staticG = scene.add.graphics();
+  rc.add(staticG);
+  let zone = null, curName = null, curGeom = null;
+  const wonNames = [];   // felled names seat AFTER the loop — the name law needs them all measured
+  for (let i = 0; i < N; i++) {
+    const f = fights[i], p = pos[i];
+    const b = SS_BEASTS[f.id];
+    const um = f.umbral && f.id !== 'phoenix';       // beastFor's umbral rule
+    const name = (um ? SS_UMBRAL.prefix : '') + b.name;
+    const state = i < fightIdx ? 'won' : i === fightIdx ? 'now' : 'far';
+    const last = i === N - 1;
+    const sc = nb[i].sc;   // grade × summit × the current ×1.5, from the shared table
+    const k = l.u(sc);
+    // LAW 5 — the state dresses fill and alpha; the figure keeps its magnitudes.
+    // WON turns the tale's gold but holds its three sizes and white cores; FAR
+    // dims by class so anchors still pierce the dark; NOW burns the beast's own
+    // tint. Lines stay dimmer than the discs they join in every state (LAW 3).
+    const mags = ssStarMags(b);
+    const ownTint = um ? SS_UMBRAL.tint : b.tint;
+    const base = state === 'won' ? 0xd7b45c : ownTint;
+    const discC = { 1: ssTintUp(base, 0.25), 2: ssTintUp(base, 0.12), 3: base };
+    const discA = SS_MAG_A[state];
+    const lineC = state === 'won' ? ssTintUp(0xd7b45c, 0.2) : ssTintUp(ownTint, 0.35);
+    const aLine = SS_MAG_LINE_A[state];
+    const coreA = SS_MAG_CORE_A[state === 'far' ? 'far' : 'lit'];
+    // star bounds → where names, rings and zones sit, whatever the shape
+    const mxX = nb[i].mxX, mxY = nb[i].mxY;
+
+    // the summit halo: the destination is lit from the very first frame
+    if (last) {
+      rc.add(scene.add.image(l.x(p.x), l.y(p.y), 'glowbig').setDisplaySize(l.u(210), l.u(168))
+        .setTint(state === 'won' ? 0xffd77a : 0xffc46b).setAlpha(0.13).setBlendMode('ADD'));
+    }
+    const drawInto = (g, gx, gy) => {
+      // LAW 3 — 2.2u round-cap lines, inset r+2.5 from each disc: the figure
+      // reads star-to-star, a line never pierces a star
+      g.lineStyle(2.2 * k, lineC, aLine);
+      g.fillStyle(lineC, aLine);
+      for (const [e1, e2] of b.edges) {
+        const seg = ssEdgeSeg(b.stars[e1], b.stars[e2], SS_MAG_R[mags[e1]], SS_MAG_R[mags[e2]]);
+        if (!seg) continue;
+        g.lineBetween(gx + seg.x1 * k, gy + seg.y1 * k, gx + seg.x2 * k, gy + seg.y2 * k);
+        g.fillCircle(gx + seg.x1 * k, gy + seg.y1 * k, 1.1 * k);   // the round caps
+        g.fillCircle(gx + seg.x2 * k, gy + seg.y2 * k, 1.1 * k);
+      }
+      // LAW 1 — three magnitudes; the lit anchor's hairline four-ray flare and
+      // the white-hot cores are FILL work, so the halo law stays honest (LAW 4)
+      for (let s = 0; s < b.stars.length; s++) {
+        const m = mags[s], r = SS_MAG_R[m] * k, px = gx + b.stars[s][0] * k, py = gy + b.stars[s][1] * k;
+        if (m === 1 && state !== 'far') {
+          const fl = r * 2.6;
+          g.lineStyle(0.8 * k, SS_MAG_CORE, state === 'now' ? 0.55 : 0.4);
+          g.lineBetween(px - fl, py, px + fl, py);
+          g.lineBetween(px, py - fl, px, py + fl);
+        }
+        g.fillStyle(discC[m], discA[m]);
+        g.fillCircle(px, py, r);
+        if (m < 3) {
+          g.fillStyle(SS_MAG_CORE, coreA[m]);
+          g.fillCircle(px, py, r * (m === 1 ? 0.48 : 0.4));
+        }
+      }
+      // far eyes: still pinpricks in the dark — hard fills, no glow (LAW 4);
+      // a felled beast's eyes close (no eyes on won)
+      if (state === 'far') for (const e of b.eyes) {
+        g.fillStyle(b.eye, 0.35); g.fillCircle(gx + e[0] * k, gy + e[1] * k, 4.5 * k);
+        g.fillStyle(b.eye, 1); g.fillCircle(gx + e[0] * k, gy + e[1] * k, 2.2 * k);
+      }
+    };
+    if (state === 'now') {
+      // the breathing beast: its own container so it can pulse
+      const nc = scene.add.container(l.x(p.x), l.y(p.y));
+      nc.add(scene.add.image(0, 0, 'glowbig').setDisplaySize(l.u(mxX * sc * 2 + 96), l.u(mxY * sc * 2 + 76))
+        .setTint(0xffd77a).setAlpha(0.17).setBlendMode('ADD'));
+      const ng = scene.add.graphics();
+      drawInto(ng, 0, 0);
+      nc.add(ng);
+      // the waking eyes: pinprick + soft iris as hard fills (r 2.2 + 4.5 —
+      // LAW 4 retires the soft dot blobs), breathing in alpha as before
+      const eyeG = scene.add.graphics();
+      for (const e of b.eyes) {
+        eyeG.fillStyle(b.eye, 0.35); eyeG.fillCircle(e[0] * k, e[1] * k, 4.5 * k);
+        eyeG.fillStyle(b.eye, 1); eyeG.fillCircle(e[0] * k, e[1] * k, 2.2 * k);
+      }
+      scene.tweens.add({ targets: eyeG, alpha: 0.55, duration: 700, yoyo: true, repeat: -1 });
+      nc.add(eyeG);
+      scene.tweens.add({ targets: nc, scaleX: 1.06, scaleY: 1.06, duration: 1100, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      rc.add(nc);
+      // the waiting ring, swelling like a held breath — an affordance, not a
+      // halo (LAW 4 keeps it), dressed down to the sharp render's .45
+      const ring = scene.add.graphics({ x: l.x(p.x), y: l.y(p.y) });
+      ring.lineStyle(l.u(1.6), 0xffd77a, 0.45);
+      ring.strokeCircle(0, 0, Math.max(l.u(34), l.u(mxX * sc + 16)));
+      scene.tweens.add({ targets: ring, scaleX: 1.14, scaleY: 1.14, alpha: 0.15, duration: 1100, repeat: -1, ease: 'Sine.easeOut' });
+      rc.add(ring);
+      // its name waits BENEATH it, born silent — it pops as the camera lands
+      // the name keeps ssTxt's own crisp shadow — the soft gold blur retired
+      // with the halo pile-up (sharpest where it matters most)
+      curName = ssTxt(scene, l.x(p.x), l.y(p.y + mxY * sc + 26), name, l.u(13.5), '#ffe9a8')
+        .setOrigin(0.5, 0).setAlpha(0);
+      rc.add(curName);
+      curGeom = { p, mxX, mxY, sc };
+    } else {
+      drawInto(staticG, l.x(p.x), l.y(p.y));
+      if (state === 'won') {
+        // felled beasts keep their names — the scroll back down reads the
+        // tale; the seat itself is the name law's, resolved below
+        const t = ssTxt(scene, 0, 0, name, l.u(10), '#8f7f4e');
+        rc.add(t);
+        wonNames.push({ t, i });
+      }
+    }
+    if (last) {
+      rc.add(ssTxt(scene, l.x(p.x), l.y(p.y - (mxY * sc + 18)), SS_T('mapDest'), l.u(9.5), '#c98f4d', 'italic')
+        .setOrigin(0.5, 1));
+    }
+  }
+
+  // THE NAME LAW — a name touches only its beast. The beside-seat holds by
+  // default, but it earns itself now: clamped inside the screen (flipping
+  // sides if the words would leave it), clear of every other beast's
+  // star-bounds by 12u and of every seated name outright — when the seat
+  // would collide, the name slides along its own side to the nearest clear
+  // seat. The current name's beneath-seat is reserved by the pitch law.
+  const placedR = [];
+  if (curName) {
+    const cw = curName.width / l.s / 2, ch = curName.height / l.s;
+    const cy = curGeom.p.y + curGeom.mxY * curGeom.sc + 26;
+    placedR.push({ x0: curGeom.p.x - cw, x1: curGeom.p.x + cw, y0: cy, y1: cy + ch });
+  }
+  const EDGE = 204;   // the design box holds ±210; six units of breath
+  for (const wn of wonNames) {
+    const p = pos[wn.i], g = nb[wn.i];
+    const w = wn.t.width / l.s, h = wn.t.height / l.s;
+    let side = p.x > 8 ? -1 : 1;
+    let nx = p.x + side * (g.hw + 14);
+    if (side < 0 ? nx - w < -EDGE : nx + w > EDGE) { side = -side; nx = p.x + side * (g.hw + 14); }
+    nx = side < 0 ? Math.max(nx, -EDGE + w) : Math.min(nx, EDGE - w);
+    const rect = (dy) => ({
+      x0: side < 0 ? nx - w : nx, x1: side < 0 ? nx : nx + w,
+      y0: p.y + dy - h / 2, y1: p.y + dy + h / 2,
+    });
+    const clear = (r) => {
+      for (let j = 0; j < N; j++) {
+        if (j === wn.i) continue;
+        const q = pos[j], m = nb[j];
+        if (r.x1 > q.x - m.hw - 12 && r.x0 < q.x + m.hw + 12 && r.y1 > q.y - m.hh - 12 && r.y0 < q.y + m.hh + 12) return false;
+      }
+      for (const o of placedR) if (r.x1 > o.x0 && r.x0 < o.x1 && r.y1 > o.y0 && r.y0 < o.y1) return false;
+      return true;
+    };
+    let dy = 0;
+    for (let step = 0; step <= 48; step += 8) {
+      if (clear(rect(step))) { dy = step; break; }
+      if (step && clear(rect(-step))) { dy = -step; break; }
+    }
+    placedR.push(rect(dy));
+    wn.t.setOrigin(side < 0 ? 1 : 0, 0.5).setPosition(l.x(nx), l.y(p.y + dy));
+  }
+
+  // THE ANCHORED HEADER — top of the screen, topmost layer, over a
+  // semi-black band that parts the words from art scrolling beneath them.
+  // Invisible until the camera ride lands (the land() below fades it in).
+  const hdr = scene.add.container(0, 0);
+  const bandB = l.y(64);
+  const hg = scene.add.graphics();
+  hg.fillStyle(0x000000, 0.55).fillRect(0, 0, l.W, bandB);
+  hg.fillStyle(0x000000, 0.3).fillRect(0, bandB, l.W, l.u(7));
+  hg.fillStyle(0x000000, 0.13).fillRect(0, bandB + l.u(7), l.W, l.u(7));
+  // …and the foot wears its mirror so the hint reads over anything
+  hg.fillStyle(0x000000, 0.13).fillRect(0, l.y(742), l.W, l.u(7));
+  hg.fillStyle(0x000000, 0.3).fillRect(0, l.y(749), l.W, l.u(7));
+  hg.fillStyle(0x000000, 0.45).fillRect(0, l.y(756), l.W, Math.max(0, l.H - l.y(756)));
+  hdr.add(hg);
+  const hk = ssGoldTex(scene, SS_T('mapTitle'), 20);
+  const hsc = Math.min(1, 300 / hk.w);
+  hdr.add(scene.add.image(l.x(0), l.y(30), hk.key).setDisplaySize(l.u(hk.w * hsc), l.u(hk.h * hsc)));
+  hdr.add(ssTxt(scene, l.x(0), l.y(52), complete ? SS_T('endWinSub') : SS_ACT_N(acts[cur.actIdx]) + '  ·  ' + SS_T('fightN', cur.fi + 1),
+    l.u(10.5), '#8a94c4', 'italic').setOrigin(0.5));
+  if (!complete) hdr.add(ssTxt(scene, l.x(0), l.y(770), SS_T('mapHint'), l.u(10), '#c9b676', 'italic').setOrigin(0.5).setAlpha(0.9));
+  hdr.setAlpha(0);
+  c.add(hdr);
+
+  // the way back to the meadow (campaign entry only; between fights the road
+  // runs forward). Fires on the UP under the drag threshold — and only once
+  // the camera has settled: mid-ride a top-corner tap skips like any other.
+  let settled = false, rideTw = null, armed = false;
+  if (home) {
+    const xB = ssTxt(scene, l.x(186), l.y(30), '✕', l.u(15), '#8a94c4').setOrigin(0.5).setInteractive({ useHandCursor: true });
+    let xdn = null;
+    xB.on('pointerdown', (p) => { xdn = p ? { x: p.x, y: p.y } : { x: 0, y: 0 }; });
+    xB.on('pointerup', (p) => {
+      if (!xdn) return;
+      const d = p ? Math.hypot(p.x - xdn.x, p.y - xdn.y) : 0;
+      xdn = null;
+      if (d > l.u(8) || !settled) return;
+      if (opts.onClose) opts.onClose();
+    });
+    hdr.add(xB);
+  }
+
+  // THE SETTLED MOMENT — the name pops, the header fades in, the zone is born
+  const land = (fast) => {
+    if (settled || !c.active) return;
+    settled = true;
+    bea.settled = true;
+    setOff(settleOff);
+    scene.tweens.add({ targets: hdr, alpha: 1, duration: fast ? 240 : 460, ease: 'Sine.easeOut' });
+    if (curName) {
+      curName.setScale(0.6);
+      scene.tweens.add({ targets: curName, alpha: 1, scaleX: 1, scaleY: 1, duration: 320, ease: 'Back.easeOut' });
+    }
+    if (curGeom) {
+      const { p, mxX, mxY, sc } = curGeom;
+      zone = scene.add.zone(l.x(p.x), l.y(p.y), Math.max(l.u(100), l.u(mxX * sc * 2 + 28)), Math.max(l.u(80), l.u(mxY * sc * 2 + 28)))
+        .setOrigin(0.5).setInteractive({ useHandCursor: true });
+      let entered = false, zdn = null;
+      const fire = () => { if (entered || !c.active) return; entered = true; SFX.ensure(); SFX.ui(); opts.onEnter(); };
+      // a bare synthetic emit (the demo driver) enters at once; a real pointer
+      // decides on the UP so a scroll starting on the beast never enters
+      zone.on('pointerdown', (p2) => { if (!p2) { fire(); return; } zdn = { x: p2.x, y: p2.y }; });
+      zone.on('pointerup', (p2) => {
+        if (!zdn) return;
+        const d = p2 ? Math.hypot(p2.x - zdn.x, p2.y - zdn.y) : 0;
+        zdn = null;
+        if (d <= l.u(8)) fire();
+      });
+      rc.add(zone);
+      c.setData('mapZone', zone);
+      bea.zone = true;
+    }
+    if (opts.onSettle) opts.onSettle();
+  };
+
+  // the two rides share one glide. The opening frame is the camera's own
+  // (the summit, or the beast just felled) — it may sit past the free-scroll
+  // stops, so it is NOT clamped; the landing is always in range, and the
+  // drag clamps on the first touch.
+  const glide = (from, hold) => {
+    setOff(from);
+    const dist = Math.abs(settleOff - bea.off);
+    if (dist < 1) { scene.time.delayedCall(hold, () => land(true)); return; }
+    const o = { v: bea.off };
+    const dur = home ? clamp(dist * 1.2, 700, 2400) : clamp(dist * 4.5, 550, 900);
+    rideTw = scene.tweens.add({
+      targets: o, v: settleOff, duration: dur, delay: hold, ease: 'Sine.easeInOut',
+      onUpdate: () => { if (c.active) setOff(o.v); },
+      onComplete: () => { rideTw = null; land(false); },
+    });
+  };
+  const skip = () => {
+    if (settled) return;
+    bea.skipped = true;
+    if (rideTw) { rideTw.stop(); rideTw = null; }
+    land(true);
+  };
+  scene.time.delayedCall(380, () => { armed = true; });   // the launching tap must never skip its own ride
+
+  if (QS.get('ride') === '0' || ssReduceMotion() || complete) {
+    setOff(settleOff);
+    land(true);
+  } else if (home) {
+    // the entry ride: open on the final boss, hold a breath, travel down the
+    // road past every beast you will face, land on the fight you are up to
+    glide(offMin, 620);
+  } else {
+    // the victory glide: from the beast just felled up to the next in line
+    glide(pos[Math.max(0, fightIdx - 1)].y - SETTLE, 260);
+  }
+
+  // free scrolling: drag anywhere on the sky; a drag beginning mid-ride
+  // first skips the ride, then the same gesture keeps scrolling
+  let drag = null;
+  const dn = (p) => {
+    if (!c.active) return;
+    if (!settled) { if (armed) skip(); else return; }
+    drag = { y: p.y, off: bea.off };
+  };
+  const mv = (p) => {
+    if (!drag || !p.isDown) return;
+    setOff(clamp(drag.off + (drag.y - p.y) / l.s, offMin, offMax));
+  };
+  const up = () => { drag = null; };
+  scene.input.on('pointerdown', dn);
+  scene.input.on('pointermove', mv);
+  scene.input.on('pointerup', up);
+  c.once('destroy', () => {
+    scene.input.off('pointerdown', dn); scene.input.off('pointermove', mv); scene.input.off('pointerup', up);
+    if (rideTw) { rideTw.stop(); rideTw = null; }
+  });
+  return { c };
+}
+
+/* ---- THE FORGE CEREMONY --------------------------------------------------
+   v0.43.0. A sigil coming out of the drip is an EVENT, not a line of text.
+   The sky goes dark, the anvil rings, and the glyph rises in its own rarity
+   medallion with the name struck in gold beneath it — the same ceremony
+   language as the lamp's mark rite and the v0.18 sigil pick: a deep veil (the
+   meadow's gold buttons read straight THROUGH anything lighter), the forge
+   chime, a tiered arrival, and letterpress copy that lands in beats.
+
+   Four laws it keeps, and every one of them is pinned by a check:
+   · IT NEVER TRAPS. One tap anywhere dismisses it, and it lets itself out on
+     its own after a hold long enough to read — the end screen's NEW RUN and
+     HOME buttons are sitting underneath it.
+   · IT NEVER STACKS. Two discoveries in one run queue: the second is BUILT
+     when the first has closed, never drawn on top of it (SS_RITE.busy, which
+     also gates the meadow so a mark rite and a forge rite cannot collide).
+   · IT IS CANVAS-SAFE. Baked canvas textures, plain images, shapes and text —
+     nothing WebGL-only, because Wyatt's phone boots the CV renderer.
+   · EVERY CHILD CARRIES scrollFactor 0. The meadow's camera sits ~4200px down
+     the sky world, and inside a Container it is the CHILD's scroll factor the
+     camera consults, not the container's — a rite drawn in world space there
+     is drawn nowhere at all.
+*/
+const SS_RITE = { busy: false };
+
+// The ceremony's medallion — the pick card's socket, alone and five times the
+// size: tier ring, inner hairline, the four compass points, and the
+// legendary's ring of rays. Baked once per tier+size like every other piece of
+// chrome in this file.
+function ssSigilMedalTex(scene, tier, d) {
+  const key = 'sigmedal' + tier + '@' + Math.round(d);
+  if (scene.textures.exists(key)) return key;
+  const R = ssTexRes(scene);
+  const t = scene.textures.createCanvas(key, Math.round(d * R), Math.round(d * R));
+  const c = t.context;
+  c.scale(R, R);
+  const frame = ['#c9a84c', '#7fb4ff', '#ffd77a'][tier];
+  const faint = ['rgba(215,180,92,', 'rgba(127,180,255,', 'rgba(255,215,122,'][tier];
+  const cx = d / 2, cy = d / 2, r = d / 2 - d * 0.11;
+  if (tier === 2) {                                   // the legendary's rays
+    c.strokeStyle = 'rgba(255,215,122,0.28)';
+    for (let i = 0; i < 24; i++) {
+      const a = (i / 24) * Math.PI * 2 + 0.13, lng = i % 2 ? d * 0.045 : d * 0.085;
+      c.lineWidth = i % 2 ? 1 : 1.8;
+      c.beginPath(); c.moveTo(cx + Math.cos(a) * (r + d * 0.018), cy + Math.sin(a) * (r + d * 0.018));
+      c.lineTo(cx + Math.cos(a) * (r + lng), cy + Math.sin(a) * (r + lng)); c.stroke();
+    }
+  }
+  const rg = c.createRadialGradient(cx, cy, 2, cx, cy, r);
+  rg.addColorStop(0, faint + '0.34)'); rg.addColorStop(0.72, faint + '0.12)'); rg.addColorStop(1, faint + '0.02)');
+  c.beginPath(); c.arc(cx, cy, r, 0, Math.PI * 2); c.fillStyle = rg; c.fill();
+  c.lineWidth = d * 0.016; c.strokeStyle = frame;
+  c.beginPath(); c.arc(cx, cy, r, 0, Math.PI * 2); c.stroke();
+  c.lineWidth = d * 0.006; c.strokeStyle = faint + '0.55)';
+  c.beginPath(); c.arc(cx, cy, r - d * 0.035, 0, Math.PI * 2); c.stroke();
+  c.fillStyle = frame;
+  for (const [dx, dy] of [[0, -r], [0, r], [-r, 0], [r, 0]]) {
+    c.beginPath(); c.arc(cx + dx, cy + dy, d * 0.017, 0, Math.PI * 2); c.fill();
+  }
+  t.refresh();
+  return key;
+}
+
+/* One discovery, held like a rite. Returns the container; calls onDone once
+   the sky is clear again (which is how the queue knows to bring the next). */
+function ssSigilRite(scene, sg, onDone) {
+  const l = ssLayout(scene);
+  const tier = sg.rarity | 0, RC = SS_RARITY[tier], loc = SS_SIG(sg);
+  SS_RITE.busy = true;
+  // spend this one from the queue the moment it is SHOWN — not when it was
+  // scheduled (a rite the scene died before building must survive to be said
+  // on the grass) and not when it closes (being told twice reads as a bug)
+  const p = SS.prof;
+  if (p.sig && p.sig.pend.length) { p.sig.pend = p.sig.pend.filter((id) => id !== sg.id); SS.save(); }
+
+  const c = scene.add.container(0, 0).setDepth(680).setScrollFactor(0);
+  c.setData('sigilRite', sg.id);          // the harness reads WHICH rite is up
+  const sf = (o) => o.setScrollFactor(0);
+  let done = false;
+  const close = () => {
+    if (done) return;
+    done = true;
+    scene.tweens.add({
+      targets: c, alpha: 0, duration: 420, ease: 'Sine.easeIn',
+      onComplete: () => { if (c.active) c.destroy(); SS_RITE.busy = false; if (onDone) onDone(); },
+    });
+  };
+  scene.events.once('shutdown', () => { SS_RITE.busy = false; });
+
+  const veil = sf(scene.add.image(l.W / 2, l.H / 2, 'veil')).setDisplaySize(l.W, l.H).setAlpha(0).setInteractive();
+  veil.on('pointerdown', () => { SFX.ui(); close(); });
+  // 0.985, not the mark rite's 0.9: this beat puts its copy across the middle
+  // of the screen, where the meadow's own gold buttons sit, and at anything
+  // lighter their letters read straight THROUGH the sigil's name
+  scene.tweens.add({ targets: veil, alpha: 0.985, duration: 380 });
+  c.add(veil);
+
+  // the anvil, then the award arpeggio for anything above a common
+  SFX.ensure(); SFX.forge();
+  if (tier > 0) scene.time.delayedCall(340, () => { if (SFX.ok && c.active) SFX.ach(); });
+
+  // ---- the glyph, rising in its medallion ----
+  const MY = 296, MD = tier === 2 ? 216 : 196;
+  const glow = sf(scene.add.image(l.x(0), l.y(MY), 'glowbig')).setDisplaySize(l.u(80), l.u(80))
+    .setTint(RC.glow).setAlpha(0).setBlendMode('ADD');
+  const medal = sf(scene.add.image(l.x(0), l.y(MY), ssSigilMedalTex(scene, tier, MD)))
+    .setDisplaySize(l.u(MD * 0.55), l.u(MD * 0.55)).setAlpha(0);
+  const glyph = sf(ssTxt(scene, l.x(0), l.y(MY), sg.icon, l.u(MD * 0.44), RC.ink)).setOrigin(0.5)
+    .setShadow(0, 0, RC.shadow, l.u(16), true, true).setAlpha(0);
+  c.add([glow, medal, glyph]);
+  scene.tweens.add({ targets: medal, alpha: 1, duration: 560, ease: 'Cubic.easeOut' });
+  scene.tweens.add({
+    targets: medal, displayWidth: l.u(MD), displayHeight: l.u(MD), duration: 700, ease: 'Back.easeOut',
+  });
+  scene.tweens.add({ targets: glyph, alpha: 1, duration: 520, delay: 200 });
+  scene.tweens.add({
+    targets: glow, alpha: tier === 2 ? 0.34 : tier === 1 ? 0.26 : 0.19,
+    displayWidth: l.u(MD * 1.9), displayHeight: l.u(MD * 1.9), duration: 700, ease: 'Cubic.easeOut',
+    onComplete: () => {
+      if (!glow.active || ssReduceMotion()) return;
+      scene.tweens.add({ targets: glow, alpha: tier === 2 ? 0.15 : 0.09, duration: 1500, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    },
+  });
+
+  // ---- the arrival: a rare announces itself, a legendary shakes the sky ----
+  if (!ssReduceMotion()) {
+    const em = sf(scene.add.particles(0, 0, 'dot', {
+      speed: { min: 20, max: 210 }, lifespan: { min: 700, max: 1700 }, gravityY: -22,
+      scale: { start: 0.75, end: 0 }, alpha: { start: 0.95, end: 0 }, blendMode: 'ADD',
+      tint: tier === 1 ? [0x9fc8ff, 0xd4e4ff, 0xfff2c9] : [0xffd77a, 0xfff2c9, 0xffb457],
+      emitting: false,
+    }));
+    c.add(em);
+    const burst = (n) => {
+      if (!em.active) return;
+      for (let k = 0; k < n; k++) {
+        em.emitParticleAt(l.x(0) + (Math.random() - 0.5) * l.u(MD * 0.8), l.y(MY) + (Math.random() - 0.5) * l.u(MD * 0.8));
+      }
+    };
+    scene.time.delayedCall(240, () => burst(tier === 2 ? 40 : tier === 1 ? 26 : 16));
+    if (tier > 0) scene.time.delayedCall(760, () => burst(tier === 2 ? 26 : 14));
+    if (tier === 2) scene.time.delayedCall(1220, () => burst(22));
+    scene.time.delayedCall(260, () => {
+      if (!c.active) return;
+      if (tier === 2) scene.cameras.main.flash(340, 255, 214, 120, false);
+      else if (tier === 1) scene.cameras.main.flash(260, 150, 190, 255, false);
+    });
+  }
+
+  // ---- the words ----
+  const head = sf(ssTxt(scene, l.x(0), l.y(146), '✦  ' + SS_T('unlHead') + '  ✦', l.u(14), '#ffd77a')).setOrigin(0.5)
+    .setLetterSpacing(l.u(3)).setShadow(0, 0, '#c9b676', l.u(10), true, true).setAlpha(0);
+  const gk = ssGoldTex(scene, loc.name, 25);
+  const gsc = Math.min(1, 340 / gk.w);
+  const name = sf(scene.add.image(l.x(0), l.y(452), gk.key)).setDisplaySize(l.u(gk.w * gsc), l.u(gk.h * gsc)).setAlpha(0);
+  const words = [head, name];
+  if (RC.label) {
+    words.push(sf(ssTxt(scene, l.x(0), l.y(488), '✦ ' + SS_T(RC.label) + ' ✦', l.u(11.5), RC.labelColor)).setOrigin(0.5)
+      .setLetterSpacing(l.u(2.5)).setShadow(0, 0, RC.shadow, l.u(8), true, true).setAlpha(0));
+  }
+  /* The three lines under the nameplate stack on MEASURED heights, not fixed
+     rows: a two-line effect and a two-line condition are both common once the
+     copy is German, and a fixed ladder either overlaps there or leaves a hole
+     under the English. `dh` converts a Text's pixel height back to design. */
+  const dh = (o) => o.height / l.s;
+  const descY = RC.label ? 520 : 498;
+  // one single-line Text per line (ssTextBlock): sf rides on every child
+  const desc = ssTextBlock(scene, l.x(0), l.y(descY), loc.desc, {
+    fontSize: l.u(13.5) + 'px', color: '#e6dfc6', fontStyle: 'italic',
+    align: 'center', wrapW: l.u(330), lineSpacing: l.u(3), ox: 0.5, oy: 0, sf: true,
+  }).setData('sigilDesc', sg.id).setAlpha(0);
+  words.push(desc);
+  let ny = descY + dh(desc) + 26;
+  const how = SS_SIG_HOW(sg);
+  if (how) {
+    const hw = ssTextBlock(scene, l.x(0), l.y(ny), '✓ ' + how, {
+      fontSize: l.u(10) + 'px', color: '#8a94c4', fontStyle: 'italic',
+      align: 'center', wrapW: l.u(320), ox: 0.5, oy: 0, sf: true,
+    }).setData('sigilHow', sg.id).setAlpha(0);
+    words.push(hw);
+    ny += dh(hw) + 28;
+  }
+  const skies = sf(ssTxt(scene, l.x(0), l.y(ny + 6), SS_T('unlSkies'), l.u(12), '#ffe9a8', 'italic')).setOrigin(0.5).setAlpha(0);
+  const hint = sf(ssTxt(scene, l.x(0), l.y(694), SS_T('unlTap'), l.u(9.5), '#8a94c4', 'italic')).setOrigin(0.5).setAlpha(0);
+  words.push(skies, hint);
+  c.add(words);
+  // head, then the nameplate, then every line under it in its own beat
+  const beats = [[head, 540], [name, 760]];
+  words.slice(2).forEach((o, i) => beats.push([o, 940 + i * 170]));
+  beats.forEach(([o, d]) => {
+    if (!o) return;
+    o.y += l.u(10);
+    scene.tweens.add({ targets: o, y: o.y - l.u(10), alpha: o === hint ? 0.85 : 1, duration: 420, delay: d, ease: 'Cubic.easeOut' });
+  });
+
+  ssHealBlankTexts(scene, 'sigil-rite');
+  // it holds long enough to be read — a legendary a beat longer — then lets
+  // whatever is underneath have the screen back, tapped or not
+  scene.time.delayedCall(tier === 2 ? 6600 : tier === 1 ? 6000 : 5400, close);
+  return c;
+}
+
+/* Say out loud whatever is waiting, one rite at a time. The queue is spent
+   rite by rite as each one is BUILT (see ssSigilRite), so two discoveries in
+   one run arrive in sequence and a scene that dies mid-queue leaves the rest
+   in `pend` for the meadow to hold instead. A second caller arriving while a
+   rite is on screen is turned away rather than allowed to stack — its ids are
+   still in `pend`, so nothing is lost. Returns the milliseconds the whole
+   sequence will take; `onAll` fires when the LAST rite has actually closed
+   (a tap can land that well before the returned worst case — the in-run
+   waking moment resumes play off this, never off the clock). */
+const SS_RITE_MS = [5400, 6000, 6600];
+function ssSigilAnnounce(scene, ids, onAll) {
+  ids = (ids || []).filter((id) => !!SS_SIG_BY[id]);
+  if (!ids.length || !scene || !scene.scene.isActive() || SS_RITE.busy) return 0;
+  const q = ids.slice();
+  const step = () => {
+    if (!scene.scene.isActive()) return;
+    const sg = SS_SIG_BY[q.shift()];
+    if (!sg) return;
+    ssSigilRite(scene, sg, () => {
+      if (q.length) scene.time.delayedCall(420, step);
+      else if (onAll) onAll();
+    });
+  };
+  step();
+  return ids.reduce((a, id) => a + SS_RITE_MS[SS_SIG_BY[id].rarity | 0] + 840, 0);
+}
+
+/* THE SIGN'S OWN RITE (v0.69.0) — a level earned by play, said in the
+   forge ceremony's dress: the veil, the sign's glyph rising where the
+   medallion sits, the gold nameplate 'LEO · LEVEL 12', and the power line
+   AT ITS NEW NUMBERS (SS_ZOD's levelled desc — the "your 6-letter words
+   now strike for +11" line, already localized). A reward row sitting at
+   exactly this level gets its own gold pair beneath. A SIBLING of
+   ssSigilRite, not a parameter-bent reuse — that one is welded to sigil
+   defs (rarity chrome, SS_SIG, the medal texture).
+   Spend-at-show (the v0.43 law): `ack` is written as the rite BUILDS, so
+   endRun and the meadow can never say the same level twice. */
+function ssSignRite(scene, z, lv, onDone) {
+  const l = ssLayout(scene);
+  SS_RITE.busy = true;
+  const sr = SS.prof.signs[z.id];
+  if (sr && (sr.ack | 0) < lv) { sr.ack = lv; SS.save(); }
+  const tint = SS_ELEMENTS[z.el];
+  const hexc = '#' + ('000000' + tint.toString(16)).slice(-6);
+  const c = scene.add.container(0, 0).setDepth(680).setScrollFactor(0);
+  c.setData('signRite', z.id);            // the harness reads WHICH sign rose
+  c.setData('signRiteLv', lv);            // …and to which level
+  const sf = (o) => o.setScrollFactor(0);
+  let done = false;
+  const close = () => {
+    if (done) return;
+    done = true;
+    scene.tweens.add({
+      targets: c, alpha: 0, duration: 420, ease: 'Sine.easeIn',
+      onComplete: () => { if (c.active) c.destroy(); SS_RITE.busy = false; if (onDone) onDone(); },
+    });
+  };
+  scene.events.once('shutdown', () => { SS_RITE.busy = false; });
+
+  const veil = sf(scene.add.image(l.W / 2, l.H / 2, 'veil')).setDisplaySize(l.W, l.H).setAlpha(0).setInteractive();
+  veil.on('pointerdown', () => { SFX.ui(); close(); });
+  // 0.985, the sigil rite's own weight — this copy crosses the middle of
+  // the screen where gold buttons may sit underneath
+  scene.tweens.add({ targets: veil, alpha: 0.985, duration: 380 });
+  c.add(veil);
+
+  SFX.ensure(); SFX.forge();
+  const rw = ssSignRewardAt(z.id, lv);
+  if (rw) scene.time.delayedCall(340, () => { if (SFX.ok && c.active) SFX.ach(); });
+
+  // ---- the glyph, rising in its element's glow ----
+  const MY = 286;
+  const glow = sf(scene.add.image(l.x(0), l.y(MY), 'glowbig')).setDisplaySize(l.u(80), l.u(80))
+    .setTint(tint).setAlpha(0).setBlendMode('ADD');
+  c.add(glow);
+  const glyph = ssZodiacGlyph(scene, z, l.u(0.7), l.x(0), l.y(MY)).setScrollFactor(0).setAlpha(0).setScale(0.6);
+  c.add(glyph);
+  scene.tweens.add({ targets: glyph, alpha: 1, scale: 1, duration: 700, ease: 'Back.easeOut' });
+  scene.tweens.add({
+    targets: glow, alpha: 0.3, displayWidth: l.u(300), displayHeight: l.u(240), duration: 700, ease: 'Cubic.easeOut',
+    onComplete: () => {
+      if (!glow.active || ssReduceMotion()) return;
+      scene.tweens.add({ targets: glow, alpha: 0.13, duration: 1500, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    },
+  });
+
+  // ---- the arrival: one element-tinted burst; a reward flashes the sky ----
+  if (!ssReduceMotion()) {
+    const em = sf(scene.add.particles(0, 0, 'dot', {
+      speed: { min: 20, max: 210 }, lifespan: { min: 700, max: 1700 }, gravityY: -22,
+      scale: { start: 0.75, end: 0 }, alpha: { start: 0.95, end: 0 }, blendMode: 'ADD',
+      tint: [tint, 0xfff2c9], emitting: false,
+    }));
+    c.add(em);
+    scene.time.delayedCall(240, () => {
+      if (!em.active) return;
+      for (let k = 0; k < (rw ? 30 : 18); k++) {
+        em.emitParticleAt(l.x(0) + (Math.random() - 0.5) * l.u(150), l.y(MY) + (Math.random() - 0.5) * l.u(120));
+      }
+    });
+    if (rw) scene.time.delayedCall(280, () => { if (c.active) scene.cameras.main.flash(300, 255, 214, 120, false); });
+  }
+
+  // ---- the words ----
+  const head = sf(ssTxt(scene, l.x(0), l.y(146), '✦  ' + SS_T('svHead') + '  ✦', l.u(14), '#ffd77a')).setOrigin(0.5)
+    .setLetterSpacing(l.u(3)).setShadow(0, 0, '#c9b676', l.u(10), true, true).setAlpha(0);
+  const gk = ssGoldTex(scene, z.name + ' · ' + (lv >= SS_SIGNLV.max ? SS_T('svLevelMax') : SS_T('svLevel', lv)), 25);
+  const gsc = Math.min(1, 340 / gk.w);
+  const name = sf(scene.add.image(l.x(0), l.y(438), gk.key)).setDisplaySize(l.u(gk.w * gsc), l.u(gk.h * gsc)).setAlpha(0);
+  const title = sf(ssTxt(scene, l.x(0), l.y(472), SS_ZOD(z, lv).title, l.u(11), hexc, 'italic')).setOrigin(0.5)
+    .setShadow(0, 0, hexc, l.u(7), true, true).setAlpha(0);
+  const words = [head, name, title];
+  const dh = (o) => o.height / l.s;
+  // the power at its NEW numbers — the levelled desc, one Text per line
+  const desc = ssTextBlock(scene, l.x(0), l.y(498), SS_ZOD(z, lv).desc, {
+    fontSize: l.u(13.5) + 'px', color: '#e6dfc6', fontStyle: 'italic',
+    align: 'center', wrapW: l.u(330), lineSpacing: l.u(3), ox: 0.5, oy: 0, sf: true,
+  }).setData('signDesc', z.id).setAlpha(0);
+  words.push(desc);
+  let ny = 498 + dh(desc) + 24;
+  if (rw) {
+    const rwLine = rw.t === 'vessel' ? SS_T('svRwVessel', rw.hp | 0) : rw.t === 'gilded' ? SS_T('svRwGilded') : '';
+    if (rwLine) {
+      words.push(sf(ssTxt(scene, l.x(0), l.y(ny), '✦ ' + SS_T('svReward') + ' ✦', l.u(10.5), '#ffe9a8')).setOrigin(0.5)
+        .setLetterSpacing(l.u(2)).setShadow(0, 0, '#c9b676', l.u(8), true, true).setAlpha(0));
+      words.push(ssTextBlock(scene, l.x(0), l.y(ny + 20), rwLine, {
+        fontSize: l.u(11.5) + 'px', color: '#ffd77a', fontStyle: 'italic',
+        align: 'center', wrapW: l.u(320), ox: 0.5, oy: 0, sf: true,
+      }).setData('signReward', z.id).setAlpha(0));
+    }
+  }
+  const hint = sf(ssTxt(scene, l.x(0), l.y(694), SS_T('unlTap'), l.u(9.5), '#8a94c4', 'italic')).setOrigin(0.5).setAlpha(0);
+  words.push(hint);
+  c.add(words);
+  const beats = [[head, 540], [name, 760]];
+  words.slice(2).forEach((o, i) => beats.push([o, 940 + i * 170]));
+  beats.forEach(([o, d]) => {
+    if (!o) return;
+    o.y += l.u(10);
+    scene.tweens.add({ targets: o, y: o.y - l.u(10), alpha: o === hint ? 0.85 : 1, duration: 420, delay: d, ease: 'Cubic.easeOut' });
+  });
+
+  ssHealBlankTexts(scene, 'sign-rite');
+  // one quiet beat — it holds to be read, then lets the sky back through
+  scene.time.delayedCall(rw ? 6000 : 5400, close);
+  return c;
+}
+
+// achievement toast, usable from any scene
+function ssAchToast(scene, def) {
+  const l = ssLayout(scene);
+  const c = scene.add.container(l.x(0), l.y(-40)).setDepth(400);
+  const bg = scene.add.image(0, 0, ssBtn(scene, false, 300, 58)).setDisplaySize(l.u(300), l.u(58));
+  const t1 = ssTxt(scene, 0, -l.u(10), '✦ ' + def.name + ' ✦', l.u(15), BTN_INK()).setOrigin(0.5);
+  const t2 = ssTxt(scene, 0, l.u(12), def.desc, l.u(10), BTN_INK2(), 'italic').setOrigin(0.5);
+  c.add([bg, t1, t2]);
+  scene.tweens.add({ targets: c, y: l.y(52), duration: 450, ease: 'Back.easeOut' });
+  scene.tweens.add({ targets: c, alpha: 0, delay: 2600, duration: 400, onComplete: () => c.destroy() });
+}
+
+/* ---- the rename notice: a name the stars already knew ----------------------
+   Unique names (net.js): a player whose standing name was claimed first by
+   somebody else is re-minted at connect, and a rename to a taken name keeps
+   the old one. Either way they are told ONCE, here, in the achievement
+   toast's frame: the title one line, the body an ssTextBlock (never a
+   multi-line bake — the desc law). Shown by whichever scene is live when
+   the ss-renamed event lands, else by the meadow when it next builds. */
+function ssRenameNotice(scene, rec) {
+  rec = rec || SSNET.renameNotice(true);
+  if (!rec || !scene || !scene.sys || !scene.sys.isActive()) return null;
+  SSNET.renameNotice(true);
+  const l = ssLayout(scene);
+  const held = rec.kind === 'held';
+  const c = scene.add.container(l.x(0), l.y(-60)).setDepth(400);
+  const body = ssTextBlock(scene, 0, l.u(8), SS_T(held ? 'nameHeldBody' : 'nameTakenBody', rec.from, rec.to),
+    { fontSize: l.u(10) + 'px', color: BTN_INK2(), fontStyle: 'italic', wrapW: l.u(272), lineSpacing: l.u(1), align: 'center', ox: 0.5, oy: 0 });
+  const H = Math.max(58, 36 + body.height / l.u(1));
+  const bg = scene.add.image(0, 0, ssBtn(scene, false, 300, Math.round(H))).setDisplaySize(l.u(300), l.u(H));
+  const t1 = ssTxt(scene, 0, -l.u(H / 2 - 14), SS_T(held ? 'nameHeldTitle' : 'nameTakenTitle'), l.u(13), BTN_INK()).setOrigin(0.5);
+  body.y = -l.u(H / 2 - 24);
+  c.add([bg, t1, body]);
+  c.setData('renameNotice', true);
+  if (scene.nameT && scene.nameT.active) scene.nameT.setText(rec.to);
+  scene.tweens.add({ targets: c, y: l.y(52 + (H - 58) / 2), duration: 450, ease: 'Back.easeOut' });
+  scene.tweens.add({ targets: c, alpha: 0, delay: 6500, duration: 500, onComplete: () => c.destroy() });
+  return c;
+}
+window.addEventListener('ss-renamed', (e) => {
+  try {
+    const live = (window.game && game.scene.getScenes(true) || []).filter((sc) => sc.scene.key !== 'boot');
+    const sc = live.find((x) => x.scene.key === 'home' || x.scene.key === 'profile') || live[0];
+    if (sc) ssRenameNotice(sc, e.detail);
+  } catch (err) { }
+});
+
+/* ---- the rating card: tap any stargazer's name, see their standing -------
+   One small window of sky: the name, the star-class glyph burning in its
+   tier's color over a breathing glow, the number in gold letterpress. Pass
+   {own:true} for yourself, {rating,rhide,name} when the numbers are already
+   in hand (versus room records), or {uid,name} to fetch the synced profile.
+   A player who veiled their rating shows as "veiled in starlight" to
+   everyone but themselves. Works in any scene that ran ssMakeTextures. */
+function ssRatingCard(scene, o) {
+  if (scene.__rcC && scene.__rcC.scene) return;   // one card at a time; a destroyed ref self-heals
+  scene.__rcC = null;
+  SFX.ui();
+  const l = ssLayout(scene);
+  const c = scene.__rcC = scene.add.container(0, 0).setDepth(950);
+  const close = () => { if (scene.__rcC !== c) return; scene.__rcC = null; c.destroy(); };
+  const veil = scene.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setInteractive();
+  scene.tweens.add({ targets: veil, alpha: 0.6, duration: 180 });
+  veil.on('pointerdown', () => { SFX.ui(); close(); });
+  c.add(veil);
+  // 276 (was 250): the foot now seats the frontier flag row (v0.77.0)
+  const PH = 276, py = (d) => l.y(400 - PH / 2 + d);
+  const items = [];
+  // the window swallows its own taps so a press inside never hits the veil
+  items.push(scene.add.image(l.x(0), py(PH / 2), 'endpanel').setDisplaySize(l.u(300), l.u(PH)).setInteractive());
+  const own = !!o.own || (!!o.uid && o.uid === SSNET.uid());
+  const nm = ssTxt(scene, l.x(0), py(38), o.name || (own ? SSNET.myName() : '…'), l.u(16), '#f0e8d2').setOrigin(0.5);
+  while (nm.width > l.u(252) && nm.text.length > 2) nm.setText(nm.text.slice(0, -2) + '…');
+  items.push(nm);
+  items.push(scene.add.rectangle(l.x(0), py(60), l.u(240), Math.max(1, l.u(1)), 0xc9a84c, 0.35));
+  const body = scene.add.container(0, 0);
+  items.push(body);
+  const fill = (rating, hidden, fl) => {
+    if (scene.__rcC !== c || !body.scene) return;
+    if (hidden && !own) {
+      // veiled in starlight veils the WHOLE ledger: no rating, no flag, no level
+      body.add(ssTxt(scene, l.x(0), py(118), '☾', l.u(30), '#5a6390').setOrigin(0.5).setAlpha(0.9));
+      body.add(ssTxt(scene, l.x(0), py(160), SS_T('rHiddenCard'), l.u(12), '#8a94c4', 'italic').setOrigin(0.5));
+      return;
+    }
+    const tier = ssRatingTier(rating);
+    const g = scene.add.image(l.x(0), py(114), 'glowbig').setDisplaySize(l.u(160), l.u(160))
+      .setTint(tier.tint).setAlpha(0.13).setBlendMode('ADD');
+    body.add(g);
+    scene.tweens.add({ targets: g, alpha: 0.05, duration: 1300, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    body.add(ssTxt(scene, l.x(0), py(96), tier.glyph, l.u(26), tier.color).setOrigin(0.5)
+      .setShadow(0, 0, tier.color, l.u(12), true, true));
+    const gk = ssGoldTex(scene, String(rating), 26);
+    body.add(scene.add.image(l.x(0), py(140), gk.key).setDisplaySize(l.u(gk.w), l.u(gk.h)));
+    body.add(ssTxt(scene, l.x(0), py(176), '— ' + SS_T(tier.key) + ' —', l.u(12), tier.color).setOrigin(0.5)
+      .setShadow(0, 0, tier.color, l.u(6), true, true));
+    if (own && SS.prof.rhide) {
+      body.add(ssTxt(scene, l.x(0), py(204), '☾ ' + SS_T('rYourVeil'), l.u(9), '#5a6390', 'italic').setOrigin(0.5));
+    }
+    // the frontier flag at the card's foot (v0.77.0): the little flag in the
+    // owner's jar and how far it stands — shown for anyone unveiled who has
+    // ever finished an endless run, exactly the endless row's own law
+    if (fl && (fl.lv | 0) > 0) {
+      body.add(ssFlag(scene, { name: '', color: fl.color, w: 56, x: l.x(-100), y: py(258) }));
+      body.add(ssTxt(scene, l.x(-52), py(246), SS_T(own ? 'flagStands' : 'flagAt', fl.lv | 0), l.u(10.5), '#c9c3ae', 'italic').setOrigin(0, 0.5));
+    }
+  };
+  if (own) fill(SS.prof.rating, SS.prof.rhide, SS.prof.endless.bestLevel > 0 ? { lv: SS.prof.endless.bestLevel, color: SS.prof.flag } : null);
+  else if (o.rating != null || !o.uid) fill(Number.isFinite(o.rating) ? o.rating : SS_RATING.BASE, !!o.rhide, null);
+  else {
+    const loadT = ssTxt(scene, l.x(0), py(130), SS_T('lbLoading'), l.u(10.5), '#5a6390', 'italic').setOrigin(0.5);
+    body.add(loadT);
+    SSNET.dbGet('players/' + o.uid).catch(() => null).then((p) => {
+      if (scene.__rcC !== c || !loadT.scene) return;
+      loadT.destroy();
+      if (p && p.name && !o.name && nm.active) nm.setText(p.name);
+      fill(p && Number.isFinite(p.rating) ? p.rating : SS_RATING.BASE, !!(p && p.rhide),
+        p && (p.endlessBest | 0) > 0 ? { lv: p.endlessBest | 0, color: p.flagColor || null } : null);
+    });
+  }
+  c.add(items);
+  // entrance: the little window settles up into place like every other sheet
+  items.forEach((it) => { if (it !== body) it.y += l.u(12); it.alpha = 0; });
+  scene.tweens.add({ targets: items, alpha: 1, duration: 240, ease: 'Cubic.easeOut' });
+  scene.tweens.add({ targets: items.filter((it) => it !== body), y: '-=' + l.u(12), duration: 240, ease: 'Back.easeOut' });
+}
+
+/* Every DOM element the game floats above the canvas (rename input, seal-code
+   input) goes through here. Phaser preventDefaults canvas touches, so tapping
+   '‹ HOME' never blurs a focused input — left to its own devices the element
+   outlives its scene and sits on top of whatever screen comes next. This ties
+   its life to the scene: Enter/blur commit, Escape cancels, and scene shutdown
+   (back link, scene.start, resize-restart) always removes it — committing only
+   if commitOnShutdown says the commit is safe to run against a dead scene.
+   One shared id doubles as a belt-and-suspenders sweep: a second overlay
+   replaces the first instead of stacking. */
+function ssDomInput(scene, inp, commit, commitOnShutdown) {
+  // removing a FOCUSED input fires its blur synchronously, whose close()
+  // detaches it mid-remove — Chrome then throws NotFoundError on the outer
+  // call. Harmless (the element is gone either way), so swallow it.
+  const prev = document.getElementById('ss-overlay-input');
+  if (prev) { try { prev.remove(); } catch (e) { } }
+  inp.id = 'ss-overlay-input';
+  let open = true;
+  const close = (save) => {
+    if (!open) return;
+    open = false;
+    scene.events.off('shutdown', onShut);
+    try { inp.remove(); } catch (e) { }
+    if (save) commit(inp.value);
+  };
+  const onShut = () => close(!!commitOnShutdown);
+  scene.events.once('shutdown', onShut);
+  inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') close(true); if (e.key === 'Escape') close(false); });
+  inp.addEventListener('blur', () => close(true));
+  document.body.appendChild(inp);
+  inp.focus();
+}
+
+/* ============================================================
+   HOME — a twilight meadow at the bottom of the world column.
+   Entering a battle rises through the dusk to the zenith.
+   A cold boot opens at the zenith and settles down (playIntro).
+   ============================================================ */
+/* ---- A MIGHTY BEAST APPEARS (v0.106.0) -----------------------------------
+   The boss herald. Clicking a BOSS on the campaign star chart interposes one
+   full-screen beat before the battle: the night holds, the beast's own figure
+   looms dim in its tint — eyes lit, still veiled in dark — and the line lands
+   in gold. Then the screen fades away and the fight's own assembly (stars
+   flying in, the v0.21 boss halo) is the actual arrival: the herald announces,
+   the battle materializes. Both chart doors speak it — the home door at the
+   top of the rise (Battle.create defers startFight behind it), the
+   between-fights door in place of its straight cut to startFight.
+   Laws it keeps: it NEVER strands (try/catch → done at once; a watchdog force-
+   finishes; done is idempotent; a scene restart mid-beat re-creates into the
+   battle because the ascent's herald flag is consumed at init) · tap-to-skip
+   arms via delayedCall (the v0.3.3 launching-tap law) · the demo solver rides
+   a fast skip unaided · reduce-motion gets quiet fades, no breathing. */
+function ssBossHerald(scene, f, done, opts) {
+  opts = opts || {};
+  let fin = false, parting = false;
+  const bea = window.__ssherald = {
+    on: true, id: f && f.id, door: opts.door || '?', shown: false, skipped: false, done: false, t: Date.now(),
+  };
+  const finish = () => {
+    if (fin) return;
+    fin = true;
+    bea.done = true;
+    try { done(); } catch (e) { DIAG('herald done FAILED: ' + (e && e.message || '?')); }
+  };
+  let c = null;
+  try {
+    const l = ssLayout(scene);
+    const b = SS_BEASTS[f.id];
+    const um = !!f.umbral && f.id !== 'phoenix';        // beastFor's umbral rule
+    const name = (um ? SS_UMBRAL.prefix : '') + b.name;
+    const tint = um ? SS_UMBRAL.tint : b.tint;
+    const eye = um ? SS_UMBRAL.eye : b.eye;
+    const rm = ssReduceMotion();
+    c = scene.add.container(0, 0).setDepth(940);
+    c.once('destroy', () => { bea.on = false; });
+    // the night itself — opaque, and the plate eats every tap beneath the beat
+    const plate = scene.add.image(l.W / 2, l.H / 2, ssMapSkyTex(scene)).setDisplaySize(l.W, l.H)
+      .setScrollFactor(0).setInteractive();
+    c.add(plate);
+    // still star dust, unlit — the stage, not the show
+    for (let i = 0; i < 12; i++) {
+      const sz = l.u(1.2 + Math.random() * 1.8);
+      c.add(scene.add.image(Math.random() * l.W, Math.random() * l.H, 'dot')
+        .setDisplaySize(sz, sz).setScrollFactor(0).setAlpha(0.08 + Math.random() * 0.2));
+    }
+    // the figure LOOMS: every boss fills the stage — scaled off its own star
+    // bounds so a compact owl and a sprawling archer press equally close
+    let mxX = 0, mxY = 0;
+    for (const s of b.stars) { mxX = Math.max(mxX, Math.abs(s[0])); mxY = Math.max(mxY, Math.abs(s[1])); }
+    const sc = Math.max(0.9, Math.min(1.5, 130 / Math.max(1, mxX), 110 / Math.max(1, mxY)));
+    const k = l.u(sc);
+    // the beast's own nebula, breathing in its tint
+    const glow = scene.add.image(l.x(0), l.y(315), 'glowbig')
+      .setDisplaySize(l.u(mxX * sc * 2 + 190), l.u(mxY * sc * 2 + 170))
+      .setTint(tint).setAlpha(0).setBlendMode('ADD').setScrollFactor(0);
+    c.add(glow);
+    // the figure: the constellation drawn DIM — three magnitudes, served lines
+    // (LAW 3), no white-hot cores; the beast is here but not yet arrived. The
+    // assembly in the battle stays the one true materialization.
+    const mags = ssStarMags(b);
+    const fig = scene.add.graphics({ x: l.x(0), y: l.y(315) }).setScrollFactor(0).setAlpha(0);
+    const lineC = ssTintUp(tint, 0.35);
+    fig.lineStyle(2.2 * k, lineC, 0.3);
+    fig.fillStyle(lineC, 0.3);
+    for (const [e1, e2] of b.edges) {
+      const seg = ssEdgeSeg(b.stars[e1], b.stars[e2], SS_MAG_R[mags[e1]], SS_MAG_R[mags[e2]]);
+      if (!seg) continue;
+      fig.lineBetween(seg.x1 * k, seg.y1 * k, seg.x2 * k, seg.y2 * k);
+      fig.fillCircle(seg.x1 * k, seg.y1 * k, 1.1 * k);
+      fig.fillCircle(seg.x2 * k, seg.y2 * k, 1.1 * k);
+    }
+    const discC = { 1: ssTintUp(tint, 0.25), 2: ssTintUp(tint, 0.12), 3: tint };
+    for (let s = 0; s < b.stars.length; s++) {
+      const m = mags[s], px = b.stars[s][0] * k, py = b.stars[s][1] * k;
+      fig.fillStyle(discC[m], m === 1 ? 0.72 : m === 2 ? 0.55 : 0.4);
+      fig.fillCircle(px, py, SS_MAG_R[m] * k);
+    }
+    c.add(fig);
+    // the waking eyes — the one lit thing on the body, breathing
+    const eyeG = scene.add.graphics({ x: l.x(0), y: l.y(315) }).setScrollFactor(0).setAlpha(0);
+    for (const e of b.eyes) {
+      eyeG.fillStyle(eye, 0.35); eyeG.fillCircle(e[0] * k, e[1] * k, 4.5 * k);
+      eyeG.fillStyle(eye, 1); eyeG.fillCircle(e[0] * k, e[1] * k, 2.2 * k);
+    }
+    c.add(eyeG);
+    // the line, struck in gold — and the beast's name beneath it, in its tint
+    const gk = ssGoldTex(scene, SS_T('bossHerald'), 21);
+    const gsc = Math.min(1, 350 / gk.w);
+    const lineI = scene.add.image(l.x(0), l.y(492), gk.key)
+      .setDisplaySize(l.u(gk.w * gsc), l.u(gk.h * gsc)).setScrollFactor(0).setAlpha(0);
+    c.add(lineI);
+    const subT = ssTxt(scene, l.x(0), l.y(528), name, l.u(11.5), '#' + tint.toString(16).padStart(6, '0'), 'italic')
+      .setOrigin(0.5).setScrollFactor(0).setAlpha(0);
+    c.add(subT);
+
+    // the timeline — every step guards on the container's life and the part
+    const step = (ms, fn) => scene.time.delayedCall(ms, () => { if (c.active && !parting) fn(); });
+    const part = () => {
+      if (parting || !c.active) return;
+      parting = true;
+      finish();   // the battle wakes NOW — the assembly rises as the veil parts
+      scene.tweens.add({
+        targets: c, alpha: 0, duration: rm ? 300 : 480, ease: 'Sine.easeIn',
+        onComplete: () => { if (c.active) c.destroy(); },
+      });
+    };
+    if (opts.fadeIn) {   // the between-fights door: the herald rises over the fading chart
+      c.setAlpha(0);
+      scene.tweens.add({ targets: c, alpha: 1, duration: opts.fadeIn, ease: 'Sine.easeOut' });
+    }
+    step(rm ? 60 : 200, () => {
+      try { SFX.herald(); } catch (e) { }
+      const arriveMs = rm ? 240 : 460;
+      scene.tweens.add({ targets: [glow, fig, eyeG], alpha: { getEnd: (t) => t === glow ? 0.12 : 1 }, duration: arriveMs, ease: 'Sine.easeOut' });
+      if (!rm) {
+        scene.tweens.add({ targets: glow, alpha: 0.16, duration: 2000, yoyo: true, repeat: -1, delay: arriveMs, ease: 'Sine.easeInOut' });
+        scene.tweens.add({ targets: eyeG, alpha: 0.55, duration: 700, yoyo: true, repeat: -1, delay: arriveMs, ease: 'Sine.easeInOut' });
+      }
+    });
+    step(640, () => {
+      bea.shown = true;
+      try { SFX.forge(); } catch (e) { }
+      if (rm) { scene.tweens.add({ targets: lineI, alpha: 1, duration: 240 }); return; }
+      const bw = lineI.displayWidth, bh = lineI.displayHeight;   // never tween scale on setDisplaySize'd images
+      lineI.setDisplaySize(bw * 1.16, bh * 1.16).setAlpha(0);
+      scene.tweens.add({ targets: lineI, displayWidth: bw, displayHeight: bh, alpha: 1, duration: 340, ease: 'Back.easeOut' });
+    });
+    step(960, () => scene.tweens.add({ targets: subT, alpha: 0.95, duration: 300 }));
+    // the skip arms only after the entering tap has fully cleared (v0.3.3)
+    scene.time.delayedCall(380, () => {
+      if (!c.active || parting) return;
+      plate.on('pointerdown', () => { if (!parting) { bea.skipped = true; part(); } });
+    });
+    scene.time.delayedCall(DEMO ? 460 : 2350, part);       // the beat lets itself out
+    scene.time.delayedCall(4400, () => {                   // the watchdog: NEVER strand the run
+      if (!fin) { DIAG('herald watchdog fired'); finish(); }
+      if (c && c.active) c.destroy();
+    });
+  } catch (e) {
+    DIAG('herald FAILED: ' + (e && e.message || '?'));     // the beat must never cost the battle
+    if (c && c.active) c.destroy();
+    finish();
+  }
+}
+
+/* ---- THE SKY'S HERALD RIBBON (v0.108.0) -----------------------------------
+   THE SKY WHEEL's battle voice: on a daily battle-open under a BUILT sky,
+   one ribbon under the title chrome speaks the sky's one-line law for
+   ~4 seconds (SS_SKY_RIBBON_MS), then folds away. The fuse ribbon's own
+   dress — the 'ribbon' pill sized to its words — never interactive, never
+   gating anything: the fight starts beneath it (contrast ssBossHerald
+   above, full-screen and input-eating). SEAT + TIMING vs the v0.107 linger:
+   it stands at y94, between the player bar (y68) and the beast's sky, and
+   the earliest a strike's crimson can reach that bar is pop 120 + hold 2200
+   + fly 780 ≈ 3.1s AFTER a blow that itself needs a first cast (~2s+ of
+   weaving) — the ribbon is folding by ~4.4s, gone before any crimson lands
+   beside it. Reduce-motion: plain fades, no fold. Stock-interim days
+   (sky null) never ring it. */
+function ssSkyRibbon(scene) {
+  const sky = scene.sky;
+  if (!sky) return;
+  const bea = window.__ssskyrib = { on: true, id: sky.id, shown: false, gone: false, t: Date.now() };
+  try {
+    const l = ssLayout(scene);
+    const rm = ssReduceMotion();
+    const c = scene.add.container(0, 0).setDepth(30);
+    c.once('destroy', () => { bea.on = false; });
+    const t = ssTxt(scene, l.x(0), l.y(94), SS_T(sky.lineKey), l.u(10.5), '#ffe9a8', 'italic').setOrigin(0.5);
+    if (t.width > l.u(324)) t.setScale(l.u(324) / t.width);
+    const rib = scene.add.image(l.x(0), l.y(94), 'ribbon').setDisplaySize(t.displayWidth + l.u(26), l.u(22));
+    c.add([rib, t]);
+    c.setAlpha(0);
+    bea.shown = true;
+    scene.tweens.add({ targets: c, alpha: 1, duration: rm ? 220 : 320, ease: 'Sine.easeOut' });
+    scene.time.delayedCall(SS_SKY_RIBBON_MS, () => {
+      if (!c.active) return;
+      bea.gone = true;
+      if (!rm) scene.tweens.add({ targets: [rib, t], scaleY: 0.06, duration: 340, ease: 'Sine.easeIn' });
+      scene.tweens.add({
+        targets: c, alpha: 0, duration: rm ? 220 : 340, ease: 'Sine.easeIn',
+        onComplete: () => { if (c.active) c.destroy(); },
+      });
+    });
+  } catch (e) { DIAG('sky ribbon FAILED: ' + (e && e.message || '?')); }
+}
+
+let PENDING_ASCENT = null;   // survives a mid-ascent resize-restart: finish to battle
+let INTRO_SEEN = false;      // once per page load — a rotation restart must not replay it
+// The language sheet reloads the page to re-render every baked string; sitting
+// through the intro again for each language tried would be miserable, so that
+// reload sets a one-shot flag this consumes.
+function ssIntroBypassed() {
+  try {
+    if (sessionStorage.getItem('beta3.skipIntro')) { sessionStorage.removeItem('beta3.skipIntro'); return true; }
+  } catch (e) { }
+  return false;
+}
+class Home extends Phaser.Scene {
+  constructor() { super('home'); }
+  create() {
+    if (PENDING_ASCENT) { DIAG('restart mid-ascent → straight to battle'); const d = PENDING_ASCENT; PENDING_ASCENT = null; this.scene.start('battle', d); return; }
+    const tCr = performance.now();
+    const l = ssLayout(this);
+    ssMakeTextures(this);
+    this.isDawn = !!((this.scene.settings.data || {}).dawn) || QS.get('dawn') === '1';
+    this.sky = ssSkyWorld(this, { dawn: this.isDawn });
+    ssShootingStars(this);
+    const tSky = performance.now();
+    this.uiItems = [];
+    this.ascending = false; this.descending = false; this.arrived = false; this.introPlaying = false;
+    // scene instances persist across restarts — a rotation mid-sheet would
+    // otherwise leave these truthy forever and the sheets could never reopen
+    this.langC = null; this.dailyC = null; this.mapC = null; this.confirmC = null; this.signC = null; this.setC = null;
+    this.streakC = null; this.riteC = null; this.riteTimer = null; this.sigTimer = null; this.signLvTimer = null;
+    this.showZone = null; this.showFx = null;   // last run's showcase died with its scene
+    this.ftueBare = false;   // the wordless first open re-arms it below if owed
+
+    // Everything at the meadow (showcase, title, buttons, chip, footer) is a
+    // full frame's work on a slow phone, and a descent-by-create (the dawn
+    // return, or any fallback) starts with the camera at the ZENITH — none of
+    // it is visible yet. Building it one frame later halves the entry hitch of
+    // those descents; on a plain boot it builds inline as before.
+    const entry = (this.scene.settings.data || {}).from;
+    // the cinematic opening plays on a cold boot only: restarts (rotation),
+    // battle/defeat returns, demo/daily/vsdemo runs and the lang-switch reload
+    // all land straight on the interactive meadow
+    const deep = typeof vsDeepPending === 'function' && vsDeepPending();   // ?join= / ?friend= (versus.js)
+    // ssIntroBypassed CONSUMES its one-shot flag — read it once, for both gates
+    const bypassed = ssIntroBypassed();
+    /* THE FIRST OPEN (v0.75.0, Skylar 9/2): the genuinely-first open is a
+       guided, wordless ride — the logo meadow with NO ui, the signature
+       rise with no questions, a curated first board, the friendly finger.
+       The gate mirrors the intro's exclusions and adds the doors the intro
+       never needed to test explicitly (?endless auto-starts a mode, ?lab
+       hands boot to lab.js, ?mpuid is a harness identity); every excluded
+       boot behaves exactly as it always did. ?ftue=1 forces the flow (the
+       dev seam, ?dawn's pattern); ?ftue=0 stands it down. */
+    const ftue = (ssFtuePending() || QS.get('ftue') === '1') && QS.get('ftue') !== '0'
+      && !entry && !DEMO && QS.get('vsdemo') !== '1' && !QS.get('frdemo') && !QS.get('botduel')
+      && QS.get('daily') !== '1' && QS.get('quick') !== '1' && QS.get('endless') !== '1'
+      && QS.get('lab') !== '1' && !QS.get('mpuid') && !deep && !bypassed;
+    window.__ssftue = { on: ftue, state: ftue ? 'gate' : 'off' };   // headless verification reads this
+    const intro = !entry && !INTRO_SEEN && !DEMO && QS.get('vsdemo') !== '1' && !QS.get('frdemo') && !QS.get('botduel') && QS.get('daily') !== '1' && QS.get('quick') !== '1' && !deep && !bypassed;
+    if (ftue) this.ftueOpen(l, intro);
+    else if (entry) this.time.delayedCall(0, () => { if (this.sys.isActive()) this.buildMeadowUi(l); });
+    else if (intro) this.playIntro(l);
+    else this.buildMeadowUi(l);
+    // the daily chip's clock ticks every second while the meadow sits open.
+    // Ticking also carries it across midnight UTC on its own: dayKey() moves,
+    // today's score stops matching, and the chip lights back up for the new
+    // sky without a reload.
+    this.time.addEvent({ delay: 1000, loop: true, callback: () => this.updateDailyChip() });
+
+    this.input.once('pointerdown', () => SFX.ensure());
+    this.events.on('ss-achproxy', (def) => ssAchToast(this, def));
+
+    // crickets sing while we stand in the grass — at dawn, the birds do.
+    // During the intro we're still up at the zenith; they start on landing.
+    if (!this.introPlaying) { SFX.crickets(!this.isDawn); SFX.birds(this.isDawn); }
+    this.events.once('shutdown', () => { SFX.crickets(false); SFX.birds(false); });
+
+    // the ascent puts this scene to SLEEP, not to rest — returning from battle
+    // wakes it and glides down, skipping the 200-370ms create() freeze that
+    // used to open every descent (see arrive())
+    this.createdW = this.scale.width; this.createdH = this.scale.height;
+    this.events.on('wake', (sys, data) => this.onWake(data || {}));
+    // pre-bake the dawn gradient while the meadow idles: the campaign-win
+    // descent re-creates the scene with the other sky, and baking + uploading
+    // skygrad-dawn inside that create was a measurable slice of its entry hitch
+    if (!this.isDawn) this.time.delayedCall(600, () => { if (this.scene.isActive()) ssSkyTextures(this, true); });
+    // …and the tile glyphs, so the board build at the top of the rise is
+    // sprite reuse instead of 32 live text rasters (see ssGlyph)
+    this.time.delayedCall(700, () => { if (this.scene.isActive()) ssPrewarmGlyphs(this); });
+
+    // arriving from a battle: descend home · from defeat: wake up on the grass
+    // a mark earned in the battle we just came home from (or on a night the
+    // app was closed before it could be honoured) waits for still grass
+    this.milestoneCheck();
+    this.sigilNotice();          // …and a sigil the drip handed over may still be unsaid
+    this.signNotice();           // …and a sign level a killed end screen never named
+    if (entry === 'battle') this.descendHome();
+    else if (entry === 'defeat') {
+      const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setScrollFactor(0).setDepth(600);
+      this.tweens.add({ targets: veil, alpha: 0, duration: 350, onComplete: () => veil.destroy() });
+    }
+
+    DIAG('home create sky ' + Math.round(tSky - tCr) + 'ms' + (entry ? ' · ui deferred (' + entry + ')' : ''));
+    localStorage.setItem('beta3.boot', BUILD);
+    console.log(BUILD);
+    DIAG(BUILD + ' · ' + (this.game.renderer.type === Phaser.WEBGL ? 'webgl' : 'canvas') + ' ' + this.game.scale.width + 'x' + this.game.scale.height + ' dprCap ' + DPR);
+    // the summons overlay rides above every screen for the whole visit — a
+    // friend's challenge banner and the friends-layer toasts live there
+    if (this.scene.get('summons') && !this.scene.isActive('summons')) { this.scene.launch('summons'); this.scene.bringToTop('summons'); }
+    // the near sky wakes with the app (9/3 card 03): standing worldwide
+    // duels get their rivals back, overdue replies land, stale rooms sweep
+    if (!window.__ssNearWoke && typeof SS_RIVAL !== 'undefined' && SS_RIVAL.wake) {
+      window.__ssNearWoke = 1;
+      this.time.delayedCall(900, () => { try { SS_RIVAL.wake(); } catch (e) { } });
+    }
+    if (deep) this.time.delayedCall(300, () => vsDeepRun(this));
+    else if (QS.get('botduel') && typeof ssBotDuelBoot === 'function') this.time.delayedCall(500, () => ssBotDuelBoot(this));   // the rival engine's dev seam (rival.js) — before vsdemo, which may ride along to play the human seat
+    else if (QS.get('vsdemo') === '1' || QS.get('frdemo') === 'host' || QS.get('frdemo') === 'invite') this.time.delayedCall(500, () => this.scene.start('vsmenu'));
+    // ?quick=1 — the harnesses' door into a quick run since the QUICK PLAY
+    // button left the meadow (v0.51.0): the mode lives on, the meadow just
+    // doesn't offer it
+    // ?endless=1 boots straight into an endless climb the same way (v0.68.0)
+    else if (DEMO || QS.get('daily') === '1' || QS.get('quick') === '1' || QS.get('endless') === '1') {
+      const mode = DEMO ? (QS.get('mode') === 'campaign' ? 'campaign' : QS.get('mode') === 'endless' ? 'endless' : 'quick')
+        : QS.get('quick') === '1' ? 'quick' : QS.get('endless') === '1' ? 'endless' : 'daily';
+      // the door knocks until the meadow is free — a one-shot call landing
+      // mid-intro was eaten by busy() and stranded the boot on the meadow
+      const knock = () => { if (this.busy()) { this.time.delayedCall(250, knock); return; } this.startMode(mode); };
+      this.time.delayedCall(400, knock);
+    }
+  }
+  buildMeadowUi(l) {
+    /* THE FIRST OPEN's meadow is WORDLESS (v0.75.0): the scene and the
+       wordmark only — no buttons, no chips, no footer, no
+       doors, nothing interactive at all. The flag lives on the scene so
+       playIntro's call lands here unchanged; onWake restarts a bare
+       meadow outright (the return from the first game deserves the full
+       chrome, built the normal way). */
+    const bare = !!this.ftueBare;
+    // a name the stars already knew (net.js, unique names): told once, here
+    if (!bare) this.time.delayedCall(700, () => { if (this.sys.isActive() && SSNET.renameNotice()) ssRenameNotice(this); });
+    // baseAlpha: the ascent fades all ui to 0 — the wake path (return from
+    // battle without a re-create) restores each item to the alpha it was born
+    // with, which is not 1 for sparkles, braid, mute/lang buttons
+    const ui = (o) => { o.baseAlpha = o.alpha; this.uiItems.push(o); return o; };
+    const tUi = performance.now();
+
+    // beast showcase — tonight's hunt, rising in the dusk sky
+    this.showC = this.add.container(l.x(0), l.y(150));
+    // dev seam (harness door): ?show=<id> pins the showcase to one sign —
+    // the rotation then deals that sign every turn. The 9s cycle is random
+    // and untestable raw; the pin makes "the horse is standing" a boot flag.
+    const showPin = QS.get('show');
+    const ids = showPin && SS_BEASTS[showPin] ? [showPin] : Object.keys(SS_BEASTS);
+    let showIdx = Math.floor(Math.random() * ids.length);
+    const cycle = () => {
+      if (!this.scene.isActive()) return;
+      if (this.showFx) {
+        if (this.showFx.skyDone) this.showFx.skyDone(true);   // a flourish mid-beat leaves cleanly
+        this.showFx.destroy(); this.showFx = null;
+      }
+      if (this.showZone) { this.showZone.destroy(); this.showZone = null; }
+      window.__SSSKY.armed = null;
+      const b = SS_BEASTS[ids[showIdx % ids.length]];
+      const asm = ssAssembleBeast(this, this.showC, b, l.u(SS_STAR_GRADES.showcase));
+      this.showFx = ssBeastFx(this, this.showC, b, l.u(SS_STAR_GRADES.showcase), asm, { lite: true });
+      showIdx++;
+      /* tappable sky signs (SS_SKY_TAPS, v0.76.0): while a registered sign
+         stands on an interactive meadow, one zone sized to its stars waits
+         for a tap. Never on the wordless first open (ftueBare: zero
+         interactive chrome is that meadow's law), and never over another
+         control — nothing else lives in the showcase band (tap-sign-check
+         proves the census live). Unregistered signs stay pure presence: no
+         zone, no hint, no dead-tap feedback. */
+      const flourish = SS_SKY_TAPS[b.id];
+      if (flourish && !this.ftueBare) {
+        const sc = l.u(SS_STAR_GRADES.showcase) * (b.boss ? 1.15 : b.tier === 'mini' ? 1.06 : 1);
+        let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+        for (const p of b.stars) {
+          x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]);
+          y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]);
+        }
+        const pad = l.u(10);   // the aura breathes a little past the stars
+        const z = this.showZone = this.add.zone(
+          this.showC.x + ((x0 + x1) / 2) * sc, this.showC.y + ((y0 + y1) / 2) * sc,
+          (x1 - x0) * sc + pad * 2, (y1 - y0) * sc + pad * 2).setInteractive({ useHandCursor: true });
+        z.on('pointerdown', () => {
+          window.__SSSKY.taps++;
+          const fx = this.showFx;
+          // the meadow-door guards (busy + every open sheet), then the
+          // sign's own: mid-assembly and mid-rear taps are the horse's
+          // business — ignored, never queued, never stacked
+          if (this.busy() || this.streakC || this.dailyC || this.langC || this.setC || this.mapC || this.confirmC || this.signC || this.riteC
+            || !fx || fx.dead || !fx.ready || fx.attacking) { window.__SSSKY.blocked++; return; }
+          SFX.ensure();
+          window.__SSSKY.plays++;
+          flourish(this, fx);
+        });
+        window.__SSSKY.armed = b.id;
+      }
+    };
+    cycle();
+    this.time.addEvent({ delay: 9000, loop: true, callback: () => { this.tweens.add({ targets: this.showC, alpha: 0, duration: 500, onComplete: () => { this.showC.setAlpha(1); cycle(); } }); } });
+
+    // title — the painted wordmark, just above the horizon glow. Sparkles are
+    // separate sprites so they can twinkle without redrawing the texture.
+    const tk = ssTitleTex(this);
+    const tScale = Math.min(1, 384 / tk.w);           // long localized titles fit the frame
+    const title = this.titleT = ui(this.add.image(l.x(0), l.y(300), tk.key)
+      .setDisplaySize(l.u(tk.w * tScale), l.u(tk.h * tScale)));
+    this.titleBase = { sx: title.scaleX, sy: title.scaleY };
+    // sparkles sit on letter-tip anchors from the renderer; fractional fallback
+    // covers a non-Latin title, which reports no anchors
+    const spots = tk.anchors.length
+      ? tk.anchors.map((a, i) => [a.x * tScale, a.y * tScale, [15, 11, 13][i % 3]])
+      : [[-0.36 * tk.w * tScale, -0.30 * tk.h * tScale, 15], [0.30 * tk.w * tScale, -0.38 * tk.h * tScale, 11], [0.42 * tk.w * tScale, 0.24 * tk.h * tScale, 13]];
+    this.sparkles = [];
+    for (const [fx, fy, fs] of spots) {
+      this.sparkles.push(ui(this.add.image(l.x(fx), l.y(300 + fy), 'spark4')
+        .setDisplaySize(l.u(fs), l.u(fs)).setAlpha(0.75).setBlendMode('ADD')));
+    }
+    // the breath and sparkle idle tweens are re-armed on wake (beginAscent
+    // kills them so its fade-to-0 doesn't fight the alpha yoyos)
+    this.idleTweens = () => {
+      title.setScale(this.titleBase.sx, this.titleBase.sy);
+      this.tweens.add({ targets: title, scaleX: this.titleBase.sx * 1.02, scaleY: this.titleBase.sy * 1.02, duration: 2200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      for (const sp of this.sparkles) {
+        this.tweens.add({ targets: sp, angle: 360, duration: 36000 + Math.random() * 20000, repeat: -1 });
+        this.tweens.add({ targets: sp, alpha: 0.3, duration: 1600 + Math.random() * 1400, yoyo: true, repeat: -1, delay: Math.random() * 1500 });
+      }
+      // the daily herald's ember breath (guarded: the first idleTweens call
+      // runs before the chip is built; the wake path re-arms it here)
+      if (this.dailyGlow) {
+        this.dailyGlow.setAlpha(0.13);
+        this.tweens.add({ targets: this.dailyGlow, alpha: 0.05, duration: 1100, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      }
+    };
+    this.idleTweens();
+    // the braid closes the wordmark on its own — the tagline that hung under
+    // it ("weave words · fell the star-beasts") retired in v0.90.0 (Skylar,
+    // 9/8: phones showing different things; the honest fix was removal).
+    // tools/tagline-check.mjs now asserts its ABSENCE on both skies.
+    const bk = ssBraidTex(this);
+    ui(this.add.image(l.x(0), l.y(300 + tk.h * tScale * 0.5 + 6), bk.key).setDisplaySize(l.u(bk.w), l.u(bk.h)).setAlpha(0.9));
+
+    if (bare) {
+      // nothing below is built; the refreshers other paths call become
+      // no-ops so a stray refresh can never half-dress a wordless meadow
+      this.layoutMenu = () => { };
+      this.setRowSub = () => { };
+      this.refreshCampDoor = () => { };
+      this.refreshEndDoor = () => { };
+      this.refreshDuelStrip = () => { };
+      DIAG('meadow ui built (bare — first open)');
+      return;
+    }
+
+    // buttons
+    /* v0.46.0: the four play buttons lost their flavour sublines ("four acts
+       · one long night" and kin — Wyatt). What remains under a label is only
+       ever INFORMATION that is live right now: the campaign's "fight N of 5"
+       while a checkpoint stands, and versus's "✦ N of your friends online"
+       while any are. With nothing to say, the label sits dead-centre in its
+       button; when a line arrives the label glides up 9 to make room (a
+       200ms tween, so the meadow never jumps). The buttons keep their 58
+       height either way — the meadow's rhythm is set by them. */
+    /* v0.47.0 — THE CAMPAIGN DOORS (Wyatt). NEW GAME is the only way into a
+       fresh climb, and warns first when a climb would be lost (newCampaign).
+       v0.51.0 — THE HOME RESHAPE (Wyatt, 8/25): CONTINUE GAME exists ONLY
+       while a checkpoint stands — no checkpoint, no button (the grey dead
+       dress is retired), and the column closes ranks below. QUICK PLAY's
+       button left the meadow (the mode, its daily chip and its leaderboard
+       rows all live on — ?quick=1 is the harnesses' door). */
+    const campRow = () => {
+      const ck = this.campaignCheckpoint();
+      return {
+        label: SS_T('contCamp'), alive: !!ck,
+        sub: ck ? SS_ACT_N(SS_ACTS[ck.actIdx]).split('·')[0].trim() + '  ·  ' + SS_T('fightN', ck.fightIdx % 5 + 1) : '',
+      };
+    };
+    this.campRow = campRow;
+    const cr = campRow();
+    /* THE ENDLESS DOOR's sub-line (v0.68.0, Skylar; v0.74.0 the high score):
+       the climb that stands ("level 7 · the climb holds"), else the high
+       score — the pair, ranked the way endless ranks itself: level first,
+       then the score — else the mode's own verb: a brand-new player is told
+       what the door IS. */
+    const endRow = () => {
+      const ck = this.endlessCheckpoint();
+      if (ck) return SS_T('endlessCont', (ck.fightIdx | 0) + 1);
+      const e = SS.prof.endless || {};
+      const b = e.bestLevel | 0;
+      return b > 0 ? SS_T('endlessBest', b, e.bestScore | 0) : SS_T('endlessSub');
+    };
+    this.endRow = endRow;
+    const rows = [
+      // CONTINUE GAME opens the star chart at the standing checkpoint —
+      // rendered only while one stands (refreshCampDoor is the one door)
+      { y: 420, h: 58, label: cr.label, sub: cr.sub, key: 'campaign', fn: () => this.campaignDoor() },
+      // NEW GAME: a fresh climb (warned first when a checkpoint stands)
+      { y: 488, h: 58, label: SS_T('newCamp'), key: 'newcamp', dark: true, fn: () => this.newCampaign() },
+      // ENDLESS (v0.68.0, Skylar): fight until you fall, see how far you
+      // climb. One door — it resumes a standing climb, offers the choice
+      // when one stands and a fresh start is wanted, and opens the sign
+      // picker for a new climb.
+      { y: 556, h: 58, label: SS_T('endless'), sub: endRow(), key: 'endless', fn: () => this.endlessDoor() },
+      // LEADERBOARD left the meadow for the profile (v0.52.0): the column is
+      // play modes only — the profile chip up in the corner is the door to
+      // the night's finest now.
+      // PROFILE moved to the chip up in the corner, which frees this row for
+      // VERSUS — it is a play mode, so it gets a real button like the rest.
+      // Its sub-line is the live friends counter, and nothing else.
+      { y: 624, h: 58, label: SS_T('versus'), sub: '', key: 'versus', fn: () => { SFX.ui(); this.scene.start('vsmenu'); } },
+    ];
+    this.rowSubs = {};
+    this.rowLabels = {};
+    this.rowBtns = {};
+    this.menuRows = [];
+    for (const r of rows) {
+      const b = ui(this.add.image(l.x(0), l.y(r.y), ssBtn(this, r.dark, 300, r.h)).setDisplaySize(l.u(300), l.u(r.h)).setInteractive({ useHandCursor: true }));
+      const live = !!r.sub;
+      const lab = ui(ssTxt(this, l.x(0), l.y(r.y - (live ? 9 : 0)), r.label, l.u(16), r.dark ? '#9fb0e8' : BTN_INK()).setOrigin(0.5));
+      lab.rowY = r.y;
+      if (r.sub !== undefined) {
+        // a slot for live information (campaign progress, friends online):
+        // hidden and empty until there is something to say
+        const sub = ui(ssTxt(this, l.x(0), l.y(r.y + 13), r.sub, l.u(10), r.dark ? '#5a6390' : BTN_INK2(), 'italic').setOrigin(0.5).setVisible(live));
+        this.rowSubs[r.key] = sub;
+      }
+      if (r.key) { this.rowBtns[r.key] = b; this.rowLabels[r.key] = lab; }
+      if (r.key === 'versus') {
+        // the door's word lost its U+2694 emoji in the 9/10 sweep — small drawn
+        // blades flank the label instead, the versus wordmark's own treatment.
+        // They ride the label through every reflow (layoutMenu, setRowSub).
+        lab.vsGlyphs = [-1, 1].map((sgn) => ui(this.add.image(l.x(0) + sgn * (lab.width / 2 + l.u(15)), l.y(r.y), vsSwordsTex(this))
+          .setDisplaySize(l.u(14), l.u(14)).setAlpha(0.9)));
+      }
+      this.menuRows.push({ key: r.key, b, lab, sub: this.rowSubs[r.key] });
+      b.on('pointerdown', () => { if (this.busy() || (r.key === 'campaign' && !this.campAlive)) return; SFX.ensure(); this.bloomBtn = b; r.fn(); });
+      b.on('pointerover', () => b.setScale(b.scaleX * 1.03, b.scaleY * 1.03));
+      b.on('pointerout', () => b.setDisplaySize(l.u(300), l.u(r.h)));
+    }
+    /* the column owns its shape (v0.51.0): the rows that stand are laid 68
+       apart, centred on the band's middle (522) — three rows read 454..590,
+       two read 488..556, and no gap is ever left where a hidden door
+       would be. Four rows (v0.68.0: ENDLESS joined the column) tighten to
+       62 apart — 429..615 — so the foot still clears the meadow's grass.
+       `snap` skips the glide (first paint, any change under a
+       veil); a live change slides the meadow's furniture, never jumps it. */
+    this.layoutMenu = (snap) => {
+      const vis = this.menuRows.filter((m) => m.b.visible);
+      const gap = vis.length >= 4 ? 62 : 68;
+      let ry = 522 - (vis.length - 1) * gap / 2;
+      for (const m of vis) {
+        m.lab.rowY = ry;
+        const lift = m.sub && m.sub.visible ? 9 : 0;
+        const move = [[m.b, l.y(ry)], [m.lab, l.y(ry - lift)]];
+        if (m.lab.vsGlyphs) for (const g of m.lab.vsGlyphs) move.push([g, l.y(ry - lift)]);
+        if (m.sub) move.push([m.sub, l.y(ry + 13)]);
+        for (const [o, ty] of move) {
+          this.tweens.killTweensOf(o);
+          if (snap || Math.abs(o.y - ty) < 0.5) o.setY(ty);
+          else this.tweens.add({ targets: o, y: ty, duration: 220, ease: 'Sine.easeInOut' });
+        }
+        ry += gap;
+      }
+    };
+    /* set (or clear) a row's live sub-line. The label re-centres when the
+       line is empty and lifts 9 when one is live; `snap` skips the glide
+       (first paint, the wake path under a veil). */
+    this.setRowSub = (key, text, color, snap) => {
+      const sub = this.rowSubs[key], lab = this.rowLabels[key];
+      if (!sub || !sub.active || !lab || !lab.active) return;
+      const live = !!text;
+      sub.setText(text || '');
+      if (color) sub.setColor(color);
+      sub.setVisible(live);
+      const ty = l.y(lab.rowY - (live ? 9 : 0));
+      for (const o of [lab, ...(lab.vsGlyphs || [])]) {
+        this.tweens.killTweensOf(o);
+        if (snap || Math.abs(o.y - ty) < 0.5) o.setY(ty);
+        else this.tweens.add({ targets: o, y: ty, duration: 200, ease: 'Sine.easeInOut' });
+      }
+    };
+    /* the CONTINUE GAME door re-reads the checkpoint: alive (full dress,
+       hand cursor, live progress line) or NOT RENDERED AT ALL (v0.51.0 —
+       the grey dead dress retired; the column reflows). Called on first
+       paint, on every return from a battle (a win or loss clears the
+       checkpoint → the door goes) and after a restart wipes it. visible is
+       the state's carrier here because the intro and the wake path restore
+       every ui item's ALPHA to baseAlpha — a hidden door must stay hidden
+       through both. */
+    this.campAlive = cr.alive;
+    this.refreshCampDoor = (snap) => {
+      const b = this.rowBtns.campaign, lab = this.rowLabels.campaign, sub = this.rowSubs.campaign;
+      if (!b || !b.active || !lab || !lab.active) return;
+      const r = this.campRow();
+      this.campAlive = r.alive;
+      lab.setText(r.label);
+      this.tweens.killTweensOf(b);
+      b.setDisplaySize(l.u(300), l.u(58));
+      if (r.alive) {
+        b.setVisible(true).setInteractive({ useHandCursor: true });
+        lab.setVisible(true);
+        b.setAlpha(b.baseAlpha = 1); lab.setAlpha(lab.baseAlpha = 1);
+        if (sub) { sub.setText(r.sub); sub.setVisible(!!r.sub); }
+      } else {
+        b.setVisible(false).disableInteractive();
+        lab.setVisible(false);
+        b.setAlpha(b.baseAlpha = 1); lab.setAlpha(lab.baseAlpha = 1);
+        if (sub) { sub.setText(''); sub.setVisible(false); }
+      }
+      this.layoutMenu(snap);
+    };
+    /* the ENDLESS door re-reads its own state — a battle just left ends or
+       suspends a climb, and the sub-line must follow (the door itself is
+       always rendered; only its line changes) */
+    this.refreshEndDoor = (snap) => {
+      this.setRowSub('endless', this.endRow(), BTN_INK2(), snap);
+    };
+    this.refreshCampDoor(true);
+    // Profile chip — the stargazer's name, up in the corner on the same line as
+    // every other scene's back link. Long or non-Latin names are trimmed to the
+    // chip rather than sized to it, so the pill keeps one baked texture.
+    const CW = 152, CH = 30;
+    const chip = this.profileChip = ui(this.add.image(l.x(195), l.y(26), ssBtn(this, true, CW, CH))
+      .setDisplaySize(l.u(CW), l.u(CH)).setOrigin(1, 0.5).setInteractive({ useHandCursor: true }));
+    const chipT = ui(ssTxt(this, l.x(195 - CW / 2), l.y(26), '✦ ' + SSNET.myName(), l.u(11), '#9fb0e8').setOrigin(0.5));
+    let nm = SSNET.myName();
+    while (chipT.width > l.u(CW - 18) && nm.length > 2) { nm = nm.slice(0, -1); chipT.setText('✦ ' + nm + '…'); }
+    chip.on('pointerdown', () => { if (this.busy()) return; SFX.ensure(); SFX.ui(); this.scene.start('profile'); });
+    chip.on('pointerover', () => chip.setScale(chip.scaleX * 1.04, chip.scaleY * 1.04));
+    chip.on('pointerout', () => chip.setDisplaySize(l.u(CW), l.u(CH)));
+    /* The star-rating pill that hung beneath the chip left the meadow in
+       v0.78.0 (Skylar 9/2: "get rid of the rating button and the text
+       underneath it") — the chip stands alone, and the rating lives on
+       inside the profile (its line, the rating card, the veil toggle). */
+
+    // Daily hunt herald — a small red chip in the top-left corner, counting
+    // tonight's sky down second by second. Alive while the hunt is unplayed
+    // (ember glow breathing behind it), quiet with a ✓ once you've hunted.
+    // Tapping it opens the daily pre-screen, same door as the old button.
+    const DW = 108, DH = 26;
+    this.dailyGlow = ui(this.add.image(l.x(-195 + DW / 2), l.y(26), 'glowbig')
+      .setDisplaySize(l.u(DW * 1.8), l.u(62)).setTint(0xff5e4d).setAlpha(0.13).setBlendMode('ADD'));
+    const dchip = this.dailyChipB = ui(this.add.image(l.x(-195), l.y(26), 'chipred')
+      .setDisplaySize(l.u(DW), l.u(DH)).setOrigin(0, 0.5).setInteractive({ useHandCursor: true }));
+    this.dailyChipT = ui(ssTxt(this, l.x(-195 + DW / 2), l.y(26), '', l.u(10.5), '#ffe2c9').setOrigin(0.5)
+      .setShadow(0, l.u(1), 'rgba(40,4,10,0.8)', l.u(1.5)));
+    dchip.on('pointerdown', () => { if (this.busy()) return; SFX.ensure(); this.dailySheet(); });
+    dchip.on('pointerover', () => dchip.setScale(dchip.scaleX * 1.05, dchip.scaleY * 1.05));
+    dchip.on('pointerout', () => dchip.setDisplaySize(l.u(DW), l.u(DH)));
+    this.tweens.add({ targets: this.dailyGlow, alpha: 0.05, duration: 1100, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+
+    /* The streak lantern hung beside the herald here from v0.39.0 until
+       v0.86.0 (Skylar: "just remove the lantern"). The streak itself keeps
+       counting underneath — the engine, the grace night, the marks and the
+       ceremony all stand; its sheet now opens from the daily sheet's own
+       streak/grace lines. */
+    this.updateDailyChip();
+
+    // the VERSUS door knows who's waiting behind it: with friends online a
+    // gold sub-line counts them (live from the presence layer); with none,
+    // the label sits alone, centred (v0.46.0 — the old flavour line is gone)
+    if (this.frOff) this.frOff();
+    this.frOff = SSNET.FR.on((FR) => {
+      const n = FR.onlineCount();
+      this.setRowSub('versus', n > 0 ? SS_T('vsFriendsOn', n) : '', '#ffe9a8');
+    });
+    this.events.once('shutdown', () => { if (this.frOff) { this.frOff(); this.frOff = null; } });
+
+    /* ---------- THE DUEL STRIP (9/8 card 04, Skylar) ----------
+       The ongoing duels, at the bottom of the home screen: one quiet row per
+       standing game — friend and worldwide, one system — whose turn it is
+       told honestly. A your-move row CALLS (gold name, breathing blades —
+       unopened mail); a their-move row waits; a decided one asks to be read;
+       a summons still out says so. Tap a row → straight into the duel; ✕ →
+       the confirmed abandon (a rated loss once words were exchanged, per
+       the 9/8 stamp — a duel nobody answered is simply taken back). With
+       nothing ongoing the strip is NOTHING: no header, no ghost chrome —
+       the meadow keeps its calm. Rows rebuild only when the truth changes;
+       repeat-forever breathers are killed before every rebuild (the
+       orphan-tween law); the band lies under the deepest menu column
+       (foot 644) and clear of the version line (784). */
+    this.duelC = ui(this.add.container(0, 0));
+    this.duelKey = '';
+    this.duelTweens = [];
+    this.refreshDuelStrip = () => {
+      if (!this.duelC || !this.duelC.scene || this.ftueBare) return;
+      const rows = (typeof vsGameRows === 'function' && SSNET.mode !== 'local') ? vsGameRows().slice(0, 5) : [];
+      const key = JSON.stringify(rows.map((r) => r.kind + r.code + r.name));
+      if (key === this.duelKey) return;
+      this.duelKey = key;
+      for (const tw of this.duelTweens) tw.remove();
+      this.duelTweens = [];
+      this.duelC.removeAll(true);
+      this.duelRows = [];
+      if (!rows.length) return;
+      // bottom-anchored, but held clear of the version footer (y784): the
+      // last row sits at 744, so five rows run 648…744 — above the footer and
+      // below the deepest door column
+      const sp = rows.length >= 5 ? 24 : rows.length === 4 ? 28 : 30;
+      const y0 = 744 - (rows.length - 1) * sp;
+      rows.forEach((r, i) => {
+        const y = l.y(y0 + i * sp);
+        const items = [];
+        const glyph = this.add.image(l.x(-168), y, vsSwordsTex(this)).setDisplaySize(l.u(16), l.u(16)).setAlpha(r.kind === 'move' ? 1 : 0.55);
+        items.push(glyph);
+        const nm = ssTxt(this, l.x(-152), y, r.name, l.u(11.5), r.kind === 'move' ? '#ffe9a8' : r.kind === 'done' ? '#f0e8d2' : '#a9a99a').setOrigin(0, 0.5);
+        while (nm.width > l.u(118) && nm.text.length > 2) nm.setText(nm.text.slice(0, -2) + '…');
+        items.push(nm);
+        const status = r.kind === 'move' ? SS_T('vsYourMove') : r.kind === 'theirs' ? SS_T('vsTheirMove', r.name)
+          : r.kind === 'done' ? SS_T('vsPendDone') : r.kind === 'declined' ? SS_T('vsDeclined', r.name)
+            : SS_T(r.p && r.p.away ? 'vsWaitAway' : r.p && r.p.busy ? 'vsWaitBusy' : 'vsWaitAnswer', r.name);
+        const st = ssTxt(this, l.x(-26), y, status, l.u(9), r.kind === 'move' ? '#ffd77a' : r.kind === 'done' ? '#d8c98f' : '#5a6390', 'italic').setOrigin(0, 0.5);
+        while (st.width > l.u(168) && st.text.length > 4) st.setText(st.text.slice(0, -2) + '…');
+        items.push(st);
+        // the call: a your-move row breathes — quiet, but unmistakably mail
+        if (r.kind === 'move' && !ssReduceMotion()) {
+          this.duelTweens.push(this.tweens.add({ targets: [glyph, st], alpha: 0.55, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' }));
+        }
+        const row = { kind: r.kind, code: r.code, name: r.name, nameT: nm, statusT: st };
+        if (r.kind === 'declined' || r.kind === 'wait') {
+          const xb = ssTxt(this, l.x(176), y, '✕', l.u(12), '#8a94c4').setOrigin(0.5).setInteractive({ useHandCursor: true });
+          ssHitPad(xb, 30);
+          xb.on('pointerdown', () => {
+            if (this.busy() || this.ascending) return;
+            SFX.ensure(); SFX.ui();
+            vsAbandonNow(r, null, false);
+            this.refreshDuelStrip();
+          });
+          items.push(xb);
+          row.cancel = xb;
+        } else {
+          items.push(ssTxt(this, l.x(152), y, '›', l.u(14), r.kind === 'move' ? '#ffd77a' : '#8a94c4').setOrigin(0.5));
+          const zone = this.add.zone(l.x(-24), y, l.u(300), l.u(sp)).setOrigin(0.5).setInteractive({ useHandCursor: true });
+          zone.on('pointerdown', () => {
+            if (this.busy() || this.ascending) return;
+            SFX.ensure(); SFX.ui();
+            this.scene.start('vsbattle', { code: r.code });
+          });
+          items.push(zone);
+          row.zone = zone;
+          if (r.kind !== 'done') {
+            const ab = ssTxt(this, l.x(176), y, '✕', l.u(12), '#39406b').setOrigin(0.5).setInteractive({ useHandCursor: true });
+            ssHitPad(ab, 30);
+            ab.on('pointerdown', () => {
+              if (this.busy() || this.ascending) return;
+              SFX.ensure(); SFX.ui();
+              vsAbandon(this, r, () => { this.duelKey = ''; this.refreshDuelStrip(); });
+            });
+            items.push(ab);
+            row.abandon = ab;
+          }
+        }
+        this.duelRows.push(row);
+        this.duelC.add(items);
+      });
+    };
+    this.refreshDuelStrip();
+    this.time.addEvent({ delay: 1000, loop: true, callback: () => { if (!this.ascending) this.refreshDuelStrip(); } });
+
+    /* the footer's one small door (v0.96.0 — Skylar, 9/10: "move the
+       languages, version and sound into one small settings button"). The
+       three quiet targets that lived on this band — 🔊 mute left, 🌐
+       language right, the version line centre — folded into one drawn gear;
+       their surfaces live on inside settingsSheet(). Bottom-RIGHT corner
+       since v0.98.1 (Skylar, 9/15) — the exact seat the old 🌐 held
+       (right edge at x 195), clear of the duel strip's last row at y744. */
+    this.setB = ui(this.add.image(l.x(185), l.y(784), ssGearTex(this))
+      .setDisplaySize(l.u(20), l.u(20)).setAlpha(0.7).setInteractive({ useHandCursor: true }));
+    this.setB.on('pointerdown', () => this.settingsSheet());
+    DIAG('meadow ui built ' + Math.round(performance.now() - tUi) + 'ms');
+  }
+
+  /* ---------- the opening: born at the zenith (cold boot only) ----------
+     The first thing a player ever sees is the top of the sky — deep twilight,
+     the aurora, the dense star field, shooting stars — then the wordmark
+     condenses out of stardust and the whole column settles down into the
+     meadow: the intro IS the home scene arriving, not a page before it.
+     Always tappable-through — one tap settles straight onto the grass (the
+     listener is armed a beat late via delayedCall: the v0.3.3 lesson, a
+     listener added during a dispatch sees the tap that created it).
+     prefers-reduced-motion swaps the flight for a veil fade on the grass.
+     No new assets: every texture here already exists for the ascent. */
+  playIntro(l) {
+    INTRO_SEEN = true;
+    this.buildMeadowUi(l);
+    if (ssReduceMotion()) {
+      // gentle: open on the grass under a lifting veil. introPlaying never
+      // sticks on this path, so create() starts the crickets as usual.
+      DIAG('intro: reduce-motion → veil fade');
+      const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setScrollFactor(0).setDepth(650);
+      this.tweens.add({ targets: veil, alpha: 0, duration: 700, onComplete: () => veil.destroy() });
+      window.__ssintro = 'reduced';
+      return;
+    }
+    try {
+      this.introPlaying = true;
+      this.introFx = [];              // landing flourishes; finish() sweeps them
+      window.__ssintro = 'playing';   // headless verification reads this
+      DIAG('intro begin');
+      // the meadow ui waits at alpha 0 for the camera to come down
+      for (const o of this.uiItems) { this.tweens.killTweensOf(o); o.setAlpha(0); }
+      this.sky.grain.setVisible(false);          // never during a flight
+      // a shade below the true zenith: the violet dusk band peeks in at the
+      // bottom edge — deeper twilight than the battle sky's flat navy, and a
+      // hint that there is a world below to settle into
+      this.introP = 0.92;
+      this.sky.setP(this.introP, 0);
+      // wordmark + halo, fixed to the camera at the zenith; they fade on the
+      // way down and hand off to the real title waiting in the meadow
+      const tk = ssTitleTex(this);
+      const tScale = Math.min(1, 384 / tk.w);
+      const t = this.add.image(l.W / 2, l.H * 0.4, tk.key)
+        .setDisplaySize(l.u(tk.w * tScale), l.u(tk.h * tScale)).setScrollFactor(0).setDepth(610).setAlpha(0);
+      const bs = { sx: t.scaleX, sy: t.scaleY };
+      t.setScale(bs.sx * 1.12, bs.sy * 1.12);
+      const glow = this.add.image(t.x, t.y, 'glowbig').setScale(l.u(2.1)).setTint(0xf3e5b4)
+        .setBlendMode('ADD').setScrollFactor(0).setDepth(605).setAlpha(0);
+      const em = this.add.particles(0, 0, 'dot', {
+        speed: { min: 6, max: 46 }, lifespan: { min: 500, max: 1100 }, gravityY: -14,
+        scale: { start: 0.5, end: 0 }, alpha: { start: 0.85, end: 0 },
+        blendMode: 'ADD', tint: [0xf3e5b4, 0xffe9c9, 0xcfd8ff], emitting: false,
+      }).setScrollFactor(0).setDepth(612);
+      // fade up from black — the page was black a moment ago; meet it there
+      const bootVeil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setScrollFactor(0).setDepth(650);
+      this.tweens.add({ targets: bootVeil, alpha: 0, duration: 450, onComplete: () => bootVeil.destroy() });
+
+      const timers = [];
+      const at = (ms, fn) => timers.push(this.time.delayedCall(ms, fn));
+      const finish = (skipped) => {
+        if (!this.introPlaying) return;
+        this.introPlaying = false;
+        for (const tm of timers) tm.remove(false);
+        if (this.introSkipFn) { this.input.off('pointerdown', this.introSkipFn); this.introSkipFn = null; }
+        this.tweens.killTweensOf([t, glow]);
+        for (const fx of this.introFx) if (fx && fx.active) { this.tweens.killTweensOf(fx); fx.destroy(); }
+        this.introFx = [];
+        t.destroy(); glow.destroy(); em.destroy();
+        this.sky.setP(0, 0);
+        this.sky.grain.setVisible(true);
+        for (const o of this.uiItems) { this.tweens.killTweensOf(o); o.setAlpha(o.baseAlpha); }
+        this.idleTweens();
+        SFX.crickets(!this.isDawn); SFX.birds(this.isDawn);
+        window.__ssintro = skipped ? 'skipped' : 'done';
+        DIAG('intro ' + (skipped ? 'SKIPPED' : 'done'));
+      };
+      // the pan down into the meadow — the sky settling IS the scene change.
+      // Re-entrant on purpose: a skip mid-glide re-calls it with a short ms to
+      // accelerate from wherever introP currently is.
+      const settle = (ms, skipped) => {
+        if (this.introGlide) { this.introGlide.stop(); this.introGlide = null; }
+        this.tweens.killTweensOf([t, glow]);
+        this.tweens.add({ targets: [t, glow], alpha: 0, duration: Math.min(500, ms * 0.55), delay: ms * 0.2 });
+        // the meadow's own wordmark (and its sparkles) wake ahead of the rest:
+        // the zenith word dissolves while this one comes up, so the title reads
+        // as riding the descent down rather than cutting from one to the other
+        const early = new Set([this.titleT, ...(this.sparkles || [])]);
+        for (const o of this.uiItems) { this.tweens.killTweensOf(o); this.tweens.add({ targets: o, alpha: o.baseAlpha, duration: 450, delay: Math.max(0, ms - (early.has(o) ? 690 : 420)) }); }
+        this.introGlide = this.tweens.addCounter({
+          from: this.introP, to: 0, duration: ms, ease: 'Cubic.easeInOut',
+          onUpdate: (tw) => { this.introP = tw.getValue(); this.sky.setP(this.introP, 0); },
+          onComplete: () => finish(skipped),
+        });
+      };
+      // the show, beats overlapping like weather: a star streaks while the boot
+      // veil is still lifting, the word condenses and LANDS (scale settles with
+      // a Back overshoot into a swell of light and kicked stardust), a second
+      // star crosses the landing itself, and the descent begins on the
+      // landing's afterglow — no beat waits for the last one to end
+      at(200, () => ssShootingStar(this));
+      at(320, () => {
+        if (!this.introPlaying) return;
+        this.tweens.add({ targets: glow, alpha: 0.32, duration: 550, yoyo: true, hold: 200 });
+        this.tweens.add({ targets: t, alpha: 1, duration: 750, ease: 'Sine.easeOut' });
+        this.tweens.add({
+          targets: t, scaleX: bs.sx, scaleY: bs.sy, duration: 950, ease: 'Back.easeOut',
+          onComplete: () => {
+            // the landing: the halo swells, a ring of light blooms outward,
+            // stardust kicks up from the word's baseline
+            if (!this.introPlaying) return;
+            this.tweens.killTweensOf(glow);
+            this.tweens.add({
+              targets: glow, alpha: 0.5, duration: 150, yoyo: true,
+              onComplete: () => { if (this.introPlaying) this.tweens.add({ targets: glow, alpha: 0.18, duration: 450 }); },
+            });
+            const ring = this.add.image(t.x, t.y, 'glowbig').setScale(l.u(0.9)).setTint(0xffe9c9)
+              .setBlendMode('ADD').setScrollFactor(0).setDepth(604).setAlpha(0.3);
+            this.introFx.push(ring);
+            this.tweens.add({ targets: ring, scale: l.u(3.1), alpha: 0, duration: 420, ease: 'Sine.easeOut', onComplete: () => { if (ring.active) ring.destroy(); } });
+            const rb = t.getBounds();
+            for (let k = 0; k < 18; k++) em.emitParticleAt(rb.x + Math.random() * rb.width, rb.y + rb.height * (0.72 + Math.random() * 0.3));
+          },
+        });
+        const b = t.getBounds();
+        for (let k = 0; k < 42; k++) em.emitParticleAt(b.x + Math.random() * b.width, b.y + b.height * 0.2 + Math.random() * b.height * 0.6);
+      });
+      at(1000, () => ssShootingStar(this));
+      at(1350, () => settle(1000, false));
+      at(300, () => {
+        if (!this.introPlaying) return;
+        this.input.on('pointerdown', this.introSkipFn = () => {
+          if (!this.introPlaying) return;
+          for (const tm of timers) tm.remove(false);
+          settle(Math.max(240, 340 * this.introP), true);
+        });
+      });
+    } catch (e) {
+      // the opening must never strand the player above their own meadow
+      DIAG('intro FALLBACK: ' + (e && e.message || '?'));
+      this.introPlaying = false;
+      this.sky.setP(0, 0);
+      this.sky.grain.setVisible(true);
+      for (const o of this.uiItems) { this.tweens.killTweensOf(o); o.setAlpha(o.baseAlpha); }
+      this.idleTweens();
+    }
+  }
+  /* ---------- THE FIRST OPEN (v0.75.0, Skylar 9/2) ----------
+     "The game needs to open up with its default Starspell logo and general
+     main menu screen, except with no UI. Then it needs to flow upwards
+     just like it does when you start a new campaign. However there are no
+     UI prompts for which Horoscope to pick… You are just transported up
+     and put into a game."
+     Every piece is the game's own move: the wordless meadow is
+     buildMeadowUi minus its chrome (ftueBare), the open is playIntro over
+     it, the rise is beginAscent. The first game is a QUICK run —
+     pickerless by nature, no checkpoint, no lantern debt — and unsigned:
+     which mode it is stays invisible, and it is exactly the game the
+     meadow's own doors offer tomorrow. */
+  ftueOpen(l, intro) {
+    this.ftueBare = true;                 // buildMeadowUi builds bare; onWake restarts on it
+    DIAG('ftue: first open');
+    window.__ssftue.state = 'open';
+    if (intro) this.playIntro(l);         // the default cinematic, over the bare meadow
+    else this.buildMeadowUi(l);           // a mid-open restart: no second cinematic
+    /* the rise follows the open by itself — nobody is asked to tap. A poll,
+       not a hook: one waiter covers the settle, a tap-skip, the
+       reduce-motion veil AND the intro's own catch-fallback. */
+    this.ftueWait = this.time.addEvent({
+      delay: 350, loop: true, callback: () => {
+        if (this.introPlaying || this.ascending || this.descending || this.arrived) return;
+        if (this.ftueWait) { this.ftueWait.remove(false); this.ftueWait = null; }
+        this.time.delayedCall(850, () => this.ftueRise());
+      },
+    });
+  }
+  ftueRise() {
+    if (!this.ftueBare || this.ascending || this.arrived || !this.scene.isActive()) return;
+    if (this.busy()) { this.time.delayedCall(400, () => this.ftueRise()); return; }
+    DIAG('ftue: rise');
+    window.__ssftue.state = 'rise';
+    this.beginAscent({ mode: 'quick', resume: null, ascended: true, ftue: 1 });
+  }
+
+  // Subtitle under DAILY HUNT. Unplayed, it invites and shows how long the sky
+  // stays up; played, it shows today's score and when the next one lands.
+  // the herald's second-by-second clock; also flips the chip between its
+  // alive (unplayed — ember glow) and quiet (✓ hunted) dress
+  updateDailyChip() {
+    if (this.dailyChipT && this.dailyChipT.active) {
+      const played = !!SS.prof.daily[String(SSNET.dayKey())];
+      this.dailyChipT.setText((played ? '✓ ' : '☀ ') + ssClock(SSNET.msToNextDay()));
+      if (this.dailyGlow && this.dailyGlow.active) this.dailyGlow.setVisible(!played);
+    }
+  }
+  /* ---------- THE MARKS: the lantern grows ----------
+     Crossing 7 / 30 / 100 nights re-dresses the lamp, and a change that big
+     is not allowed to happen behind the player's back. `streak.pend` carries
+     the earned mark from the battle that earned it all the way to the grass —
+     it survives an app closed on the end screen, which is exactly where a
+     player who just finished a hunt tends to close it.
+     The beat waits for a meadow that is standing still: the ascent and the
+     descent own the camera and every ui alpha for their duration, and a sheet
+     open over the grass owns the player's attention. */
+  milestoneCheck() {
+    const m = SS.prof.streak.pend | 0;
+    if (!m || !SS_MS_ACH[m] || this.riteC) return;
+    if (this.riteTimer) { this.riteTimer.remove(false); this.riteTimer = null; }
+    let tries = 0;
+    const settled = () => !this.busy() && !this.streakC && !this.dailyC && !this.langC
+      && !this.setC && !this.mapC && !this.confirmC && !this.signC;
+    const armed = () => {
+      if (!this.scene.isActive()) return;
+      if (settled()) { this.riteTimer = null; this.milestoneRite(m); return; }
+      if (++tries > 40) { this.riteTimer = null; return; }   // ~16s of grass, then let it lie for next time
+      this.riteTimer = this.time.delayedCall(400, armed);
+    };
+    this.riteTimer = this.time.delayedCall(700, armed);
+  }
+  /* THE DRIP'S SAFETY NET. The end screen says a discovery out loud the
+     moment it happens, but a player can leave before it does — tap NEW RUN on
+     the beat, close the app on the end window, or abandon a run whose last
+     word finished a condition. Anything still in `pend` is therefore said on
+     the grass instead, on the same terms as the lantern's ceremony: it waits
+     for a meadow that is standing still, and it never cuts in front of a mark
+     (riteTimer/riteC are part of `settled`, so the lamp's rite goes first). */
+  sigilNotice() {
+    if (this.sigTimer || !ssSigilPending().length) return;
+    let tries = 0;
+    const settled = () => !this.busy() && !this.riteC && !this.riteTimer && !this.streakC
+      && !this.dailyC && !this.langC && !this.setC && !this.mapC && !this.confirmC && !this.signC;
+    const armed = () => {
+      if (!this.scene.isActive()) return;
+      const pend = ssSigilPending();
+      if (!pend.length) { this.sigTimer = null; return; }
+      if (settled()) { this.sigTimer = null; ssSigilAnnounce(this, pend); return; }
+      if (++tries > 60) { this.sigTimer = null; return; }   // ~24s, then let it lie for next time
+      this.sigTimer = this.time.delayedCall(400, armed);
+    };
+    this.sigTimer = this.time.delayedCall(900, armed);
+  }
+  /* A sign level earned in a run whose end screen was never seen is said on
+     the grass instead (v0.69.0) — the same settled terms as the sigil
+     notice, with the sigil queue going FIRST (ssSigilPending in `settled`
+     keeps this one waiting while discoveries still stand). ack is spent as
+     the rite shows, so this can never repeat an end screen's ceremony. */
+  signNotice() {
+    if (this.signLvTimer || !ssSignPending().length) return;
+    let tries = 0;
+    const settled = () => !this.busy() && !this.riteC && !this.riteTimer && !this.streakC
+      && !this.dailyC && !this.langC && !this.setC && !this.mapC && !this.confirmC && !this.signC
+      && !SS_RITE.busy && !ssSigilPending().length;
+    const armed = () => {
+      if (!this.scene.isActive()) return;
+      if (!ssSignPending().length) { this.signLvTimer = null; return; }
+      if (settled()) {
+        this.signLvTimer = null;
+        const say = () => {
+          if (!this.scene.isActive() || SS_RITE.busy) return;
+          const u = ssSignPending()[0];
+          if (u) ssSignRite(this, SS_ZODIAC_BY[u.id], u.lv, say);
+        };
+        say();
+        return;
+      }
+      if (++tries > 60) { this.signLvTimer = null; return; }   // ~24s, then let it lie for next time
+      this.signLvTimer = this.time.delayedCall(400, armed);
+    };
+    this.signLvTimer = this.time.delayedCall(1300, armed);
+  }
+  milestoneRite(m) {
+    if (this.riteC) return;
+    const copy = ssMarkCopy(m);
+    const tier = SS_MILESTONES.indexOf(m) + 1;
+    // spend the mark the moment it is honoured, not when it is scheduled — an
+    // app closed mid-wait must still get its ceremony on the next visit
+    SS.prof.streak.pend = 0; SS.save();
+    const l = ssLayout(this);
+    const c = this.riteC = this.add.container(0, 0).setDepth(660);
+    let done = false;
+    const close = () => {
+      if (done) return;
+      done = true;
+      this.tweens.add({
+        targets: c, alpha: 0, duration: 520, ease: 'Sine.easeIn',
+        onComplete: () => { if (this.riteC === c) this.riteC = null; c.destroy(); },
+      });
+    };
+
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H)
+      .setScrollFactor(0).setAlpha(0).setInteractive();
+    veil.on('pointerdown', () => { SFX.ui(); close(); });
+    // deep, like the sigil pick — anything lighter and the meadow's own gold
+    // buttons keep reading THROUGH the ceremony and the words land on them
+    this.tweens.add({ targets: veil, alpha: 0.9, duration: 420 });
+    c.add(veil);
+
+    // the forge/award language: the anvil chime, then the award arpeggio
+    SFX.ensure(); SFX.forge();
+    this.time.delayedCall(360, () => { if (SFX.ok) SFX.ach(); });
+
+    // the lamp, in its new dress, rising out of the dark at the sky's middle
+    const LS = 3.4, ly = 288;
+    const glow = this.add.image(l.x(0), l.y(ly), 'glowbig').setDisplaySize(l.u(60), l.u(60))
+      .setTint(tier >= 2 ? 0xffd77a : 0xffb457).setAlpha(0).setBlendMode('ADD').setScrollFactor(0);
+    const lamp = this.add.image(l.x(0), l.y(ly), SS_LANTERN_TEX[tier + 1])
+      .setDisplaySize(l.u(SS_LANTERN_W * LS * 0.6), l.u(SS_LANTERN_H * LS * 0.6))
+      .setAlpha(0).setScrollFactor(0);
+    c.add([glow, lamp]);
+    this.tweens.add({ targets: lamp, alpha: 1, duration: 620, ease: 'Cubic.easeOut' });
+    this.tweens.add({
+      targets: lamp, displayWidth: l.u(SS_LANTERN_W * LS), displayHeight: l.u(SS_LANTERN_H * LS),
+      duration: 760, ease: 'Back.easeOut',
+    });
+    this.tweens.add({
+      targets: glow, alpha: 0.34, displayWidth: l.u(250), displayHeight: l.u(250), duration: 760, ease: 'Cubic.easeOut',
+      onComplete: () => { if (glow.active) this.tweens.add({ targets: glow, alpha: 0.16, duration: 1500, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' }); },
+    });
+    // the number, riding in the pane the way it does on the meadow
+    const nT = ssTxt(this, l.x(0), l.y(ly + SS_LANTERN_TY * LS), String(SS.prof.streak.n | 0), l.u(30), '#3a2408').setOrigin(0.5).setScrollFactor(0).setAlpha(0);
+    let fs = 30;
+    while (nT.width > l.u(12.5 * LS) && fs > 11) { fs -= 2; nT.setFontSize(l.u(fs)); }
+    c.add(nT);
+    this.tweens.add({ targets: nT, alpha: 1, duration: 500, delay: 300 });
+
+    // sparks off the glass — the forge's own particles
+    if (!ssReduceMotion()) {
+      const em = this.add.particles(0, 0, 'dot', {
+        speed: { min: 20, max: 190 }, lifespan: { min: 700, max: 1700 }, gravityY: -26,
+        scale: { start: 0.7, end: 0 }, alpha: { start: 0.95, end: 0 },
+        blendMode: 'ADD', tint: [0xffd77a, 0xfff2c9, 0xffb457], emitting: false,
+      }).setScrollFactor(0);
+      c.add(em);
+      const burst = (n2) => { for (let k = 0; k < n2; k++) em.emitParticleAt(l.x(0) + (Math.random() - 0.5) * l.u(52), l.y(ly) + (Math.random() - 0.5) * l.u(60)); };
+      this.time.delayedCall(220, () => { if (em.active) burst(38); });
+      this.time.delayedCall(700, () => { if (em.active) burst(22); });
+      if (tier >= 3) this.time.delayedCall(1150, () => { if (em.active) burst(26); });
+    }
+
+    // the words
+    const head = ssTxt(this, l.x(0), l.y(452), SS_T('stkMsHead'), l.u(12), '#c9b676').setOrigin(0.5).setScrollFactor(0).setAlpha(0);
+    const gk = ssGoldTex(this, copy.name, 26);
+    const gsc = Math.min(1, 330 / gk.w);
+    const name = this.add.image(l.x(0), l.y(494), gk.key).setDisplaySize(l.u(gk.w * gsc), l.u(gk.h * gsc)).setScrollFactor(0).setAlpha(0);
+    const sub = ssTxt(this, l.x(0), l.y(534), copy.sub, l.u(12), '#ffe9a8', 'italic').setOrigin(0.5).setScrollFactor(0).setAlpha(0);
+    const hint = ssTxt(this, l.x(0), l.y(596), SS_T('inspSub'), l.u(9.5), '#8a94c4', 'italic').setOrigin(0.5).setScrollFactor(0).setAlpha(0);
+    c.add([head, name, sub, hint]);
+    [[head, 620], [name, 800], [sub, 1060], [hint, 1600]].forEach(([o, d]) => {
+      o.y += l.u(10);
+      this.tweens.add({ targets: o, y: o.y - l.u(10), alpha: o === hint ? 0.85 : 1, duration: 420, delay: d, ease: 'Cubic.easeOut' });
+    });
+
+    ssHealBlankTexts(this, 'lantern-rite');
+    // it holds long enough to be read, then lets the meadow back
+    this.time.delayedCall(5200, close);
+    this.events.once('shutdown', () => { if (this.riteC === c) this.riteC = null; });
+  }
+
+  /* ---------- THE LANTERN SHEET ----------
+     The streak's own story, opened from the daily sheet's streak/grace lines
+     (the meadow lamp that used to open it left in v0.86.0): the lantern at
+     whatever size it has grown to, the number of nights, THE WEEK STRIP —
+     the last seven nights as small rings, lit ✓, grace ◌, dark for a miss —
+     and the plain truth about the grace night. The daily is still one tap
+     away at the bottom. */
+  streakSheet() {
+    if (this.busy() || this.streakC || this.dailyC || this.langC || this.setC || this.mapC || this.confirmC || this.signC || this.riteC) return;
+    SFX.ensure(); SFX.ui();
+    const l = ssLayout(this);
+    const c = this.streakC = this.add.container(0, 0).setDepth(700);
+    const closeSheet = () => {
+      if (this.streakC !== c) return;
+      this.streakC = null;
+      c.destroy();
+    };
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setInteractive();
+    this.tweens.add({ targets: veil, alpha: 0.72, duration: 220 });
+    veil.on('pointerdown', () => { SFX.ui(); closeSheet(); });
+    c.add(veil);
+
+    const PH = 486, top = 400 - PH / 2;
+    const py = (d) => l.y(top + d);
+    /* One ordered list, because z-order here is the halo BEHIND the lamp and
+       the rings ABOVE the window. Anything that owns its own alpha (the
+       breathing halo, tonight's pulsing ring) is flagged __fx and skipped by
+       the entrance tween — a fade-to-1 over one of those kills the repeating
+       yoyo the moment it starts. */
+    const items = [];
+    const fx = (o) => { o.__fx = true; return o; };
+    const win = this.add.image(l.x(0), py(PH / 2), 'endpanel').setDisplaySize(l.u(340), l.u(PH)).setInteractive();
+    items.push(win);
+    const xB = ssTxt(this, l.x(148), py(26), '✕', l.u(15), '#8a94c4').setOrigin(0.5).setInteractive({ useHandCursor: true });
+    xB.on('pointerdown', () => { SFX.ui(); closeSheet(); });
+    items.push(xB);
+
+    const st = ssStreakState();
+    const n = st.n, tier = ssLanternTier(n);
+    const hk = ssGoldTex(this, SS_T('stkSheet'), 19);
+    const hsc = Math.min(1, 276 / hk.w);
+    items.push(this.add.image(l.x(0), py(42), hk.key).setDisplaySize(l.u(hk.w * hsc), l.u(hk.h * hsc)));
+
+    // the lamp itself, at twice its corner size — this is the one screen where
+    // the thing the player built is allowed to be the subject
+    if (n >= 1) {
+      const gl = this.add.image(l.x(0), py(108), 'glowbig').setDisplaySize(l.u(160), l.u(160))
+        .setTint(tier >= 2 ? 0xffd77a : 0xffb457).setAlpha(0).setBlendMode('ADD');
+      items.push(fx(gl));
+      this.tweens.add({ targets: gl, alpha: 0.2, duration: 500, onComplete: () => {
+        if (gl.active) this.tweens.add({ targets: gl, alpha: 0.09, duration: 1700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      } });
+    }
+    const LS = 2;
+    const lamp = this.add.image(l.x(0), py(108), SS_LANTERN_TEX[tier + 1])
+      .setDisplaySize(l.u(SS_LANTERN_W * LS), l.u(SS_LANTERN_H * LS)).setAlpha(n >= 1 ? 1 : 0.82);
+    items.push(lamp);
+    if (n >= 2) {
+      const cT = ssTxt(this, l.x(0), py(108 + SS_LANTERN_TY * LS), String(n), l.u(24), '#3a2408').setOrigin(0.5);
+      let fs = 24;
+      while (cT.width > l.u(12.5 * LS) && fs > 9) { fs -= 1.5; cT.setFontSize(l.u(fs)); }
+      items.push(cT);
+    }
+
+    // the count, in the same words the end screen and the daily sheet use
+    items.push(ssTxt(this, l.x(0), py(176), n >= 1 ? '🔥 ' + SS_T('stkNight', n) : SS_T('stkCold'),
+      l.u(n >= 1 ? 16 : 14), n >= 1 ? '#ffb457' : '#5a6390', n >= 1 ? null : 'italic').setOrigin(0.5)
+      .setShadow(0, 0, n >= 1 ? '#a8520d' : 'rgba(0,0,0,0)', l.u(n >= 1 ? 9 : 0), true, true));
+    if (n < 1) items.push(ssTxt(this, l.x(0), py(198), SS_T('stkColdSub'), l.u(10.5), '#8a94c4', 'italic').setOrigin(0.5));
+    else if (SS.prof.streak.best > n) items.push(ssTxt(this, l.x(0), py(198), SS_T('stkBest', SS.prof.streak.best | 0), l.u(10), '#8a94c4', 'italic').setOrigin(0.5));
+
+    items.push(this.add.rectangle(l.x(0), py(216), l.u(288), Math.max(1, l.u(1)), 0xc9a84c, 0.35));
+
+    // ---- THE WEEK STRIP: the last seven nights, oldest first ----
+    items.push(ssTxt(this, l.x(0), py(236), SS_T('stkWeekHead'), l.u(10.5), '#c9b676').setOrigin(0.5));
+    const week = ssStreakWeek();
+    const RY = 268, RR = 11, GAP = 41;
+    week.forEach((d, i) => {
+      const x = l.x((i - 3) * GAP), y = py(RY);
+      const g = this.add.graphics({ x, y });
+      if (d.state === 'lit') {
+        // a night that was hunted: a warm disc with a gold rim, and a tick
+        g.fillStyle(0xffb457, 0.9); g.fillCircle(0, 0, l.u(RR - 1));
+        g.lineStyle(l.u(1.6), 0xffe9a8, 1); g.strokeCircle(0, 0, l.u(RR));
+        items.push(g, ssTxt(this, x, y, '✓', l.u(11), '#3a2408').setOrigin(0.5, 0.55));
+      } else if (d.state === 'grace') {
+        // THE GRACE NIGHT, owned up to: a dashed ring, hollow where a hunt
+        // should have been. Twelve arcs with twelve gaps.
+        g.lineStyle(l.u(1.7), 0xffb457, 0.95);
+        for (let k = 0; k < 12; k++) {
+          const a0 = (k / 12) * Math.PI * 2, a1 = a0 + (Math.PI * 2 / 12) * 0.55;
+          g.beginPath(); g.arc(0, 0, l.u(RR), a0, a1); g.strokePath();
+        }
+        items.push(g, ssTxt(this, x, y, '◌', l.u(11), '#ffb457').setOrigin(0.5, 0.52).setAlpha(0.95));
+      } else if (d.state === 'open') {
+        // tonight, still unhunted — the one ring the player can still change
+        g.lineStyle(l.u(1.5), 0xffb457, 0.55); g.strokeCircle(0, 0, l.u(RR));
+        items.push(fx(g));
+        this.tweens.add({ targets: g, alpha: 0.35, duration: 1200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      } else {
+        g.lineStyle(l.u(1.4), 0x39406b, 1); g.strokeCircle(0, 0, l.u(RR));
+        items.push(g);
+      }
+      // the date under each ring — digits read in every language
+      items.push(ssTxt(this, x, py(RY + 20), String(d.k % 100), l.u(9),
+        d.state === 'lit' || d.state === 'grace' ? '#c9b676' : '#4a5480').setOrigin(0.5));
+    });
+    items.push(ssTxt(this, l.x(0), py(RY + 40), SS_T('stkLegend'), l.u(8.5), '#5a6390', 'italic').setOrigin(0.5));
+
+    items.push(this.add.rectangle(l.x(0), py(340), l.u(288), Math.max(1, l.u(1)), 0xc9a84c, 0.35));
+
+    // ---- the grace night, said plainly ----
+    const gr = ssGraceLine(st);
+    items.push(ssTxt(this, l.x(0), py(360), gr.text, l.u(11), gr.color).setOrigin(0.5)
+      .setShadow(0, 0, gr.glow || 'rgba(0,0,0,0)', l.u(gr.glow ? 6 : 0), true, true));
+    // ---- the next mark ----
+    const next = SS_MILESTONES.find((m) => m > n);
+    if (next) items.push(ssTxt(this, l.x(0), py(382), SS_T('stkNextMark', next), l.u(10), '#8a94c4', 'italic').setOrigin(0.5));
+    else items.push(ssTxt(this, l.x(0), py(382), SS_T('stkMs100'), l.u(10), '#ffd77a', 'italic').setOrigin(0.5));
+
+    // ---- the door the lamp used to be ----
+    const played = !!SS.prof.daily[String(SSNET.dayKey())];
+    const pb = this.add.image(l.x(0), py(434), ssBtn(this, false, 240, 52)).setDisplaySize(l.u(240), l.u(52)).setInteractive({ useHandCursor: true });
+    const pbT = ssTxt(this, l.x(0), py(434), SS_T(played ? 'dpAgain' : 'dpPlay'), l.u(15), BTN_INK()).setOrigin(0.5);
+    items.push(pb, pbT);
+    pb.on('pointerover', () => pb.setScale(pb.scaleX * 1.03, pb.scaleY * 1.03));
+    pb.on('pointerout', () => pb.setDisplaySize(l.u(240), l.u(52)));
+    pb.on('pointerdown', () => { if (this.busy()) return; SFX.ui(); closeSheet(); this.dailySheet(); });
+
+    c.add(items);
+    // the week strip is a dozen small Texts on one screen — exactly the shape
+    // that lost a bake on Wyatt's phone in v0.38.0 (see ssHealBlankTexts)
+    ssHealBlankTexts(this, 'lantern-sheet');
+    // entrance: the same settle-up the daily notice board uses
+    const rise = items.filter((it) => !it.__fx);
+    rise.forEach((it) => { it.__a = it.alpha; it.y += l.u(14); it.alpha = 0; });
+    rise.forEach((it) => this.tweens.add({ targets: it, y: it.y - l.u(14), alpha: it.__a, duration: 300, ease: 'Back.easeOut' }));
+  }
+  // the language sheet — a parchment list of native names. Picking one rewrites
+  // ?lang= and reloads: strings.js saves the choice, and every string plus the
+  // baked wordmark texture re-render in the new language. Rewriting the URL
+  // (rather than only saving) matters because a ?lang= already in the address
+  // would out-rank the saved preference on the next load.
+  langSheet() {
+    if (this.busy() || this.langC || this.setC || this.dailyC || this.mapC || this.confirmC || this.signC || this.streakC || this.riteC) return;
+    SFX.ensure(); SFX.ui();
+    const l = ssLayout(this);
+    const c = this.langC = this.add.container(0, 0).setDepth(700);
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0.55).setInteractive();
+    veil.on('pointerdown', () => { c.destroy(); this.langC = null; });
+    const keys = Object.keys(SS_STR);
+    const rowH = 30, ph = keys.length * rowH + 34;
+    c.add(veil);
+    c.add(this.add.image(l.x(0), l.y(400), 'panel').setDisplaySize(l.u(232), l.u(ph)));
+    keys.forEach((k, i) => {
+      const y = 400 - ph / 2 + 32 + i * rowH;
+      const cur = k === SS_LANG;
+      const t = ssTxt(this, l.x(0), l.y(y), (cur ? '✦  ' : '') + (SS_LANGS[k] || k) + (cur ? '  ✦' : ''),
+        l.u(15), cur ? '#8a6210' : '#4a3305').setOrigin(0.5).setInteractive({ useHandCursor: true });
+      t.on('pointerdown', () => {
+        SFX.ui();
+        // this reload is navigation, not a fresh visit — don't replay the intro
+        try { sessionStorage.setItem('beta3.skipIntro', '1'); } catch (e) { }
+        const u = new URL(location.href);
+        u.searchParams.set('lang', k);
+        location.replace(u.toString());
+      });
+      c.add(t);
+    });
+  }
+  /* ---------- the settings sheet (v0.96.0) ----------
+     Skylar (9/10): "Bottom of the home screen move the languages, version
+     and sound into one small settings button." The meadow's foot keeps one
+     drawn-gear door; this small sheet is where the three retired footer
+     surfaces live now: the sound toggle (the same SFX singleton —
+     setMuted writes beta3.mute itself), the language row (the parchment
+     langSheet itself, unforked — this sheet steps aside and it opens),
+     and the version line at the foot, its ' · offline' suffix rule intact. */
+  settingsSheet() {
+    if (this.busy() || this.setC || this.langC || this.dailyC || this.mapC || this.confirmC || this.signC || this.streakC || this.riteC) return;
+    SFX.ensure(); SFX.ui();
+    const l = ssLayout(this);
+    const c = this.setC = this.add.container(0, 0).setDepth(700);
+    const closeSheet = () => {
+      if (this.setC !== c) return;
+      this.setC = null;
+      c.destroy();
+    };
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setInteractive();
+    this.tweens.add({ targets: veil, alpha: 0.66, duration: 200 });
+    veil.on('pointerdown', () => { SFX.ui(); closeSheet(); });
+    c.add(veil);
+    const PH = 248, top = 400 - PH / 2;
+    const items = [];
+    // the window swallows its own taps so a press inside never falls through
+    items.push(this.add.image(l.x(0), l.y(400), 'endpanel').setDisplaySize(l.u(300), l.u(PH)).setInteractive());
+    const xB = ssTxt(this, l.x(128), l.y(top + 28), '✕', l.u(15), '#8a94c4').setOrigin(0.5).setInteractive({ useHandCursor: true });
+    xB.on('pointerdown', () => { SFX.ui(); closeSheet(); });
+    items.push(xB);
+    const tk = ssGoldTex(this, SS_T('setTitle'), 17);
+    const tsc = Math.min(1, 220 / tk.w);
+    items.push(this.add.image(l.x(0), l.y(top + 34), tk.key).setDisplaySize(l.u(tk.w * tsc), l.u(tk.h * tsc)));
+    // one row, one truth: the label left, the live state right, the whole
+    // band tappable (44-pt law rides the zone's setInteractive)
+    const row = (y, label, valueT, fn) => {
+      items.push(ssTxt(this, l.x(-124), l.y(y), label, l.u(13.5), '#f0e8d2').setOrigin(0, 0.5));
+      const z = this.add.zone(l.x(0), l.y(y), l.u(280), l.u(46)).setOrigin(0.5).setInteractive({ useHandCursor: true });
+      z.on('pointerdown', fn);
+      items.push(valueT, z);
+      return z;
+    };
+    // sound — the glyph IS the state, exactly as the old footer told it
+    const sndT = ssTxt(this, l.x(124), l.y(top + 96), SFX.muted ? '🔇' : '🔊', l.u(14)).setOrigin(1, 0.5);
+    c.sndT = sndT;
+    c.sndZone = row(top + 96, SS_T('setSound'), sndT, () => {
+      SFX.ensure(); SFX.setMuted(!SFX.muted);
+      sndT.setText(SFX.muted ? '🔇' : '🔊');
+    });
+    // language — the current tongue's own name points at the picker
+    const lnT = ssTxt(this, l.x(124), l.y(top + 148), (SS_LANGS[SS_LANG] || SS_LANG) + '  ›', l.u(12), '#c9b676').setOrigin(1, 0.5);
+    c.langZone = row(top + 148, SS_T('setLang'), lnT, () => {
+      closeSheet();
+      this.langSheet();
+    });
+    // the version line, quiet at the sheet's foot
+    c.verT = ssTxt(this, l.x(0), l.y(top + PH - 26), BUILD + ' · Corkscrew Games' + (SSNET.mode === 'local' ? ' · offline' : ''), l.u(9), '#5a6390').setOrigin(0.5);
+    items.push(c.verT);
+    c.add(items);
+    items.forEach((it) => { it.y += l.u(12); it.alpha = 0; });
+    this.tweens.add({ targets: items, y: '-=' + l.u(12), alpha: 1, duration: 260, ease: 'Back.easeOut' });
+  }
+  /* ---------- the daily pre-screen ----------
+     Tapping DAILY opens tonight's notice board instead of dropping straight
+     into the game: today's top hunters (live from RTDB), the reset countdown
+     ticking in seconds, whether you've already hunted, your completion streak,
+     and one big PLAY that rides the full ascent. This is also the home of the
+     daily-challenge leaderboard — everyone on it completed today's sky. (A
+     separate "completed the daily" board would list the same names: the score
+     list IS the completion list, and RTDB prunes past days, so the streak
+     shown here is the player's own, kept in the local profile log.) */
+  dailySheet() {
+    if (this.busy() || this.dailyC || this.langC || this.setC || this.mapC || this.confirmC || this.signC || this.streakC || this.riteC) return;
+    SFX.ensure(); SFX.ui();
+    const l = ssLayout(this);
+    const c = this.dailyC = this.add.container(0, 0).setDepth(700);
+    let tick = null;
+    const closeSheet = () => {
+      if (this.dailyC !== c) return;
+      this.dailyC = null;
+      if (tick) { tick.remove(false); tick = null; }
+      c.destroy();
+    };
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setInteractive();
+    this.tweens.add({ targets: veil, alpha: 0.72, duration: 220 });
+    veil.on('pointerdown', () => { SFX.ui(); closeSheet(); });
+    c.add(veil);
+
+    // 560 → 616 for THE SKY BAND (v0.108.0): top 92, foot 708 — inside every
+    // proven inset band; everything below the countdown's rule rides +56
+    const PH = 616, top = 400 - PH / 2;
+    const py = (d) => l.y(top + d);
+    const items = [];
+    // the window swallows its own taps so a press inside never falls through to the veil
+    const win = this.add.image(l.x(0), py(PH / 2), 'endpanel').setDisplaySize(l.u(372), l.u(PH)).setInteractive();
+    items.push(win);
+    const xB = ssTxt(this, l.x(164), py(28), '✕', l.u(15), '#8a94c4').setOrigin(0.5).setInteractive({ useHandCursor: true });
+    xB.on('pointerdown', () => { SFX.ui(); closeSheet(); });
+    items.push(xB);
+
+    // header: the hunt's name in gold, tonight's date, the shared-sky line
+    const hk = ssGoldTex(this, '☀ ' + SS_T('daily'), 21);
+    const hsc = Math.min(1, 300 / hk.w);
+    items.push(this.add.image(l.x(0), py(46), hk.key).setDisplaySize(l.u(hk.w * hsc), l.u(hk.h * hsc)));
+    items.push(ssTxt(this, l.x(0), py(76), SSNET.dayKeyISO() + ' · ' + SS_T('dpOneSky'), l.u(11), '#8a94c4', 'italic').setOrigin(0.5));
+    const cdT = ssTxt(this, l.x(0), py(98), '', l.u(12), '#c9b676').setOrigin(0.5);
+    // The countdown IS the streak's clock once a flame stands and tonight is
+    // still unhunted — same seconds, but they now measure something you own.
+    // Once you've hunted (or have no flame to lose) it goes back to heralding
+    // the next sky.
+    const tickCd = () => {
+      if (!cdT.active) return;
+      const cd = ssCountdownLive(SSNET.msToNextDay());
+      const atRisk = ssStreakCount() >= 1 && !SS.prof.daily[String(SSNET.dayKey())];
+      cdT.setText(atRisk ? '🔥 ' + SS_T('stkKeep', cd) : '☾ ' + SS_T('lbNewSky', cd));
+      cdT.setColor(atRisk ? '#ffb457' : '#c9b676');
+    };
+    tickCd();
+    tick = this.time.addEvent({ delay: 1000, loop: true, callback: tickCd });
+    items.push(cdT);
+    const rule = (d) => items.push(this.add.rectangle(l.x(0), py(d), l.u(316), Math.max(1, l.u(1)), 0xc9a84c, 0.35));
+    rule(116);
+
+    /* THE SKY BAND (v0.108.0, the seven-skies spine): tonight's rule as
+       furniture between the countdown and your standing — the sky's drawn
+       glyph · its name in gold · its one-line law · THE WEEK'S RUNG, seven
+       ember pips filled to tonight's height, so the climb itself reads at a
+       glance. A day whose sky card has not shipped speaks the classic words
+       (the stock hunt's name + the shared-sky line) — never an unbuilt
+       sky's promise. */
+    const sky = ssSkyToday();
+    const rung = ssSkyWeekday(SSNET.dayKey());
+    items.push(this.add.image(l.x(0), py(152), ssSkyBandTex(this)).setDisplaySize(l.u(316), l.u(56)));
+    items.push(this.add.image(l.x(-134), py(152), ssSkyGlyphTex(this, sky)).setDisplaySize(l.u(30), l.u(30)));
+    const bandName = ssTxt(this, l.x(-112), py(141), sky ? SS_T(sky.nameKey) : SS_T('daily'), l.u(11.5), '#ffe9a8')
+      .setOrigin(0, 0.5).setLetterSpacing(l.u(1));
+    if (bandName.width > l.u(172)) bandName.setScale(l.u(172) / bandName.width);
+    items.push(bandName);
+    // the one-liner wraps the safe way — single-line children only (the
+    // one-line-per-text law: an italic multi-line bake goes blank on iOS) —
+    // and never past TWO lines: a long law steps down the ladder until it
+    // fits the band (the seven real one-liners run to ~90 chars ×5 tongues)
+    let bandLine = null;
+    for (const fs of [9, 8, 7.2]) {
+      if (bandLine) bandLine.destroy();
+      bandLine = ssTextBlock(this, l.x(-112), py(161), sky ? SS_T(sky.lineKey) : SS_T('dpOneSky'), {
+        fontSize: l.u(fs), color: '#c9b676', fontStyle: 'italic',
+        wrapW: l.u(172), lineSpacing: l.u(2), align: 'left', ox: 0, oy: 0.5,
+      });
+      if (bandLine.lines.length <= 2) break;
+    }
+    items.push(bandLine);
+    for (let i = 0; i < 7; i++) {
+      items.push(this.add.image(l.x(73 + i * 11), py(146), 'dot').setDisplaySize(l.u(6.5), l.u(6.5))
+        .setTint(i < rung ? 0xffb457 : 0x2a3160));
+    }
+    items.push(ssTxt(this, l.x(106), py(158), SS_T('skyRung', rung), l.u(7.5), '#8a94c4')
+      .setOrigin(0.5).setLetterSpacing(l.u(0.8)));
+
+    // your standing under today's sky
+    const played = SS.prof.daily[String(SSNET.dayKey())] | 0;
+    items.push(ssTxt(this, l.x(0), py(196), played ? SS_T('dpPlayed', played) : SS_T('dpAwait'),
+      l.u(13.5), played ? '#f0e8d2' : '#ffe9a8').setOrigin(0.5)
+      .setShadow(0, 0, played ? 'rgba(0,0,0,0.45)' : '#c9b676', l.u(played ? 2 : 8), true, true));
+    // the lantern's own number, in the same words the end screen uses, and —
+    // when there is anything to say — where the grace night stands. Tapping
+    // either opens the lantern sheet, where the week of nights is drawn.
+    const sState = ssStreakState();
+    const streak = sState.n;
+    if (streak >= 2) {
+      items.push(ssTxt(this, l.x(0), py(214), '🔥 ' + SS_T('stkNight', streak), l.u(11), '#ffb457').setOrigin(0.5)
+        .setShadow(0, 0, '#a8520d', l.u(6), true, true));
+    }
+    if (streak >= 1 || !sState.held) {
+      const gl = ssGraceLine(sState);
+      const gT = ssTxt(this, l.x(0), py(streak >= 2 ? 232 : 220), gl.text, l.u(9.5), gl.color, 'italic')
+        .setOrigin(0.5).setInteractive({ useHandCursor: true });
+      gT.on('pointerdown', () => { SFX.ui(); closeSheet(); this.streakSheet(); });
+      items.push(gT);
+    }
+    rule(246);
+
+    // today's board — live from RTDB while the sheet stands open
+    items.push(ssTxt(this, l.x(0), py(262), '— ' + SS_T('dpTop') + ' —', l.u(12), '#c9b676').setOrigin(0.5));
+    const loadT = ssTxt(this, l.x(0), py(356), SS_T('lbLoading'), l.u(11.5), '#5a6390', 'italic').setOrigin(0.5);
+    items.push(loadT);
+    SSNET.getBoard('daily', ssGameLang()).then((b) => {
+      if (this.dailyC !== c || !this.scene.isActive()) return;
+      loadT.destroy();
+      const meId = SSNET.uid();
+      const rows = [];
+      if (!b.rows.length) {
+        rows.push(ssTxt(this, l.x(0), py(356), SS_T('lbEmpty'), l.u(11.5), '#5a6390', 'italic').setOrigin(0.5));
+      }
+      b.rows.slice(0, 6).forEach((r, i) => {
+        const y = py(286 + i * 34);
+        const me = r.id === meId;
+        if (me) rows.push(this.add.rectangle(l.x(0), y, l.u(324), l.u(28), 0xd7b45c, 0.13));
+        if (i < 3) {
+          rows.push(this.add.image(l.x(-146), y, ssMedalTex(this, i)).setDisplaySize(l.u(24), l.u(24)));
+          rows.push(ssTxt(this, l.x(-146), y, String(i + 1), l.u(12), SS_MEDAL_INK[i]).setOrigin(0.5, 0.52));
+        } else {
+          rows.push(ssTxt(this, l.x(-146), y, '#' + (i + 1), l.u(11), '#8a94c4').setOrigin(0.5));
+        }
+        const nm = ssTxt(this, l.x(-124), y, r.name, l.u(12.5), me ? '#ffe9a8' : '#e8e0c8').setOrigin(0, 0.5)
+          .setInteractive({ useHandCursor: true });
+        while (nm.width > l.u(190) && nm.text.length > 2) nm.setText(nm.text.slice(0, -2) + '…');
+        nm.on('pointerdown', () => ssRatingCard(this, r.ghost ? { name: r.name, rating: r.rating, rhide: r.rhide } : { uid: r.id, name: r.name }));
+        rows.push(nm);
+        rows.push(ssTxt(this, l.x(146), y, String(r.score), l.u(13), me ? '#ffe9a8' : '#d8d2bd').setOrigin(1, 0.5));
+      });
+      if (b.me >= 0) {
+        const mine = b.me >= 6 && b.rows[b.me]
+          ? '#' + (b.me + 1) + ' · ' + b.rows[b.me].name + ' · ' + b.rows[b.me].score + '   ·   '
+          : '';
+        rows.push(ssTxt(this, l.x(0), py(494), mine + SS_T('lbYouRank', b.me + 1, b.total), l.u(11), '#ffd77a').setOrigin(0.5));
+      }
+      rows.forEach((o, i) => { o.alpha = 0; this.tweens.add({ targets: o, alpha: 1, duration: 260, delay: i * 24 }); });
+      c.add(rows);
+    }).catch(() => { });
+
+    // the big door: PLAY — closes the sheet and rides the ascent
+    const pb = this.add.image(l.x(0), py(548), ssBtn(this, false, 260, 58)).setDisplaySize(l.u(260), l.u(58)).setInteractive({ useHandCursor: true });
+    const pbT = ssTxt(this, l.x(0), py(548), played ? SS_T('dpAgain') : SS_T('dpPlay'), l.u(17), BTN_INK()).setOrigin(0.5);
+    items.push(pb, pbT);
+    pb.on('pointerover', () => pb.setScale(pb.scaleX * 1.03, pb.scaleY * 1.03));
+    pb.on('pointerout', () => pb.setDisplaySize(l.u(260), l.u(58)));
+    pb.on('pointerdown', () => {
+      if (this.busy()) return;
+      SFX.ui();
+      closeSheet();
+      this.bloomBtn = this.dailyChipB;   // the corner chip blooms as we lift off
+      this.startMode('daily');
+    });
+
+    c.add(items);
+    // entrance: the notice board settles up into place like the end-run window
+    items.forEach((it) => { it.y += l.u(14); it.alpha = 0; });
+    this.tweens.add({ targets: items, y: '-=' + l.u(14), alpha: 1, duration: 300, ease: 'Back.easeOut' });
+  }
+
+  /* ---------- the campaign map sheet ----------
+     The campaign's only door: CAMPAIGN/CONTINUE opens the star chart over the
+     meadow — the whole climb laid out, the checkpoint breathing — and tapping
+     the glowing constellation closes the sheet and rides the full ascent into
+     that fight. Fresh campaigns enter the same way, at the first node. */
+  mapSheet() {
+    if (this.busy() || this.mapC || this.dailyC || this.langC || this.setC || this.confirmC || this.signC) return;
+    SFX.ensure(); SFX.ui();
+    const c = this.mapC = this.add.container(0, 0).setDepth(700);
+    const closeSheet = () => {
+      if (this.mapC !== c) return;
+      this.mapC = null;
+      c.destroy();
+    };
+    const ck = this.campaignCheckpoint();
+    const chart = ssStarChart(this, {
+      door: 'home',
+      fightIdx: ck ? ck.fightIdx : 0,
+      onEnter: () => {
+        closeSheet();
+        this.bloomBtn = this.rowBtns && this.rowBtns.campaign;
+        this.startMode('campaign');
+      },
+      onClose: () => { SFX.ui(); closeSheet(); },
+    });
+    c.add(chart.c);
+    // the sky owns the whole screen; it fades up and the camera ride inside
+    // it opens on the summit — the entrance IS the ride, no sliding sheet
+    chart.c.alpha = 0;
+    this.tweens.add({ targets: chart.c, alpha: 1, duration: 240 });
+  }
+
+  /* NEW CAMPAIGN — with a checkpoint standing, warn first (v0.47.0, Wyatt's
+     words): "This will restart your current campaign in progress." BACK
+     dismisses to the meadow with nothing lost; NEW wipes the checkpoint and
+     runs the normal fresh-campaign flow, sign choice included. With no
+     checkpoint there is nothing to lose: it is simply the door. */
+  newCampaign() {
+    if (this.busy() || this.mapC || this.dailyC || this.langC || this.setC || this.confirmC || this.signC) return;
+    const ck = this.campaignCheckpoint();
+    // no checkpoint → nothing to abandon: wipe any half-made choice (a rolled
+    // roster, a pinned sign never entered) and offer the stars afresh
+    if (!ck) { ssClearCampaign(); this.signSheet(); return; }
+    SFX.ensure(); SFX.ui();
+    const l = ssLayout(this);
+    const c = this.confirmC = this.add.container(0, 0).setDepth(720);
+    const closeSheet = () => {
+      if (this.confirmC !== c) return;
+      this.confirmC = null;
+      c.destroy();
+    };
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setInteractive();
+    this.tweens.add({ targets: veil, alpha: 0.66, duration: 200 });
+    veil.on('pointerdown', () => { SFX.ui(); closeSheet(); });
+    c.add(veil);
+    const items = [];
+    items.push(this.add.image(l.x(0), l.y(400), 'endpanel').setDisplaySize(l.u(336), l.u(272)).setInteractive());
+    const tk = ssGoldTex(this, SS_T('restartTitle'), 17);
+    const tsc = Math.min(1, 280 / tk.w);
+    items.push(this.add.image(l.x(0), l.y(304), tk.key).setDisplaySize(l.u(tk.w * tsc), l.u(tk.h * tsc)));
+    items.push(ssTextBlock(this, l.x(0), l.y(352), SS_T('restartBody'), {
+      fontSize: l.u(12) + 'px', color: '#c9c3ae', fontStyle: 'italic', shadow: true,
+      wrapW: l.u(280), align: 'center', ox: 0.5, oy: 0.5,
+    }));
+    // where the climb stands, so the player knows exactly what NEW costs
+    items.push(ssTxt(this, l.x(0), l.y(388), SS_ACT_N(SS_ACTS[ck.actIdx]).split('·')[0].trim() + '  ·  ' + SS_T('fightN', ck.fightIdx % 5 + 1), l.u(10.5), '#8a94c4', 'italic').setOrigin(0.5));
+    // BACK wears the gold — restarting a climb should never be the brightest
+    // thing on screen
+    const backB = this.add.image(l.x(0), l.y(438), ssBtn(this, false, 250, 50)).setDisplaySize(l.u(250), l.u(50)).setInteractive({ useHandCursor: true });
+    const backT = ssTxt(this, l.x(0), l.y(438), SS_T('restartBack'), l.u(15), BTN_INK()).setOrigin(0.5);
+    const newB = this.add.image(l.x(0), l.y(492), ssBtn(this, true, 250, 40)).setDisplaySize(l.u(250), l.u(40)).setInteractive({ useHandCursor: true });
+    const newT = ssTxt(this, l.x(0), l.y(492), SS_T('restartNew'), l.u(13), '#e6a2a2').setOrigin(0.5);
+    items.push(backB, backT, newB, newT);
+    backB.on('pointerdown', () => { SFX.ui(); closeSheet(); });
+    newB.on('pointerdown', () => {
+      SFX.ui();
+      ssClearCampaign();          // the old climb is gone — the door greys
+      this.refreshCampDoor();
+      closeSheet();
+      this.signSheet();           // the fresh climb opens under fresh stars
+    });
+    c.add(items);
+    items.forEach((it) => { it.y += l.u(12); it.alpha = 0; });
+    this.tweens.add({ targets: items, y: '-=' + l.u(12), alpha: 1, duration: 260, ease: 'Back.easeOut' });
+  }
+
+  /* The campaign's front door. A standing checkpoint (or an already-answered
+     picker — sign chosen, map opened, fight not yet entered) goes straight to
+     the chart; a truly fresh campaign asks the stars first. */
+  campaignDoor() {
+    if (!this.campaignCheckpoint()) return;   // the door is dead without a climb to continue
+    this.mapSheet();
+  }
+
+  /* ---------- THE ENDLESS DOOR (v0.68.0) ----------
+     One door for the whole mode: a standing climb opens a small sheet —
+     CONTINUE THE CLIMB (the ladder holds its level, sigils, clock) or
+     BEGIN A NEW CLIMB (the sheet IS the warning: the standing level is
+     named on it) — and with nothing standing it goes straight to the
+     sign picker, zodiac powers applying to endless exactly as they do
+     to the campaign. */
+  endlessCheckpoint() {
+    let ck = null;
+    try { ck = JSON.parse(localStorage.getItem('beta3.endless')); } catch (e) { return null; }
+    if (!ck || typeof ck !== 'object' || typeof ck.fightIdx !== 'number' || !(ck.fightIdx >= 0) || !Number.isFinite(ck.eseed)) return null;
+    return ck;
+  }
+  endlessDoor() {
+    if (this.busy() || this.mapC || this.dailyC || this.langC || this.setC || this.confirmC || this.signC) return;
+    const ck = this.endlessCheckpoint();
+    // nothing standing: wipe any half-made choice (a pinned sign never
+    // entered) and ask the stars afresh
+    if (!ck) { ssClearEndless(); this.signSheet('endless'); return; }
+    SFX.ensure(); SFX.ui();
+    const l = ssLayout(this);
+    const c = this.confirmC = this.add.container(0, 0).setDepth(720);
+    const closeSheet = () => {
+      if (this.confirmC !== c) return;
+      this.confirmC = null;
+      c.destroy();
+    };
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setInteractive();
+    this.tweens.add({ targets: veil, alpha: 0.66, duration: 200 });
+    veil.on('pointerdown', () => { SFX.ui(); closeSheet(); });
+    c.add(veil);
+    const items = [];
+    items.push(this.add.image(l.x(0), l.y(400), 'endpanel').setDisplaySize(l.u(336), l.u(272)).setInteractive());
+    const tk = ssGoldTex(this, SS_T('endlessTitle'), 17);
+    const tsc = Math.min(1, 280 / tk.w);
+    items.push(this.add.image(l.x(0), l.y(304), tk.key).setDisplaySize(l.u(tk.w * tsc), l.u(tk.h * tsc)));
+    items.push(ssTextBlock(this, l.x(0), l.y(352), SS_T('endStands', (ck.fightIdx | 0) + 1), {
+      fontSize: l.u(12) + 'px', color: '#c9c3ae', fontStyle: 'italic', shadow: true,
+      wrapW: l.u(280), align: 'center', ox: 0.5, oy: 0.5,
+    }));
+    // where the climb stands, in the ledger's own voice
+    items.push(ssTxt(this, l.x(0), l.y(388), '✦ ' + SS_T('endLvl', (ck.fightIdx | 0) + 1) + ' ✦', l.u(10.5), '#8a94c4', 'italic').setOrigin(0.5));
+    // CONTINUE wears the gold — abandoning a climb should never be the
+    // brightest thing on screen (the restart sheet's own law)
+    const contB = this.add.image(l.x(0), l.y(438), ssBtn(this, false, 250, 50)).setDisplaySize(l.u(250), l.u(50)).setInteractive({ useHandCursor: true });
+    const contT = ssTxt(this, l.x(0), l.y(438), SS_T('endContBtn'), l.u(14), BTN_INK()).setOrigin(0.5);
+    if (contT.width > l.u(226)) contT.setScale(l.u(226) / contT.width);
+    const newB = this.add.image(l.x(0), l.y(492), ssBtn(this, true, 250, 40)).setDisplaySize(l.u(250), l.u(40)).setInteractive({ useHandCursor: true });
+    const newT = ssTxt(this, l.x(0), l.y(492), SS_T('endNewBtn'), l.u(12.5), '#e6a2a2').setOrigin(0.5);
+    if (newT.width > l.u(226)) newT.setScale(l.u(226) / newT.width);
+    items.push(contB, contT, newB, newT);
+    contB.on('pointerdown', () => {
+      SFX.ui();
+      closeSheet();
+      this.bloomBtn = this.rowBtns && this.rowBtns.endless;
+      this.startMode('endless');
+    });
+    newB.on('pointerdown', () => {
+      SFX.ui();
+      ssClearEndless();           // the old climb is gone — the door's line follows
+      this.refreshEndDoor();
+      closeSheet();
+      this.signSheet('endless');  // the fresh climb opens under fresh stars
+    });
+    c.add(items);
+    items.forEach((it) => { it.y += l.u(12); it.alpha = 0; });
+    this.tweens.add({ targets: items, y: '-=' + l.u(12), alpha: 1, duration: 260, ease: 'Back.easeOut' });
+  }
+
+  /* ---------- the zodiac picker: THE CARDS (v0.57.0, Wyatt 8/26) ----------
+     Before a fresh campaign: one full-size card at a time — the sign's name
+     and title, a portrait art region, its power at the card's bottom and
+     the player's record under that sign — with ‹ › arrows in the margins
+     and a real swipe on the card (the neighbor peeks in as you drag, a
+     settle tween finishes the move; wraps at both ends). The FIRST card is
+     THE OPEN SKY, the unsigned classic climb; the twelve follow in
+     SS_ZODIAC order. BEGIN is always live — the card you are looking at IS
+     the choice. Only three card containers ever exist (prev/cur/next),
+     recycled on every move — the Canvas renderer never carries a 13-card
+     stack. The art region asks ssZodArtKey() for `zod_<id>` (the MJ card
+     art, ZODIAC-ART.md) and falls back to the asterism drawn large on a
+     night-sky wash, so the real art drops in per sign with no relayout.
+     The choice is pinned for the whole campaign (beta3.campsign) and
+     cleared with it — and since v0.95.0 ALSO remembered past the campaign
+     in prof (ssRememberSign), so the next fresh climb's deck opens standing
+     on the sign the last one was begun under. */
+  signSheet(forMode) {
+    if (this.busy() || this.signC || this.mapC || this.dailyC || this.langC || this.setC || this.confirmC) return;
+    // the picker serves two climbs (v0.68.0): the campaign pins its sign and
+    // opens the chart; the endless ladder pins its own and rises at once
+    this.signFor = forMode === 'endless' ? 'endless' : 'campaign';
+    SFX.ensure(); SFX.ui();
+    const l = ssLayout(this);
+    const c = this.signC = this.add.container(0, 0).setDepth(700);
+    const closeSheet = () => {
+      if (this.signC !== c) return;
+      this.signC = null;
+      c.destroy();
+    };
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setInteractive();
+    this.tweens.add({ targets: veil, alpha: 0.72, duration: 220 });
+    veil.on('pointerdown', () => { SFX.ui(); closeSheet(); });
+    c.add(veil);
+
+    /* v0.79.0 — the sheet went FULL-BLEED on Skylar's call: the framed
+       window, the CHOOSE YOUR SIGN headline, the subtitle and the pager all
+       died so the card itself can take the whole safe band and the plates
+       can be as big as the phone allows. What lives: the card, the two
+       arrows, BEGIN — and one ✕ riding the card's top corner (the frame
+       that carried it is gone; the veil's margins are gone with it). */
+    const items = [];
+    const xB = ssTxt(this, l.x(182), l.y(44), '✕', l.u(16), '#c3cae6').setOrigin(0.5)
+      .setShadow(0, 0, '#0a0e1f', l.u(7), true, true).setInteractive({ useHandCursor: true });
+    ssHitPad(xB, 48);
+    // it rides the card now, so it closes on the UP under a drag threshold —
+    // a swipe that brushes the corner can never dismiss the sheet
+    let xArm = null;
+    xB.on('pointerdown', (p) => { xArm = { x: p.x, y: p.y }; });
+    xB.on('pointerup', (p) => {
+      if (!xArm) return;
+      const moved = Math.abs(p.x - xArm.x) > l.u(8) || Math.abs(p.y - xArm.y) > l.u(8);
+      xArm = null;
+      if (moved) return;
+      SFX.ui(); closeSheet();
+    });
+    items.push(xB);
+
+    /* the deck: the twelve first, THE OPEN SKY last (Skylar 9/17: a first
+       climb should meet the signs before the unsigned sky — "it should be
+       at the end of all the cards"). Each entry is what a card needs — id,
+       name, title, desc, tint, and the sign (null = open) */
+    const deck = SS_ZODIAC.map((z) => {
+      // the desc speaks at the sign's HELD LEVEL (v0.69.0) — the numbers
+      // on the card are the numbers the climb will pay
+      const t = SS_ZOD(z, ssSignLv(z.id));
+      return { id: z.id, z, name: z.name, title: t.title, desc: t.desc, tint: SS_ELEMENTS[z.el] };
+    }).concat([{ id: 'none', z: null, name: SS_T('zpOpenName'), title: SS_T('zpOpenTitle'), desc: SS_T('zpOpenDesc'), tint: 0xb9c2e6 }]);
+    const N = deck.length;
+    /* geometry (design units): the card IS the sheet now — the full design
+       box less a hair of margin, the arrows and ✕ riding on top of it. The
+       plate cover-fills the whole card (2:3 art scaled to the card's height,
+       the spill either side cropped away); the deck window's mask rounds
+       the corners, so no texture is ever re-baked for the shape. */
+    const CW = 404, CH = 706, CY = 365, STRIDE = 428;
+    const ART_W = CH * (2 / 3);   // the 2:3 plate at cover height
+    const hex = (n) => '#' + ('000000' + n.toString(16)).slice(-6);
+
+    const mkCard = (i) => {
+      const d = deck[((i % N) + N) % N];
+      const k = this.add.container(0, 0);
+      const tint = d.tint;
+      // the dark pane under the plate — it only shows before the art lands
+      // (and through the wash's baked corner cutouts)
+      const g = this.add.graphics();
+      g.fillStyle(0x0a0e1f, 0.9);
+      g.fillRoundedRect(-l.u(CW / 2), -l.u(CH / 2), l.u(CW), l.u(CH), l.u(16));
+      k.add(g);
+      // the art, wall to wall: the plate covers the whole card. Real art is
+      // cover-cropped (height-true, the horizontal spill trimmed by setCrop
+      // so a sliding neighbor never overlaps); the fallback is the sign's
+      // own stars drawn large over the night-sky wash, stretched to fit.
+      const artKey = ssZodArtKey(this, d.id);
+      if (artKey) {
+        const art = this.add.image(0, 0, artKey).setDisplaySize(l.u(ART_W), l.u(CH));
+        const fw = art.frame.realWidth || art.frame.width, fh = art.frame.realHeight || art.frame.height;
+        const cw = fw * (CW / ART_W);
+        art.setCrop((fw - cw) / 2, 0, cw, fh);
+        k.add(art);
+      } else {
+        k.add(this.add.image(0, 0, ssZodSkyTex(this)).setDisplaySize(l.u(CW), l.u(CH)));
+        if (d.z) {
+          k.add(this.add.image(0, -l.u(40), 'glowbig').setDisplaySize(l.u(CW * 1.15), l.u(CH * 0.62)).setTint(tint).setBlendMode('ADD').setAlpha(0.16));
+          k.add(ssZodiacGlyph(this, d.z, l.u(1.2), 0, -l.u(40)));
+        }
+      }
+      // THE OPEN SKY alone comes alive (v0.84.0; its own painted plate
+      // since v0.98.0) — the living layer rides between the plate (painted,
+      // or the zodsky fallback while the webp hasn't landed) and the
+      // reading scrims; sign cards stay dead still either way
+      if (d.id === 'none') k.add(ssOpenSkyAlive(this, l, CW, CH));
+      /* the scrims: a deep foot for the power cluster to read on, a whisper
+         at the crown under the name — baked alpha gradients (one texture,
+         flipped for the crown; setTint stays away, the Canvas law) */
+      k.add(this.add.image(0, l.u(CH / 2), ssZodScrimTex(this)).setOrigin(0.5, 1).setDisplaySize(l.u(CW), l.u(252)));
+      k.add(this.add.image(0, -l.u(CH / 2), ssZodScrimTex(this)).setOrigin(0.5, 0).setDisplaySize(l.u(CW), l.u(148)).setFlipY(true).setAlpha(0.72));
+      // name + title, riding the crown of the plate
+      k.add(ssTxt(this, 0, -l.u(CH / 2 - 40), d.name, l.u(24), hex(tint)).setOrigin(0.5)
+        .setShadow(0, 0, hex(tint), l.u(9), true, true));
+      k.add(ssTxt(this, 0, -l.u(CH / 2 - 72), d.title, l.u(12.5), '#d8d2bd', 'italic').setOrigin(0.5));
+      // the power, at the card's bottom — one Text per line (ssTextBlock),
+      // GENERATED at card build from the def's own dials at the held level
+      // (v0.69.0 no-drift law: a dial that moves reaches the next build)
+      const desc = ssTextBlock(this, 0, l.u(CH / 2 - 106), d.z ? SS_ZOD(d.z, ssSignLv(d.id)).desc : d.desc, {
+        fontSize: l.u(11.5) + 'px', color: '#e6dfc8', fontStyle: 'italic', shadow: true,
+        wrapW: l.u(CW - 56), align: 'center', ox: 0.5, oy: 0,
+      });
+      desc.setData('zodDesc', d.id);
+      k.add(desc);
+      /* the sign's LEVEL + its XP toward the next (v0.69.0) — every sign
+         card, never THE OPEN SKY. Label + thin gold bar centred as one
+         row; at the summit the label wears its crown over a solid bar. */
+      if (d.z) {
+        const lv = ssSignLv(d.id);
+        const srx = SS.prof.signs[d.id];
+        const xp = srx ? (srx.xp | 0) : 0;
+        const atMax = lv >= SS_SIGNLV.max;
+        const frac = atMax ? 1
+          : clamp((xp - SS_SIGNLV.cum[lv]) / Math.max(1, SS_SIGNLV.cum[lv + 1] - SS_SIGNLV.cum[lv]), 0, 1);
+        const ly = l.u(CH / 2 - 46);
+        const lvT = ssTxt(this, 0, ly, atMax ? SS_T('svLevelMax') : SS_T('svLevel', lv), l.u(10.5), '#d7b45c').setOrigin(1, 0.5);
+        if (lvT.width > l.u(120)) lvT.setScale(l.u(120) / lvT.width);
+        const BW = 150, GAP = 10;
+        const lw = (lvT.width * lvT.scaleX) / l.u(1);
+        const left = -(lw + GAP + BW) / 2;
+        lvT.setX(l.u(left + lw));
+        lvT.setData('signLvRow', d.id);
+        const trough = this.add.image(l.u(left + lw + GAP), ly, 'bartrough').setOrigin(0, 0.5).setDisplaySize(l.u(BW), l.u(6.5));
+        const fill = this.add.image(l.u(left + lw + GAP + 1), ly, 'barfill-gold').setOrigin(0, 0.5).setDisplaySize(l.u(BW - 2), l.u(4.5));
+        fill.setCrop(0, 0, fill.frame.width * frac, fill.frame.height);
+        fill.setData('signLvFill', frac);
+        k.add([lvT, trough, fill]);
+      }
+      // the record under this sign, styled in
+      const sr = d.z ? SS.prof.signs[d.id] : null;
+      if (sr && sr.clears > 0) {
+        k.add(ssTxt(this, 0, l.u(CH / 2 - 24), '★ ' + SS_T('zpRec', sr.clears, sr.best), l.u(10.5), '#d7b45c').setOrigin(0.5));
+      }
+      /* HARD MODE's tick box (v0.70.0, Skylar: "under each sign in the new
+         campaign there should be a box that lets you tick off if you want
+         to play that sign in hard mode") — a drawn control in the game's
+         own language, never a browser checkbox. Campaign picker only (the
+         endless ladder accepts the modifier later); remembered PER SIGN in
+         prof.hardPick (THE OPEN SKY keeps its own under 'none'). It sits
+         in the quiet band between the art and the power. The VISUALS live
+         on each card (each shows its own remembered state as the deck
+         turns); the TAP lands on one fixed zone layered over the swipe
+         zone below, because Phaser's topOnly input hands every event to
+         the topmost object — a zone inside the card would never hear it. */
+      if (this.signFor === 'campaign') {
+        const hy = l.u(CH / 2 - 126);
+        const lab = ssTxt(this, 0, hy, SS_T('hardLbl'), l.u(11), '#9aa3cc').setOrigin(0, 0.5).setLetterSpacing(l.u(1));
+        const BOX = 15, GAP2 = 8;
+        const w = BOX + GAP2 + lab.width / l.u(1);
+        const bx = -w / 2 + BOX / 2;
+        lab.setX(l.u(-w / 2 + BOX + GAP2));
+        const hg = this.add.graphics();
+        const tick = ssTxt(this, l.u(bx), hy, '✓', l.u(12), '#ff8a70').setOrigin(0.5)
+          .setShadow(0, 0, '#e05e2a', l.u(5), true, true);
+        tick.setData('hardTick', d.id);
+        const drawBox = (flare) => {
+          const on = !!SS.prof.hardPick[d.id];
+          hg.clear();
+          hg.fillStyle(on ? 0x2a1016 : 0x121628, on ? 0.92 : 0.7);
+          hg.fillRoundedRect(l.u(bx - BOX / 2), hy - l.u(BOX / 2), l.u(BOX), l.u(BOX), l.u(3));
+          hg.lineStyle(l.u(1.2), on ? 0xff5e4d : 0x8a94c4, on ? 0.95 : 0.5);
+          hg.strokeRoundedRect(l.u(bx - BOX / 2), hy - l.u(BOX / 2), l.u(BOX), l.u(BOX), l.u(3));
+          tick.setVisible(on);
+          lab.setColor(on ? '#ff8a70' : '#9aa3cc');
+          if (flare && on) {   // one ember breath as the challenge is taken
+            const fl = this.add.image(l.u(bx), hy, 'glowbig').setDisplaySize(l.u(40), l.u(40))
+              .setTint(0xff5e4d).setBlendMode('ADD').setAlpha(0.5);
+            k.add(fl);
+            this.tweens.add({ targets: fl, alpha: 0, displayWidth: l.u(64), displayHeight: l.u(64), duration: 360, onComplete: () => fl.destroy() });
+          }
+        };
+        drawBox();
+        k.setData('hardDraw', drawBox);
+        k.add([hg, tick, lab]);
+      }
+      // the element's rim, over the art so the plate wears it
+      const rim = this.add.graphics();
+      rim.lineStyle(l.u(1.5), tint, 0.75);
+      rim.strokeRoundedRect(-l.u(CW / 2 - 0.75), -l.u(CH / 2 - 0.75), l.u(CW - 1.5), l.u(CH - 1.5), l.u(15));
+      rim.lineStyle(l.u(0.7), tint, 0.25);
+      rim.strokeRoundedRect(-l.u(CW / 2 - 5), -l.u(CH / 2 - 5), l.u(CW - 10), l.u(CH - 10), l.u(11));
+      k.add(rim);
+      k.setData('zodCard', d.id);
+      return k;
+    };
+
+    /* the deck's window: three live cards ride a strip that the finger drags;
+       a geometry mask keeps neighbors to a peek at the card's edges */
+    const strip = this.add.container(l.x(0), l.y(CY));
+    const mg = this.make.graphics();
+    // the window IS the card slot, rounded — full-bleed art slides through
+    // it and the mask alone shapes the corners
+    mg.fillStyle(0xffffff, 1);
+    mg.fillRoundedRect(l.x(-CW / 2), l.y(CY - CH / 2), l.u(CW), l.u(CH), l.u(16));
+    strip.setMask(mg.createGeometryMask());
+    /* THE DECK REMEMBERS (v0.95.0): a fresh climb's picker stands on the
+       sign the LAST climb was begun under (per door — the campaign and
+       endless memories are separate fields). Only the OPENING index moves,
+       so arrows/swipe/wrap are untouched. A remembered card — THE OPEN SKY
+       included, at the deck's far end since 9/17 — opens right there; no
+       memory at all opens the deck's front, the first sign. */
+    const remembered = this.signFor === 'endless' ? SS.prof.lastSignEnd : SS.prof.lastSign;
+    const remIdx = remembered ? deck.findIndex((d) => d.id === remembered) : -1;
+    let cur = remIdx >= 0 ? remIdx : 0, moving = false;
+    const cards = { prev: null, cur: null, next: null };
+    const place = () => {
+      cards.prev.x = -l.u(STRIDE); cards.cur.x = 0; cards.next.x = l.u(STRIDE);
+      cards.prev.setVisible(false); cards.next.setVisible(false); cards.cur.setVisible(true);
+    };
+    const build = () => {
+      for (const key of ['prev', 'cur', 'next']) if (cards[key]) cards[key].destroy();
+      cards.prev = mkCard(cur - 1); cards.cur = mkCard(cur); cards.next = mkCard(cur + 1);
+      strip.add([cards.prev, cards.cur, cards.next]);
+      strip.x = l.x(0);
+      place();
+    };
+    build();
+
+    // a move: the strip slides one stride (settle tween), then the three
+    // cards are recycled around the new index and the strip snaps home
+    const go = (dir, fromX) => {
+      if (moving) return;
+      moving = true;
+      cards.prev.setVisible(true); cards.next.setVisible(true);
+      if (fromX != null) strip.x = fromX;
+      this.tweens.add({
+        targets: strip, x: l.x(0) - dir * l.u(STRIDE), duration: 240, ease: 'Cubic.easeOut',
+        onComplete: () => {
+          if (this.signC !== c) return;
+          cur = ((cur + dir) % N + N) % N;
+          build();
+          moving = false;
+        },
+      });
+    };
+    const settle = () => {
+      if (moving) return;
+      moving = true;
+      this.tweens.add({ targets: strip, x: l.x(0), duration: 200, ease: 'Cubic.easeOut', onComplete: () => { if (this.signC === c) { place(); moving = false; } } });
+    };
+    // the harness seams: which card stands, and a programmatic move
+    this.signGo = (dir) => go(dir);
+    this.signPeek = () => ({ id: deck[cur].id, cur, n: N, moving, x: strip.x - l.x(0), card: cards.cur });
+
+    // the arrows live on (Skylar's call) — riding the card's edges now,
+    // gold on a dark halo so they read on any plate (44-pt law via ssHitPad)
+    const mkArrow = (dx, glyph, dir) => {
+      const a = ssTxt(this, l.x(dx), l.y(CY), glyph, l.u(30), '#d7b45c').setOrigin(0.5)
+        .setShadow(0, 0, '#0a0e1f', l.u(8), true, true).setInteractive({ useHandCursor: true });
+      ssHitPad(a, 48);
+      a.on('pointerdown', () => { if (moving) return; SFX.ui(); go(dir); });
+      return a;
+    };
+    const arrowL = mkArrow(-180, '‹', -1), arrowR = mkArrow(180, '›', 1);
+    items.push(arrowL, arrowR);
+
+    // the swipe: a real drag anywhere on the card. Past a third of the card
+    // (or a quick flick) it commits to the neighbor; short of that it settles
+    const zone = this.add.zone(l.x(0), l.y(CY), l.u(CW), l.u(CH)).setOrigin(0.5).setInteractive({ useHandCursor: true });
+    let drag = null;
+    zone.on('pointerdown', (p) => { if (moving) return; drag = { x: p.x, t: performance.now() }; cards.prev.setVisible(true); cards.next.setVisible(true); });
+    const mv = (p) => {
+      if (!drag) return;
+      if (!p.isDown) { drag = null; settle(); return; }
+      strip.x = l.x(0) + clamp(p.x - drag.x, -l.u(STRIDE), l.u(STRIDE));
+    };
+    const up = (p) => {
+      if (!drag) return;
+      const dx = p.x - drag.x, dt = Math.max(1, performance.now() - drag.t);
+      drag = null;
+      const flick = Math.abs(dx) > l.u(18) && Math.abs(dx) / dt > 0.45;
+      if (Math.abs(dx) > l.u(CW / 3) || flick) { SFX.ui(); go(dx < 0 ? 1 : -1, strip.x); }
+      else settle();
+    };
+    this.input.on('pointermove', mv);
+    this.input.on('pointerup', up);
+    c.once('destroy', () => { this.input.off('pointermove', mv); this.input.off('pointerup', up); mg.destroy(); this.signGo = null; this.signPeek = null; });
+
+    // BEGIN — always live: the visible card is the choice
+    const enter = (id) => {
+      if (this.signFor === 'endless') {
+        // pin the endless climb's sign and rise at once — the ladder has no
+        // chart; its map is the level counter itself
+        try { localStorage.setItem('beta3.endsign', id); } catch (e) { }
+        ssRememberSign('endless', id);   // the choice outlives the climb (v0.95.0)
+        closeSheet();
+        this.bloomBtn = this.rowBtns && this.rowBtns.endless;
+        this.startMode('endless');
+        return;
+      }
+      // pin the choice and open the chart — the map is the campaign's own door.
+      // The HARD pin (v0.70.0) rides beside it: the card's tick box, as it
+      // stands at BEGIN, is the whole climb's difficulty (resume included —
+      // the checkpoint carries it on).
+      try {
+        localStorage.setItem('beta3.campsign', id);
+        if (SS.prof.hardPick[id]) localStorage.setItem('beta3.camphard', '1');
+        else localStorage.removeItem('beta3.camphard');
+      } catch (e) { }
+      ssRememberSign('campaign', id);    // the choice outlives the campaign (v0.95.0)
+      closeSheet();
+      this.mapSheet();
+    };
+    // the band under the card is BEGIN's own ground: a quiet catch zone
+    // soaks up near-misses so a finger aiming for the button can never
+    // fall through to the veil and lose the sheet
+    const catchB = this.add.zone(l.x(0), l.y(759), l.u(420), l.u(82)).setOrigin(0.5).setInteractive();
+    const beginB = this.add.image(l.x(0), l.y(755), ssBtn(this, false, 330, 54)).setDisplaySize(l.u(330), l.u(54))
+      .setInteractive({ useHandCursor: true });
+    const beginT = ssTxt(this, l.x(0), l.y(755), SS_T('zpBegin'), l.u(16), BTN_INK()).setOrigin(0.5);
+    beginB.on('pointerover', () => beginB.setScale(beginB.scaleX * 1.03, beginB.scaleY * 1.03));
+    beginB.on('pointerout', () => beginB.setDisplaySize(l.u(330), l.u(54)));
+    beginB.on('pointerdown', () => { if (moving) return; SFX.ui(); enter(deck[cur].id); });
+    items.push(beginB, beginT);
+
+    /* HARD's one fixed tap zone (v0.70.0): every card draws its control at
+       the same spot, so one zone above the swipe zone takes the tap for
+       whichever card stands (topOnly input — the topmost object gets the
+       event). It arms the deck's own drag on the way down so a swipe that
+       begins here still turns the deck, and the toggle fires on the UP
+       only under a drag threshold — a real swipe never flips the box. */
+    let hardZone = null;
+    if (this.signFor === 'campaign') {
+      hardZone = this.add.zone(l.x(0), l.y(CY + CH / 2 - 126), l.u(190), l.u(34)).setOrigin(0.5).setInteractive({ useHandCursor: true });
+      ssHitPad(hardZone, 44);
+      hardZone.setData('hardBox', 1);
+      let harm = null;
+      hardZone.on('pointerdown', (p) => {
+        if (moving) return;
+        harm = { x: p.x, y: p.y };
+        drag = { x: p.x, t: performance.now() };   // the swipe still lives here
+        cards.prev.setVisible(true); cards.next.setVisible(true);
+      });
+      hardZone.on('pointerup', (p) => {
+        if (!harm) return;
+        const moved = Math.abs(p.x - harm.x) > l.u(8) || Math.abs(p.y - harm.y) > l.u(8);
+        harm = null;
+        if (moved || moving) return;
+        SFX.ui();
+        const id = deck[cur].id;
+        if (SS.prof.hardPick[id]) delete SS.prof.hardPick[id];
+        else SS.prof.hardPick[id] = 1;
+        SS.save();
+        const dr = cards.cur && cards.cur.getData && cards.cur.getData('hardDraw');
+        if (dr) dr(true);
+      });
+    }
+    /* display order IS the input order under topOnly: the swipe zone rides
+       the cards, and every tappable thing that overlays the card (arrows,
+       ✕, the HARD zone) must sit ABOVE it or it never hears a tap */
+    c.add(strip);
+    c.add(zone);
+    if (hardZone) c.add(hardZone);
+    c.add(catchB);
+    c.add(items);
+    // entrance: the sky of signs settles up into place like the other sheets.
+    // Zones are pure hit areas (no alpha component) — they stay where they are.
+    for (const it of items.concat([strip])) {
+      if (it.type === 'Zone') continue;
+      const baseA = it.alpha;
+      it.y += l.u(14); it.alpha = 0;
+      this.tweens.add({ targets: it, y: it.y - l.u(14), alpha: baseA, duration: 300, ease: 'Back.easeOut' });
+    }
+  }
+
+  /* the standing checkpoint, or null. A checkpoint from an older build is
+     welcome as long as it knows which fight it stands on; an act index it
+     lacks (or one past the roster) is re-derived from the fight, so the
+     door never throws on a save it did not write. */
+  campaignCheckpoint() {
+    let ck = null;
+    try { ck = JSON.parse(localStorage.getItem('beta3.campaign')); } catch (e) { return null; }
+    if (!ck || typeof ck !== 'object' || typeof ck.fightIdx !== 'number' || !(ck.fightIdx >= 0)) return null;
+    if (!SS_ACTS[ck.actIdx]) ck.actIdx = Math.min(SS_ACTS.length - 1, Math.floor(ck.fightIdx / 5));
+    return ck;
+  }
+  busy() { return this.ascending || this.descending || this.introPlaying || SS_RITE.busy; }
+  startMode(mode) {
+    if (this.busy()) return;
+    SFX.ui();
+    const resume = mode === 'campaign' ? this.campaignCheckpoint()
+      : mode === 'endless' ? this.endlessCheckpoint() : null;
+    // campaign's one door is the chart — the herald flag marks "a node was
+    // clicked", and Battle heralds only when that node's beast is a boss
+    this.beginAscent({ mode, resume, ascended: true, herald: mode === 'campaign' ? 1 : 0 });
+  }
+
+  /* ---------- the rise (SKY-DESIGN §5) ---------- */
+  beginAscent(data) {
+    this.ascending = true;
+    PENDING_ASCENT = data;
+    DIAG('ascent begin (' + data.mode + ')');
+    try {
+      const l = ssLayout(this);
+      SFX.crickets(false); SFX.birds(false); SFX.riser();
+      this.sky.scatterFlies();
+      for (const o of this.uiItems) this.tweens.killTweensOf(o);
+      // BUGFIX: this tweened `scale`, whose setter writes BOTH axes — a setDisplaySize'd
+      // button (scaleX ~1.17, scaleY ~0.60) had its height snapped to the scaleX value, so
+      // the pressed button doubled in height for 130ms and never came back. Drive the axes
+      // separately. (Same trap as the Runefall note: never tween `scale` on these.)
+      if (this.bloomBtn) {
+        const b = this.bloomBtn;
+        this.tweens.add({
+          targets: b, duration: 130, yoyo: true,
+          scaleX: { from: b.scaleX, to: b.scaleX * 1.08 },
+          scaleY: { from: b.scaleY, to: b.scaleY * 1.08 },
+        });
+      }
+      this.tweens.add({ targets: this.uiItems, alpha: 0, duration: 300 });
+      this.dissolveTitle();
+      if (ssReduceMotion()) {
+        DIAG('ascent: reduce-motion is ON → veil crossfade instead of the rise');
+        // kept on this.ascVeil: if the scene sleeps and later wakes, the wake
+        // path lands under this veil instead of gliding (respects the setting)
+        const veil = this.ascVeil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setScrollFactor(0).setAlpha(0).setDepth(600);
+        this.tweens.add({ targets: veil, alpha: 1, duration: 200, onComplete: () => this.arrive() });
+        return;
+      }
+      this.sky.grain.setVisible(false);   // full-screen blended fill — not during the flight
+      PERF.start('ascent', this);
+      this.ascentStart = this.time.now;
+      this.skipAt = null; this.lastP = 0; this.lastT = this.time.now;
+      // arm the tap-to-skip only after the launching tap has fully cleared —
+      // Phaser delivers the button's own pointerdown to scene listeners added
+      // during dispatch, so arming immediately made every real tap self-skip
+      this.time.delayedCall(400, () => {
+        if (!this.ascending || this.arrived) return;
+        this.input.on('pointerdown', this.skipFn = () => { if (this.ascending && !this.skipAt) this.skipAt = ASC.TOTAL_MS - 220; });
+      });
+      if (DEMO) this.skipAt = ASC.TOTAL_MS - 220;   // the solver has no time for wonder
+    } catch (e) {
+      this.fallbackToBattle(e);                      // the rise must never strand the player
+    }
+  }
+  // the title doesn't just fade — it comes apart into stardust as the
+  // world starts to fall away (SKY-DESIGN P3)
+  dissolveTitle() {
+    if (ssReduceMotion()) return;
+    this.time.delayedCall(340, () => {
+      if (!this.ascending || this.arrived || !this.titleT) return;
+      const b = this.titleT.getBounds();
+      const em = this.add.particles(0, 0, 'dot', {
+        speed: { min: 8, max: 60 }, lifespan: { min: 700, max: 1500 }, gravityY: -30,
+        scale: { start: 0.55, end: 0 }, alpha: { start: 0.9, end: 0 },
+        blendMode: 'ADD', tint: [0xf3e5b4, 0xffe9c9, 0xcfd8ff], emitting: false,
+      }).setDepth(60);
+      for (let k = 0; k < 46; k++) em.emitParticleAt(b.x + Math.random() * b.width, b.y + b.height * 0.15 + Math.random() * b.height * 0.7);
+      this.time.delayedCall(1700, () => em.destroy());
+    });
+  }
+  fallbackToBattle(e) {
+    DIAG('ascent FALLBACK: ' + (e && e.message || '?'));
+    const data = PENDING_ASCENT || { mode: 'quick', resume: null };
+    PENDING_ASCENT = null;
+    this.arrived = true;
+    this.scene.start('battle', data);
+  }
+  update(time) {
+    if (!this.ascending || this.arrived || !this.ascentStart) return;
+    try {
+      let ms = time - this.ascentStart;
+      if (this.skipAt && ms < this.skipAt) { this.ascentStart = time - this.skipAt; ms = this.skipAt; }
+      if (ms >= ASC.TOTAL_MS) { this.arrive(); return; }
+      const p = ssAscentP(ms);
+      const vel = Math.max(0, (p - this.lastP) / Math.max(1, time - this.lastT));
+      this.sky.setP(p, vel);
+      this.lastP = p; this.lastT = time;
+    } catch (e) {
+      this.fallbackToBattle();
+    }
+  }
+  arrive() {
+    if (this.arrived) return;
+    this.arrived = true;
+    PERF.stop();
+    DIAG('ascent arrive' + (this.skipAt ? ' (skipped)' : ''));
+    if (this.skipFn) this.input.off('pointerdown', this.skipFn);
+    SFX.arriveChime();                              // the hush, then the forge voice
+    const data = PENDING_ASCENT; PENDING_ASCENT = null;
+    try {
+      this.sky.setP(1, 0);
+      localStorage.setItem('beta3.ascent', JSON.stringify({ v: BUILD, skipped: !!this.skipAt, t: Date.now() }));
+      // sleep (don't stop): the meadow keeps its 300+ objects alive so the trip
+      // home is a wake + camera glide instead of a full re-create — the create
+      // ran 200-370ms on a throttled phone profile, a visible freeze exactly at
+      // the "leave battle" moment. Dawn returns still restart the scene (other
+      // sky); rotation is caught on wake by the layout check there.
+      this.scene.transition({ target: 'battle', duration: 450, data, moveAbove: true, sleep: true });
+      // the handoff frame runs Battle.create — probe it (auto-stops)
+      PERF.start('arrive', this, 30);
+    } catch (e) {
+      this.scene.start('battle', data);
+    }
+  }
+
+  /* ---------- the way back down ---------- */
+  descendHome() {
+    this.descending = true;
+    PERF.start('descend' + (this.isDawn ? '-dawn' : ''), this);
+    this.sky.grain.setVisible(false);
+    this.sky.setP(1, 0);
+    SFX.descendSweep();
+    this.tweens.addCounter({
+      from: 1, to: 0, duration: ASC.DESCEND_MS, ease: 'Cubic.easeInOut',
+      onUpdate: (tw) => this.sky.setP(tw.getValue(), 0),
+      onComplete: () => { this.descending = false; PERF.stop(); this.sky.grain.setVisible(true); this.sky.setP(0, 0); if (this.isDawn) SFX.birds(true); else SFX.crickets(true); },
+    });
+  }
+  /* the woken meadow: everything still exists, so returning is bookkeeping —
+     restore what the ascent faded/killed, refresh what battle changed, glide */
+  onWake(data) {
+    // the first game just ended below a WORDLESS meadow: the player has
+    // graduated — restart into the standard full-chrome meadow (the ftue
+    // flag is already down, so create() builds everything the normal way)
+    if (this.ftueBare) { this.ftueBare = false; this.scene.restart(data); return; }
+    // rotated while asleep: the viewport loop only restarts ACTIVE scenes, so
+    // a stale layout lands here — rebuild rather than glide a broken frame
+    if (this.scale.width !== this.createdW || this.scale.height !== this.createdH) { this.scene.restart(data); return; }
+    // the dawn meadow is a once-per-campaign-win moment: if the sleeping scene
+    // and the return disagree about it, rebuild with the sky the return wants
+    // (matches the old create-path behavior — dusk again on the next descent)
+    if (this.isDawn !== !!data.dawn) { this.scene.restart(data); return; }
+    this.ascending = false; this.arrived = false; this.ascentStart = null;
+    // the outgoing transition disabled this scene's input for the crossfade;
+    // a stopped scene would re-enable it in create, a slept one must here
+    this.input.enabled = true;
+    for (const o of this.uiItems) { this.tweens.killTweensOf(o); o.setAlpha(o.baseAlpha); }
+    this.idleTweens();
+    this.sky.restoreFlies();
+    this.refreshCampDoor(true);  // battle moved (or cleared) the campaign checkpoint
+    this.refreshEndDoor(true);   // …and the endless climb's own line follows it
+    this.updateDailyChip();
+    if (this.refreshDuelStrip) { this.duelKey = ''; this.refreshDuelStrip(); }   // a duel fought (or stood up) just now moves its row
+    this.milestoneCheck();       // the hunt we just came home from may have grown the lamp
+    this.sigilNotice();
+    this.signNotice();           // a sign level the climb earned may be unsaid
+    const l = ssLayout(this);
+    if (this.ascVeil) {          // reduce-motion rise → reduce-motion return
+      this.sky.setP(0, 0);
+      this.sky.grain.setVisible(true);
+      const veil = this.ascVeil; this.ascVeil = null;
+      this.tweens.add({ targets: veil, alpha: 0, duration: 350, onComplete: () => veil.destroy() });
+      SFX.crickets(true);
+    } else if (data.from === 'battle') this.descendHome();
+    else {                       // defeat: wake up on the grass under a lifting veil
+      this.sky.setP(0, 0);
+      this.sky.grain.setVisible(true);
+      const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setScrollFactor(0).setDepth(600);
+      this.tweens.add({ targets: veil, alpha: 0, duration: 350, onComplete: () => veil.destroy() });
+      SFX.crickets(true);
+    }
+  }
+}
+
+/* ============================================================
+   BATTLE — one scene, three modes
+   ============================================================ */
+/* THE FIRST OPEN's fingertip (v0.75.0): where the finger's tip sits inside
+   art/hand.webp, normalized — measured and printed by tools/make-hand-asset.py
+   (the sprite is anchored BY the tip, so pointing lands the tip on target).
+   The drawn fallback pointer is built to the same anchor. */
+const SS_FTUE_TIP = { x: 0.0066, y: 0.7458 };
+class Battle extends Phaser.Scene {
+  constructor() { super('battle'); }
+  init(data) {
+    this.mode = data.mode || 'quick'; this.resume = data.resume || null; this.ascended = !!data.ascended; this.ftue = !!data.ftue;
+    // the boss herald rides the chart door's data and is CONSUMED here: a
+    // resize-restart mid-herald (or mid-fight) re-inits on the same data
+    // object and falls straight to the battle — the beat never replays and
+    // never strands (restart() with no args re-passes the original data)
+    this.heraldIn = !!(data && data.herald);
+    if (data && data.herald) data.herald = 0;
+  }
+
+  create() {
+    const tCr = performance.now();
+    const l = this.L = ssLayout(this);
+    ssMakeTextures(this);
+    // solo always fights in the player's own tongue (a versus battle may have
+    // left the globals on the room's pack — flip them back)
+    ssUsePack(ssGameLang());
+    if (this.ascended) {   // arriving from the rise: fade in over the zenith — bg matches, no pop
+      this.cameras.main.setAlpha(0);
+      this.tweens.add({ targets: this.cameras.main, alpha: 1, duration: 420, ease: 'Sine.easeOut' });
+    }
+    ssStarfield(this, 110);
+    ssShootingStars(this);
+    const tSky = performance.now();
+    for (const [tint, dx, dy] of [[0x2fe0d0, -140, 140], [0x8a5ae0, 140, 620]]) {
+      const a = this.add.image(l.x(dx), l.y(dy), 'glowbig').setScale(l.u(2.2)).setTint(tint).setAlpha(0.04).setBlendMode('ADD');
+      this.tweens.add({ targets: a, x: a.x + l.u(24), scale: l.u(2.6), duration: 8000, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    }
+
+    /* HARD MODE (v0.70.0) — a MODIFIER, read before anything derives from
+       it: the resumed checkpoint is the truth (a climb begun hard stays
+       hard), a fresh campaign reads the picker's pin. Everything hard does
+       keys on this one flag — the 10s strike clock, the sparser sigil
+       cadence, the boss knobs, the ×1.5 tally — so endless accepts it
+       later by extending this expression by one clause. */
+    this.hard = this.resume ? !!this.resume.hard : (this.mode === 'campaign' && ssCampHard());
+    /* THE SKY WHEEL (v0.108.0) — the daily's OWN modifier, seated beside
+       `hard` the same way: ONE rule object resolved here from the calendar
+       (weekday of SSNET.dayKey(), pure UTC — the ?daykey seam steers it),
+       read wherever the scene reads its modifiers. Null on every other
+       mode AND on a day whose sky card has not shipped — null IS the stock
+       daily, byte-for-byte. Never a second battle scene. */
+    this.sky = this.mode === 'daily' ? ssSkyToday() : null;
+    /* THE GILDED LETTER (v0.109.0): Monday's gold, resolved ONCE beside the
+       sky itself — one bag-weighted letter per language per day, rolled on
+       the sky's own stream (never the main one — the deal below must not
+       move). Null under every other sky and every other mode; wordDamage
+       pays it ×3 and spawnTile lays the leaf. */
+    this.skyGild = this.sky && this.sky.gild ? ssSkyGildLetter() : null;
+    /* THE FALLING SKY (v0.110.0): ONE clock truth, resolved beside the flags
+       it rides — hard mode's 10s or Saturday's own 12s (SS_SKY_FALL_MS; the
+       sky never re-dials SS_HARD), 0 everywhere else. Every strike-clock
+       ENGINE site (the ring's build, update's tick, the re-arms, the ring's
+       fraction) reads THIS and nothing else, so the two flags can never
+       disagree — while the ×1.5 tally, the sparser cadence, the boss knobs
+       and the boards' ⚑ stay keyed on this.hard and do not ride the sky. */
+    this.strikeMs = this.hard ? SS_HARD.strikeMs : (this.sky && this.sky.clockMs) || 0;
+
+    // ---- build the fight list ----
+    // daily: same-language hunters share one seeded sky; the pack salt keeps
+    // a language switch from replaying today's English board with new letters
+    if (this.mode === 'daily') setSeed(SSNET.dayKey() ^ ssPackSeed(PACK.lang));
+    else setSeed(Math.floor(Math.random() * 1e9));
+    this.fights = [];
+    let planSeed;
+    if (this.mode === 'campaign') {
+      const roster = ssCampaignRoster();
+      this.fights = SS_CAMPAIGN_FIGHTS(roster);
+      planSeed = ssStrSeed(roster.join('·'));   // pinned roster → a resumed climb keeps its schedule
+    } else if (this.mode === 'endless') {
+      // the ladder's seed rides the checkpoint — a resumed climb rebuilds the
+      // IDENTICAL ladder and sigil schedule; a fresh climb rolls its own sky
+      this.eseed = this.resume && Number.isFinite(this.resume.eseed) ? this.resume.eseed : Math.floor(Math.random() * 1e9);
+      this.fights = ssEndlessFights(this.eseed, SS_ENDLESS.horizon);
+      planSeed = this.eseed;
+      /* THE FRONTIER FLAGS (v0.77.0): the ledger is read ONCE, at climb
+         start/resume — never per level, never polled mid-battle. Real
+         players only (getFlags filters the seeded hunters), the veiled
+         gone (their stats are veiled; the flag is a stat), own row out
+         (the local profile is fresher and draws the own flag itself).
+         A late arrival dresses the standing level and rings any beat the
+         entry already earned; the sequence token keeps a slow read from
+         landing on a restarted scene's state. */
+      this.flagRows = null;
+      this.flagMine = null;
+      const fseq = this.flagSeq = (this.flagSeq | 0) + 1;
+      SSNET.getFlags().then((rows) => {
+        if (this.flagSeq !== fseq || this.mode !== 'endless' || !this.flagC || !this.flagC.scene) return;
+        this.flagRows = rows.filter((r) => !r.veiled && r.id !== SSNET.uid());
+        if (this.state === 'end') return;
+        this.plantFlags(true);
+        this.flagBeats();
+      }).catch(() => { });
+    } else {
+      /* THE COURT OF KINGS (v0.110.0): Sunday's sky replaces the pool
+         wholesale ON THE SAME main-stream draws the stock deal makes —
+         four splice rolls, then the plan seed, exactly as below — so the
+         rng-order law holds by construction (the board's deal never moves)
+         and the whole world shares one court. The four drawn kings stand
+         tempered by the court's own mults in fight order; THE ZENITH
+         ARCHER is the fixed crown, seated exactly where DRACO stands on a
+         stock night — no draw for either. Signature attacks and the
+         kings' own fuses ride their bestiary rows untouched. */
+      const court = this.sky && this.sky.court;
+      const pool = court ? [...court.kings] : [...SS_QUICK_POOL];
+      for (let i = 0; i < 4; i++) this.fights.push({ id: pool.splice(Math.floor(rng() * pool.length), 1)[0], actIdx: 0, mult: court ? court.mults[i] : 1 + i * 0.12, atkAdd: court ? 0 : Math.floor(i / 2), umbral: false });
+      this.fights.push({ id: court ? court.crown : SS_QUICK_BOSS, actIdx: 0, mult: 1, atkAdd: 0, umbral: false });
+      planSeed = Math.floor(rng() * 1e9);       // daily: seeded stream → every hunter shares the schedule
+    }
+    /* THE DYING NAMES (v0.110.0): the curse ladder — one letter per fight,
+       precomputed from the day's own fight list (fight order, no rng at
+       all), so the whole world darkens in the same order and two hunters
+       at the same fell always hold the same dark set. Each beast takes the
+       first letter of its OWN name; a letter already dark walks to the
+       name's next star (CORVUS after CANCER takes O); a name burned
+       through end to end passes the curse over (null — unreachable on a
+       five-fight night, kept lawful anyway). Letters map to tile glyphs
+       through the pack's digraph door (q → qu), the gilded letter's law. */
+    this.skyCursed = null;
+    this.skyCurseLadder = null;
+    if (this.sky && this.sky.dying) {
+      const dark = new Set();
+      this.skyCurseLadder = this.fights.map((f) => {
+        for (const c of SS_BEASTS[f.id].name.toLowerCase()) {
+          if (c < 'a' || c > 'z') continue;
+          const ch = PACK.digraph[c] || c;
+          if (!dark.has(ch)) { dark.add(ch); return ch; }
+        }
+        return null;
+      });
+      this.skyCursed = new Set();
+    }
+    this.sigPlan = ssSigilPlan(this.mode, this.fights, planSeed, this.hard);
+    this.sigTypes = ssOfferTypes(this.mode, this.sigPlan, planSeed);
+
+    // ---- run state ----
+    // `tiers` (v0.66.0): id → held tier. A pre-tier checkpoint has no field
+    // and resumes with every sigil at tier I — its exact pre-update strength.
+    this.run = this.resume ? {
+      fightIdx: this.resume.fightIdx, hpMax: this.resume.hpMax, hp: this.resume.hp,
+      sigils: this.resume.sigils || [], words: this.resume.words | 0, longest: this.resume.longest || '',
+      totalDmg: this.resume.totalDmg | 0, scried: !!this.resume.scried, featherUsed: !!this.resume.featherUsed,
+      letters: this.resume.letters | 0, bigHit: this.resume.bigHit | 0,
+      playMs: ssClockInherit(this.resume, this.mode === 'endless' ? 'beta3.endless' : 'beta3.campaign'),
+      overkill: this.resume.overkill | 0, tiers: this.resume.tiers || {},
+      // the flag beats already rung this climb (v0.77.0) — a resumed climb
+      // re-reads the ledger but never repeats a ceremony
+      fpassLv: this.resume.fpassLv | 0, ffront: !!this.resume.ffront,
+    } : { fightIdx: 0, hpMax: 50, hp: 50, sigils: [], words: 0, longest: '', totalDmg: 0, scried: false, featherUsed: false, letters: 0, bigHit: 0, playMs: 0, overkill: 0, tiers: {}, fpassLv: 0, ffront: false };
+    this.clockLast = 0;   // the active-play heartbeat's last stamp — 0 until the first update ticks
+    this.run.firstUsed = false;
+    // the birth sign — the campaign's and the endless climb's, each pinned
+    // for its whole climb (v0.68.0: zodiac powers apply to endless exactly
+    // as to the campaign). TAURUS's endurance lands once at the run's start
+    // and rides the checkpoint's hpMax.
+    /* THE BORROWED SIGN (v0.109.0): Tuesday's sky lends the whole world one
+       sign — the SAME one everywhere, at the same guest level, so the
+       fairness the unsigned law protects is intact while its letter bends.
+       The run carries it in this.sign so every power, emblem and toast
+       reads exactly as in the campaign; signBorrowed gates every settle
+       site (signXp, the word/hit record, the star-crossed award): a
+       borrowed sign is a guest, not a birth — nothing may write home. */
+    this.signBorrowed = !!(this.sky && this.sky.borrow);
+    this.sign = this.mode === 'campaign' ? ssCampSign() : this.mode === 'endless' ? ssEndSign() : this.signBorrowed ? ssSkyBorrowSign() : null;
+    this.signZ = this.sign ? SS_ZODIAC_BY[this.sign] : null;
+    // the run's opening level (v0.69.0) — read here for the vessels below,
+    // refreshed per battle at startFight; a borrowed sign holds the guest
+    // level for the whole run (never the player's own ladder)
+    this.signLv = this.signBorrowed ? SS_SKY_SIGN_LV : ssSignLv(this.sign);
+    if (this.sign && !this.resume) {
+      // what lands once at a fresh climb's start and rides the checkpoint's
+      // hpMax: the reward table's vessel rows (every sign) and TAURUS's own
+      // endurance at its level — the bull takes both
+      const rw = ssSignRewards(this.sign, this.signLv);
+      let vessel = rw.hp | 0;
+      if (this.sign === 'taurus') vessel += ssSignVal('taurus', 'hp', this.signLv);
+      if (vessel > 0) { this.run.hpMax += vessel; this.run.hp = this.run.hpMax; }
+    }
+    this.state = 'boot';
+    this.board = []; this.sel = []; this.lineTiles = [];
+    this.skyAsh = [];    // THE ASHEN BOARD's cooling cells (v0.110.0) — markers by slot, empty under every other sky
+    this.pending = [];   // bonus tiles owed to the next empty slots (forge drops, GILDED DAWN's start)
+    SS.prof.runs++; SS.save();
+
+    const tState = performance.now();
+    this.buildUi();
+    const tUi = performance.now();
+    // THE SKY WHEEL's ribbon (v0.108.0): a BUILT sky announces its law once
+    // as the daily opens — non-blocking, folds by itself; stock days silent
+    if (this.mode === 'daily' && this.sky) ssSkyRibbon(this);
+    // A MIGHTY BEAST APPEARS (v0.106.0): a campaign entry that CLICKED a boss
+    // on the chart (the herald flag rode the ascent data) heralds at arrival —
+    // the fight itself wakes as the beat parts, so the assembly and the v0.21
+    // boss dress stay the one true materialization. Everything else fights at
+    // once, byte-for-byte the old way.
+    const hf = this.fights[this.run.fightIdx];
+    if (this.heraldIn && this.mode === 'campaign' && hf && SS_BEASTS[hf.id] && SS_BEASTS[hf.id].boss) {
+      ssBossHerald(this, hf, () => this.startFight(), { door: 'chart' });
+    } else this.startFight();
+    const tEnd = performance.now();
+    DIAG('battle create ' + Math.round(tEnd - tCr) + 'ms (sky ' + Math.round(tSky - tCr) +
+      ' · state ' + Math.round(tState - tSky) + ' · ui ' + Math.round(tUi - tState) + ' · fight ' + Math.round(tEnd - tUi) + ')');
+
+    if (this.ftue) this.ftueStart();   // the first open: curated deal landed above; the finger follows
+
+    if (DEMO) this.demoTimer = this.time.addEvent({ delay: 1400, loop: true, callback: () => this.demoStep() });
+    this.input.on('pointerdown', () => SFX.ensure());
+    this.game.events.on('ss-ach', this.onAch, this);
+    this.events.once('shutdown', () => { this.clockPersist(); this.game.events.off('ss-ach', this.onAch, this); });
+  }
+  onAch(def) { ssAchToast(this, def); }
+
+  /* THE ACTIVE-PLAY CLOCK's heartbeat (see ssPageActive). Every live frame
+     adds its own delta; a delta past SS_CLOCK_STEP_MAX is a frozen tab
+     waking up, not play, and is dropped — the clock resumes where it
+     stopped, never back-filling the gap. Date.now, not Phaser's delta:
+     the TimeStep smooths spikes away, which would count a freeze as play. */
+  update() {
+    const now = Date.now(), last = this.clockLast;
+    this.clockLast = now;
+    if (!last || this.state === 'end' || !this.run) return;
+    const dt = now - last;
+    if (dt > SS_CLOCK_STEP_MAX) { DIAG('clock: dropped ' + Math.round(dt / 1000) + 's gap'); return; }
+    if (dt <= 0 || !ssPageActive()) return;
+    this.run.playMs += dt;
+    // the strike clock rides the SAME honest heartbeat — the gap drop and
+    // the visible+focused gates above already hold for it (hard mode's
+    // 10s, or THE FALLING SKY's 12s — this.strikeMs is the one truth)
+    if (this.strikeMs) this.hardTick(dt);
+  }
+  /* ---- THE STRIKE CLOCK (v0.70.0; generalized v0.110.0) ----
+     One engine, two flags: hard mode dials it to SS_HARD.strikeMs, THE
+     FALLING SKY to its own SS_SKY_FALL_MS — this.strikeMs (resolved once at
+     create) is the only pace any site below reads.
+     Counts down only while the board is the player's: state 'pick', beast
+     alive, no death animation — so sigil picks, the map, scries, rites and
+     cast animations all HOLD it (the plan's non-play beats), and the
+     update() gates above pause it on hide/blur/lock exactly like the run
+     clock. At zero the beast throws its NORMAL strike (strikeNow — shield,
+     shell, ward, eclipse, feather, the waters: everything a cast-counted
+     strike would meet) and the clock re-arms; the cast counter is NOT
+     touched — both threats live. */
+  hardTick(dt) {
+    const live = this.state === 'pick' && !this.dying && this.beast && this.beast.hpNow > 0;
+    if (!live) { this.hardDraw(false); return; }
+    const before = this.hardLeft;
+    this.hardLeft = Math.max(0, (this.hardLeft | 0) - dt);
+    // the last seconds tick out loud — one tock per second boundary
+    if (this.hardLeft > 0 && this.hardLeft <= SS_HARD.warnMs
+      && Math.ceil(this.hardLeft / 1000) !== Math.ceil(before / 1000)) SFX.tick();
+    this.hardDraw(true);
+    if (this.hardLeft <= 0) this.hardStrike();
+  }
+  hardStrike() {
+    if (this.state !== 'pick' || this.dying || !this.beast || this.beast.hpNow <= 0) return;
+    this.state = 'anim';
+    this.hardLeft = this.strikeMs;   // re-armed behind the blow, at the run's own pace
+    this.strikeNow(() => { this.state = 'pick'; this.sigilMoment(); });
+  }
+  /* the ring: an ember arc draining from twelve o'clock, the seconds
+     inside, a warn flare in the last moments; dim while the clock is held.
+     Redrawn only when the shown fraction/second/liveness moves — never a
+     per-frame repaint at dpr3. */
+  hardDraw(live) {
+    if (!this.hardG || !this.hardG.active) return;
+    const l = this.L;
+    const ms = Math.max(0, this.hardLeft | 0);
+    const f = Math.round((ms / this.strikeMs) * 50) / 50;
+    const s = Math.ceil(ms / 1000);
+    const sh = this.hardShown;
+    if (sh.f === f && sh.s === s && sh.live === !!live) return;
+    const warn = live && ms <= SS_HARD.warnMs;
+    if (sh.s !== s && warn && this.hardT.active) {   // the second lands — one small jolt
+      this.hardT.setScale(1.35);
+      this.tweens.add({ targets: this.hardT, scale: 1, duration: 160, ease: 'Sine.easeOut' });
+    }
+    sh.f = f; sh.s = s; sh.live = !!live;
+    const x = l.x(-160), y = l.y(45), r = l.u(13.5);
+    const g = this.hardG;
+    g.clear();
+    g.setAlpha(live ? 1 : 0.45);
+    g.lineStyle(l.u(2.2), 0x39406b, 0.6);
+    g.strokeCircle(x, y, r);
+    if (f > 0) {
+      g.lineStyle(l.u(3), warn ? 0xff3860 : 0xe05e2a, 0.95);
+      g.beginPath();
+      g.arc(x, y, r, -Math.PI / 2, -Math.PI / 2 + f * Math.PI * 2, false);
+      g.strokePath();
+    }
+    this.hardT.setText(String(s));
+    this.hardT.setColor(warn ? '#ff3860' : '#ff8a70');
+    this.hardT.setAlpha(live ? 1 : 0.5);
+    this.hardGlow.setAlpha(warn ? 0.16 + 0.1 * (1 - ms / SS_HARD.warnMs) : 0);
+  }
+  /* a stop event (blur / hidden / pagehide / scene shutdown) writes the
+     honest count into the standing checkpoint. ONLY playMs moves: the run
+     state keeps its fight-start semantics, so a resumed fight still opens
+     where it began — the minutes spent on the abandoned attempt were
+     played, and they count. */
+  clockPersist() {
+    const key = this.mode === 'campaign' ? 'beta3.campaign' : this.mode === 'endless' ? 'beta3.endless' : null;
+    if (!key || this.state === 'end' || !this.run) return;
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return;
+      const ck = JSON.parse(raw);
+      if (!ck || (ck.fightIdx | 0) !== (this.run.fightIdx | 0)) return;
+      ck.playMs = this.run.playMs | 0; ck.clockV = 2;
+      localStorage.setItem(key, JSON.stringify(ck));
+    } catch (e) { }
+  }
+
+  // Wake the sleeping meadow instead of re-creating it — the descent must
+  // start on the very next frame. The dawn return (campaign win) needs the
+  // other sky so it takes the full re-create, and so does a home that a
+  // mid-ascent resize restart already stopped.
+  goHome(data) {
+    // leaving the first game by ANY door — the end screen's HOME or the
+    // back-arrow abandon — completes the first open for good; the woken
+    // (or re-created) meadow builds its full chrome
+    if (this.ftue) ssFtueDone();
+    const h = this.scene.get('home');
+    if (!data.dawn && h && h.sys.isSleeping()) { this.scene.wake('home', data); this.scene.stop(); }
+    else this.scene.start('home', data);
+  }
+
+  // ---------- ui ----------
+  buildUi() {
+    const l = this.L;
+    const txt = (x, y, s, size, color, style) => ssTxt(this, x, y, s, l.u(size), color, style);
+
+    this.headT = txt(l.x(0), l.y(24), this.modeTitle(), 13, '#c9b676').setOrigin(0.5).setAlpha(0.9);
+    this.pips = [];
+    // campaign pips band by act; endless bands its levels in fives the same
+    // way (the boss is the band's last pip) — never one pip per fight there
+    const nP = this.mode === 'campaign' || this.mode === 'endless' ? 5 : this.fights.length;
+    for (let i = 0; i < nP; i++) this.pips.push(this.add.image(l.x(-40 + i * 20), l.y(46), 'dot').setScale(0.6).setTint(0x4a5480));
+    this.scoreT = txt(l.x(190), l.y(24), '0', 15).setOrigin(1, 0.5);
+
+    /* THE STRIKE CLOCK's ember ring (v0.70.0) — the badge AND the telegraph:
+       an arc drains counter-clockwise from twelve o'clock with the seconds
+       inside it; in the last warnMs it burns brighter, breathes, and ticks
+       (SFX.tick). Dimmed whenever the clock is held (a sigil pick, the map,
+       a scry mid-flight, a rite, the cast's own animation). Built wherever
+       a clock runs — hard mode's 10s, or THE FALLING SKY's own 12s
+       (v0.110.0; this.strikeMs is the one truth). Never built on a
+       clockless run — the harness pins hardG === undefined. */
+    if (this.strikeMs) {
+      this.hardGlow = this.add.image(l.x(-160), l.y(45), 'glowbig').setDisplaySize(l.u(58), l.u(58))
+        .setTint(0xff3860).setBlendMode('ADD').setAlpha(0);
+      this.hardG = this.add.graphics().setDepth(20);
+      this.hardT = txt(l.x(-160), l.y(45), String(Math.ceil(this.strikeMs / 1000)), 12.5, '#ff8a70').setOrigin(0.5)
+        .setShadow(0, 0, '#e05e2a', l.u(6), true, true).setDepth(21);
+      this.hardShown = { f: -1, s: -1, live: null };
+    }
+
+    // the birth sign keeps watch beside the score. Tapping it speaks the
+    // power — except VIRGO, whose tap IS the power (arm purify, tap a tile).
+    if (this.signZ) {
+      this.signGlow = this.add.image(l.x(172), l.y(48), 'glowbig').setDisplaySize(l.u(64), l.u(50))
+        .setTint(SS_ELEMENTS[this.signZ.el]).setAlpha(0).setBlendMode('ADD');
+      this.signG = ssZodiacGlyph(this, this.signZ, l.u(0.14), l.x(172), l.y(48));
+      const zn = this.add.zone(l.x(172), l.y(48), l.u(52), l.u(42)).setOrigin(0.5).setInteractive({ useHandCursor: true });
+      zn.on('pointerdown', () => this.signTap());
+      this.updateSignGlow();
+      /* THE BORROWED SIGN's dress (v0.109.0): the guest wears one word on a
+         small ribbon beside the emblem — the fuse ribbon's own pill, seated
+         in the clear air between the fight pips and the glyph. */
+      if (this.signBorrowed) {
+        const bc = this.add.container(0, 0);
+        const bt = txt(l.x(150), l.y(48), SS_T('skyBorrowed'), 8.5, '#ffdf8f').setOrigin(1, 0.5).setLetterSpacing(l.u(1.2));
+        if (bt.width > l.u(86)) bt.setScale(l.u(86) / bt.width);
+        const rb = this.add.image(l.x(150) - bt.displayWidth / 2 - l.u(2), l.y(48), 'ribbon')
+          .setDisplaySize(bt.displayWidth + l.u(18), l.u(15));
+        bc.add([rb, bt]);
+      }
+    }
+
+    txt(l.x(-190), l.y(68), 'YOU', 12, '#c9b676').setOrigin(0, 0.5);
+    // framed troughs + gradient fills; progress is a setCrop in the draw fns
+    this.add.image(l.x(-152), l.y(68), 'bartrough').setOrigin(0, 0.5).setDisplaySize(l.u(254), l.u(15));
+    this.hpBar = this.add.image(l.x(-150), l.y(68), 'barfill-gold').setOrigin(0, 0.5).setDisplaySize(l.u(250), l.u(9));
+    this.hpT = txt(l.x(190), l.y(68), '', 12).setOrigin(1, 0.5);
+    // what the player bar SHOWS — trails run.hp while a strike's number is in
+    // flight (playerHit holds it, then drains it slow), exactly the enemy
+    // bar's ehpShown law mirrored. hpHold COUNTS the blows in flight (the
+    // ~3s linger, v0.107.0, lets strikes overlap); hitPend books each one's
+    // damage so a landing drains only its own slice.
+    this.hpShown = { v: this.run.hp };
+    this.hpHold = 0;
+    this.hitPend = [];
+    this._php = null;
+
+    // the frontier flags' ground (v0.77.0): built just under the beast so a
+    // planted flag stands IN the sky, never over the constellation's face —
+    // and never interactive, so it cannot eat a tap
+    this.flagC = this.add.container(0, 0);
+    this.beastC = this.add.container(l.x(0), l.y(170));
+    this.beastNameI = null;   // gold nameplate image, built per beast in setBeastName
+    this.beastTitle = txt(l.x(0), l.y(301), '', 10, '#8a94c4').setOrigin(0.5).setLetterSpacing(l.u(2));
+    // trough + fill + numbers live in one container so a heavy hit can shake
+    // the whole bar as a unit
+    this.ehpC = this.add.container(0, 0);
+    // the beast's health, unmissable (v0.104.0, Skylar 9/22): a wider, taller
+    // trough and a numeral a player reads at arm's length — the flying damage
+    // number lands HERE, teaching where the beast's health lives
+    const eTrough = this.add.image(l.x(-130), l.y(321), 'bartrough').setOrigin(0, 0.5).setDisplaySize(l.u(260), l.u(19));
+    this.ehpBar = this.add.image(l.x(-128), l.y(321), 'barfill-rose').setOrigin(0, 0.5).setDisplaySize(l.u(256), l.u(13));
+    // numeric HP on the bar itself — players plan lethal ("15 left, build 15+")
+    this.ehpT = txt(l.x(0), l.y(321), '', 16, '#ffe9e0')
+      .setOrigin(0.5).setShadow(0, l.u(1.5), 'rgba(16,4,12,0.95)', l.u(3));
+    this._ehpStr = null;   // scene restarts reuse this instance — never let a stale cache mute the fresh text
+    this.ehpC.add([eTrough, this.ehpBar, this.ehpT]);
+    // the strike fuse: an ember glow breathes behind the ribbon while the
+    // NEXT cast is the strike (the count-1 alarm, run by updateBars)
+    this.strikeGlow = this.add.image(l.x(0), l.y(343), 'glowbig').setDisplaySize(l.u(240), l.u(52))
+      .setTint(0xff5a48).setBlendMode('ADD').setAlpha(0);
+    this.strikeRib = this.add.image(l.x(0), l.y(343), 'ribbon').setAlpha(0);
+    this.strikeT = txt(l.x(0), l.y(343), '', 15, '#e6a2a2').setOrigin(0.5);
+    this.strikeAlarm = null;
+    this._strikeCnt = null;
+
+    this.lineC = this.add.container(l.x(0), l.y(372));
+    this.lineHint = txt(l.x(0), l.y(372), 'tap letters to weave a word', 12, '#5a6390').setOrigin(0.5).setAlpha(0.9);
+
+    this.boardC = this.add.container(0, 0);
+    this.tileSize = l.u(78); this.tileGap = l.u(8);
+    this.slotPos = (i) => ({
+      x: l.x(0) + ((i % 4) - 1.5) * (this.tileSize + this.tileGap),
+      y: l.y(556) + (Math.floor(i / 4) - 1.5) * (this.tileSize + this.tileGap),
+    });
+
+    // the row sits at 766, not against the grid: the board's bottom rim ends
+    // ~724, so open sky separates the letters from the buttons. The foot
+    // below is bare on purpose — in-fight mute and the version stamp live in
+    // the settings gear sheet now, not on the battle floor.
+    this.castB = this.add.image(l.x(70), l.y(766), ssBtn(this, false, 180, 56)).setDisplaySize(l.u(180), l.u(56)).setInteractive({ useHandCursor: true });
+    this.castT = txt(l.x(70), l.y(766), 'CAST', 20, BTN_INK()).setOrigin(0.5)
+      .setShadow(0, l.u(1), ART && SSART.ready ? '#2a1c05' : '#ffe9b0', l.u(1));
+    this.castB.on('pointerdown', () => this.tryCast());
+    // scry + hint wear the painted dark button (aspect-correct via ssBtn), same
+    // as the home screen's LEADERBOARD/PROFILE — no more bare dev rectangles
+    this.scryB = this.add.image(l.x(-150), l.y(766), ssBtn(this, true, 100, 50)).setDisplaySize(l.u(100), l.u(50)).setInteractive({ useHandCursor: true });
+    txt(l.x(-150), l.y(766), 'SCRY ↻', 14, '#9fb0e8').setOrigin(0.5);
+    this.scryPips = [];   // COMET TRAIL's charge pips, built by updateScryPips
+    this.scryB.on('pointerdown', () => this.scry());
+    this.hintB = this.add.image(l.x(-62), l.y(766), ssBtn(this, true, 50, 50)).setDisplaySize(l.u(50), l.u(50)).setInteractive({ useHandCursor: true }).setVisible(false);
+    this.hintT = txt(l.x(-62), l.y(766), '◉', 18, '#d7b45c').setOrigin(0.5).setVisible(false);
+    this.hintB.on('pointerdown', () => this.useHint());
+
+    this.homeB = txt(l.x(-195), l.y(24), '‹', 22, '#5a6390').setOrigin(0, 0.5).setInteractive({ useHandCursor: true });
+    this.homeB.on('pointerdown', () => { SFX.ui(); this.goHome({ from: 'battle' }); });
+    // flying damage numbers mint one texture per distinct value; drop them when
+    // the battle ends so a long session doesn't hoard canvases
+    this.events.once('shutdown', () => {
+      for (const k of this.textures.getTextureKeys()) if (k.indexOf('gold@') === 0) this.textures.remove(k);
+    });
+
+    this.fxC = this.add.container(0, 0).setDepth(50);
+    this.starBurst = this.add.particles(0, 0, 'dot', {
+      speed: { min: 60, max: 320 }, lifespan: { min: 300, max: 800 }, scale: { start: 0.9, end: 0 },
+      blendMode: 'ADD', emitting: false,
+    }).setDepth(60);
+    this.goldRain = this.add.particles(0, 0, 'dot', {
+      x: { min: 0, max: this.scale.width }, y: -20,
+      speedY: { min: 120, max: 260 }, speedX: { min: -30, max: 30 },
+      lifespan: 2200, scale: { start: 0.7, end: 0.1 }, quantity: 2,
+      tint: [0xffd77a, 0xfff2c9, 0xd7b45c], blendMode: 'ADD', emitting: false,
+    }).setDepth(55);
+    this.overlayC = this.add.container(0, 0).setDepth(100);
+
+    // ---- the sigil dock ----
+    // Held sigils keep watch on the right edge, below the birth sign — the
+    // beast's authoring box never reaches past x ±115, so the column is clear.
+    // Tapping it opens the inspector window; the run resumes untouched when
+    // the window closes (strikes are cast-counted, so reading costs nothing).
+    this.dockC = this.add.container(0, 0).setDepth(40);
+    this.refreshDock();
+  }
+
+  // Rebuilds the compact dock from run.sigils; newIdx blooms the arrival.
+  // Six icons show, then the tail folds into a +N — the window lists them all.
+  refreshDock(newIdx) {
+    const l = this.L;
+    this.dockC.removeAll(true);
+    const ids = this.run.sigils;
+    if (!ids.length) return;
+    const X = 187, TOP = 100, STEP = 30;
+    const slots = ids.length <= 6 ? ids.length : 6;
+    const shown = ids.length <= 6 ? ids : ids.slice(0, 5);
+    const pillH = slots * STEP + 6;
+    this.dockC.add(this.add.image(l.x(X), l.y(TOP + pillH / 2), ssDockTex(this, pillH))
+      .setDisplaySize(l.u(34), l.u(pillH)));
+    shown.forEach((id, k) => {
+      const sg = SS_SIGILS.find((s) => s.id === id);
+      if (!sg) return;
+      const RC = SS_RARITY[sg.rarity | 0];
+      const t = ssTxt(this, l.x(X), l.y(TOP + 18 + k * STEP), sg.icon, l.u(15), RC.ink).setOrigin(0.5)
+        .setShadow(0, 0, RC.shadow, l.u(4), true, true);
+      this.dockC.add(t);
+      // a strengthened sigil wears its grade numeral, whisper-quiet at the
+      // icon's foot — the inspector carries the detail (v0.66.0)
+      const ht = this.sigTier(id);
+      if (ht >= 2) {
+        const slot = ssGradeSlot(id, ht), GD = SS_GRADE[slot - 1] || SS_GRADE[1];
+        this.dockC.add(ssTxt(this, l.x(X + 10), l.y(TOP + 27 + k * STEP), SS_ROMAN[slot - 1], l.u(7.5), GD.color)
+          .setOrigin(0.5).setAlpha(0.92));
+      }
+      if (newIdx === k) {         // the newest sigil lands with a small bloom
+        const b = this.add.image(t.x, t.y, 'glowbig').setDisplaySize(l.u(70), l.u(54))
+          .setTint(RC.glow).setAlpha(0.5).setBlendMode('ADD');
+        this.dockC.add(b);
+        this.tweens.add({ targets: b, alpha: 0, duration: 900, ease: 'Sine.easeOut', onComplete: () => b.destroy() });
+        t.setScale(1.7);
+        this.tweens.add({ targets: t, scale: 1, duration: 380, ease: 'Back.easeOut' });
+      }
+    });
+    if (ids.length > 6) this.dockC.add(ssTxt(this, l.x(X), l.y(TOP + 18 + 5 * STEP), '+' + (ids.length - 5), l.u(12), '#c9b676').setOrigin(0.5));
+    const zone = this.add.zone(l.x(X), l.y(TOP + pillH / 2), l.u(46), Math.max(l.u(pillH + 18), l.u(48)))
+      .setOrigin(0.5).setInteractive({ useHandCursor: true });
+    zone.on('pointerdown', () => this.openInspect());
+    this.dockC.add(zone);
+  }
+
+  // The inspector: freeze the fight (every action gates on state 'pick' and
+  // strikes are cast-counted, so nothing can punish the reader), then raise
+  // the window. Closing hands the turn straight back.
+  openInspect() {
+    if (this.state !== 'pick' || this.inspectP) return;
+    if (!this.run.sigils.length && !this.signZ) return;
+    this.state = 'inspect';
+    this.dockC.setVisible(false);          // the compact form yields to the window
+    this.inspectP = ssSigilPanel(this, {
+      sigils: this.run.sigils, tiers: this.run.tiers, sign: this.signZ, signLv: this.signLv, signBorrowed: this.signBorrowed, sleeping: true,
+      onClose: () => {
+        this.inspectP = null;
+        this.dockC.setVisible(true);
+        if (this.state === 'inspect') this.state = 'pick';
+      },
+    });
+  }
+  modeTitle() {
+    if (this.mode === 'campaign') return SS_ACT_N(SS_ACTS[this.fights[this.run.fightIdx].actIdx]);
+    if (this.mode === 'endless') return SS_T('endlessTitle') + ' · ' + SS_T('endLvl', this.run.fightIdx + 1);
+    // the sky's name alone (THE SKY WHEEL, v0.108.0 — Q5: the date lives on
+    // the sheet and the share card); a stock-interim day keeps the classic
+    if (this.mode === 'daily') return '☀ ' + SS_T(this.sky ? this.sky.nameKey : 'daily');
+    return 'QUICK PLAY';
+  }
+
+  /* ---------- THE FIRST OPEN's friendly finger (v0.75.0, Skylar 9/2) ----------
+     "The curated letters will have a friendly finger… that will show you
+     how to push each button. After you push in a word, whether you pushed
+     in the word that the tutorial wants you to push in or whatever word
+     you pushed in, when the Cast button lines up, the hand will move over
+     to the Cast and animate as pushing in at the Cast button."
+     The hand DEMONSTRATES; the player performs every real tap. It is never
+     interactive (it cannot eat a touch), it anchors by its fingertip
+     (SS_FTUE_TIP) so pointing lands the tip on the target's edge — never
+     over the letter — and it mirrors for the board's right half so it
+     always has room. Off the target's road it backs away and waits; the
+     moment ANY woven word goes valid it glides to CAST and pushes; the
+     player's first real cast retires it for good. */
+  ftueStart() {
+    const deal = ssFtueDeal(PACK.lang);
+    this.ftueWord = deal.word;
+    this.ftueGone = false; this.ftueAt = null;
+    window.__ssftue = Object.assign(window.__ssftue || {}, {
+      state: 'board', word: deal.word.join(''), deal: this.board.map((s) => (s ? s.ch : '')).join(' '), point: null,
+    });
+    DIAG('ftue: board (' + deal.word.join('') + ')');
+    // the finger rises once the opening deal's bounce has landed — unless
+    // the player has already cast without it (their game; it lets them)
+    this.time.delayedCall(1500, () => { if (this.ftue && !this.ftueGone && this.sys.isActive()) this.ftueShow(); });
+  }
+  ftueShow() {
+    if (this.ftueHand || this.ftueGone) return;
+    const l = this.L;
+    // the painted glove (art/hand.webp, cut by tools/make-hand-asset.py) —
+    // or a drawn stand-in if the fetch never landed. Real art either way,
+    // never a glyph (the no-emoji-as-game-art law).
+    if (!this.textures.exists('ftuehand')) {
+      if (ART && SSART.img.hand) this.textures.addImage('ftuehand', SSART.img.hand);
+      else {
+        const t = this.textures.createCanvas('ftuehand', 128, 71);
+        ssBake(t, 'ftuehand', 128, 71, (c, w, h) => {
+          c.lineCap = 'round'; c.lineJoin = 'round';
+          // dark rim first, then the glove over it — plain primitives only
+          c.fillStyle = '#14141c';
+          c.beginPath(); c.arc(w * 0.62, h * 0.44, h * 0.44, 0, 7); c.fill();
+          c.strokeStyle = '#14141c'; c.lineWidth = h * 0.36;
+          c.beginPath(); c.moveTo(w * 0.10, h * 0.74); c.lineTo(w * 0.52, h * 0.60); c.stroke();
+          c.fillStyle = '#f4f2ee';
+          c.beginPath(); c.arc(w * 0.62, h * 0.44, h * 0.35, 0, 7); c.fill();
+          c.strokeStyle = '#f4f2ee'; c.lineWidth = h * 0.22;
+          c.beginPath(); c.moveTo(w * 0.12, h * 0.73); c.lineTo(w * 0.52, h * 0.59); c.stroke();
+        });
+      }
+    }
+    const src = this.textures.get('ftuehand').getSourceImage();
+    const hw = l.u(86), hh = hw * (src.height / src.width);
+    const h = this.ftueHand = this.add.image(l.x(60), l.y(650), 'ftuehand')
+      .setOrigin(SS_FTUE_TIP.x, SS_FTUE_TIP.y).setDisplaySize(hw, hh).setAlpha(0).setDepth(62);
+    // never interactive — the 44-pt zones it points at stay wholly the player's
+    this.tweens.add({ targets: h, alpha: 0.97, duration: 350, ease: 'Sine.easeOut' });
+    this.ftueTimer = this.time.addEvent({ delay: 500, loop: true, callback: () => this.ftueRepoint() });
+    this.ftueRepoint(true);
+  }
+  // where the finger belongs right now. While the selection is still a
+  // PROPER prefix of the target (empty counts), the walk continues — even
+  // when the prefix happens to be a word itself (German's dictionary makes
+  // a word of nearly every 3-letter opening; the finger teaches the whole
+  // word, and CAST is lit for a player who'd rather stop). The finger
+  // moves to CAST when a woven word stands complete — the target, or
+  // WHATEVER valid word the player built off the road. Otherwise it waits.
+  ftueGoal() {
+    if (this.ftueGone || this.state === 'end') return null;
+    const tt = this.ftueWord;
+    const onRoad = this.sel.length < tt.length
+      && this.sel.every((bi, k) => this.board[bi] && this.board[bi].ch === tt[k]);
+    if (onRoad) {
+      const need = tt[this.sel.length];
+      for (let i = 0; i < 16; i++) {
+        const s = this.board[i];
+        if (s && s.c.active && !s.blk && s.ch === need && this.sel.indexOf(i) < 0) return i;
+      }
+    }
+    const word = this.currentWord();
+    if (this.sel.length >= 2 && WORDSET.has(word)) return 'cast';
+    return 'wait';
+  }
+  ftueRepoint(snap) {
+    const h = this.ftueHand;
+    if (!h || !h.active || this.ftueGone) return;
+    const goal = this.ftueGoal();
+    if (goal === null) { this.ftueRetire(false); return; }
+    const key = typeof goal === 'number' ? 'slot:' + goal : goal;
+    if (window.__ssftue) window.__ssftue.point = key;
+    if (key === this.ftueAt) return;
+    this.ftueAt = key;
+    const l = this.L, ts = this.tileSize;
+    let pose;
+    // CAST is approached MIRRORED, from the label's left, so the glove
+    // never covers the damage preview it is pointing the player at
+    if (goal === 'cast') pose = { x: this.castB.x - l.u(58), y: this.castB.y - l.u(10), flip: true, dip: 9 };
+    else if (goal === 'wait') pose = { x: h.x, y: Math.min(h.y, l.y(700)) - l.u(44), flip: h.flipX, faded: true };
+    else {
+      const p = this.slotPos(goal);
+      const flip = goal % 4 >= 2;   // the right half is pointed at from the left — room on every phone
+      pose = { x: p.x + (flip ? -1 : 1) * ts * 0.36, y: p.y - ts * 0.10, flip, dip: 7 };
+    }
+    this.tweens.killTweensOf(h);
+    // the mirror keeps the TIP as the anchor: flipX mirrors the frame, so
+    // the origin swaps to the opposite edge with it
+    h.setFlipX(pose.flip).setOrigin(pose.flip ? 1 - SS_FTUE_TIP.x : SS_FTUE_TIP.x, SS_FTUE_TIP.y);
+    const arrive = () => {
+      if (!h.active || this.ftueGone || this.ftueAt !== key) return;
+      if (pose.faded) {
+        // wandering is welcome: the finger backs off and breathes until
+        // it has something true to show again
+        this.tweens.add({ targets: h, alpha: 0.4, duration: 300 });
+        this.tweens.add({ targets: h, y: pose.y - l.u(5), duration: 1300, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+        return;
+      }
+      h.setAlpha(0.97);
+      // the push: along the finger's own axis, tip-first, with a soft ring
+      // where it lands — repeated gently until the player takes the tap
+      const dx = (pose.flip ? 1 : -1) * l.u(pose.dip), dy = l.u(pose.dip * 0.72);
+      this.tweens.add({
+        targets: h, x: pose.x + dx, y: pose.y + dy,
+        duration: 300, ease: 'Sine.easeIn', yoyo: true, hold: 110, repeat: -1, repeatDelay: 700,
+        onYoyo: () => {
+          if (!h.active) return;
+          const ring = this.add.image(pose.x + dx * 0.4, pose.y + dy * 0.4, ssFxTex(this, 'ring', 0xffd77a))
+            .setBlendMode('ADD').setAlpha(0.55).setScale(0.16).setDepth(61);
+          this.tweens.add({ targets: ring, scale: l.u(0.55), alpha: 0, duration: 340, ease: 'Sine.easeOut', onComplete: () => ring.destroy() });
+        },
+      });
+      this.tweens.add({ targets: h, angle: pose.flip ? 2.5 : -2.5, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    };
+    h.setAngle(0);
+    if (snap) { h.setPosition(pose.x, pose.y); arrive(); }
+    else this.tweens.add({ targets: h, x: pose.x, y: pose.y, alpha: 0.97, duration: 430, ease: 'Sine.easeInOut', onComplete: arrive });
+  }
+  // the player's first real cast (or the run's end) sends the finger off —
+  // its two lessons are taught, and it never comes back
+  ftueRetire(happy) {
+    this.ftueGone = true;
+    if (this.ftueTimer) { this.ftueTimer.remove(false); this.ftueTimer = null; }
+    const h = this.ftueHand;
+    this.ftueHand = null;
+    if (window.__ssftue) { window.__ssftue.point = null; window.__ssftue.state = 'done'; }
+    if (!h || !h.active) return;
+    this.tweens.killTweensOf(h);
+    if (happy) {
+      this.starBurst.emitParticleAt(h.x, h.y, 8);
+      this.tweens.add({ targets: h, y: h.y - this.L.u(60), alpha: 0, angle: -10, duration: 600, ease: 'Sine.easeIn', onComplete: () => h.destroy() });
+    } else {
+      this.tweens.add({ targets: h, alpha: 0, duration: 240, onComplete: () => h.destroy() });
+    }
+  }
+
+  // ---------- board ----------
+  boardVowels() { return this.board.filter((s) => s && VOWELS.includes(s.ch[0])).length; }
+  fillBoard(initial) {
+    /* THE FIRST OPEN (v0.75.0): the very first board a brand-new player
+       ever sees is CURATED — the language's authored deal (SS_FTUE,
+       data.js: friendly letters, a designated target word the finger will
+       walk) instead of the bag's roll. The opening deal of the first fight
+       only; every refill, scry and later fight rolls the bag as always. */
+    const deal = initial && this.ftue && this.run.fightIdx === 0 ? ssFtueDeal(PACK.lang).board : null;
+    for (let i = 0; i < 16; i++) {
+      if (this.board[i]) continue;
+      // THE ASHEN BOARD (v0.110.0): a burned cell takes no star — the ash
+      // stands until the fell's fresh deal or the scry sweeps it (both
+      // clear the markers before calling here); every other sky sees an
+      // empty array and fills exactly as always
+      if (this.skyAsh[i]) continue;
+      let ch;
+      if (deal) ch = deal[i];
+      else {
+        ch = rpick(BAG);
+        if (this.boardVowels() < 5 && !VOWELS.includes(ch)) ch = rpick(['a', 'e', 'i', 'o', 'u']);
+        ch = PACK.digraph[ch] || ch;
+      }
+      // the pending queue (v0.66.0): each empty slot takes one owed bonus
+      // tile — GILDED DAWN's start (one gilded; two; two stars at its
+      // height) and the forge's drop ride the same line. The curated deal
+      // is all plain glass on purpose (nothing to explain yet).
+      const tier = deal ? 0 : this.pending.length ? this.pending.shift() : 0;
+      this.spawnTile(i, ch, tier, initial);
+    }
+  }
+  spawnTile(i, ch, tier, initial) {
+    const l = this.L, p = this.slotPos(i);
+    /* THE DYING NAMES (v0.110.0): a cursed letter is BORN dark — the void
+       face, the pale letter, the flat 0 — and keeps dealing: dead weight
+       the hunt routes around. It rides the standing blk law whole, so
+       wordDamage pays nothing, the dew refuses the cell, the boss's own
+       volley passes over it, and the chip's 0 tells the truth at a
+       glance. Dark wins from birth: no tier, no leaf, no glow. */
+    const cursed = !!(this.skyCursed && this.skyCursed.has(ch));
+    if (cursed) tier = 0;
+    const c = this.add.container(p.x, p.y - (initial ? l.u(500) + i * l.u(14) : l.u(420)));
+    const img = this.add.image(0, 0, cursed ? 'tileblk' : 'tile' + tier).setDisplaySize(this.tileSize, this.tileSize);
+    // THE GILDED LETTER (v0.109.0): every tile of Monday's gold wears the
+    // leaf — an overlay above the face, under the letter, so the tier
+    // beneath keeps telling its own story
+    const leaf = !cursed && this.skyGild && ch === this.skyGild
+      ? this.add.image(0, 0, ssSkyLeafTex(this)).setDisplaySize(this.tileSize, this.tileSize) : null;
+    const letter = this.add.image(0, -l.u(2), ssGlyph(this, ch, cursed ? SS_BLK_INK : SS_TILE_INK[tier]))
+      .setDisplaySize(l.u(64), l.u(48));
+    const val = this.add.image(l.u(24), l.u(21), cursed ? ssGlyphVal(this, 0, SS_BLK_VINK) : this.chipKey(ch, tier))
+      .setDisplaySize(l.u(30), l.u(20));
+    c.add(leaf ? [img, leaf, letter, val] : [img, letter, val]);
+    let glow = null;
+    if (!cursed && tier > 0) {
+      glow = this.add.image(0, 0, 'dot').setScale(this.tileSize / 9).setAlpha(tier === 2 ? 0.35 : 0.25)
+        .setTint(SS_TIER_GLOW[tier]).setBlendMode('ADD');
+      c.addAt(glow, 0);
+    } else if (leaf) {
+      // a plain tile's gold breathes behind it; a tiered one keeps its own
+      glow = this.add.image(0, 0, 'dot').setScale(this.tileSize / 9).setAlpha(0.22)
+        .setTint(SS_TIER_GLOW[1]).setBlendMode('ADD');
+      c.addAt(glow, 0);
+    }
+    c.setSize(this.tileSize, this.tileSize).setInteractive({ useHandCursor: true });
+    c.on('pointerdown', () => this.tapTile(i));
+    this.boardC.add(c);
+    this.board[i] = { ch, tier, blk: cursed, c, img, letter, val, glow, leaf };
+    this.tweens.add({ targets: c, y: p.y, duration: initial ? 550 : 420, ease: 'Bounce.easeOut', delay: initial ? i * 45 : Math.random() * 90 });
+  }
+  /* THE ASHEN BOARD's cooling cell (v0.110.0): where a cast star stood, its
+     ashes settle — a marker, never a tile: non-interactive, outside the
+     board array, so taps, the solver, the dew and the volley all read the
+     cell as simply EMPTY. Two sparks rise off the fresh burn and die (pure
+     cosmetics — Math.random, never rng()). */
+  skyAshSettle(i) {
+    const l = this.L, p = this.slotPos(i);
+    const a = this.add.image(p.x, p.y, ssSkyAshTex(this)).setDisplaySize(this.tileSize, this.tileSize).setAlpha(0);
+    this.boardC.add(a);
+    this.tweens.add({ targets: a, alpha: 0.92, duration: 340, ease: 'Sine.easeOut' });
+    for (let k = 0; k < 2; k++) {
+      const m = this.add.image(p.x + (Math.random() - 0.5) * l.u(26), p.y + l.u(12), 'dot')
+        .setScale(0.35 + Math.random() * 0.3).setTint(0xff8a50).setAlpha(0.65).setBlendMode('ADD').setDepth(60);
+      this.boardC.add(m);
+      this.tweens.add({ targets: m, y: m.y - l.u(24 + Math.random() * 14), alpha: 0, delay: 60 + k * 150, duration: 600, ease: 'Sine.easeOut', onComplete: () => m.destroy() });
+    }
+    this.skyAsh[i] = a;
+  }
+  // the sweep: the fell's fresh deal and the scry both blow the ash away
+  // (each then fills every cell); cheap and idempotent everywhere else
+  skyAshClear() {
+    for (const a of this.skyAsh) {
+      if (!a || !a.active) continue;
+      this.tweens.add({ targets: a, alpha: 0, duration: 260, onComplete: () => { if (a.active) a.destroy(); } });
+    }
+    this.skyAsh = [];
+  }
+  tileVal(ch, tier) { return (VALS[ch] || VALS[ch[0]] || 1) + (tier === 1 ? 6 : 0); }
+  // what a held sigil adds to this letter (0 when none apply) — at the HELD
+  // tier, so the chip, the preview, the blackout's weighing and the cast
+  // all rise together when the choir or the runes are strengthened
+  sigilLetterAdd(ch) { return ssSigilLetterAdd(this.run.sigils, ch, undefined, this.run.tiers); }
+  // what the value chip prints: the TRUE points the cast will pay — letter +
+  // tier + held-sigil letter bonuses — or ♥6 on a dew tile (the heal is that
+  // tile's worth; its letter still scores through wordDamage)
+  tileChip(ch, tier) { return tier === 3 ? SS_DEW_CHIP() : this.tileVal(ch, tier) + this.sigilLetterAdd(ch); }
+  // the chip's texture: a sigil-raised letter prints warmer and wears the spark
+  chipKey(ch, tier) {
+    if (tier !== 3 && this.sigilLetterAdd(ch) > 0) return ssGlyphVal(this, this.tileChip(ch, tier), SS_BUFF_VINK[tier], true);
+    return ssGlyphVal(this, this.tileChip(ch, tier), SS_TILE_VINK[tier]);
+  }
+  // the held set changed mid-run (a sigil picked between fights): every
+  // standing chip repaints to the true worth — inked tiles keep their flat 0,
+  // the dew keeps its heart
+  repaintChips() {
+    const l = this.L;
+    for (const s of this.board) {
+      if (!s || !s.c.active || s.blk) continue;
+      s.val.setTexture(this.chipKey(s.ch, s.tier)).setDisplaySize(l.u(30), l.u(20));
+    }
+  }
+
+  /* THE DEW (Wyatt): where the blow fell, dew gathers — one random plain
+     tile (tier 0, never a forged special or an inked one) turns green after
+     a strike lands. Seeded rng, not Math.random: the daily must deal the same
+     dew to everyone. Returns the slot, or -1 when no tile could take it.
+     `at` pins the slot (harness seam; a taken or inked slot is refused). */
+  dewTile(at) {
+    const l = this.L;
+    if (at === undefined && rng() >= DEW_CHANCE) return -1;
+    const open = [];
+    for (let i = 0; i < 16; i++) { const s = this.board[i]; if (s && s.tier === 0 && !s.blk && s.c.active) open.push(i); }
+    if (!open.length) return -1;
+    const i = at === undefined ? open[Math.floor(rng() * open.length)] : at, s = this.board[i];
+    if (!open.includes(i)) return -1;
+    s.tier = 3;
+    SFX.dew();
+    // the settle: green glass crossfades in under cooling inks, the chip
+    // turns to ♥6, a soft glow blooms and three droplets sink onto the face
+    const g = this.add.image(0, 0, 'tile3').setDisplaySize(this.tileSize, this.tileSize).setAlpha(0);
+    s.c.addAt(g, s.c.list.indexOf(s.img) + 1);
+    const old = s.img;
+    s.img = g;
+    this.tweens.add({ targets: g, alpha: 1, duration: 420, ease: 'Sine.easeOut', onComplete: () => { if (old.active) old.destroy(); } });
+    if (s.glow) { this.tweens.killTweensOf(s.glow); s.glow.destroy(); }
+    s.glow = this.add.image(0, 0, 'dot').setScale(this.tileSize / 9).setAlpha(0).setTint(SS_TIER_GLOW[3]).setBlendMode('ADD');
+    s.c.addAt(s.glow, 0);
+    this.tweens.add({ targets: s.glow, alpha: 0.5, duration: 260, ease: 'Sine.easeOut',
+      onComplete: () => { if (s.glow && s.glow.active) this.tweens.add({ targets: s.glow, alpha: 0.25, duration: 500 }); } });
+    for (let k = 0; k < 3; k++) {
+      const drop = this.add.image(s.c.x + (Math.random() - 0.5) * l.u(30), s.c.y - l.u(30 + Math.random() * 12), 'dot')
+        .setScale(0.45 + Math.random() * 0.3).setTint(SS_TIER_GLOW[3]).setAlpha(0).setBlendMode('ADD').setDepth(60);
+      this.boardC.add(drop);
+      this.tweens.add({ targets: drop, y: s.c.y + (Math.random() - 0.5) * l.u(10), alpha: { from: 0.8, to: 0 }, delay: 80 + k * 110, duration: 460, ease: 'Sine.easeIn', onComplete: () => drop.destroy() });
+    }
+    this.tweens.add({ targets: s.c, scaleX: 1.08, scaleY: 1.08, duration: 130, yoyo: true, ease: 'Sine.easeOut', delay: 60 });
+    this.time.delayedCall(200, () => {
+      if (!s.c.active) return;
+      s.letter.setTexture(ssGlyph(this, s.ch, SS_TILE_INK[3])).setDisplaySize(l.u(64), l.u(48));
+      s.val.setTexture(this.chipKey(s.ch, 3)).setDisplaySize(l.u(30), l.u(20));
+    });
+    window.__ssdew = { i, ch: s.ch, fight: this.run.fightIdx, t: Date.now() };   // verification beacon
+    return i;
+  }
+
+  // USE IT OR LOSE IT (Wyatt): a bonus tile must ride the very next cast or
+  // its power drains away — the letter stays, the shimmer goes. Swept after a
+  // cast's impact and BEFORE the refill drops the newly earned tile, so every
+  // reward is live for exactly one cast. The beast's strike is not a cast and
+  // never wastes a tile; only the player's own word can.
+  expireSpecials() {
+    const l = this.L;
+    let drained = false;
+    for (const s of this.board) {
+      if (!s || !s.tier || !s.c.active) continue;
+      drained = true;
+      const wasTier = s.tier, tint = SS_TIER_GLOW[wasTier];
+      s.tier = 0;
+      // the goodbye: the glow swells once and drains, gold dust sinks out of
+      // the letter, and the plain face crossfades in under cooling inks
+      if (s.glow) {
+        this.tweens.killTweensOf(s.glow);
+        this.tweens.add({
+          targets: s.glow, alpha: 0.55, scaleX: s.glow.scaleX * 1.3, scaleY: s.glow.scaleY * 1.3,
+          duration: 150, ease: 'Sine.easeOut',
+          onComplete: () => this.tweens.add({ targets: s.glow, alpha: 0, duration: 420, onComplete: () => { if (s.glow.active) s.glow.destroy(); } }),
+        });
+      }
+      const plain = this.add.image(0, 0, 'tile0').setDisplaySize(this.tileSize, this.tileSize).setAlpha(0);
+      s.c.addAt(plain, s.c.list.indexOf(s.img) + 1);
+      const old = s.img;
+      s.img = plain;
+      this.tweens.add({ targets: plain, alpha: 1, duration: 480, delay: 120, onComplete: () => { if (old.active) old.destroy(); } });
+      // pure cosmetics use Math.random, never rng() — the seeded stream deals
+      // the tiles and must not be nudged by an animation
+      for (let k = 0; k < 3; k++) {
+        const mote = this.add.image(s.c.x + (Math.random() - 0.5) * l.u(34), s.c.y + (Math.random() - 0.5) * l.u(20), 'dot')
+          .setScale(0.5 + Math.random() * 0.4).setTint(tint).setAlpha(0.5).setBlendMode('ADD').setDepth(60);
+        this.boardC.add(mote);
+        this.tweens.add({ targets: mote, y: mote.y + l.u(16 + Math.random() * 10), alpha: 0, delay: k * 90, duration: 520, ease: 'Sine.easeIn', onComplete: () => mote.destroy() });
+      }
+      this.time.delayedCall(280, () => {
+        if (!s.c.active) return;
+        s.letter.setTexture(ssGlyph(this, s.ch, SS_TILE_INK[0])).setDisplaySize(l.u(64), l.u(48));
+        s.val.setTexture(this.chipKey(s.ch, 0)).setDisplaySize(l.u(30), l.u(20));
+      });
+      // teach it once per run — after that the drain speaks for itself
+      if (!this.run.fadeShown) {
+        this.run.fadeShown = true;
+        const ft = ssTxt(this, s.c.x, s.c.y - l.u(52), SS_T('tileFade'), l.u(12), '#c9b676', 'italic')
+          .setOrigin(0.5).setDepth(70).setShadow(0, 0, '#0a0d1c', l.u(8), true, true);
+        this.tweens.add({ targets: ft, alpha: 0, y: ft.y - l.u(20), delay: 1400, duration: 500, onComplete: () => ft.destroy() });
+      }
+    }
+    if (drained) SFX.fizzle();
+  }
+
+  /* THE BLACKOUT (Wyatt): void-fictioned bosses ink letters as they charge.
+     An inked tile stays readable and stays usable in words — it is simply
+     worth NOTHING when the points are added up (base value, tier bonus and
+     letter bonuses all void; the rest of the word scores normally and the
+     word-level multipliers still apply to the others). It rides the existing
+     boss telegraph: the volley flies at "strikes in 1 cast", the same beat
+     the eyes charge and the sky rumbles, so the word woven under the gun is
+     the word that must route around the dark. The curse holds until the tile
+     leaves the board — spend it for nothing, scry the board away, or purify
+     it (VIRGO cleanses) — because those valves already exist, "until used"
+     plays better than a timed lift. Targets are the highest-value clean
+     PLAIN tiles — a forged special (orange, blue, green) is spared until no
+     plain tile is left to ink (Skylar, 8/31: the boss eats your best
+     letters, not your earned ones; when a special IS inked it still loses
+     its shimmer outright — blackout wins). Never more than 6 dark at once,
+     and an inked letter still spells, so a board is never uncastable. */
+  blackoutAttack(done) {
+    const l = this.L;
+    const dark = this.board.filter((s) => s && s.blk).length;
+    const n = Math.min(this.beast.fx.ink || 2, Math.max(0, 6 - dark));
+    const targets = this.board.map((s, i) => ({ s, i })).filter((x) => x.s && !x.s.blk && x.s.c.active)
+      .sort((a, b) => (a.s.tier > 0) - (b.s.tier > 0) || this.inkWorth(b.s) - this.inkWorth(a.s) || a.i - b.i)
+      .slice(0, n);
+    if (!targets.length) { done(); return; }
+    let fin = false;
+    const finish = () => { if (!fin) { fin = true; done(); } };
+    this.time.delayedCall(2200, finish);            // watchdog — the turn must always return
+    window.__ssink = { n: targets.length, tiles: targets.map((t) => t.i), fight: this.run.fightIdx, t: Date.now() };
+    SFX.curse();
+    // the windup: the boss shudders with gathered dark — strike-tremble language
+    const c = this.beastC;
+    this.tweens.add({ targets: c, x: l.x(0) - l.u(6), duration: 90, yoyo: true, repeat: 3, ease: 'Sine.easeInOut', onComplete: () => c.setX(l.x(0)) });
+    ssEdgeFlash(this, 0x6b5fa8, 0.3, 700);
+    // the telegraph line borrows the word-line hint's spot — dip the hint so
+    // the two never overprint, and hand its alpha back when the line passes
+    this.tweens.killTweensOf(this.lineHint);
+    this.tweens.add({ targets: this.lineHint, alpha: 0, duration: 150 });
+    const tt = ssTxt(this, l.x(0), l.y(384), SS_T('inkTele'), l.u(13), '#b9b0d8', 'italic')
+      .setOrigin(0.5).setDepth(70).setAlpha(0).setShadow(0, 0, '#0a0d1c', l.u(8), true, true);
+    this.tweens.add({ targets: tt, alpha: 0.95, duration: 220 });
+    this.tweens.add({
+      targets: tt, alpha: 0, y: tt.y - l.u(14), delay: 1350, duration: 450,
+      onComplete: () => { tt.destroy(); if (this.lineHint.active) this.lineHint.setAlpha(this.sel.length ? 0 : 0.9); },
+    });
+    // ink bolts: dark motes streak from the beast's gaze onto the chosen letters
+    const eye = (this.beast.eyes && this.beast.eyes[0]) || [0, 0];
+    const from = { x: c.x + eye[0] * l.u(1.32), y: c.y + eye[1] * l.u(1.32) };
+    const dotK = ssFxTex(this, 'dot', 0x8a76e8);
+    let landed = 0;
+    targets.forEach((tg, k) => {
+      this.time.delayedCall(380 + k * 150, () => {
+        const s = this.board[tg.i];
+        const settle = () => { if (++landed === targets.length) this.time.delayedCall(240, finish); };
+        if (!s || !s.c.active || s.blk) { settle(); return; }
+        SFX.noise(0.14, 700, 1.6, 0.05, 220);
+        const to = { x: s.c.x, y: s.c.y };
+        const ctrl = { x: (from.x + to.x) / 2 + (k % 2 ? -1 : 1) * l.u(70), y: (from.y + to.y) / 2 };
+        const dots = [];
+        for (let j = 0; j < 6; j++) dots.push(this.add.image(from.x, from.y, dotK).setBlendMode('ADD').setDepth(58).setScale(1.05 - j * 0.12).setAlpha(0));
+        const pr = { t: 0 };
+        this.tweens.add({
+          targets: pr, t: 1, duration: 290, ease: 'Cubic.easeIn',
+          onUpdate: () => dots.forEach((d, j) => {
+            const t2 = clamp(pr.t * 1.3 - j * 0.055, 0, 1);
+            const p = ssQBez(from, ctrl, to, t2);
+            d.x = p.x; d.y = p.y; d.alpha = t2 > 0 ? 0.9 - j * 0.13 : 0;
+          }),
+          onComplete: () => {
+            dots.forEach((d) => this.tweens.add({ targets: d, alpha: 0, duration: 150, onComplete: () => d.destroy() }));
+            this.blackTile(tg.i);
+            settle();
+          },
+        });
+      });
+    });
+  }
+  // what the blackout weighs: the letter's true worth — points, held-sigil
+  // letter bonuses, and the dew's balm counted as the +6 it is
+  inkWorth(s) { return this.tileVal(s.ch, s.tier) + this.sigilLetterAdd(s.ch) + (s.tier === 3 ? DEW_HEAL : 0); }
+  blackTile(i) {
+    const s = this.board[i];
+    if (!s || !s.c.active || s.blk) return;
+    const l = this.L;
+    s.blk = true;
+    // blackout wins: a gilded or forged letter is simply dark now
+    s.tier = 0;
+    if (s.glow) {
+      const gg = s.glow;
+      s.glow = null;
+      this.tweens.killTweensOf(gg);
+      this.tweens.add({ targets: gg, alpha: 0, duration: 260, onComplete: () => { if (gg.active) gg.destroy(); } });
+    }
+    if (s.leaf) {
+      // blackout wins over the gold leaf too — it chars away with the light
+      const lf = s.leaf;
+      s.leaf = null;
+      this.tweens.add({ targets: lf, alpha: 0, duration: 260, onComplete: () => { if (lf.active) lf.destroy(); } });
+    }
+    // the ink pools: the void face crossfades in under a pale letter and a flat 0
+    const inked = this.add.image(0, 0, 'tileblk').setDisplaySize(this.tileSize, this.tileSize).setAlpha(0);
+    s.c.addAt(inked, s.c.list.indexOf(s.img) + 1);
+    const old = s.img;
+    s.img = inked;
+    this.tweens.add({ targets: inked, alpha: 1, duration: 300, onComplete: () => { if (old.active) old.destroy(); } });
+    this.time.delayedCall(150, () => {
+      if (!s.c.active) return;
+      s.letter.setTexture(ssGlyph(this, s.ch, SS_BLK_INK)).setDisplaySize(l.u(64), l.u(48));
+      s.val.setTexture(ssGlyphVal(this, 0, SS_BLK_VINK)).setDisplaySize(l.u(30), l.u(20));
+    });
+    const ring = this.add.image(s.c.x, s.c.y, ssFxTex(this, 'ring', 0x8a76e8)).setBlendMode('ADD').setAlpha(0.7).setScale(0.2).setDepth(59);
+    this.tweens.add({ targets: ring, scale: l.u(0.85), alpha: 0, duration: 380, ease: 'Cubic.easeOut', onComplete: () => ring.destroy() });
+    this.tweens.add({ targets: s.c, angle: -3, duration: 60, yoyo: true, repeat: 2, onComplete: () => s.c.setAngle(0) });
+    this.cameras.main.shake(60, 0.0022);
+    // teach it once per run — after that the flat 0 speaks
+    if (!this.run.inkShown) {
+      this.run.inkShown = true;
+      const ft = ssTxt(this, s.c.x, s.c.y - l.u(52), SS_T('inkHint'), l.u(12), '#b9b0d8', 'italic')
+        .setOrigin(0.5).setDepth(70).setShadow(0, 0, '#0a0d1c', l.u(8), true, true);
+      this.tweens.add({ targets: ft, alpha: 0, y: ft.y - l.u(20), delay: 1500, duration: 500, onComplete: () => ft.destroy() });
+    }
+  }
+
+  // ---------- selection ----------
+  tapTile(i) {
+    if (this.state !== 'pick') return;
+    SFX.ensure();
+    if (this.purifyArmed) { this.purifyTile(i); return; }
+    const k = this.sel.indexOf(i);
+    if (k >= 0) { this.unselectFrom(k); return; }
+    if (this.sel.length >= 8) return;
+    this.sel.push(i);
+    this.board[i].c.setAlpha(0.28);
+    SFX.chime(this.sel.length - 1);
+    this.layoutLine();
+  }
+  unselectFrom(k) {
+    if (!this.sel.length) return;
+    SFX.unchime();
+    const removed = this.sel.splice(k);
+    for (const i of removed) if (this.board[i]) this.board[i].c.setAlpha(1);
+    this.layoutLine();
+  }
+  currentWord() { return this.sel.map((i) => this.board[i].ch).join(''); }
+  layoutLine() {
+    const l = this.L;
+    for (const t of this.lineTiles) t.destroy();
+    this.lineTiles = [];
+    const n = this.sel.length;
+    this.lineHint.setAlpha(n ? 0 : 0.9);
+    const word = this.currentWord();
+    // THE LONG ROAD (v0.109.0): the weave stays free, but a word below the
+    // sky's floor reads exactly as an invalid one — the button dims, the
+    // worth is withheld — and the button's own seat says why (CAST 5+)
+    const valid = n >= 2 && word.length >= this.castMinLen() && WORDSET.has(word);
+    const sz = l.u(44), gap = l.u(6);
+    const w = n * sz + (n - 1) * gap;
+    this.sel.forEach((bi, k) => {
+      const s = this.board[bi];
+      const mc = this.add.container(-w / 2 + sz / 2 + k * (sz + gap), 0);
+      const img = this.add.image(0, 0, s.blk ? 'tileblk' : 'tile' + s.tier).setDisplaySize(sz, sz);
+      // same glyph texture as the board, at the line's font-16/20 proportions;
+      // an inked letter keeps its ash ink in the staged word — it spells, but
+      // the player should see it carrying no weight
+      const gsc = s.ch.length > 1 ? 16 / 30 : 20 / 36;
+      const letter = this.add.image(0, 0, ssGlyph(this, s.ch, s.blk ? SS_BLK_INK : valid ? SS_LINE_GREEN : SS_TILE_INK[0]))
+        .setDisplaySize(l.u(64 * gsc), l.u(48 * gsc));
+      // Monday's gold keeps its leaf in the staged word (blackout excepted)
+      mc.add(!s.blk && this.skyGild && s.ch === this.skyGild
+        ? [img, this.add.image(0, 0, ssSkyLeafTex(this)).setDisplaySize(sz, sz), letter]
+        : [img, letter]);
+      mc.setSize(sz, sz).setInteractive({ useHandCursor: true });
+      mc.on('pointerdown', () => this.unselectFrom(k));
+      this.lineC.add(mc);
+      this.lineTiles.push(mc);
+      mc.setScale(0.6); this.tweens.add({ targets: mc, scale: 1, duration: 140, ease: 'Back.easeOut' });
+    });
+    this.castB.setAlpha(valid ? 1 : 0.45);
+    this.castT.setAlpha(valid ? 1 : 0.5);
+    // a REAL word standing below the road's floor: the worth's own seat
+    // carries the reason it will not fly (language-neutral, no new words)
+    const short = !valid && n >= 2 && WORDSET.has(word) && word.length < this.castMinLen();
+    this.castT.setText(valid ? 'CAST ' + this.previewDamage() : short ? 'CAST ' + this.castMinLen() + '+' : 'CAST');
+    // the first open's finger follows every selection change the moment it
+    // lands (its own slow poll covers scries and refills)
+    if (this.ftueHand) this.ftueRepoint();
+  }
+
+  // ---------- the birth sign ----------
+  signTap() {
+    if (!this.signZ) return;
+    if (this.sign === 'virgo') {
+      if (this.state !== 'pick' || (this.purifyLeft | 0) <= 0) return;
+      SFX.ensure(); SFX.ui();
+      this.setPurifyArmed(!this.purifyArmed);
+      return;
+    }
+    SFX.ensure();
+    // the sign's power reads in the inspector window — never as text over the
+    // board (it was an unreadable toast once; Wyatt called it)
+    this.openInspect();
+  }
+  // VIRGO's ember: charged = a soft breath behind the emblem, armed = bright
+  updateSignGlow() {
+    if (!this.signGlow) return;
+    this.tweens.killTweensOf(this.signGlow);
+    if (this.sign !== 'virgo') { this.signGlow.setAlpha(0); return; }
+    if (this.purifyArmed) {
+      this.signGlow.setAlpha(0.32);
+      this.tweens.add({ targets: this.signGlow, alpha: 0.14, duration: 500, yoyo: true, repeat: -1 });
+    } else if ((this.purifyLeft | 0) > 0) {
+      // the charged breath returns while ANY purify stands (v0.69.0 — the
+      // maiden at her height carries two or three per battle)
+      this.signGlow.setAlpha(0.10);
+      this.tweens.add({ targets: this.signGlow, alpha: 0.04, duration: 1100, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    } else this.signGlow.setAlpha(0);
+  }
+  setPurifyArmed(on) {
+    this.purifyArmed = on;
+    if (this.purifyHintT) { this.purifyHintT.destroy(); this.purifyHintT = null; }
+    if (on) {
+      this.purifyHintT = ssTxt(this, this.L.x(0), this.L.y(452), SS_T('zpPurify'), this.L.u(12), '#cfe8b0', 'italic')
+        .setOrigin(0.5).setDepth(70).setShadow(0, 0, '#3a5a2a', this.L.u(8), true, true);
+    }
+    this.updateSignGlow();
+  }
+  purifyTile(i) {
+    const s = this.board[i];
+    if (!s) return;
+    this.purifyLeft = Math.max(0, (this.purifyLeft | 0) - 1);
+    // the disarm stands (a purify is a deliberate two-tap rite) — at 2+
+    // charges the player taps the emblem again for the next one
+    this.setPurifyArmed(false);
+    const k = this.sel.indexOf(i);
+    if (k >= 0) this.unselectFrom(k);
+    const p = this.slotPos(i);
+    this.starBurst.emitParticleAt(p.x, p.y, 8);
+    SFX.forge();
+    s.c.destroy(); this.board[i] = null;
+    let ch = rpick(BAG);
+    ch = PACK.digraph[ch] || ch;
+    this.spawnTile(i, ch, s.tier, false);
+  }
+
+  // ---------- damage ----------
+  hasSigil(id) { return this.run.sigils.includes(id); }
+  // the held copy's tier (1..maxT; 0 unheld) and its dials (v0.66.0) —
+  // every effect site pays the HELD TIER's value through the one resolver
+  sigTier(id) {
+    if (!this.hasSigil(id)) return 0;
+    return Math.max(1, Math.min(((this.run.tiers || {})[id] | 0) || 1, ssSigilMaxT(id)));
+  }
+  sigVal(id, field) { return ssSigilVal(id, field, this.sigTier(id) || 1); }
+  // the birth sign's dial at the run's HELD LEVEL (v0.69.0) — one resolver,
+  // the level refreshed per battle at startFight (a mid-climb level-up
+  // strengthens the NEXT battle, never mid-fight)
+  signVal(field) { return ssSignVal(this.sign, field, this.signLv || 1); }
+  /* THE LONG ROAD (v0.109.0): the shortest word CAST will let fly — 2
+     always, the sky's own floor under Wednesday's law. ONE test shared by
+     the button, the cast and the solver, so the three can never disagree. */
+  castMinLen() { return this.sky && this.sky.minLen ? this.sky.minLen : 2; }
+  // XP settles the moment it is earned; the caller's own SS.save carries it
+  // — except under a BORROWED sign (v0.109.0), which may never write home:
+  // the unsigned daily's suppression is BUILT here, not assumed
+  signXp(n) {
+    if (!this.sign || this.signBorrowed || !n) return;
+    const sr = SS.prof.signs[this.sign] || (SS.prof.signs[this.sign] = { best: 0, clears: 0, runs: 0, xp: 0, ack: 1 });
+    sr.xp = (sr.xp | 0) + n;
+  }
+  // STORMBINDER's cycle — ONE test for the ×2 and the ↯ toast, so the two
+  // can never disagree; nth-word means run.words ≡ n−1 (mod n), pre-cast
+  stormProc() {
+    if (!this.hasSigil('storm')) return false;
+    const n = this.sigVal('storm', 'every');
+    return this.run.words % n === n - 1;
+  }
+  wordDamage(tiles) {
+    let base = 0, starMult = 1, vowelsN = 0, letters = 0;
+    for (const s of tiles) {
+      letters += s.ch.length;
+      const c0 = s.ch[0];
+      if (VOWELS.includes(c0)) vowelsN++;      // structural — LIBRA's balance sees even inked vowels
+      if (s.blk) continue;                     // blackout: the letter spells, but pays NOTHING
+      // the chip's own arithmetic — letter + tier + held-sigil letter bonuses
+      // (River Runes, the Choir) — so the board and the cast can never differ.
+      // THE GILDED LETTER (v0.109.0): Monday's gold pays ×3 the very number
+      // its chip prints — the preview rides this same sum (the v0.62 law),
+      // so weaving the gold IS the lesson
+      const tv = this.tileVal(s.ch, s.tier) + this.sigilLetterAdd(s.ch);
+      base += this.skyGild && s.ch === this.skyGild ? tv * 3 : tv;
+      if (s.tier === 2) starMult = 1.5;
+    }
+    let dmg = base * (LEN_MULT[Math.min(letters, 8)] || 2.3) * starMult;
+    // every dial below reads the HELD TIER's value (v0.66.0) — tier I is
+    // byte-for-byte today's arithmetic
+    if (this.hasSigil('quill')) dmg += this.sigVal('quill', 'add');
+    if (this.hasSigil('longbow') && letters >= 6) dmg += this.sigVal('longbow', 'add');
+    if (this.hasSigil('roots')) dmg += this.sigVal('roots', 'add') * this.run.sigils.length;
+    if (this.hasSigil('verse')) dmg += this.sigVal('verse', 'add') * this.run.words;
+    // birth-sign angles (campaign + endless; this.sign is null elsewhere) —
+    // every dial reads the HELD LEVEL through signVal (v0.69.0)
+    if (this.sign === 'gemini') {
+      const twice = {};
+      for (const s of tiles) twice[s.ch] = (twice[s.ch] | 0) + 1;
+      for (const ch in twice) if (twice[ch] >= 2) { dmg += this.signVal('add'); break; }
+    }
+    if (this.sign === 'leo' && letters >= 6) dmg += this.signVal('add');
+    if (this.sign === 'libra' && tiles.length && vowelsN * 2 === tiles.length) dmg += this.signVal('add');
+    // capricorn's `per` may be fractional (0.5 = every second beast, 2 =
+    // twice per beast) — floor the PRODUCT, never the dial
+    if (this.sign === 'capricorn') dmg += Math.floor(this.run.fightIdx * this.signVal('per'));
+    if (this.sign === 'pisces' && this.beast && this.beast.count === 1 && this.beast.hpNow > 0) dmg *= 1 + this.signVal('pct') / 100;
+    if (this.hasSigil('blood')) dmg *= 1 + this.sigVal('blood', 'mult') / 100;
+    if (this.hasSigil('nova') && letters >= this.sigVal('nova', 'thresh')) dmg *= 2;
+    if (this.stormProc()) dmg *= 2;   // STORMBINDER's cycling word
+    if (this.hasSigil('first') && !this.run.firstUsed) dmg *= this.sigVal('first', 'mult');
+    return Math.round(dmg);
+  }
+  previewDamage() { return this.wordDamage(this.sel.map((i) => this.board[i])); }
+
+  // ---------- fights ----------
+  beastFor(f) {
+    const base = SS_BEASTS[f.id];
+    const b = { ...base };
+    b.hp = Math.round(base.hp * f.mult);
+    b.atk = base.atk + f.atkAdd;
+    // BLOOD INK's pact: the beast's side stays +25% at every tier (smult is
+    // flat on the ladder) — upgrading the ink never deepens your wound
+    if (this.hasSigil('blood')) b.atk = Math.round(b.atk * (1 + this.sigVal('blood', 'smult') / 100));
+    if (f.umbral && !base.boss) { b.tint = SS_UMBRAL.tint; b.eye = SS_UMBRAL.eye; b.name = SS_UMBRAL.prefix + base.name; }
+    if (f.umbral && base.boss && f.id !== 'phoenix') { b.tint = SS_UMBRAL.tint; b.eye = SS_UMBRAL.eye; b.name = SS_UMBRAL.prefix + base.name; }
+    // the endless deepening (v0.68.0): the ladder squeezes the strike clock
+    // (never below 2 casts) and its deep bosses drink the light. fx is
+    // cloned before the curse lands — the def in SS_BEASTS must never learn
+    // what one fight dressed it in.
+    if (f.tcut) b.timer = Math.max(2, b.timer - f.tcut);
+    if (f.curse === 'blackout' && base.boss) {
+      b.fx = Object.assign({}, b.fx, { curse: 'blackout', ink: Math.max(f.ink || 2, (base.fx && base.fx.ink) || 0) });
+    }
+    // HARD MODE's boss knobs (v0.70.0) — shipped 1.0 / 0, so today they
+    // change nothing: SS_HARD.hardMult / hardAtkAdd are Skylar's dials if
+    // the clock alone leaves hard too easy ("possibly increase the boss's
+    // health and the attack they do")
+    if (this.hard && base.boss) {
+      b.hp = Math.round(b.hp * SS_HARD.hardMult);
+      b.atk += SS_HARD.hardAtkAdd | 0;
+    }
+    return b;
+  }
+  startFight() {
+    const l = this.L;
+    const f = this.fights[this.run.fightIdx];
+    // the endless climb's rungs ring the moment they are REACHED (v0.68.0):
+    // award() is idempotent, so a resumed climb settles up quietly
+    if (this.mode === 'endless') {
+      if (this.run.fightIdx + 1 >= 10) SS.award('end-10', this.game);
+      if (this.run.fightIdx + 1 >= 20) SS.award('end-20', this.game);
+    }
+    this.beast = this.beastFor(f);
+    if (this.hasSigil('hush')) this.beast.timer += this.sigVal('hush', 'delay');
+    // THE LONG ROAD (v0.109.0): in fairness to the slower rhythm, every
+    // beast's fuse runs one cast longer under Wednesday's sky
+    if (this.sky && this.sky.fuseAdd) this.beast.timer += this.sky.fuseAdd;
+    this.beast.hpNow = this.beast.hp;
+    if ((this.run.overkill | 0) > 0) {                 // ECHO OF RUIN carries the surplus
+      const carve = Math.min(this.run.overkill | 0, this.beast.hp - 1);
+      this.beast.hpNow -= carve;
+      this.run.overkill = 0;
+      const et = ssTxt(this, l.x(0), l.y(238), '☍ −' + carve, l.u(18), '#d9b0ff').setOrigin(0.5).setDepth(70)
+        .setShadow(0, 0, '#a86be0', l.u(8), true, true);
+      this.tweens.add({ targets: et, alpha: 0, y: l.y(214), delay: 1100, duration: 500, onComplete: () => et.destroy() });
+    }
+    // the birth sign wakes with the battle — at the level the profile holds
+    // NOW (v0.69.0): a level-up mid-climb strengthens the next battle, a
+    // resumed climb reads the same way, and the charge counters below are
+    // per-battle grants at that level (fight-start semantics, derived
+    // never persisted — the cometLeft law)
+    this.signLv = this.signBorrowed ? SS_SKY_SIGN_LV : ssSignLv(this.sign);
+    this.venom = 0;
+    this.shellUsed = false;
+    this.watersLeft = this.sign === 'aquarius' ? this.signVal('charges') : 0;
+    this.purifyLeft = this.sign === 'virgo' ? this.signVal('charges') : 0;
+    if (this.purifyArmed) this.setPurifyArmed(false);
+    else this.updateSignGlow && this.updateSignGlow();
+    if (this.sign === 'aries') {                       // the opening ram
+      const ram = Math.min(this.signVal('ram'), this.beast.hpNow - 1);
+      if (ram > 0) {
+        this.beast.hpNow -= ram;
+        this.run.totalDmg += ram;
+        const rt = ssTxt(this, l.x(0), l.y(214), '−' + ram, l.u(18), '#ffb066').setOrigin(0.5).setDepth(70)
+          .setShadow(0, 0, '#e05e2a', l.u(9), true, true);
+        this.tweens.add({ targets: rt, alpha: 0, y: l.y(190), delay: 1000, duration: 500, onComplete: () => rt.destroy() });
+        this.cameras.main.shake(120, 0.004);
+      }
+    }
+    // what the bar/numbers SHOW — trails hpNow, catching up when a flying
+    // damage number lands on the bar
+    this.ehpShown = { v: this.beast.hpNow };
+    this._strikeCnt = null;   // a fresh fight's first fuse paint never pulses
+    this.dying = false;
+    this.beast.count = this.beast.timer;
+    this.run.firstUsed = false;
+    this.struckThisBattle = false;
+    // per-battle allowances, granted fresh every fight (resume included —
+    // fight-start semantics, derived never persisted) at the HELD TIER:
+    // SILVER SHIELD's blocks (1; 2 at its height), the TOME's reveals
+    // (1; 2), COMET TRAIL's free scries (1 / 2 / 3)
+    this.shieldLeft = this.hasSigil('shield') ? this.sigVal('shield', 'blocks') : 0;
+    this.hintsLeft = this.hasSigil('tome') ? this.sigVal('tome', 'uses') : 0;
+    this.cometLeft = this.hasSigil('comet') ? ssSigilCharges('comet', this.sigTier('comet')) : 0;
+    // the strike clock re-arms with every battle (fight-start semantics,
+    // derived never persisted — the cometLeft law); one truth, two flags
+    if (this.strikeMs) { this.hardLeft = this.strikeMs; this.hardDraw(true); }
+    this.clearHintFx();
+    this.headT.setText(this.modeTitle());
+    const pipBase = this.mode === 'campaign' || this.mode === 'endless' ? Math.floor(this.run.fightIdx / 5) * 5 : 0;
+    this.pips.forEach((p, i) => {
+      const gi = pipBase + i;
+      p.setTint(gi < this.run.fightIdx ? 0xd7b45c : gi === this.run.fightIdx ? 0xffffff : 0x4a5480)
+        .setScale(gi === this.run.fightIdx ? 0.9 : 0.6);
+    });
+    this.setBeastName(''); this.beastTitle.setText('');
+    if (this.beastFx) this.beastFx.destroy();
+    this.beastC.setPosition(l.x(0), l.y(170)).setScale(1).setRotation(0);
+    const asm = ssAssembleBeast(this, this.beastC, this.beast, l.u(SS_STAR_GRADES.battle), () => {
+      this.setBeastName(this.beast.name);
+      const tag = this.beast.boss ? ' · ' + SS_T('tBoss') : this.beast.tier === 'mini' ? ' · ' + SS_T('tElite') : '';
+      this.beastTitle.setText((SS_BEAST_T(this.beast) + tag).toUpperCase());
+    });
+    this.beastLines = asm.lines; this.beastStars = asm.stars;
+    // presence + attack fx (aura, idle, shimmer, telegraph, signature strikes);
+    // it also owns the body's breathing, so no more breathTween here
+    this.beastFx = ssBeastFx(this, this.beastC, this.beast, l.u(SS_STAR_GRADES.battle), asm);
+    // the frontier flags stand at the level's own beat (v0.77.0): whoever's
+    // best this rung is, their flag is HERE — and entering the level above a
+    // flag rings its pass ceremony, the frontier's the biggest of all
+    this.plantFlags();
+    this.flagBeats();
+
+    this.sel = [];
+    for (const s of this.board) if (s) s.c.destroy();
+    this.board = [];
+    // THE ASHEN BOARD (v0.110.0): the beast fell — the ash blows away and
+    // sixteen fresh stars deal in below (the board is reborn at the fell)
+    this.skyAshClear();
+    this.tweens.killTweensOf([this.boardC, this.lineC]);
+    this.boardC.setAlpha(1); this.lineC.setAlpha(1);
+    this.layoutLine();
+    if (this.hasSigil('gilded')) this.pending = [...this.sigVal('gilded', 'start')];
+    // the sign's own gilded gift (SS_SIGN_REWARDS, level 40+): the climb's
+    // OPENING battle begins with gilded tiles, stacking with GILDED DAWN's
+    // through the same pending queue (fight-start semantics, like the rest)
+    if (this.sign && this.run.fightIdx === 0) {
+      const rg = ssSignRewards(this.sign, this.signLv).gilded | 0;
+      for (let gi = 0; gi < rg; gi++) this.pending.push(1);
+    }
+    this.fillBoard(true);
+    this.hintB.setVisible(this.hasSigil('tome')); this.hintT.setVisible(this.hasSigil('tome'));
+    this.hintB.setAlpha(1); this.hintT.setAlpha(1);
+    this.updateScryPips();
+    this.updateBars();
+    this.state = 'pick';
+  }
+  updateBars() {
+    const l = this.L;
+    // the player bar renders the SHOWN hp: outside a staged strike beat the
+    // shown value follows truth silently (heals, fight resets, rebuilds);
+    // during one — hpHold up, or the drain tween running — the beat owns it
+    if (!this.hpHold && !this.tweens.isTweening(this.hpShown)) this.hpShown.v = this.run.hp;
+    this.drawPhp();
+    this.drawEhp();
+    const alive = this.beast.hpNow > 0;
+    this.strikeT.setText(alive ? SS_T(this.beast.count === 1 ? 'strikeIn1' : 'strikeIn', this.beast.count) : '');
+    this.strikeT.setColor(this.beast.count === 1 && alive ? '#ff8a70' : '#e6a2a2');
+    this.strikeRib.setAlpha(this.strikeT.text ? 0.9 : 0);
+    if (this.strikeT.text) {
+      this.strikeRib.setDisplaySize(this.strikeT.width + l.u(30), l.u(22));
+      this.strikeGlow.setDisplaySize(this.strikeT.width + l.u(70), l.u(52));
+    }
+    // the count-1 alarm: while the NEXT cast is the strike, an ember glow
+    // breathes behind the ribbon — killed on any other count so a fresh
+    // fight or a re-armed fuse never inherits it
+    const alarm = alive && this.beast.count === 1;
+    if (alarm && !this.strikeAlarm) {
+      this.strikeGlow.setAlpha(0.18);
+      this.strikeAlarm = this.tweens.add({ targets: this.strikeGlow, alpha: 0.6, duration: 520, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    } else if (!alarm && this.strikeAlarm) {
+      this.strikeAlarm.remove(); this.strikeAlarm = null;
+      this.strikeGlow.setAlpha(0);
+    }
+    // the fuse is FELT: any change of the counter pops the ribbon — hot when
+    // it burns down a step, cool when the beast re-arms after striking. The
+    // null sentinel keeps a fight's first paint (and a cleared line) quiet.
+    const cnt = alive ? this.beast.count : null;
+    if (cnt !== null && this._strikeCnt !== null && cnt !== this._strikeCnt) this.strikePulse(cnt < this._strikeCnt);
+    this._strikeCnt = cnt;
+    // telegraph: the constellation charges as the strike counter fills
+    if (this.beastFx) this.beastFx.setThreat(alive
+      ? (this.beast.timer - this.beast.count) / Math.max(1, this.beast.timer - 1) : 0);
+    // while a damage number is in flight the tally animation owns the counter
+    if (!this.scoreAnim) this.scoreT.setText(String(this.runScore()));
+  }
+  // enemy bar + numbers render the SHOWN hp (which trails hpNow during a
+  // damage flight); numbers count down as the drain tween runs
+  drawEhp() {
+    const shown = Math.max(0, Math.round(this.ehpShown.v));
+    this.ehpBar.setCrop(0, 0, this.ehpBar.frame.width * clamp(shown / this.beast.hp, 0, 1), this.ehpBar.frame.height);
+    // setText re-rasterizes and re-uploads the text texture — at dpr3 a
+    // per-frame repaint during the 300ms drain eats the frame budget. The
+    // bar crop stays per-frame (cheap, carries the smoothness); the numeral
+    // repaints at ~20Hz and always lands exact on the drain's endpoints.
+    const s = shown + ' / ' + this.beast.hp;
+    if (s === this._ehpStr) return;
+    const now = performance.now();
+    const atRest = shown === Math.max(0, this.beast.hpNow) || shown === 0;
+    if (!atRest && now - (this._ehpTextAt || 0) < 45) return;
+    this._ehpStr = s; this._ehpTextAt = now;
+    this.ehpT.setText(s);
+  }
+  // the player bar renders the same way — shown trails truth through a
+  // strike's staged beat, with the identical ~20Hz text-repaint economy
+  drawPhp() {
+    const shown = Math.max(0, Math.round(this.hpShown.v));
+    this.hpBar.setCrop(0, 0, this.hpBar.frame.width * clamp(shown / this.run.hpMax, 0, 1), this.hpBar.frame.height);
+    const s = shown + ' / ' + this.run.hpMax;
+    if (s === this._php) return;
+    const now = performance.now();
+    const atRest = shown === Math.max(0, this.run.hp) || shown === 0;
+    if (!atRest && now - (this._phpAt || 0) < 45) return;
+    this._php = s; this._phpAt = now;
+    this.hpT.setText(s);
+  }
+  /* the drain's body (v0.104.0 — the versus hp engine's dress, ported to the
+     cropped-image bars): the lost chunk stands on the bar as a pale ghost
+     slice and fades out, while the fill itself flinches — a lowering bar is
+     FELT, not just repainted. f0/f1 are fill fractions, old > new. */
+  barGhost(bar, f0, f1, tint) {
+    f0 = clamp(f0, 0, 1); f1 = clamp(f1, 0, 1);
+    if (f0 - f1 < 0.004) return;
+    const g = this.add.rectangle(bar.x + bar.displayWidth * f1, bar.y, bar.displayWidth * (f0 - f1), bar.displayHeight, tint, 0.5)
+      .setOrigin(0, 0.5).setDepth(30);
+    this.tweens.add({ targets: g, alpha: 0, duration: 700, ease: 'Sine.easeIn', onComplete: () => g.destroy() });
+    this.tweens.killTweensOf(bar);
+    bar.setAlpha(1);
+    this.tweens.add({ targets: bar, alpha: 0.55, duration: 90, yoyo: true });
+  }
+  /* every change of the strike counter pops the fuse so the burn-down is
+     never missed (Skylar 9/22). Ribbon rides displayWidth/Height — never
+     tween scale on a setDisplaySize'd image — sized from truth, not from a
+     possibly mid-pulse displayWidth. Fired only by updateBars, right after
+     it re-set the ribbon's base size. */
+  strikePulse(hot) {
+    if (!this.strikeT.text) return;
+    const l = this.L;
+    this.tweens.killTweensOf([this.strikeT, this.strikeRib]);
+    this.strikeT.setScale(1);
+    this.tweens.add({ targets: this.strikeT, scale: hot ? 1.45 : 1.2, duration: 160, ease: 'Back.easeOut', yoyo: true });
+    const rw = this.strikeT.width + l.u(30), rh = l.u(22);
+    this.strikeRib.setDisplaySize(rw, rh);
+    this.tweens.add({
+      targets: this.strikeRib, displayWidth: rw * 1.12, displayHeight: rh * 1.3, duration: 160, yoyo: true,
+      onComplete: () => this.strikeRib.setDisplaySize(rw, rh),
+    });
+    // a hot step flares the ember glow once (the count-1 alarm owns it then)
+    if (hot && !this.strikeAlarm) {
+      this.tweens.killTweensOf(this.strikeGlow);
+      this.strikeGlow.setAlpha(0.45);
+      this.tweens.add({ targets: this.strikeGlow, alpha: 0, duration: 420, ease: 'Sine.easeOut' });
+    }
+  }
+  runScore() { return this.run.totalDmg + this.run.longest.length * 15 + this.run.fightIdx * 50; }
+  setBeastName(name) {
+    if (this.beastNameI) { this.beastNameI.destroy(); this.beastNameI = null; }
+    if (!name) return;
+    const gk = ssGoldTex(this, name, 19);
+    const sc = Math.min(1, 340 / gk.w);   // umbral prefixes get long
+    this.beastNameI = this.add.image(this.L.x(0), this.L.y(280), gk.key)
+      .setDisplaySize(this.L.u(gk.w * sc), this.L.u(gk.h * sc));
+  }
+
+  // ---------- casting ----------
+  tryCast() {
+    if (this.state !== 'pick') return;
+    const word = this.currentWord();
+    const l = this.L;
+    // THE LONG ROAD (v0.109.0): a word under the sky's floor is refused in
+    // the very grammar an invalid word uses — shake, wiggle, nothing spent
+    if (this.sel.length < 2 || word.length < this.castMinLen() || !WORDSET.has(word)) {
+      SFX.invalid();
+      this.cameras.main.shake(120, 0.004);
+      this.tweens.add({ targets: this.lineC, x: this.lineC.x + l.u(8), duration: 50, yoyo: true, repeat: 3, onComplete: () => this.lineC.setX(l.x(0)) });
+      return;
+    }
+    this.state = 'anim';
+    // the first open's finger bows out on the player's first real cast —
+    // both of its lessons (weave, then CAST) are now the player's own
+    if (this.ftue && !this.ftueGone) this.ftueRetire(true);
+    // a successful cast winds the strike clock back to the top — "every
+    // time you spell a word and cast a word, that timer goes back up"
+    // (the clock itself is held through the cast's animation); hard's 10s
+    // and THE FALLING SKY's 12s ride the same law
+    if (this.strikeMs) this.hardLeft = this.strikeMs;
+    this.clearHintFx(true);
+    if (this.purifyArmed) this.setPurifyArmed(false);
+    const tiles = this.sel.map((i) => this.board[i]);
+    const dmg = this.wordDamage(tiles);
+    const letters = tiles.reduce((a, s) => a + s.ch.length, 0);
+    const stormProc = this.stormProc();   // before words++ — same test the damage math ran
+    this.run.words++; this.run.firstUsed = true;
+    this.run.letters += letters;
+    if (dmg > this.run.bigHit) this.run.bigHit = dmg;
+    SS.prof.words++;
+    if (letters > this.run.longest.length) this.run.longest = word;
+    if (word.length > SS.prof.longest.length) SS.prof.longest = word;
+    if (dmg > SS.prof.bigHit) SS.prof.bigHit = dmg;
+    /* the sign's own ledger takes the word and the blow (v0.85.0, Skylar:
+       "longest word played with that sign"). Only campaign and endless
+       carry a sign — quick, the daily and versus run unsigned and write
+       nothing by construction — and a BORROWED Tuesday sign (v0.109.0)
+       writes nothing by GATE: a guest, not a birth. LOCAL-ONLY fields
+       (the Q2 stamp): they ride beta3.profile and are never sent by
+       sync(). */
+    if (this.sign && !this.signBorrowed) {
+      const zr = SS.prof.signs[this.sign] || (SS.prof.signs[this.sign] = { best: 0, clears: 0, runs: 0, xp: 0, ack: 1 });
+      if (word.length > (zr.word || '').length) zr.word = word;
+      if (dmg > (zr.hit | 0)) zr.hit = dmg;
+    }
+    // the drip's word counters. Length is counted in LETTERS (a digraph tile
+    // spells two), which is the same figure the score and the share card pay
+    // on — never tiles, or a Qu word would be short-changed.
+    if (letters >= 6) ssSigilBump('w6');
+    if (letters >= 7) ssSigilBump('w7');
+    if (letters >= 8) ssSigilBump('w8');
+    // …and the tile this word forges. `letters >= 5` is the very test the
+    // drop below makes (tier = 7+ ? 2 : 5+ ? 1 : 0), read here so the count
+    // lands inside the save that already runs on every cast.
+    if (letters >= 5) ssSigilBump('frg');
+    SS.save();
+    if (letters >= 7) SS.award('lexicon-7', this.game);
+    if (letters >= 8) SS.award('grand-weaver', this.game);
+    if (dmg >= 60) SS.award('heavy-hit', this.game);
+    if (tiles.some((t) => t.ch === 'qu')) SS.award('q-mage', this.game);
+    if (SS.prof.words >= 100) SS.award('century', this.game);
+    SFX.cast(this.sel.length);
+    if (letters >= 6) {
+      SFX.bigWord();
+      this.cameras.main.flash(260, 240, 210, 120, false);
+      const word6 = letters >= 8 ? 'CELESTIAL!' : letters >= 7 ? 'MAGNIFICENT!' : 'SPLENDID!';
+      const bt = ssTxt(this, l.x(0), l.y(430), word6, l.u(24), '#ffe9a8').setOrigin(0.5).setDepth(70).setScale(0.5);
+      this.tweens.add({ targets: bt, scale: 1, duration: 200, ease: 'Back.easeOut' });
+      this.tweens.add({ targets: bt, alpha: 0, y: l.y(410), delay: 800, duration: 400, onComplete: () => bt.destroy() });
+    }
+    if (stormProc) {                                   // STORMBINDER doubles this one
+      const st = ssTxt(this, l.x(0), l.y(498), '↯ ×2', l.u(18), '#bfe0ff').setOrigin(0.5).setDepth(70)
+        .setShadow(0, 0, '#6fa8ff', l.u(9), true, true);
+      this.tweens.add({ targets: st, alpha: 0, y: l.y(474), delay: 650, duration: 400, onComplete: () => st.destroy() });
+    }
+
+    // the word rides to the beast a touch slower (v0.104.0, Skylar 9/22:
+    // "it needs to move slower") — 70ms stagger / 380ms flight, was 55/280;
+    // the impact gate below matches
+    const tx = this.beastC.x - this.lineC.x, ty = this.beastC.y - this.lineC.y;
+    this.lineTiles.forEach((mc, k) => {
+      this.tweens.add({
+        targets: mc, x: tx + (rng() - 0.5) * l.u(60), y: ty + (rng() - 0.5) * l.u(40),
+        scale: 0.25, alpha: 0.9, delay: k * 70, duration: 380, ease: 'Cubic.easeIn',
+        onUpdate: () => { if (Math.random() < 0.3) this.starBurst.emitParticleAt(this.lineC.x + mc.x, this.lineC.y + mc.y, 1); },
+        onComplete: () => { this.starBurst.emitParticleAt(this.beastC.x + (rng() - 0.5) * l.u(60), this.beastC.y + (rng() - 0.5) * l.u(40), 4); mc.destroy(); },
+      });
+    });
+
+    this.time.delayedCall(this.sel.length * 70 + 420, () => {
+      SFX.impact();
+      this.cameras.main.shake(140, 0.006);
+      if (this.hasSigil('salve') && letters >= 5) this.heal(this.sigVal('salve', 'heal'));
+      if (this.hasSigil('leech')) this.heal(this.sigVal('leech', 'heal'));
+      // the dew rides the cast: every green in the word heals DEW_HEAL (they
+      // sum), in addition to the letter's own points already in dmg
+      const dews = this.sel.filter((i) => this.board[i] && this.board[i].tier === 3 && !this.board[i].blk).length;
+      if (dews > 0) {
+        const before = this.run.hp;
+        this.heal(DEW_HEAL * dews);
+        SFX.dew();
+        const ht = ssTxt(this, l.x(-150), l.y(94), '♥ +' + (this.run.hp - before) + ' ♥', l.u(16), '#9fe87a').setOrigin(0.5).setDepth(70)
+          .setShadow(0, 0, '#2a7a3a', l.u(8), true, true);
+        this.tweens.add({ targets: ht, alpha: 0, y: l.y(74), delay: 700, duration: 450, onComplete: () => ht.destroy() });
+        window.__ssdewHeal = { n: dews, healed: this.run.hp - before, hp: this.run.hp, t: Date.now() };
+      }
+      if (this.sign === 'scorpio') this.venom = (this.venom | 0) + this.signVal('venomAdd');   // the sting settles in (twofold at level 40)
+      const used = [...this.sel];
+      this.sel = [];
+      this.lineTiles = [];
+      // STAR FORGE at its height lowers the forging floor to 4 letters
+      // (`low`); at tier I it is today's 5, held or not
+      let tier = letters >= 7 ? 2 : letters >= (this.hasSigil('forge') ? this.sigVal('forge', 'low') : 5) ? 1 : 0;
+      if (tier > 0 && this.hasSigil('forge')) tier = 2;
+      for (const i of used) {
+        this.board[i].c.destroy(); this.board[i] = null;
+        // THE ASHEN BOARD (v0.110.0): the cast star's cell cools as ash —
+        // no star returns here until the beast falls or the scry sweeps
+        // the whole board away (a forged reward keeps riding `pending`
+        // and lands with the next true deal)
+        if (this.sky && this.sky.ash) this.skyAshSettle(i);
+      }
+      if (tier > 0) { this.pending.push(tier); SFX.forge(); }
+      this.layoutLine();
+      this.beastHit(dmg);
+      this.time.delayedCall(200, () => {
+        if (this.beast.hpNow <= 0) return;   // board rebuilds next fight — nothing to drain
+        this.expireSpecials();               // unspent bonuses fade BEFORE the new reward drops
+        this.fillBoard(false);
+        this.tickEnemy(() => { this.state = 'pick'; this.sigilMoment(); });
+      });
+    });
+  }
+
+  beastHit(dmg) {
+    const l = this.L;
+    this.beast.hpNow -= dmg;
+    const from = parseInt(this.scoreT.text, 10) || 0;
+    this.run.totalDmg += dmg;
+    const to = this.runScore();
+    this.scoreAnim = (this.scoreAnim || 0) + 1;
+    // beast recoil + hull flash read instantly; the bar waits for the number
+    this.tweens.add({ targets: this.beastC, x: l.x(0) + l.u(10), duration: 60, yoyo: true, repeat: 1, onComplete: () => this.beastC.setX(l.x(0)) });
+    if (this.beastFx && this.beastFx.ready) this.beastFx.hitFlash();
+    else if (this.beastLines) { this.beastLines.setAlpha(1); this.tweens.add({ targets: this.beastLines, alpha: 0.35, duration: 300 }); }
+    this.updateBars();
+
+    // the hit beat: the damage pops big at center screen, slams up into the
+    // enemy HP bar, and only when it lands does the bar drain + count down.
+    // Then the same value arcs on from the bar to the score tally.
+    // v0.104.0 (Skylar 9/22): the pop far bigger (34 → 52) and quicker
+    // (190 → 120ms in), so the number is the beat's unmissable heart.
+    const big = dmg >= 25;
+    const gk = ssGoldTex(this, String(dmg), 52);
+    const nI = this.add.image(l.x(0), l.y(468), gk.key)
+      .setDisplaySize(l.u(gk.w), l.u(gk.h)).setDepth(70);
+    const sx = nI.scaleX, sy = nI.scaleY;
+    nI.setScale(sx * 0.2, sy * 0.2).setAlpha(0);
+    const pop = big ? 1.45 : 1.18;
+    this.tweens.add({ targets: nI, scaleX: sx * pop, scaleY: sy * pop, alpha: 1, duration: 120, ease: 'Back.easeOut' });
+    this.tweens.add({ targets: nI, scaleX: sx, scaleY: sy, delay: 120, duration: 110 });
+    const start = { x: nI.x, y: nI.y }, dst = { x: l.x(0), y: l.y(321) };
+    const pt = { t: 0 };
+    this.tweens.add({
+      targets: pt, t: 1, delay: 400, duration: 320, ease: 'Cubic.easeIn',
+      onUpdate: () => {
+        nI.x = start.x + (dst.x - start.x) * pt.t;
+        nI.y = start.y + (dst.y - start.y) * pt.t;
+        const k = 1 - pt.t * 0.55;
+        nI.setScale(sx * k, sy * k);
+        if (Math.random() < 0.3) this.starBurst.emitParticleAt(nI.x, nI.y, 1);
+      },
+      onComplete: () => {
+        nI.destroy();
+        this.starBurst.emitParticleAt(dst.x, dst.y, big ? 6 : 3);
+        // small bar shake — only when the hit is worth bragging about
+        if (big) {
+          this.tweens.killTweensOf(this.ehpC);
+          this.ehpC.setX(0);
+          this.tweens.add({ targets: this.ehpC, x: l.u(3), duration: 40, yoyo: true, repeat: 3, onComplete: () => this.ehpC.setX(0) });
+        }
+        // drain now — the number has landed. Landing always retargets the
+        // latest hpNow so chained casts stay truthful. The drain runs slow
+        // enough to WATCH (300 → 560ms) and wears the ghost-slice dress.
+        this.barGhost(this.ehpBar, this.ehpShown.v / this.beast.hp, Math.max(0, this.beast.hpNow) / this.beast.hp, 0xffd0c9);
+        this.tweens.killTweensOf(this.ehpShown);
+        this.tweens.add({
+          targets: this.ehpShown, v: Math.max(0, this.beast.hpNow), duration: 560, ease: 'Cubic.easeOut',
+          onUpdate: () => this.drawEhp(),
+          onComplete: () => {
+            this.drawEhp();
+            if (this.beast.hpNow <= 0 && !this.dying) { this.dying = true; this.beastDeath(); }
+          },
+        });
+        this.flyScore(dst, dmg, from, to);
+      },
+    });
+  }
+
+  /* the blow lands ON the player (v0.104.0 — beastHit's grammar, mirrored;
+     re-tuned v0.107.0, Skylar 9/23: "the amount it attacks for should be
+     visible and large for at least 2 seconds, then when it moves to the
+     player's health it needs to be slower"): a crimson number pops LARGE at
+     the point of contact, LINGERS readable — breathing faintly — for a full
+     two seconds, then flies up to the player's health bar slower than any
+     cast, and only when it lands does that bar drain — 560ms with the
+     ghost-slice dress. The long beat lets blows overlap (a queued strike,
+     hard's clock): each number is its own actor — a later blow seats its
+     number a step higher, the hold is counted, and a landing drains the bar
+     only to ITS truth (live hp plus every blow still in the air), so no
+     blow's damage ever shows before its own number has landed. Runs AFTER
+     the archetype's own animation delivered the hit (land()). onDone fires
+     when the drain settles — the death path rides the landing that empties
+     the bar into endRun. */
+  playerHit(atk, mult, boss, onDone) {
+    const l = this.L;
+    const big = boss || atk >= 15;
+    const others = Math.max(0, (this.hitPend ? this.hitPend.length : 1) - 1);
+    const nT = ssTxt(this, l.x(0), l.y(468) - l.u(44) * Math.min(others, 2), '−' + atk, l.u(big ? 54 : 46), '#ff9a8a')
+      .setOrigin(0.5).setDepth(70).setShadow(0, 0, '#7a1420', l.u(12), true, true);
+    nT.setScale(0.2).setAlpha(0);
+    this.tweens.add({ targets: nT, scale: big ? 1.3 : 1.15, alpha: 1, duration: 120, ease: 'Back.easeOut' });
+    this.tweens.add({ targets: nT, scale: 1, delay: 120, duration: 110 });
+    // the linger breathes so two held seconds read alive, never frozen
+    const breath = ssReduceMotion() ? null
+      : this.tweens.add({ targets: nT, scale: 1.05, delay: 260, duration: 620, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    const start = { x: nT.x, y: nT.y }, dst = { x: l.x(-25), y: l.y(68) };
+    const pt = { t: 0 };
+    this.tweens.add({
+      targets: pt, t: 1, delay: 2200, duration: 780, ease: 'Cubic.easeIn',
+      onStart: () => { if (breath) breath.stop(); nT.setScale(1); },
+      onUpdate: () => {
+        nT.x = start.x + (dst.x - start.x) * pt.t;
+        nT.y = start.y + (dst.y - start.y) * pt.t;
+        nT.setScale(1 - pt.t * 0.45);
+      },
+      onComplete: () => {
+        nT.destroy();
+        this.starBurst.emitParticleAt(dst.x, dst.y, big ? 6 : 3);
+        // this landing settles ONLY its own slice: later blows still in the
+        // air keep their damage off the bar until their numbers land
+        const gi = this.hitPend.indexOf(atk);
+        if (gi >= 0) this.hitPend.splice(gi, 1);
+        const still = this.hitPend.reduce((s, a) => s + a, 0);
+        const to = clamp(Math.max(0, this.run.hp) + still, 0, this.run.hpMax);
+        this.barGhost(this.hpBar, this.hpShown.v / this.run.hpMax, to / this.run.hpMax, 0xffe6b8);
+        this.hpHold = Math.max(0, (this.hpHold | 0) - 1);
+        this.tweens.killTweensOf(this.hpShown);
+        this.tweens.add({
+          targets: this.hpShown, v: to, duration: 560, ease: 'Cubic.easeOut',
+          onUpdate: () => this.drawPhp(),
+          onComplete: () => {
+            // free of the beat, settle on live truth (a mid-drain heal);
+            // under a still-flying blow keep this landing's own mark
+            const free = !(this.hpHold | 0) && !this.hitPend.length;
+            this.hpShown.v = free ? Math.max(0, this.run.hp) : to;
+            this.drawPhp();
+            if (onDone) onDone();
+          },
+        });
+      },
+    });
+  }
+
+  // the tally beat (v0.9.0), re-anchored: a smaller +N lifts off the enemy bar
+  // where the damage landed, arcs up to the score trailing stars, and the score
+  // counts up when it lands. The counter is read from the label (not runScore)
+  // so back-to-back casts chain smoothly.
+  flyScore(startPt, dmg, from, to) {
+    const l = this.L;
+    const gk = ssGoldTex(this, '+' + dmg, 22);
+    const nI = this.add.image(startPt.x, startPt.y, gk.key)
+      .setDisplaySize(l.u(gk.w), l.u(gk.h)).setDepth(70);
+    const sx = nI.scaleX, sy = nI.scaleY;
+    const dst = { x: this.scoreT.x - l.u(16), y: this.scoreT.y };
+    const ctrl = { x: (startPt.x + dst.x) / 2 + l.u(40), y: Math.min(startPt.y, dst.y) - l.u(52) };
+    const pt = { t: 0 };
+    this.tweens.add({
+      targets: pt, t: 1, duration: 430, ease: 'Cubic.easeIn',
+      onUpdate: () => {
+        const u = pt.t, v = 1 - u;
+        nI.x = v * v * startPt.x + 2 * v * u * ctrl.x + u * u * dst.x;
+        nI.y = v * v * startPt.y + 2 * v * u * ctrl.y + u * u * dst.y;
+        const k = 1 - u * 0.45;
+        nI.setScale(sx * k, sy * k);
+        if (Math.random() < 0.35) this.starBurst.emitParticleAt(nI.x, nI.y, 1);
+      },
+      onComplete: () => {
+        nI.destroy();
+        this.starBurst.emitParticleAt(dst.x, dst.y, 3);
+        this.tweens.add({ targets: this.scoreT, scale: 1.3, duration: 110, yoyo: true });
+        const cnt = { v: from, at: 0 };
+        this.tweens.add({
+          targets: cnt, v: to, duration: Math.min(700, 90 + (to - from) * 6), ease: 'Cubic.easeOut',
+          // same texture-repaint economy as drawEhp: count at ~20Hz, land exact
+          onUpdate: () => {
+            const now = performance.now();
+            if (now - cnt.at < 45) return;
+            cnt.at = now;
+            this.scoreT.setText(String(Math.round(cnt.v)));
+          },
+          onComplete: () => {
+            this.scoreT.setText(String(Math.round(to)));
+            this.scoreAnim--; if (!this.scoreAnim) this.updateBars();
+          },
+        });
+      },
+    });
+  }
+
+  beastDeath() {
+    this.state = 'anim';
+    SFX.victory();
+    const l = this.L;
+    if (this.beastFx) this.beastFx.die();   // stops idle/shimmer, implodes the aura
+    this.beastC.setScale(1);
+    for (const st of this.beastStars) {
+      this.tweens.killTweensOf(st);
+      const ang = Math.atan2(st.y, st.x) + (rng() - 0.5);
+      this.tweens.add({ targets: st, x: st.x + Math.cos(ang) * l.u(140), y: st.y + Math.sin(ang) * l.u(140), alpha: 0, scale: 0.1, duration: 900, ease: 'Cubic.easeOut' });
+    }
+    this.starBurst.emitParticleAt(this.beastC.x, this.beastC.y, 26);
+    this.goldRain.start();
+    this.time.delayedCall(1300, () => this.goldRain.stop());
+    if (this.beastLines) this.tweens.add({ targets: this.beastLines, alpha: 0, duration: 350 });
+    this.strikeT.setText(''); this.strikeRib.setAlpha(0);
+    SS.prof.beasts++;
+    SS.award('first-blood', this.game);
+    if (this.fights[this.run.fightIdx].id === 'draco') SS.award('dragonfall', this.game);
+    if (this.fights[this.run.fightIdx].id === 'phoenix') SS.award('first-flame', this.game);
+    // star-crossed means YOUR star — a borrowed Tuesday sign never rings it
+    if (this.signZ && !this.signBorrowed && this.signZ.beast === this.fights[this.run.fightIdx].id) SS.award('star-crossed', this.game);
+    if (!this.struckThisBattle) SS.award('untouched', this.game);
+    /* THE DYING NAMES (v0.110.0): the beast takes its letter with it — the
+       ladder's entry for THIS fight (precomputed at create: first letter
+       of its own name, walked past any already dark) joins the dark set,
+       and every standing star of that letter goes out with the beast, in
+       the very shatter of its fell. From here the letter deals dark
+       (spawnTile) for the rest of the night. */
+    if (this.skyCurseLadder) {
+      const cch = this.skyCurseLadder[this.run.fightIdx];
+      if (cch) {
+        this.skyCursed.add(cch);
+        const gone = [];
+        this.board.forEach((s, i) => { if (s && s.ch === cch && !s.blk) gone.push(i); });
+        gone.forEach((bi, k) => this.time.delayedCall(160 + k * 110, () => this.blackTile(bi)));
+        window.__sscurse = { ch: cch, fight: this.run.fightIdx, dark: [...this.skyCursed], tiles: gone.length, t: Date.now() };
+      }
+    }
+    // the drip counts the surplus whether or not ECHO OF RUIN is there to
+    // spend it, and counts a kill made on the brink BEFORE the fell's heal
+    ssSigilBump('ovk', Math.max(0, -this.beast.hpNow));
+    if (this.run.hp <= 10) ssSigilBump('brnk');
+    // the sign's own experience settles AT THE FELL (v0.69.0) — win or
+    // lose, an abandoned climb keeps what its fells earned (the drip's
+    // philosophy); a boss-TIER fell pays extra. fightIdx++ and the
+    // checkpoint ride the same synchronous beat below, so a fell can never
+    // pay twice across a quit/resume.
+    this.signXp(SS_SIGN_XP.fell + (SS_BEASTS[this.fights[this.run.fightIdx].id].boss ? SS_SIGN_XP.boss : 0));
+    SS.save();
+    // ECHO OF RUIN carries the surplus at its tier's weight (×1 / ×1.5 / ×2);
+    // the drip counter above kept the RAW figure
+    if (this.hasSigil('echo')) this.run.overkill = Math.round(Math.max(0, -this.beast.hpNow) * this.sigVal('echo', 'carry'));
+    this.run.fightIdx++;
+    if (this.hasSigil('meteor')) {
+      // at its height the METEOR first grows the vessel (+3 max), THEN fills it
+      this.run.hpMax += this.sigVal('meteor', 'hpAdd') | 0;
+      this.heal(this.run.hpMax);
+    } else this.heal(6);
+    // the endless ladder extends itself long before anyone can touch its
+    // edge — the climb is UNBOUNDED, so the exhausted-fights win below must
+    // stay unreachable there (the same seed grows the same ladder)
+    if (this.mode === 'endless' && this.run.fightIdx >= this.fights.length - 2) this.extendEndless();
+    if (this.mode === 'campaign' || this.mode === 'endless') this.saveCheckpoint();
+    this.time.delayedCall(1150, () => {
+      // the final win ends the run — endRun settles and announces for itself
+      if (this.run.fightIdx >= this.fights.length) { this.endRun(true); return; }
+      // THE CADENCE (v0.65.0): only a fight the plan marks pays an offer.
+      // The others keep the beat they already had — the death shatter, then
+      // the campaign's star chart or the next constellation assembling.
+      const go = () => {
+        if (this.sigPlan && this.sigPlan.has(this.run.fightIdx - 1)) this.payOffer();
+        else this.afterSigil();
+      };
+      /* THE WAKING MOMENT at the fight's own end (v0.67.0): a fell that
+         finished a condition — the beast count, the brink, the spilt
+         overkill — wakes its sigil HERE, settled BEFORE payOffer rolls, so
+         the fresh sigil is draw-eligible in the very offer this win pays.
+         The rite spends `pend`, so endRun and the meadow (both kept as the
+         safety net) can never say it twice. */
+      ssSigilCheck();
+      const pend = ssSigilPending();
+      if (pend.length && !SS_RITE.busy && ssSigilAnnounce(this, pend, go)) return;
+      go();
+    });
+  }
+  /* What a paying fight hands over (v0.66.0). The pre-rolled intent
+     (sigTypes) says whether this offer is three new sigils or the
+     STRENGTHEN screen; a fight with no entry (a harness pin) falls to the
+     row's own type, and an unknown type falls to 'sigil' — a bad row can
+     never dead-screen. When the roster of new sigils is dry, a 'sigil'
+     offer crosses over to an upgrade instead of riding on — a long climb
+     that has taken everything still gets paid. Both dry → ride on. */
+  payOffer() {
+    const idx = this.run.fightIdx - 1;                       // beastDeath already ++'d
+    let intent = (this.sigTypes && this.sigTypes.get(idx)) || (SS_CADENCE[this.mode] || {}).type || 'sigil';
+    if (!SS_OFFER_TYPES.includes(intent)) intent = 'sigil';
+    const canUp = this.run.sigils.some((id) => this.sigTier(id) < ssSigilMaxT(id));
+    if (intent === 'upgrade' && canUp) { this.showUpgradePick(); return; }
+    const opts = this.rollSigilOpts();                       // roll ONCE — handed into the pick
+    if (opts.length) { this.showSigilPick(opts); return; }
+    if (canUp) { this.showUpgradePick(); return; }
+    this.afterSigil();
+  }
+  /* THE WAKING MOMENT mid-fight (v0.67.0). The drip used to settle only at
+     endRun; now a condition met DURING a run wakes its sigil at the next
+     quiet beat — the cast resolved, the strike weathered, the scry settled —
+     with the same forge ceremony, right there in the fight. Called wherever
+     the board hands the turn back (state → 'pick'), never mid-animation; the
+     beast strikes on casts, not the clock, so the held board is safe under
+     the rite. The rite spends `pend` as it shows, so the end screen and the
+     meadow can never repeat it — and a `pend` a resumed run carried in is
+     said here too, at the first cast instead of the next meadow. */
+  sigilMoment() {
+    if (this.state !== 'pick' || this.dying || SS_RITE.busy) return;
+    ssSigilCheck();
+    const pend = ssSigilPending();
+    if (!pend.length) return;
+    this.state = 'rite';
+    if (!ssSigilAnnounce(this, pend, () => { if (this.state === 'rite') this.state = 'pick'; })) this.state = 'pick';
+  }
+  saveCheckpoint() {
+    // the endless climb survives an app kill exactly as the campaign does
+    // (v0.68.0): the seed rebuilds the identical ladder, the level and the
+    // active-play clock ride along, and the same fight-start semantics hold
+    if (this.mode === 'endless') {
+      localStorage.setItem('beta3.endless', JSON.stringify({
+        fightIdx: this.run.fightIdx, hp: this.run.hp, hpMax: this.run.hpMax,
+        sigils: this.run.sigils, tiers: this.run.tiers, words: this.run.words, longest: this.run.longest,
+        totalDmg: this.run.totalDmg, scried: this.run.scried, featherUsed: this.run.featherUsed,
+        letters: this.run.letters, bigHit: this.run.bigHit, playMs: this.runElapsed(),
+        overkill: this.run.overkill | 0, eseed: this.eseed, clockV: 2,
+        hard: this.hard ? 1 : undefined,
+        // the flag ceremonies already rung (v0.77.0): a resumed climb never
+        // repeats a pass beat or takes the frontier twice
+        fpassLv: this.run.fpassLv | 0, ffront: this.run.ffront ? 1 : undefined,
+      }));
+      return;
+    }
+    if (this.run.fightIdx >= this.fights.length) { ssClearCampaign(); return; }
+    const f = this.fights[this.run.fightIdx];
+    localStorage.setItem('beta3.campaign', JSON.stringify({
+      fightIdx: this.run.fightIdx, actIdx: f.actIdx, hp: this.run.hp, hpMax: this.run.hpMax,
+      sigils: this.run.sigils, tiers: this.run.tiers, words: this.run.words, longest: this.run.longest,
+      totalDmg: this.run.totalDmg, scried: this.run.scried, featherUsed: this.run.featherUsed,
+      letters: this.run.letters, bigHit: this.run.bigHit, playMs: this.runElapsed(),
+      overkill: this.run.overkill | 0, clockV: 2,
+      // hard rides the checkpoint (v0.70.0): a climb begun hard resumes hard
+      hard: this.hard ? 1 : undefined,
+    }));
+  }
+  // deterministic growth: the same seed re-runs the same stream, so the new
+  // stretch changes nothing already climbed; the sigil plan re-walks the
+  // longer ladder (its prefix is identical for the same reason)
+  extendEndless() {
+    this.fights = ssEndlessFights(this.eseed, this.fights.length + SS_ENDLESS.horizon);
+    this.sigPlan = ssSigilPlan(this.mode, this.fights, this.eseed, this.hard);
+    this.sigTypes = ssOfferTypes(this.mode, this.sigPlan, this.eseed);
+  }
+  /* ---- THE FRONTIER FLAGS in the climb (v0.77.0, Skylar 9/3) --------------
+     "We want players to have an iconic moment if they pass a flag of
+     another player, to be like, 'Oh, hey, this player is over here.' They
+     see their flag and they see their name."
+     plantFlags dresses the CURRENT level: every rival flag standing at
+     exactly this rung (fetched once at climb start — this.flagRows), plus
+     your own — at your standing best when you climb back to it, riding
+     with you once you're past it (the level you're on IS your best-so-far;
+     the reckoning writes it down at the fall). Up to three fly legibly
+     fanned; more say so on a small ledge mark. Flags live in flagC (under
+     the beast, over the sky), are never interactive, and are torn down and
+     re-planted at every startFight — the same lifecycle as the beast fx. */
+  plantFlags(late) {
+    if (this.mode !== 'endless' || !this.flagC || !this.flagC.scene) return;
+    const l = this.L;
+    for (const ch of this.flagC.list.slice()) this.tweens.killTweensOf(ch);
+    this.flagC.removeAll(true);
+    this.flagMine = null;
+    const L = this.run.fightIdx + 1;
+    const rows = this.flagRows || [];
+    const here = rows.filter((r) => r.level === L);
+    const best = SS.prof.endless.bestLevel | 0;
+    const mine = best > 0 && L >= best ? { name: SSNET.myName(), color: SS.prof.flag, mine: true } : null;
+    const fly = mine ? [mine, ...here] : here.slice();
+    const drawn = fly.slice(0, 3);
+    const more = fly.length - drawn.length;
+    // the fan: the lead flag full-size, the others tucked behind its shoulder
+    const spots = [{ x: -140, y: 292, w: 126 }, { x: -178, y: 300, w: 96 }, { x: -100, y: 302, w: 84 }];
+    const red = ssReduceMotion();
+    for (let i = drawn.length - 1; i >= 0; i--) {   // back-to-front: the lead lands on top
+      const f = drawn[i], sp = spots[i];
+      const c = ssFlag(this, { name: f.name, color: f.color, w: sp.w, x: l.x(sp.x), y: l.y(sp.y), sway: true });
+      if (i > 0) c.setAlpha(0.92);
+      this.flagC.add(c);
+      if (f.mine) this.flagMine = c;
+      const a = c.alpha;
+      c.setAlpha(0);
+      if (red) this.tweens.add({ targets: c, alpha: a, duration: 400, delay: 300 + i * 120 });
+      else {
+        c.y += l.u(10);
+        this.tweens.add({ targets: c, alpha: a, y: '-=' + l.u(10), duration: 520, delay: 380 + i * 140, ease: 'Cubic.easeOut' });
+      }
+    }
+    if (more > 0) {
+      const mt = ssTxt(this, l.x(-108), l.y(283), '+' + more, l.u(8.5), '#c9b676', 'italic').setOrigin(0, 0.5).setAlpha(0);
+      this.flagC.add(mt);
+      this.tweens.add({ targets: mt, alpha: 0.9, duration: 400, delay: 700 });
+    }
+    window.__ssflags = Object.assign(window.__ssflags || {}, {
+      level: L, rows: rows.length, drawn: drawn.length, more, late: !!late,
+      names: drawn.map((f) => f.name), mine: !!mine,
+    });
+  }
+  /* Entering the level ABOVE a flag passes it — a quiet gold line names its
+     owner, once per climb per rung (fpassLv rides the checkpoint so a
+     resumed climb never re-rings). Passing the HIGHEST flag in the sky while
+     it stood at or above your own best is THE FRONTIER: the big beat — your
+     flag plants above theirs, the next climber finds it up there. The passed
+     flag takes one last bow (faded, sinking) unless this rung has flags of
+     its own standing. */
+  flagBeats() {
+    if (this.mode !== 'endless' || !this.flagC || !this.flagC.scene || this.state === 'end') return;
+    const l = this.L;
+    const L = this.run.fightIdx + 1;
+    const rows = this.flagRows || [];
+    const passedLv = L - 1;
+    if (passedLv < 1 || passedLv <= (this.run.fpassLv | 0)) return;
+    const passed = rows.filter((r) => r.level === passedLv);
+    if (!passed.length) return;
+    this.run.fpassLv = passedLv;
+    const frontLv = rows.reduce((m, r) => Math.max(m, r.level), 0);
+    const best = SS.prof.endless.bestLevel | 0;
+    const front = !this.run.ffront && passedLv === frontLv && best <= frontLv;
+    if (front) this.run.ffront = true;
+    this.saveCheckpoint();   // the ceremony is spent the moment it rings — a mid-fight kill must not replay it
+    const top = passed[0];
+    const red = ssReduceMotion();
+    // the passed flag's last bow — tucked lower and to the side so the own
+    // flag planting above it reads as exactly that, never a sandwich
+    if (!rows.some((r) => r.level === L)) {
+      const pf = ssFlag(this, { name: top.name, color: top.color, w: 90, x: l.x(-172), y: l.y(310) });
+      pf.setAlpha(0);
+      this.flagC.add(pf);
+      this.tweens.add({ targets: pf, alpha: 0.5, duration: 420 });
+      this.tweens.add({
+        targets: pf, y: '+=' + l.u(22), alpha: 0, duration: red ? 600 : 2200, delay: 1700,
+        ease: 'Sine.easeIn', onComplete: () => { if (pf.scene) pf.destroy(); },
+      });
+    }
+    // the lines, floating in the open sky band under the vitals
+    const main = front ? SS_T('flagFront')
+      : passed.length > 1 ? SS_T('flagPassMore', top.name, passed.length - 1) : SS_T('flagPass', top.name);
+    const sub = front ? SS_T('flagFrontSub', top.name, L) : SS_T('flagPassSub', passedLv);
+    const beat = [];
+    if (front) {
+      const g = this.add.image(l.x(0), l.y(100), 'glowbig').setDisplaySize(l.u(300), l.u(120))
+        .setTint(0xffd77a).setAlpha(0).setBlendMode('ADD').setDepth(59);
+      beat.push(g);
+      this.tweens.add({ targets: g, alpha: 0.3, duration: 500, yoyo: true, hold: 1400 });
+    }
+    const mT = ssTxt(this, l.x(0), l.y(96), main, l.u(front ? 15 : 12.5), front ? '#ffe9a8' : '#e8c86a', 'italic')
+      .setOrigin(0.5).setDepth(60).setShadow(0, 0, '#c9a94f', l.u(front ? 10 : 7), true, true).setAlpha(0);
+    if (mT.width > l.u(392)) mT.setScale(l.u(392) / mT.width);
+    const sT = ssTxt(this, l.x(0), l.y(front ? 118 : 114), sub, l.u(9.5), '#8a94c4', 'italic')
+      .setOrigin(0.5).setDepth(60).setAlpha(0);
+    if (sT.width > l.u(392)) sT.setScale(l.u(392) / sT.width);
+    beat.push(mT, sT);
+    this.tweens.add({ targets: [mT, sT], alpha: 1, duration: 450, delay: 250 });
+    this.tweens.add({
+      targets: beat, alpha: 0, duration: 600, delay: front ? 4200 : 3300,
+      onComplete: () => beat.forEach((b) => { if (b.scene) b.destroy(); }),
+    });
+    if (front) SFX.sigil(); else SFX.chime(5);
+    // your own flag plants above the one you just passed — with its beat
+    if (this.flagMine) {
+      const m = this.flagMine;
+      this.tweens.killTweensOf(m);
+      m.setAlpha(1);
+      if (!red) {
+        const my = l.y(292);
+        m.y = my - l.u(30);
+        this.tweens.add({ targets: m, y: my, duration: 620, delay: 350, ease: 'Back.easeOut' });
+      }
+      if (this.starBurst) this.time.delayedCall(red ? 400 : 950, () => {
+        if (m.scene && this.starBurst) this.starBurst.emitParticleAt(m.x, m.y - l.u(46), front ? 22 : 10);
+      });
+    }
+    window.__ssflags = Object.assign(window.__ssflags || {}, {
+      passes: ((window.__ssflags || {}).passes | 0) + 1, front: !!front || !!(window.__ssflags || {}).front,
+      beat: main, beatSub: sub, passedLv,
+    });
+  }
+  runElapsed() { return this.run.playMs | 0; }
+
+  heal(n) { this.run.hp = clamp(this.run.hp + n, 0, this.run.hpMax); this.updateBars(); }
+
+  tickEnemy(done) {
+    const l = this.L;
+    // SCORPIO's venom seeps first — over a long fight it can fell the beast
+    // before the strike ever lands
+    if (this.sign === 'scorpio' && (this.venom | 0) > 0 && this.beast.hpNow > 0) {
+      const vd = Math.min(this.signVal('cap'), this.venom | 0);
+      this.beast.hpNow -= vd;
+      this.run.totalDmg += vd;
+      const vt = ssTxt(this, l.x(64), l.y(214), '−' + vd, l.u(15), '#9fe87a').setOrigin(0.5).setDepth(70)
+        .setShadow(0, 0, '#3a8a2a', l.u(8), true, true);
+      this.tweens.add({ targets: vt, alpha: 0, y: l.y(190), delay: 500, duration: 450, onComplete: () => vt.destroy() });
+      this.barGhost(this.ehpBar, this.ehpShown.v / this.beast.hp, Math.max(0, this.beast.hpNow) / this.beast.hp, 0xd9f2c9);
+      this.tweens.killTweensOf(this.ehpShown);
+      this.tweens.add({ targets: this.ehpShown, v: Math.max(0, this.beast.hpNow), duration: 240, onUpdate: () => this.drawEhp() });
+      if (this.beast.hpNow <= 0) {
+        if (!this.dying) { this.dying = true; this.updateBars(); this.beastDeath(); }
+        return;
+      }
+    }
+    this.beast.count--;
+    this.updateBars();
+    if (this.beast.count > 0) {
+      // void bosses ink letters at the very beat the telegraph charges —
+      // "strikes in 1 cast" and the board goes dark under the gun
+      if (this.beast.count === 1 && this.beast.fx && this.beast.fx.curse === 'blackout' && this.beast.hpNow > 0) {
+        this.blackoutAttack(done);
+        return;
+      }
+      done(); return;
+    }
+    this.beast.count = this.beast.timer;
+    this.strikeNow(done);
+  }
+  /* the strike itself, split from the cast counter (v0.70.0) so hard mode's
+     10s clock can throw the beast's NORMAL blow without touching the count:
+     the shield's block, the signature attack, and every defence in land()
+     — shell, ward, eclipse, feather, the waters, the dew — meet a clock
+     strike exactly as they meet a counted one. */
+  strikeNow(done) {
+    const l = this.L;
+    if (this.hasSigil('shield') && (this.shieldLeft | 0) > 0) {
+      this.shieldLeft--;
+      SFX.blocked();
+      const bt = ssTxt(this, l.x(0), l.y(240), '✦ BLOCKED ✦', l.u(20), '#9fd8ff').setOrigin(0.5).setDepth(70);
+      this.tweens.add({ targets: bt, alpha: 0, y: l.y(220), delay: 600, duration: 400, onComplete: () => bt.destroy() });
+      this.updateBars();
+      done();
+      return;
+    }
+    // the blow itself: the beast's signature attack (archetype from data.js)
+    // telegraphs, strikes, and calls land() at the moment of contact — where
+    // the player-side feedback (shake, red flash, screen-edge wash) fires
+    const land = (mult) => {
+      mult = mult || 1;
+      const boss = !!this.beast.boss;
+      SFX.hurt();
+      this.cameras.main.shake(Math.round(260 * (boss ? 1.35 : 1)), 0.012 * (boss ? 1.3 : 1) * mult);
+      this.cameras.main.flash(220, 120, 20, 30);
+      ssEdgeFlash(this, this.beast.eye, Math.min(0.85, 0.42 * mult * (boss ? 1.25 : 1)));
+      this.struckThisBattle = true;
+      ssSigilBump('hit'); SS.save();
+      let atk = this.beast.atk;
+      if (this.hasSigil('eclipse')) atk = Math.ceil(atk / this.sigVal('eclipse', 'div'));
+      if (this.sign === 'cancer' && !this.shellUsed) {   // the shell takes the first blow
+        this.shellUsed = true;
+        // the growing reduction (v0.69.0): cut 50 ≡ the old ceil-half for
+        // every integer atk; ceil keeps the blow ≥ 1 — player-hostile
+        // rounding, so even a 70% shell never zeroes a strike. Integer
+        // space before the divide: (1 − 70/100) is 0.30000000000000004 in
+        // floats and would ceil a clean 6 into 7.
+        atk = Math.ceil(atk * (100 - this.signVal('cut')) / 100);
+        SFX.blocked();
+        const st = ssTxt(this, l.x(0), l.y(240), '◈ ' + SS_T('zShell') + ' ◈', l.u(16), '#9fd8ff').setOrigin(0.5).setDepth(70);
+        this.tweens.add({ targets: st, alpha: 0, y: l.y(220), delay: 700, duration: 400, onComplete: () => st.destroy() });
+      }
+      if (this.hasSigil('ward')) atk = Math.max(1, atk - this.sigVal('ward', 'cut'));
+      // the bar HOLDS its value while the blow's number flies to it — the
+      // beast side's grammar mirrored (playerHit releases the hold). The
+      // long linger lets blows overlap: count the hold, book the damage.
+      this.hpHold = (this.hpHold | 0) + 1;
+      this.hitPend.push(atk);
+      this.run.hp -= atk;
+      if (this.run.hp <= 0 && this.hasSigil('feather') && !this.run.featherUsed) {
+        this.run.featherUsed = true;
+        this.run.hp = Math.min(this.sigVal('feather', 'revive'), this.run.hpMax);
+        this.cameras.main.flash(500, 255, 160, 60);
+        SFX.bigWord();
+        const ft = ssTxt(this, l.x(0), l.y(400), '🔥 THE FEATHER BURNS 🔥', l.u(20), '#ffa94d').setOrigin(0.5).setDepth(70);
+        this.tweens.add({ targets: ft, alpha: 0, delay: 1200, duration: 500, onComplete: () => ft.destroy() });
+      }
+      // AQUARIUS: a stumble below half health pours the waters — a counted
+      // per-battle grant now (v0.69.0; twice per battle from level 42)
+      if (this.sign === 'aquarius' && (this.watersLeft | 0) > 0 && this.run.hp > 0 && this.run.hp < this.run.hpMax / 2) {
+        this.watersLeft--;
+        const wn = this.signVal('heal');
+        this.time.delayedCall(430, () => {
+          if (this.state === 'end' || !this.scene.isActive()) return;
+          this.heal(wn);
+          SFX.forge();
+          const wt = ssTxt(this, l.x(-150), l.y(94), '≈ +' + wn + ' ≈', l.u(16), '#7ae0d8').setOrigin(0.5).setDepth(70)
+            .setShadow(0, 0, '#2a8a8a', l.u(8), true, true);
+          this.tweens.add({ targets: wt, alpha: 0, y: l.y(74), delay: 700, duration: 450, onComplete: () => wt.destroy() });
+        });
+      }
+      this.updateBars();
+      // the blow LANDS on the player (v0.104.0, Skylar 9/22): its number
+      // pops at the point of contact, flies to the player's bar at the top,
+      // and only then does that bar drain — slow enough to watch
+      this.playerHit(atk, mult, boss, () => {
+        // ride the landing that EMPTIES the bar — a still-flying later blow
+        // keeps the death waiting for its own number to land
+        if (this.run.hp <= 0 && this.state !== 'end' && !this.hitPend.length) this.endRun(false);
+      });
+      if (this.run.hp <= 0) return;   // the beat carries the death — endRun fires when the bar lands empty
+      // dew gathers where the blow fell — one plain tile greens, a beat
+      // after the hit reads (never in versus: VsBattle has its own strike)
+      this.time.delayedCall(260, () => { if (this.state !== 'end' && this.scene.isActive()) this.dewTile(); });
+      done();
+    };
+    if (this.beastFx && this.beastFx.ready) this.beastFx.attack(land);
+    else {   // struck before the constellation finished assembling — plain lunge
+      this.tweens.add({ targets: this.beastC, y: l.y(170) + l.u(60), duration: 160, yoyo: true, ease: 'Cubic.easeIn', onComplete: () => this.beastC.setY(l.y(170)) });
+      this.time.delayedCall(220, () => land(1));
+    }
+  }
+
+  scry() {
+    if (this.state !== 'pick') return;
+    SFX.ensure(); SFX.noise(0.4, 600, 1, 0.12, 1800);
+    this.state = 'anim';
+    this.run.scried = true;
+    ssSigilBump('scry'); SS.save();
+    this.clearHintFx();
+    if (this.purifyArmed) this.setPurifyArmed(false);
+    this.unselectFrom(0);
+    for (let i = 0; i < 16; i++) { if (this.board[i]) { this.board[i].c.destroy(); this.board[i] = null; } }
+    // THE ASHEN BOARD (v0.110.0): the scry is the priced relief — it sweeps
+    // the ash with everything else, and sixteen fresh stars rain in (the
+    // strike still hastens below exactly as on any night: the board can
+    // never dead-end, and the fail state stays the fuse)
+    this.skyAshClear();
+    this.fillBoard(false);
+    // SAGITTARIUS: the scry is also a loosed arrow
+    if (this.sign === 'sagittarius' && this.beast.hpNow > 0) {
+      const l = this.L;
+      const ar = ssTxt(this, l.x(0), l.y(470), '➳', l.u(24), '#ffd77a').setOrigin(0.5).setDepth(70).setRotation(-Math.PI / 2);
+      this.tweens.add({
+        targets: ar, y: this.beastC.y, duration: 240, ease: 'Cubic.easeIn',
+        onComplete: () => { this.starBurst.emitParticleAt(ar.x, ar.y, 6); ar.destroy(); },
+      });
+      this.beastHit(this.signVal('arrow'));
+      if (this.beast.hpNow <= 0) return;   // the arrow felled it — the death sequence takes over
+    }
+    // COMET TRAIL: a limited charge, never a blanket pardon (Skylar 9/1 —
+    // "it should never be that scry no longer hastens the strike"). While a
+    // charge stands the scry rides free; spent, every scry ticks the beast
+    // exactly as if the sigil weren't held. Fresh charges at every startFight.
+    if (this.hasSigil('comet') && (this.cometLeft | 0) > 0) {
+      this.cometLeft--;
+      this.updateScryPips(true);
+      this.time.delayedCall(300, () => { this.state = 'pick'; this.sigilMoment(); });
+      return;
+    }
+    this.tickEnemy(() => { this.state = 'pick'; this.sigilMoment(); });
+  }
+
+  /* COMET TRAIL's charge, printed on the SCRY button itself: one small ☄ per
+     free scry this battle — gold while it waits, a dim cinder once spent,
+     nothing at all when the sigil isn't held. The pip count is data-driven
+     (ssSigilCharges), so the coming rare/legendary tiers print 2 or 3 pips
+     with no new code here. `spent` marks the charge burning out NOW: that pip
+     flares once as it cools, so the next scry's true price reads on the
+     button before it is paid. */
+  updateScryPips(spent) {
+    const l = this.L;
+    const total = this.hasSigil('comet') ? ssSigilCharges('comet', this.sigTier('comet')) : 0;
+    if (this.scryPips.length !== total) {
+      for (const p of this.scryPips) p.destroy();
+      this.scryPips = [];
+      for (let i = 0; i < total; i++) {
+        this.scryPips.push(ssTxt(this, l.x(-150) + l.u((i - (total - 1) / 2) * 15), l.y(781), '☄', l.u(13), '#ffd77a').setOrigin(0.5));
+      }
+    }
+    // the cinder stays LEGIBLE on the dark button — a spent charge must read
+    // as "used", never as "no sigil" (that state shows no pip at all)
+    const cool = (p) => { p.setColor('#5a6390').setAlpha(0.55).setShadow(0, 0, '#000000', 0, false, false); };
+    this.scryPips.forEach((p, i) => {
+      this.tweens.killTweensOf(p);
+      p.setScale(1);
+      if (i < (this.cometLeft | 0)) {
+        p.setColor('#ffd77a').setAlpha(0.95).setShadow(0, 0, '#ffd77a', l.u(5), true, true);
+      } else if (spent && i === (this.cometLeft | 0)) {
+        // the pip that just burned: one bright flare, then the cinder
+        p.setColor('#fff2c9').setAlpha(1).setShadow(0, 0, '#ffd77a', l.u(8), true, true);
+        this.tweens.add({
+          targets: p, scale: 1.7, duration: 170, yoyo: true, ease: 'Sine.easeOut',
+          onComplete: () => { if (p.scene) cool(p); },
+        });
+      } else cool(p);
+    });
+  }
+
+  // The hint teaches the ORDER, not just the letters: tiles light one at a
+  // time in word order, a gold thread grows from tile to tile as it goes, the
+  // finished path holds long enough to read and start tracing, then fades.
+  // A simultaneous highlight told you WHICH letters but never WHAT word.
+  // Pacing is deliberately unhurried (Wyatt: the old beat was "way too fast")
+  // — and holding is free: only a successful cast clears the fx, so the
+  // player can trace the lit path while it stands.
+  useHint() {
+    if (this.state !== 'pick' || !this.hasSigil('tome') || (this.hintsLeft | 0) <= 0) return;
+    const best = this.bestWord();
+    if (!best) return;
+    // the TOME's reveals are a per-battle count now (1; 2 at its higher
+    // tiers) — the eye dims only when the last one is spent
+    this.hintsLeft--;
+    const dim = (this.hintsLeft | 0) <= 0 ? 0.3 : 1;
+    this.hintB.setAlpha(dim); this.hintT.setAlpha(dim);
+    SFX.forge();
+    const l = this.L;
+    this.clearHintFx();
+    const fx = this.hintFx = this.add.container(0, 0).setDepth(45);
+    const line = this.add.graphics().setBlendMode('ADD');
+    fx.add(line);
+    // slot positions, not live containers — tiles may pop/shift under the fx
+    const pts = best.map((bi) => ({ x: this.board[bi].c.x, y: this.board[bi].c.y, bi }));
+    const segs = [];
+    const drawAll = (a, b, t) => {
+      line.clear();
+      line.lineStyle(l.u(4), 0xffd77a, 0.7);
+      for (const [p1, p2] of segs) { line.beginPath(); line.moveTo(p1.x, p1.y); line.lineTo(p2.x, p2.y); line.strokePath(); }
+      if (a && t > 0) {
+        line.beginPath(); line.moveTo(a.x, a.y);
+        line.lineTo(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t); line.strokePath();
+      }
+    };
+    const step = (k) => {
+      if (this.hintFx !== fx) return;   // cancelled mid-reveal
+      const p = pts[k];
+      SFX.chime(k);   // same rising scale the taps will make — ear learns it too
+      // soft halo, not a floodlight — the letter has to stay readable so the
+      // player can read the word off the board as the path grows
+      const g = this.add.image(p.x, p.y, 'dot').setScale(this.tileSize / 14)
+        .setTint(0xffc95c).setAlpha(0).setBlendMode('ADD');
+      fx.add(g);
+      this.tweens.add({ targets: g, alpha: 0.55, duration: 260, ease: 'Sine.easeOut', yoyo: true, hold: 120, repeat: 0, onComplete: () => g.setAlpha(0.35) });
+      const bc = this.board[p.bi] && this.board[p.bi].c;
+      if (bc) this.tweens.add({ targets: bc, scale: 1.1, duration: 200, yoyo: true });
+      if (k > 0) {
+        const a = pts[k - 1], seg = { t: 0 };
+        this.tweens.add({
+          targets: seg, t: 1, duration: 440, ease: 'Sine.easeOut',
+          onUpdate: () => { if (this.hintFx === fx) drawAll(a, p, seg.t); },
+          onComplete: () => { if (this.hintFx === fx) { segs.push([a, p]); drawAll(null, null, 0); } },
+        });
+      }
+      if (k + 1 < pts.length) this.time.delayedCall(650, () => step(k + 1));
+      else this.time.delayedCall(5000, () => { if (this.hintFx === fx) this.clearHintFx(900); });
+    };
+    step(0);
+  }
+  clearHintFx(fade) {
+    if (!this.hintFx) return;
+    const fx = this.hintFx;
+    this.hintFx = null;
+    if (fade) this.tweens.add({ targets: fx, alpha: 0, duration: fade === true ? 450 : fade, onComplete: () => fx.destroy() });
+    else fx.destroy();
+  }
+
+  // ---------- sigil pick ----------
+  // Rarity gating. Campaign: rares surface from late Act I and climb with the
+  // ascent, legendaries from mid Act II — power arrives with the difficulty.
+  // Quick/daily: any tier can appear anywhere, but at LOW odds, so an early
+  // lucky legendary stays a story, not a strategy (the legendary effects are
+  // also tuned to scale — none of them flat-nukes an early beast).
+  // The ramp keys on run.fightIdx — FIGHTS FOUGHT, not offers made — so the
+  // sparser cadence (v0.65.0) never slows it: the pick after PHOENIX rolls
+  // the same odds however many offers came before it, and the last act's
+  // offers still reach the legendary band (leg 0.12-0.18 at fights 15-19).
+  sigilChances() {
+    if (this.mode === 'campaign' || this.mode === 'endless') {
+      // endless rides the campaign's own 20-fight ramp and then holds at the
+      // summit band forever — level 20+ deals like the campaign's last act
+      const span = this.mode === 'endless' ? 19 : Math.max(1, this.fights.length - 1);
+      const p = Math.min(1, this.run.fightIdx / span);
+      return {
+        rare: this.run.fightIdx >= 3 ? 0.12 + 0.28 * p : 0,
+        leg: this.run.fightIdx >= 7 ? 0.04 + 0.14 * Math.max(0, p - 0.5) / 0.5 : 0,
+      };
+    }
+    return { rare: 0.10, leg: 0.03 };
+  }
+  rollSigilOpts() {
+    const { rare, leg } = this.sigilChances();
+    /* THE DRIP'S ONE GATE. Every solo pick — quick, campaign and daily alike
+       — draws from ssSigilOpen(), so a locked sigil can never be offered.
+       The tier-fall below is what makes a thin pool safe: a dry legendary or
+       rare tier falls DOWNWARD into the fat basic tier, and only a run that
+       has already taken everything it is allowed to hold can come back with
+       fewer than three cards (showSigilPick then centres what there is). */
+    const open = ssSigilOpen();
+    const pools = [0, 1, 2].map((r) => open.filter((s) => (s.rarity | 0) === r && !this.run.sigils.includes(s.id)));
+    const opts = [];
+    for (let k = 0; k < 3; k++) {
+      const roll = rng();
+      let tier = roll < leg ? 2 : roll < leg + rare ? 1 : 0;
+      while (tier > 0 && !pools[tier].length) tier--;          // pool dry → fall a tier
+      const pool = pools[tier].length ? pools[tier] : pools.find((p) => p.length);
+      if (!pool || !pool.length) break;
+      opts.push(pool.splice(Math.floor(rng() * pool.length), 1)[0]);
+    }
+    return opts;
+  }
+  showSigilPick(pre) {
+    const l = this.L;
+    this.state = 'sigil';
+    const opts = pre || this.rollSigilOpts();   // payOffer pre-rolls; bare calls (harnesses) roll here
+    if (!opts.length) { this.afterSigil(); return; }           // every sigil owned — ride on
+    this.tweens.add({ targets: [this.boardC, this.lineC], alpha: 0.1, duration: 300 });
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setInteractive();
+    this.tweens.add({ targets: veil, alpha: 0.86, duration: 300 });
+    const items = [veil];
+    ssVeilStars(this, items, 90);   // the veil wears the night sky, not a black wash
+    const head = ssTxt(this, l.x(0), l.y(128), SS_T('sigilHead'), l.u(18), '#c9b676').setOrigin(0.5)
+      .setShadow(0, 0, '#c9b676', l.u(10), true, true);
+    items.push(head);
+    // pick-screen sparkles ride above the cards (added to overlayC last)
+    const sparks = this.add.particles(0, 0, 'dot', {
+      speed: { min: 40, max: 240 }, lifespan: { min: 300, max: 900 }, scale: { start: 0.8, end: 0 },
+      tint: [0xffd77a, 0xfff2c9], blendMode: 'ADD', emitting: false,
+    });
+    // a short board (the drip's pool exhausted by a long climb) centres on the
+    // same middle row a full one uses, rather than hanging from the top
+    const cy0 = 268 + (3 - opts.length) * 84;
+    opts.forEach((sg, k) => {
+      const cy = l.y(cy0 + k * 168);
+      const tier = sg.rarity | 0;
+      const glow = this.add.image(l.x(0), cy, 'glowbig').setDisplaySize(l.u(470), l.u(240))
+        .setTint(SS_RARITY[tier].glow).setAlpha(0).setBlendMode('ADD');
+      const card = ssSigilCard(this, l, sg, 336, 137).setPosition(l.x(0), cy + l.u(26)).setAlpha(0);
+      items.push(glow, card);
+      const delay = 160 + k * 150;
+      this.tweens.add({ targets: card, alpha: 1, y: cy, delay, duration: 320, ease: 'Cubic.easeOut' });
+      if (tier > 0) {
+        // arrival glow settles into a slow breathing pulse
+        this.tweens.add({
+          targets: glow, alpha: tier === 2 ? 0.22 : 0.12, delay, duration: 400,
+          onComplete: () => this.tweens.add({ targets: glow, alpha: tier === 2 ? 0.10 : 0.05, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' }),
+        });
+        this.time.delayedCall(delay + 280, () => {
+          if (this.state !== 'sigil') return;
+          if (tier === 2) {                                    // the legendary announces itself
+            SFX.forge();
+            this.cameras.main.flash(300, 255, 214, 120, false);
+            sparks.emitParticleAt(l.x(0), cy, 22);
+          } else sparks.emitParticleAt(l.x(0), cy, 8);
+        });
+      }
+      card.on('pointerover', () => { if (this.state === 'sigil') this.tweens.add({ targets: card, scale: 1.03, duration: 120 }); });
+      card.on('pointerout', () => this.tweens.add({ targets: card, scale: 1, duration: 120 }));
+      card.on('pointerdown', () => {
+        if (this.state !== 'sigil') return;
+        this.state = 'anim';
+        SFX.sigil();
+        this.run.sigils.push(sg.id);
+        // a new sigil always arrives at tier I — the AEGIS grants its base
+        // vessel, data-read so the ladder and the pick can never disagree
+        if (sg.id === 'aegis') { this.run.hpMax += ssSigilVal('aegis', 'hp', 1); this.run.hp = this.run.hpMax; }
+        this.repaintChips();   // a letter-bonus sigil shows on the standing board at once
+        if (this.mode === 'campaign' || this.mode === 'endless') this.saveCheckpoint();
+        sparks.emitParticleAt(card.x, card.y, tier === 2 ? 26 : 12);
+        this.tweens.add({ targets: card, scale: 1.05, duration: 130, yoyo: true });
+        for (const it of items) if (it !== card && it !== sparks) this.tweens.add({ targets: it, alpha: 0, duration: 200 });
+        this.time.delayedCall(260, () => {
+          sparks.destroy(); for (const it of items) it.destroy();
+          this.refreshDock(this.run.sigils.length - 1);   // the dock receives it with a bloom
+          this.afterSigil();
+        });
+      });
+    });
+    items.push(sparks);
+    this.overlayC.add(items);
+    ssHealBlankTexts(this, 'sigil-pick');
+  }
+
+  /* ---------- the upgrade pick (v0.66.0) ----------
+     Skylar (9/1): "sometimes at the end of a battle, instead of it granting
+     you a new sigil, you get the ability to upgrade a sigil that you
+     already have in your possession." Same panel language as the 3-card
+     pick: the board dims, the veil rises, a gold header — then one row per
+     held sigil in the order they were taken. An upgradable row wears the
+     grade-slot pair (II → IV — a skipped epic visibly skips) in the TARGET
+     grade's dress and speaks the NEXT tier's effect; a maxed row dims
+     under AT ITS HEIGHT and speaks what it already does. Rows pick on the
+     pointer UP under a small drag threshold so the same finger can scroll
+     a long list; a synthetic emit('pointerdown') (the demo, the harnesses)
+     picks at once. The forge is the upgrade's voice — SFX.sigil stays with
+     new arrivals. */
+  showUpgradePick() {
+    const l = this.L;
+    this.state = 'upgrade';
+    this.tweens.add({ targets: [this.boardC, this.lineC], alpha: 0.1, duration: 300 });
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setInteractive();
+    this.tweens.add({ targets: veil, alpha: 0.86, duration: 300 });
+    const head = ssTxt(this, l.x(0), l.y(116), SS_T('upHead'), l.u(18), '#c9b676').setOrigin(0.5)
+      .setShadow(0, 0, '#c9b676', l.u(10), true, true);
+    const items = [veil, head];
+    const sparks = this.add.particles(0, 0, 'dot', {
+      speed: { min: 40, max: 240 }, lifespan: { min: 300, max: 900 }, scale: { start: 0.8, end: 0 },
+      tint: [0xffd77a, 0xfff2c9], blendMode: 'ADD', emitting: false,
+    });
+    const RW = 340, RH = 84, GAP = 10, TOPY = 146, VIEWH = 616;
+    const ids = this.run.sigils;
+    const contentH = ids.length * (RH + GAP) - GAP;
+    const rc = this.add.container(0, 0);
+    const rows = [];
+    let done = false;
+    const pick = (row, id, idx) => {
+      if (this.state !== 'upgrade' || done) return;
+      done = true;
+      this.state = 'anim';
+      SFX.forge();
+      const cur = this.sigTier(id);
+      this.run.tiers[id] = cur + 1;
+      const slot = ssGradeSlot(id, cur + 1);
+      const GD = SS_GRADE[slot - 1] || SS_GRADE[1];
+      if (id === 'aegis') {
+        // the dawn grows NOW: grant the tier DELTA to the vessel, healed —
+        // and never re-granted on resume (hpMax rides the checkpoint)
+        const d = (ssSigilVal('aegis', 'hp', cur + 1) | 0) - (ssSigilVal('aegis', 'hp', cur) | 0);
+        this.run.hpMax += d; this.heal(d);
+      }
+      this.repaintChips();   // a choir/runes step shows on the standing board at once
+      if (this.mode === 'campaign' || this.mode === 'endless') this.saveCheckpoint();
+      const glow = this.add.image(row.x, row.y + rc.y, 'glowbig').setDisplaySize(l.u(440), l.u(180))
+        .setTint(GD.glow).setAlpha(0).setBlendMode('ADD');
+      this.overlayC.add(glow);
+      items.push(glow);
+      this.tweens.add({ targets: glow, alpha: 0.42, duration: 170, yoyo: true });
+      sparks.emitParticleAt(row.x, row.y + rc.y, slot >= 4 ? 26 : 14);
+      if (slot >= 4) this.cameras.main.flash(300, 255, 214, 120, false);   // a legendary ascension announces itself
+      this.tweens.add({ targets: row, scale: 1.05, duration: 130, yoyo: true });
+      for (const it of items) if (it !== sparks && it !== glow && it !== rc) this.tweens.add({ targets: it, alpha: 0, duration: 200 });
+      for (const r of rows) if (r !== row) this.tweens.add({ targets: r, alpha: 0, duration: 200 });
+      this.time.delayedCall(360, () => {
+        sparks.destroy();
+        for (const it of items) it.destroy();
+        this.refreshDock(idx);   // the icon re-blooms wearing its new numeral
+        this.afterSigil();
+      });
+    };
+    ids.forEach((id, k) => {
+      const sg = SS_SIG_BY[id];
+      if (!sg) return;
+      const cur = this.sigTier(id), can = cur < ssSigilMaxT(id);
+      const dropT = sg.rarity | 0;
+      const RC = SS_RARITY[dropT];
+      const cy = l.y(TOPY + RH / 2) + l.u(k * (RH + GAP));
+      const tex = ssSigilCardTex(this, dropT, RW, RH);
+      const row = this.add.container(l.x(0), cy);
+      row.add(this.add.image(0, 0, tex.key).setDisplaySize(l.u(RW), l.u(RH)));
+      const gx = -RW / 2 + tex.mx;
+      row.add(ssTxt(this, l.u(gx), 0, sg.icon, l.u(tex.mr * 0.95), RC.ink).setOrigin(0.5)
+        .setShadow(0, 0, RC.shadow, l.u(5), true, true));
+      const lx = gx + tex.mr + 14, maxW = RW / 2 - lx - 12;
+      const loc = SS_SIG(sg, can ? cur + 1 : cur);
+      const gk = ssGoldTex(this, loc.name, 13);
+      const nsc = Math.min(1, (maxW - 74) / gk.w);
+      row.add(this.add.image(l.u(lx), l.u(-RH / 2 + 19), gk.key).setOrigin(0, 0.5)
+        .setDisplaySize(l.u(gk.w * nsc), l.u(gk.h * nsc)));
+      if (can) {
+        const slot = ssGradeSlot(id, cur), next = ssGradeSlot(id, cur + 1);
+        const GD = SS_GRADE[next - 1] || SS_GRADE[1];
+        // no letterSpacing on the right-anchored pair — Phaser renders the
+        // spacing wider than it measures, and the last numeral bleeds past
+        // the card frame (screenshot-caught at dpr3)
+        row.add(ssTxt(this, l.u(RW / 2 - 22), l.u(-RH / 2 + 14), SS_ROMAN[slot - 1] + ' → ' + SS_ROMAN[next - 1], l.u(11), GD.color)
+          .setOrigin(1, 0.5).setShadow(0, 0, GD.color, l.u(6), true, true));
+        row.add(ssTxt(this, l.u(RW / 2 - 22), l.u(-RH / 2 + 28), SS_T(GD.key), l.u(7.5), GD.color)
+          .setOrigin(1, 0.5).setAlpha(0.85));
+      } else {
+        row.add(ssTxt(this, l.u(RW / 2 - 16), l.u(-RH / 2 + 19), '✦ ' + SS_T('upMax') + ' ✦', l.u(8.5), '#8a94c4')
+          .setOrigin(1, 0.5).setLetterSpacing(l.u(1.5)));
+      }
+      row.add(ssTextBlock(this, l.u(lx), l.u(-RH / 2 + 33), loc.desc, {
+        fontSize: l.u(11.5) + 'px', color: can ? '#c9ccde' : '#8a90ac', fontStyle: 'italic',
+        wrapW: l.u(maxW + 6), lineSpacing: l.u(1.5),
+      }).setData('sigilDesc', id));
+      row.setSize(l.u(RW), l.u(RH));
+      if (can) {
+        row.setInteractive({ useHandCursor: true });
+        row.setData('sigilCard', true);
+        let armY = null;
+        row.on('pointerdown', (p) => { if (!p) { pick(row, id, k); return; } armY = p.y; });
+        row.on('pointerup', (p) => {
+          if (armY == null) return;
+          const dy = Math.abs(p.y - armY);
+          armY = null;
+          // a scrolled-away row must not take a blind tap — its centre has
+          // to be inside the viewport when the finger lifts
+          const vy = row.y + rc.y;
+          if (dy < l.u(9) && vy > l.y(TOPY) - l.u(24) && vy < l.y(TOPY + VIEWH) + l.u(24)) pick(row, id, k);
+        });
+      } else row.setAlpha(0.5);
+      rows.push(row); rc.add(row);
+      const restA = can ? 1 : 0.5;
+      row.alpha = 0; row.y = cy + l.u(20);
+      this.tweens.add({ targets: row, alpha: restA, y: cy, delay: 120 + k * 80, duration: 300, ease: 'Cubic.easeOut' });
+    });
+    items.push(rc, sparks);
+    this.overlayC.add(items);
+    // a longer roster than the window holds scrolls under a mask — the
+    // inspector's pattern, driven from anywhere (the rows' pick threshold
+    // arbitrates tap vs drag)
+    const maxOff = Math.max(0, l.u(contentH) - l.u(VIEWH));
+    if (maxOff > 0) {
+      const mg = this.make.graphics();
+      mg.fillRect(l.x(-186), l.y(TOPY), l.u(372), l.u(VIEWH));
+      rc.setMask(mg.createGeometryMask());
+      let drag = null, off = 0;
+      const dn = (p) => { if (this.state === 'upgrade') drag = { y: p.y, off }; };
+      const mv = (p) => {
+        if (!drag) return;
+        if (!p.isDown) { drag = null; return; }
+        off = clamp(drag.off + (drag.y - p.y), 0, maxOff);
+        rc.y = -off;
+      };
+      const up = () => { drag = null; };
+      this.input.on('pointerdown', dn);
+      this.input.on('pointermove', mv);
+      this.input.on('pointerup', up);
+      rc.once('destroy', () => {
+        this.input.off('pointerdown', dn); this.input.off('pointermove', mv); this.input.off('pointerup', up);
+        mg.destroy();
+      });
+    }
+    ssHealBlankTexts(this, 'upgrade-pick');
+  }
+
+  // ---------- the map between fights ----------
+  // Campaign only: after the win settles — the sigil taken on a paying
+  // fight, the shatter alone on the rest — the star chart rises: where the
+  // night stands, what has been felled, what waits above — and the player
+  // taps the breathing constellation to march on. Quick/daily keep their
+  // straight fight → (sigil when the cadence pays) → fight rhythm.
+  afterSigil() {
+    if (this.mode === 'campaign') this.showMap();
+    else this.startFight();
+  }
+  showMap() {
+    // 'map' now means SETTLED and tappable — the victory glide (from the
+    // beast just felled up to the next) runs under 'anim' first, so the demo
+    // driver and the harnesses only ever tap a camera that has landed
+    this.state = 'anim';
+    this.tweens.add({ targets: [this.boardC, this.lineC], alpha: 0.1, duration: 300 });
+    const chart = ssStarChart(this, {
+      door: 'battle',
+      fightIdx: this.run.fightIdx,
+      onSettle: () => { if (this.state === 'anim') this.state = 'map'; },
+      onEnter: () => {
+        if (this.state !== 'map') return;
+        this.state = 'anim';
+        this.tweens.add({ targets: chart.c, alpha: 0, duration: 220 });
+        // A MIGHTY BEAST APPEARS (v0.106.0): a boss node heralds — the beat
+        // rises over the dissolving chart and startFight waits for its part.
+        // Non-boss nodes keep the straight cut, byte-identical.
+        const nf = this.fights[this.run.fightIdx];
+        const boss = nf && SS_BEASTS[nf.id] && SS_BEASTS[nf.id].boss;
+        if (boss) ssBossHerald(this, nf, () => this.startFight(), { door: 'map', fadeIn: 320 });
+        this.time.delayedCall(240, () => { chart.c.destroy(); if (!boss) this.startFight(); });
+      },
+    });
+    this.overlayC.add(chart.c);
+    chart.c.alpha = 0;
+    this.tweens.add({ targets: chart.c, alpha: 1, duration: 300 });
+  }
+
+  // ---------- run end ----------
+  endRun(won) {
+    const l = this.L;
+    this.state = 'end';
+    // the first game COMPLETED — win or loss, the first-open flag is down
+    // forever (the abandon door pays the same toll in goHome)
+    if (this.ftue) { ssFtueDone(); if (!this.ftueGone) this.ftueRetire(false); }
+    if (this.inspectP) this.inspectP.close();   // no window may outlive the run
+    // THE TOME'S PRICE — holding the Whispering Tome taxes the final score
+    // by its held tier's rate (25%; 15% at its height). Applied here, before
+    // the books: bests, sign records, the daily ledger, the beacon and the
+    // submitted leaderboard score all pay it.
+    const rawScore = this.runScore();
+    const tomeTax = this.hasSigil('tome') ? this.sigVal('tome', 'tax') : 0;
+    let score = tomeTax ? Math.round(rawScore * (1 - tomeTax / 100)) : rawScore;
+    // HARD MODE amplifies the FINAL tally (v0.70.0, Skylar: "not when you're
+    // attacking the beast but at the end of your total tally scored") — here
+    // beside the tome's price, so every book below (bests, sign records, the
+    // boards, the beacon) pays the amplified figure, win or fall alike; the
+    // end screen prints the bargain as its own ⚑ row.
+    if (this.hard) score = Math.round(score * SS_HARD.scoreMult);
+    const elapsed = this.runElapsed();
+    if (!won) SFX.defeat();
+    /* THE ENDLESS RECKONING (v0.68.0, Skylar): "at the end it should read
+       what level they got to, if that's their highest level … if that's
+       high score". The level REACHED is the one you fell on — you made it
+       there — and both bests are captured before the books move so the NEW
+       BEST flags are honest. A fall always ends the climb (no continue;
+       PHOENIX FEATHER's survive-once already intercepted before this). */
+    const isEnd = this.mode === 'endless';
+    const level = isEnd ? this.run.fightIdx + (won ? 0 : 1) : 0;
+    let prevBestLvl = -1, newBestLvl = false, newBestScore = false;
+    // best-run reference, captured before the books are updated below
+    const dk = String(SSNET.dayKey());
+    let prevBest = -1;                                     // -1 = no best line for this mode/result
+    if (won && this.mode === 'quick') prevBest = SS.prof.bestQuick;
+    if (won && this.mode === 'campaign') prevBest = SS.prof.bestCampaign;
+    if (this.mode === 'daily') prevBest = SS.prof.daily[dk] | 0;
+    if (isEnd) {
+      prevBestLvl = SS.prof.endless.bestLevel | 0;
+      prevBest = SS.prof.endless.bestScore | 0;
+      newBestLvl = prevBestLvl > 0 && level > prevBestLvl;
+      newBestScore = prevBest > 0 && score > prevBest;
+      const e = SS.prof.endless;
+      e.runs++;
+      if (level > e.bestLevel) e.bestLevel = level;
+      if (score > e.bestScore) e.bestScore = score;
+      // the sign ledger's endless line: the deepest level ever reached
+      // under this sign (campaign clears/best stay campaign-only)
+      if (this.sign) {
+        const sr = SS.prof.signs[this.sign] || (SS.prof.signs[this.sign] = { best: 0, clears: 0, runs: 0, xp: 0, ack: 1 });
+        if (level > (sr.eBest | 0)) sr.eBest = level;
+        // …and the sign page's own columns (v0.85.0, local-only): the
+        // ladder's best score and how many climbs began under this sign
+        sr.eRuns = (sr.eRuns | 0) + 1;
+        if (score > (sr.eScore | 0)) sr.eScore = score;
+      }
+      ssClearEndless();
+    }
+    if (won && this.mode === 'quick') {
+      SS.award('star-caller', this.game);
+      if (!this.run.scried) SS.award('no-scry', this.game);
+      if (score > SS.prof.bestQuick) SS.prof.bestQuick = score;
+    }
+    if (won && this.mode === 'campaign') {
+      SS.award('sky-sweeper', this.game);
+      if (score > SS.prof.bestCampaign) SS.prof.bestCampaign = score;
+    }
+    // the sign's own ledger — best is a winning-run score, like bestCampaign
+    if (this.mode === 'campaign' && this.sign) {
+      const sr = SS.prof.signs[this.sign] || (SS.prof.signs[this.sign] = { best: 0, clears: 0, runs: 0, xp: 0, ack: 1 });
+      sr.runs++;
+      if (won) {
+        sr.clears++;
+        if (score > sr.best) sr.best = score;
+        // the summit's own XP bonus (v0.69.0) — the campaign clear only;
+        // the endless ladder has no end to bonus, its depth IS the bonus
+        this.signXp(SS_SIGN_XP.clear);
+        SS.award('sign-born', this.game);
+        const cleared = Object.keys(SS.prof.signs).filter((k) => SS.prof.signs[k].clears > 0).length;
+        if (cleared >= 3) SS.award('wheel-walker', this.game);
+        if (cleared >= 12) SS.award('grand-zodiac', this.game);
+        // a HARD clear crowns the sign (v0.70.0): hardClears moves, the
+        // sign's own ember achievement rings, twelve of them the zodiac's
+        if (this.hard) ssHardAward(this.sign, this.game);
+      }
+    }
+    if (this.mode === 'campaign') ssClearCampaign();
+    let streak = null;
+    if (this.mode === 'daily') {
+      SS.award('daily-devout', this.game);
+      if (!SS.prof.daily[dk] || score > SS.prof.daily[dk]) SS.prof.daily[dk] = score;
+      // THE FLAME — tonight's hunt feeds the lantern. Win or lose, like the
+      // daily's own ledger: this counts having HUNTED, not having won. A
+      // second run tonight is the same night and changes nothing.
+      streak = ssStreakNote();
+      // the marks the flame now satisfies. award() is idempotent, so this
+      // both rings a fresh crossing and quietly settles up with a player who
+      // arrived already deep into a streak the marks did not exist for yet.
+      streak.marks.forEach((m) => SS.award(SS_MS_ACH[m], this.game));
+    }
+    // the rating stirs: a win pays by mode, a mighty word pays a pinch — all
+    // through the PvE gate (daily cap + diminishing), so solo play can seed a
+    // rating but never inflate one past what versus supports. The ENDLESS
+    // climb pays no rating at all (v0.68.0 — the ladder is its own ledger:
+    // best level, best score, the endless board; grinding an unbounded mode
+    // must never become the rating's back door), the mighty-word pinch
+    // included.
+    let rDelta = 0;
+    if (won && !isEnd) rDelta += SS_RATING.pve(this.mode === 'campaign' ? 10 : 5);
+    if (!isEnd) {
+      if (this.run.bigHit >= 60) rDelta += SS_RATING.pve(3);
+      else if (this.run.bigHit >= 40) rDelta += SS_RATING.pve(1);
+    }
+    if (won) SS.prof.wins++;
+    SS.save(); SS.sync();
+    /* THE DRIP settles here and nowhere else in a battle: the volley is over,
+       the books are closed, and a LOSS that finished a condition finishes it
+       exactly as a win would. `pend` is read rather than the fresh ids, so a
+       notice an earlier run never got to say is said now. */
+    ssSigilCheck();
+    const unlocked = ssSigilPending();
+    // mode rides along: only daily runs may land on the daily board (the
+    // weekly takes any run; campaign still only when the whole climb is won).
+    // An endless fall lands on the ENDLESS board — level first, score the
+    // tiebreak — and its score joins the weekly like any other run's.
+    // the row carries the flag's dress too (v0.77.0): the jar this mage
+    // flies and whether their stats are veiled — the climb's flag ledger
+    // reads both straight off the board row, no second fetch
+    if (isEnd) SSNET.submitEndless(level, score, this.run.longest, SS.prof.flag, !!SS.prof.rhide);
+    if (this.mode !== 'campaign' || won) SSNET.submitScore(score, this.run.longest, PACK.lang, this.mode, this.hard);
+    // a campaign hard CLEAR also lands on the hard board (v0.70.0) — the
+    // all-time ledger of everyone who beat the mountain with the clock on
+    if (this.hard && this.mode === 'campaign' && won) SSNET.submitHard(score, this.run.longest);
+
+    this.tweens.add({ targets: [this.boardC, this.lineC], alpha: 0.1, duration: 300 });
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setInteractive();
+    this.tweens.add({ targets: veil, alpha: won ? 0.7 : 0.8, duration: won ? 300 : 550 });
+    // THE FANFARE — a triumph beat lands before the window; the window waits
+    // it out. A campaign win (the whole long night) reads biggest. Losses
+    // keep their quiet veil.
+    let fanWait = 0;
+    if (won) fanWait = ssWinFanfare(this, this.mode === 'campaign' ? 3 : 1,
+      { text: SS_T(this.mode === 'campaign' ? 'fanCamp' : 'fanWin') });
+    const items = [];
+
+    // the window: an opaque midnight/gold panel, sized to its contents (the
+    // daily carries two extra rows: the flame line and the share button)
+    // (the daily carries three extra rows now: the flame, the lantern's own
+    // note — a mark crossed, or where the grace night stands — and the share)
+    // (the endless reckoning carries the LEVEL plate above the score, so it
+    // stands a little taller than a quick run's window)
+    const ph = this.mode === 'daily' ? 672 : isEnd ? 620 : 566;
+    const top = 410 - ph / 2;
+    const py = (d) => l.y(top + d);
+    items.push(this.add.image(l.x(0), py(ph / 2), 'endpanel').setDisplaySize(l.u(372), l.u(ph)));
+
+    /* the endless fall is read out with pride, not a defeat mask — the level
+       reached IS the run's prize (a fresh best wears the win's gold) */
+    const titleKey = isEnd ? 'endEndTitle' : won ? 'endWin' : 'endLose';
+    const tGold = won || (isEnd && (newBestLvl || newBestScore));
+    const title = ssTxt(this, l.x(0), py(42), SS_T(titleKey), l.u(isEnd ? 22 : 24), tGold ? '#ffe9a8' : isEnd ? '#d8c8e8' : '#e66a6a').setOrigin(0.5)
+      .setShadow(0, 0, tGold ? '#c9b676' : isEnd ? '#5a4a80' : '#802020', l.u(12), true, true);
+    items.push(title);
+    items.push(ssTxt(this, l.x(0), py(70), SS_T(isEnd ? 'endEndSub' : won ? 'endWinSub' : 'endLoseSub'), l.u(12), tGold ? '#c9b676' : '#8f8090', 'italic').setOrigin(0.5));
+    const rule = (d) => items.push(this.add.rectangle(l.x(0), py(d), l.u(316), Math.max(1, l.u(1)), 0xc9a84c, 0.35));
+    rule(92);
+
+    // the best-flag pair, shared by every plate below: pulsing NEW BEST when
+    // a standing best fell, the quiet reference line otherwise
+    const bestLine = (d, isNew, ref, refKey) => {
+      if (isNew) {
+        const nb = ssTxt(this, l.x(0), py(d), SS_T('newBest'), l.u(14), '#ffe9a8').setOrigin(0.5)
+          .setShadow(0, 0, '#c9b676', l.u(10), true, true);
+        items.push(nb);
+        this.tweens.add({ targets: nb, alpha: 0.55, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut', delay: 1000 });
+      } else if (ref > 0) {
+        items.push(ssTxt(this, l.x(0), py(d), SS_T(refKey, ref), l.u(12), '#8f8873').setOrigin(0.5));
+      }
+    };
+    let lvlPlateY = 0;
+    if (isEnd) {
+      // LEVEL REACHED — the climb's own headline, above the score
+      items.push(ssTxt(this, l.x(0), py(110), SS_T('endLvlReached'), l.u(11), '#8f8873').setOrigin(0.5));
+      const lk = ssGoldTex(this, SS_T('endLvl', level), 26);
+      const lsc = Math.min(1, 316 / lk.w);
+      lvlPlateY = 138;
+      items.push(this.add.image(l.x(0), py(138), lk.key).setDisplaySize(l.u(lk.w * lsc), l.u(lk.h * lsc)));
+      bestLine(164, newBestLvl, prevBestLvl, 'endBestLvl');
+      // the score beneath, with its own best flag
+      items.push(ssTxt(this, l.x(0), py(186), SS_T('stScore'), l.u(11), '#8f8873').setOrigin(0.5));
+      const gk2 = ssGoldTex(this, String(score), 20);
+      items.push(this.add.image(l.x(0), py(210), gk2.key).setDisplaySize(l.u(gk2.w), l.u(gk2.h)));
+      if (tomeTax) items.push(ssTxt(this, l.x(150), py(210), SS_T('endTomeTax', tomeTax), l.u(9), '#cf8fa0', 'italic').setOrigin(1, 0.5));
+      // unreachable today (endless never runs hard) — stands ready for the
+      // one-line day the modifier reaches the ladder
+      if (this.hard) items.push(ssTxt(this, l.x(-150), py(210), '⚑ ' + SS_T('hardLbl') + ' ×' + SS_HARD.scoreMult, l.u(9), '#ff8a70', 'italic').setOrigin(0, 0.5)
+        .setShadow(0, 0, '#e05e2a', l.u(5), true, true));
+      bestLine(232, newBestScore, prevBest, 'stBest');
+    } else {
+      // the score, in gold letterpress, with the best-run reference under it
+      items.push(ssTxt(this, l.x(0), py(112), SS_T('stScore'), l.u(11), '#8f8873').setOrigin(0.5));
+      const gk = ssGoldTex(this, String(score), 30);
+      items.push(this.add.image(l.x(0), py(140), gk.key).setDisplaySize(l.u(gk.w), l.u(gk.h)));
+      // HARD's amplifier, printed where it paid (v0.70.0) — beside the
+      // score plate, the tome's own placement law
+      if (this.hard) items.push(ssTxt(this, l.x(150), py(140), '⚑ ' + SS_T('hardLbl') + ' ×' + SS_HARD.scoreMult, l.u(9.5), '#ff8a70', 'italic').setOrigin(1, 0.5)
+        .setShadow(0, 0, '#e05e2a', l.u(5), true, true));
+      // the bargain stated where it bit — the score shown already paid it
+      if (tomeTax) items.push(ssTxt(this, l.x(0), py(163), SS_T('endTomeTax', tomeTax), l.u(9.5), '#cf8fa0', 'italic').setOrigin(0.5));
+      bestLine(tomeTax ? 178 : 170, prevBest >= 0 && score > prevBest && prevBest > 0, prevBest, 'stBest');
+    }
+
+    // the finest word gets the nameplate treatment
+    const wordY = isEnd ? 252 : 196;
+    items.push(ssTxt(this, l.x(0), py(wordY), SS_T('stFinest'), l.u(11), '#8f8873').setOrigin(0.5));
+    if (this.run.longest) {
+      const wk = ssGoldTex(this, this.run.longest.toUpperCase(), 20);
+      const sc = Math.min(1, 300 / wk.w);
+      items.push(this.add.image(l.x(0), py(wordY + 26), wk.key).setDisplaySize(l.u(wk.w * sc), l.u(wk.h * sc)));
+    } else {
+      items.push(ssTxt(this, l.x(0), py(wordY + 26), '—', l.u(18), '#d8d2bd').setOrigin(0.5));
+    }
+    rule(isEnd ? 302 : 246);
+
+    // the ledger: label left, value right — the endless climb's beast count
+    // has no denominator (the ladder has no end to be counted against)
+    const mins = Math.floor(elapsed / 60000), secs = Math.floor(elapsed / 1000) % 60;
+    const ledgerY = isEnd ? 320 : 266;
+    const rows = [
+      [SS_T('stBeasts'), isEnd ? String(this.run.fightIdx) : this.run.fightIdx + ' / ' + this.fights.length],
+      [SS_T('stWords'), String(this.run.words)],
+      [SS_T('stLetters'), String(this.run.letters)],
+      [SS_T('stBigHit'), this.run.bigHit ? String(this.run.bigHit) : '—'],
+      [SS_T('stTime'), mins + ':' + String(secs).padStart(2, '0')],
+    ];
+    rows.forEach(([k, v], i) => {
+      items.push(ssTxt(this, l.x(-150), py(ledgerY + i * 26), k, l.u(13), '#a89f85').setOrigin(0, 0.5));
+      items.push(ssTxt(this, l.x(150), py(ledgerY + i * 26), v, l.u(13.5), '#e8e0c8').setOrigin(1, 0.5));
+    });
+
+    // sigils held, as their icons — and TAPPABLE: the whole row opens the
+    // inspector so a finished run can still be read (Wyatt's TestFlight ask).
+    // The panel must outrank overlayC (100), hence the depth.
+    const sigY = isEnd ? 448 : 400;
+    items.push(ssTxt(this, l.x(-150), py(sigY), SS_T('stSigils'), l.u(13), '#a89f85').setOrigin(0, 0.5));
+    const glyphs = this.run.sigils.map((id) => (SS_SIGILS.find((s) => s.id === id) || {}).icon || '✦');
+    items.push(ssTxt(this, l.x(150), py(sigY), glyphs.length ? glyphs.join(' ') : '—', l.u(glyphs.length > 10 ? 12 : 14), '#d7b45c').setOrigin(1, 0.5)
+      .setShadow(0, 0, '#c9b676', l.u(6), true, true));
+    if (this.run.sigils.length || this.signZ) {
+      const sigZone = this.add.zone(l.x(0), py(sigY), l.u(384), l.u(34)).setOrigin(0.5).setInteractive({ useHandCursor: true });
+      sigZone.on('pointerdown', () => {
+        if (this.endInspectP) return;
+        SFX.ui();
+        this.endInspectP = ssSigilPanel(this, {
+          sigils: this.run.sigils, tiers: this.run.tiers, sign: this.signZ, signLv: this.signLv, signBorrowed: this.signBorrowed, sleeping: true, depth: 130,
+          onClose: () => { this.endInspectP = null; },
+        });
+      });
+      items.push(sigZone);
+    }
+
+    // the rating readout — when the number moved, show it move
+    if (rDelta) {
+      const rTier = ssRatingTier(SS.prof.rating);
+      items.push(ssTxt(this, l.x(0), py(this.mode === 'daily' ? 421 : 428), '✦ +' + rDelta + '  ·  ' + SS.prof.rating + ' ' + SS_T(rTier.key), l.u(11), '#ffd77a').setOrigin(0.5)
+        .setShadow(0, 0, '#c9b676', l.u(6), true, true));
+    }
+
+    let by = isEnd ? 500 : 470;
+    if (this.mode === 'daily') {
+      // THE ONE LINE: what tonight did to the flame. The first night lights
+      // the lantern; every night after names its number.
+      const sn = (streak && streak.n) || 1;
+      const flame = ssTxt(this, l.x(0), py(448), '🔥 ' + (sn <= 1 ? SS_T('stkLit') : SS_T('stkNight', sn)),
+        l.u(15), '#ffb457').setOrigin(0.5).setShadow(0, 0, '#a8520d', l.u(9), true, true);
+      items.push(flame);
+      // it breathes like the lantern it feeds
+      this.tweens.add({ targets: flame, alpha: 0.72, duration: 1500, yoyo: true, repeat: -1, ease: 'Sine.easeInOut', delay: (fanWait || 0) + 700 });
+      /* …and one line beneath it for what the flame's own night cost or won:
+         a mark just crossed (the meadow will hold the ceremony), the grace
+         night this very hunt spent, or simply where the safety net stands. */
+      let note;
+      if (streak && streak.ms) {
+        note = ssTxt(this, l.x(0), py(470), '✦ ' + ssMarkCopy(streak.ms).name + ' ✦', l.u(12.5), '#ffd77a').setOrigin(0.5)
+          .setShadow(0, 0, '#c9b676', l.u(8), true, true);
+      } else if (streak && streak.ev === 'graced') {
+        note = ssTxt(this, l.x(0), py(470), '◌ ' + SS_T('stkGraced'), l.u(11.5), '#ffb457').setOrigin(0.5)
+          .setShadow(0, 0, '#a8520d', l.u(6), true, true);
+      } else {
+        const gl2 = ssGraceLine();
+        note = ssTxt(this, l.x(0), py(470), gl2.text, l.u(10.5), gl2.color, 'italic').setOrigin(0.5);
+      }
+      items.push(note);
+      const share = this.add.image(l.x(0), py(508), ssBtn(this, true, 240, 44)).setDisplaySize(l.u(240), l.u(44)).setInteractive({ useHandCursor: true });
+      const shareT = ssTxt(this, l.x(0), py(508), SS_T('shareBtn'), l.u(13), '#9fb0e8').setOrigin(0.5);
+      items.push(share, shareT);
+      /* Fires on the UP, not the down: iOS grants the clipboard only inside
+         a user activation, and Phaser's pointerdown comes from touchstart,
+         which is not one — touchend is (versus's share buttons learned this
+         first; vsOnTap is their arm-on-down/fire-on-up pattern). */
+      vsOnTap(share, () => {
+        // the spoiler-free card (ssShareCard). The streak line rides on
+        // tonight's own count when the lantern exists at all, and the card
+        // simply omits it otherwise — nothing here may depend on it.
+        const txt = ssShareCard({
+          score, felled: this.run.fightIdx, beasts: this.fights.length,
+          wordLen: (this.run.longest || '').length,
+          streak: (streak && streak.n) || (typeof ssStreakCount === 'function' ? ssStreakCount() : 0),
+        });
+        ssCopyText(txt).then((okd) => {
+          if (shareT.active) shareT.setText(SS_T(okd ? 'shareCopied' : 'shareFail'));
+        });
+      });
+      by = 564;
+    }
+    const again = this.add.image(l.x(0), py(by), ssBtn(this, false, 240, 56)).setDisplaySize(l.u(240), l.u(56)).setInteractive({ useHandCursor: true });
+    const againT = ssTxt(this, l.x(0), py(by), SS_T(isEnd ? 'endAgain' : won || this.mode !== 'campaign' ? 'newRun' : 'tryAgain'), l.u(17), BTN_INK()).setOrigin(0.5);
+    if (againT.width > l.u(216)) againT.setScale(l.u(216) / againT.width);
+    const homeB = this.add.image(l.x(0), py(by + 58), ssBtn(this, true, 240, 46)).setDisplaySize(l.u(240), l.u(46)).setInteractive({ useHandCursor: true });
+    const homeT = ssTxt(this, l.x(0), py(by + 58), SS_T('home'), l.u(14), '#9fb0e8').setOrigin(0.5);
+    items.push(again, againT, homeB, homeT);
+    again.on('pointerdown', () => {
+      SFX.ui();
+      // a campaign retry keeps the sign you climbed under; only the meadow's
+      // NEW CAMPAIGN asks the stars again — and CLIMB AGAIN keeps the
+      // endless sign the same way (endRun's books wiped the pin with the
+      // checkpoint, so the retry re-pins the identity it climbed under)
+      if (this.mode === 'campaign' && this.sign) { try { localStorage.setItem('beta3.campsign', this.sign); } catch (e) { } ssRememberSign('campaign', this.sign); }
+      if (isEnd && this.sign) { try { localStorage.setItem('beta3.endsign', this.sign); } catch (e) { } ssRememberSign('endless', this.sign); }
+      // …and a hard climb retries HARD (the books wiped the pin with the
+      // checkpoint; the retry keeps the challenge it was taken under)
+      if (this.mode === 'campaign' && this.hard) { try { localStorage.setItem('beta3.camphard', '1'); } catch (e) { } }
+      this.scene.restart({ mode: this.mode, resume: null });
+    });
+    // the Act III payoff: win the campaign and you descend into sunrise
+    homeB.on('pointerdown', () => { SFX.ui(); this.goHome({ from: won ? 'battle' : 'defeat', dawn: won && this.mode === 'campaign' }); });
+    this.overlayC.add([veil, ...items]);
+    ssHealBlankTexts(this, 'end-screen');
+
+    // while the fanfare plays, the window's (invisible) buttons can't eat taps
+    if (fanWait) {
+      const lock = items.filter((o) => o.input);
+      lock.forEach((o) => { o.input.enabled = false; });
+      this.time.delayedCall(fanWait, () => lock.forEach((o) => { if (o.active && o.input) o.input.enabled = true; }));
+    }
+    // entrance: the window settles up into place; a defeat sinks in more slowly
+    items.forEach((it) => { it.y += l.u(16); it.alpha = 0; });
+    this.tweens.add({ targets: items, y: '-=' + l.u(16), alpha: 1, duration: won ? 380 : 600, ease: won ? 'Back.easeOut' : 'Sine.easeOut', delay: won ? fanWait : 250 });
+    // gold motes crown a victory — and an endless fall that set a NEW BEST
+    // level (the beast won the fight, but the climb won the ledger)
+    const crown = won || (isEnd && newBestLvl);
+    if (crown) this.time.delayedCall(fanWait + (won ? 180 : 750), () => {
+      const cy = isEnd && lvlPlateY ? py(lvlPlateY) : title.y - l.u(16);
+      for (let i = 0; i < 14; i++) {
+        const a = (i / 14) * Math.PI * 2, r = l.u(30 + rng() * 40);
+        const m = this.add.image(title.x, cy, 'dot').setScale(0.5 + rng() * 0.5)
+          .setTint(0xffe9a8).setBlendMode('ADD').setDepth(101);
+        this.overlayC.add(m);
+        this.tweens.add({ targets: m, x: title.x + Math.cos(a) * r * 2.4, y: cy + Math.sin(a) * r, alpha: 0, scale: 0.1, duration: 900 + rng() * 500, ease: 'Cubic.easeOut', onComplete: () => m.destroy() });
+      }
+    });
+
+    // the discovery rides in after the window has settled (and after any
+    // fanfare) — never over the top of a triumph beat. The SIGN's level-up
+    // rite (v0.69.0) chains BEHIND the sigil queue (the onAll seam), so
+    // ceremonies never stack; ack is spent as each rite shows, so a rite a
+    // restart kills is simply said later (the meadow's signNotice).
+    const lvups = ssSignPending();
+    const sayLv = () => {
+      if (!this.scene.isActive() || SS_RITE.busy) return;
+      const u = ssSignPending()[0];
+      if (u) ssSignRite(this, SS_ZODIAC_BY[u.id], u.lv, sayLv);
+    };
+    if (unlocked.length) this.time.delayedCall((fanWait || 0) + 1400, () => ssSigilAnnounce(this, unlocked, sayLv));
+    else if (lvups.length) this.time.delayedCall((fanWait || 0) + 1400, sayLv);
+
+    if (DEMO) {
+      localStorage.setItem('beta3.result', JSON.stringify({ won, mode: this.mode, score, level: isEnd ? level : undefined, hard: this.hard || undefined, words: this.run.words, longest: this.run.longest, letters: this.run.letters, bigHit: this.run.bigHit, elapsed, rating: SS.prof.rating, rd: rDelta }));
+      this.time.delayedCall(2500, () => again.emit('pointerdown'));
+    }
+  }
+
+  // ---------- solver (hint + demo) ----------
+  buildTrie() {
+    // one trie per language, cached for the session — a versus battle in
+    // another tongue must not hint from the solo language's words
+    Battle.tries = Battle.tries || {};
+    if (!Battle.tries[PACK.lang]) {
+      const root = {};
+      for (const w of WORDSET) {
+        if (w.length > 8) continue;
+        let n = root;
+        for (const ch of w) n = n[ch] || (n[ch] = {});
+        n.$ = true;
+      }
+      Battle.tries[PACK.lang] = root;
+    }
+    this.trie = Battle.tries[PACK.lang];
+  }
+  bestWord() {
+    this.buildTrie();
+    const tiles = this.board.map((s, i) => ({ i, s })).filter((x) => x.s);
+    let best = null, bestScore = -1;
+    const used = new Array(tiles.length).fill(false);
+    const pick = [];
+    // the solver keeps the sky's law (THE LONG ROAD): a word the button
+    // would refuse is no candidate — hint and demo speak castable words only
+    const need = this.castMinLen();
+    const dive = (node) => {
+      if (node.$ && pick.length >= 2 && (need <= 2 || pick.reduce((a, k) => a + tiles[k].s.ch.length, 0) >= need)) {
+        const dmg = this.wordDamage(pick.map((k) => tiles[k].s));
+        if (dmg > bestScore) { bestScore = dmg; best = pick.map((k) => tiles[k].i); }
+      }
+      if (pick.length >= 8) return;
+      const seen = new Set();
+      for (let k = 0; k < tiles.length; k++) {
+        if (used[k]) continue;
+        const key = tiles[k].s.ch + ':' + tiles[k].s.tier + (tiles[k].s.blk ? ':b' : '');
+        if (seen.has(key)) continue;
+        seen.add(key);
+        let n = node, ok = true;
+        for (const ch of tiles[k].s.ch) { n = n[ch]; if (!n) { ok = false; break; } }
+        if (!ok) continue;
+        used[k] = true; pick.push(k);
+        dive(n);
+        used[k] = false; pick.pop();
+      }
+    };
+    dive(this.trie);
+    return best;
+  }
+  demoStep() {
+    if (this.state === 'map') {
+      const ch = this.overlayC.list.find((o) => o.getData && o.getData('mapZone'));
+      const z = ch && ch.getData('mapZone');
+      if (z && z.active) z.emit('pointerdown');
+      return;
+    }
+    if (this.state === 'sigil' || this.state === 'upgrade') {
+      if (!this.sigilShownAt) this.sigilShownAt = this.time.now;
+      if (this.time.now - this.sigilShownAt > 2200) {
+        this.sigilShownAt = 0;
+        // the upgrade rows live one container down but wear the same tag —
+        // walk overlayC and its children so both screens' cards are found
+        const cards = [];
+        const scan = (ls) => ls.forEach((o) => {
+          if (o.getData && o.getData('sigilCard')) cards.push(o);
+          else if (o.list) scan(o.list);
+        });
+        scan(this.overlayC.list);
+        if (cards.length) cards[Math.floor(Math.random() * cards.length)].emit('pointerdown');
+      }
+      return;
+    }
+    if (this.state !== 'pick' || this.sel.length) return;
+    const best = this.bestWord();
+    if (!best) { this.scry(); return; }
+    best.forEach((bi, k) => this.time.delayedCall(k * 120, () => this.tapTile(bi)));
+    this.time.delayedCall(best.length * 120 + 320, () => this.tryCast());
+    localStorage.setItem('beta3.stat', JSON.stringify({
+      v: BUILD, mode: this.mode, fight: this.run.fightIdx, hp: this.run.hp,
+      words: this.run.words, longest: this.run.longest, score: this.runScore(), t: Date.now(),
+    }));
+  }
+}
+
+/* ============================================================
+   PROFILE
+   ============================================================ */
+class Profile extends Phaser.Scene {
+  constructor() { super('profile'); }
+  create() {
+    const l = ssLayout(this);
+    // scene instances persist across restarts — every sheet ref starts null
+    this.skiesP = null;
+    this.statsP = null;
+    this.achP = null;
+    this.flagP = null;
+    this.signP = null;
+    this.rowFlag = null;
+
+    ssMakeTextures(this);
+    ssStarfield(this, 90);
+
+    const back = ssTxt(this, l.x(-195), l.y(24), '‹ HOME', l.u(14), '#9fb0e8').setOrigin(0, 0.5).setInteractive({ useHandCursor: true });
+    back.on('pointerdown', () => { SFX.ui(); this.scene.start('home'); });
+
+    ssTxt(this, l.x(0), l.y(60), '— STARGAZER —', l.u(13), '#8a94c4').setOrigin(0.5);
+    this.nameT = ssTxt(this, l.x(0), l.y(92), SSNET.myName(), l.u(26), '#f3e5b4').setOrigin(0.5)
+      .setShadow(0, 0, '#c9a94f', l.u(12), true, true).setInteractive({ useHandCursor: true });
+    ssTxt(this, l.x(0), l.y(120), 'tap your name to change it', l.u(10), '#5a6390', 'italic').setOrigin(0.5);
+    this.nameT.on('pointerdown', () => this.editName(l));
+
+    const p = SS.prof;
+
+    // the star rating, right under the name — tap it for your own card; the
+    // line below veils/unveils it from other stargazers (you always see yours)
+    const rTier = ssRatingTier(p.rating);
+    const ratingT = ssTxt(this, l.x(0), l.y(139), rTier.glyph + ' ' + p.rating + ' · ' + SS_T(rTier.key), l.u(12.5), rTier.color).setOrigin(0.5)
+      .setShadow(0, 0, rTier.color, l.u(6), true, true).setInteractive({ useHandCursor: true });
+    ratingT.on('pointerdown', () => ssRatingCard(this, { own: true }));
+    /* the rating and the veil sit 17 apart — a stacked pair, so their 44-pt
+       pads take the meadow's old chip-over-pill anchors: the rating grows
+       toward the sky, the veil toward the doors. And setText WIPES a text's
+       padded hit rect (Phaser re-sizes it to the new frame), so the veil
+       re-pads inside its dress — without it the toggle's real target was 8
+       css pt tall and its stale rect stole taps aimed at the rating line
+       (v0.78.0, found by profile-check's judge). */
+    ssHitPad(ratingT, 44, 'up');
+    const veilT = ssTxt(this, l.x(0), l.y(156), '', l.u(8.5), '#5a6390', 'italic').setOrigin(0.5).setInteractive({ useHandCursor: true });
+    const dressVeil = () => {
+      veilT.setText(SS_T('rVeilRow') + ':  ' + (SS.prof.rhide ? '☾ ' + SS_T('rVeiled') : '✦ ' + SS_T('rShown')));
+      ssHitPad(veilT, 44, 'down');
+    };
+    dressVeil();
+    veilT.on('pointerdown', () => {
+      SFX.ui(); SS.prof.rhide = !SS.prof.rhide; SS.save(); SS.sync(); dressVeil();
+      // the veil covers the flag too (v0.77.0): the standing row follows at once
+      SSNET.dressFlag(SS.prof.flag, !!SS.prof.rhide);
+    });
+
+    /* THE FOUR DOORS (v0.78.0, Skylar 9/2: "put the leaderboard button, the
+       Your Skies button, the new stats button, and the new achievement
+       buttons in a 2x2 grid that is underneath Veil My Rating"). Everything
+       the page used to spread down its column now stands behind these four:
+       LEADERBOARD · YOUR SIGILS on the first rank, STATS · ACHIEVEMENTS on
+       the second. The Board is told where it was opened from so its back
+       link returns HERE, never to the meadow; the other three open sheets
+       over this page. One sheet at a time — every door checks the field. */
+    this.anySheet = () => !!(this.skiesP || this.statsP || this.achP || this.flagP || this.signP);
+    const gDoor = (col, row, label, withSub, open) => {
+      const x = l.x(col ? 95 : -95), y = l.y(194 + row * 54);
+      const b = this.add.image(x, y, ssBtn(this, true, 182, 44)).setDisplaySize(l.u(182), l.u(44))
+        .setInteractive({ useHandCursor: true });
+      const t = ssTxt(this, x, y - (withSub ? l.u(8) : 0), '✦  ' + label, l.u(12), '#e8c86a')
+        .setOrigin(0.5).setShadow(0, 0, '#c9a94f', l.u(7), true, true);
+      // a long word (CLASIFICACIÓN, ESTADÍSTICAS) fits its door, never spills
+      if (t.width > l.u(158)) t.setScale(l.u(158) / t.width);
+      const s = withSub ? ssTxt(this, x, y + l.u(11), '', l.u(8), '#8a94c4', 'italic').setOrigin(0.5) : null;
+      const go = () => { if (this.anySheet()) return; open(); };
+      b.on('pointerdown', go);
+      t.setInteractive({ useHandCursor: true }).on('pointerdown', go);
+      return { b, t, s };
+    };
+    const lbD = gDoor(0, 0, SS_T('board'), false, () => { SFX.ui(); this.scene.start('board', { from: 'profile' }); });
+    this.leaderB = lbD.b; this.leaderT = lbD.t;
+    const skD = gDoor(1, 0, SS_T('skiesTitle'), true, () => this.openSkies());
+    this.skiesB = skD.b; this.skiesSubT = skD.s;
+    const stD = gDoor(0, 1, SS_T('pfStats'), false, () => this.statsSheet());
+    this.statsB = stD.b;
+    const acD = gDoor(1, 1, SS_T('pfAch'), true, () => this.achSheet());
+    this.achB = acD.b; this.achSubT = acD.s;
+    // the sigils sub keeps the door's old voice (v0.67.0): while something
+    // sleeping is NEARLY THERE it says so instead of the plain fraction —
+    // dressed, never baked, and re-dressed when the gallery closes (a rite
+    // can hand a sigil over while this scene is alive)
+    this.dressSkies = () => {
+      const n = ssSigilOpen().length, m = ssSigilNearCount();
+      this.skiesSubT.setText(m > 0 ? SS_T('skiesNear', n, m) : n + ' / ' + SS_SIGILS.length);
+      this.skiesSubT.setScale(Math.min(1, l.u(158) / Math.max(1, this.skiesSubT.width)));
+    };
+    this.dressSkies();
+    /* the tally counts DISPLAY rows: hard mode's twelve ember signs live
+       behind ONE evolving family row (v0.70.0) that counts once, lit by
+       its first member — so the fraction always matches the sheet's list */
+    const achGot = SS_ACH.reduce((n, a) => n + (a.famIds ? (a.famIds.some((id) => p.ach[id]) ? 1 : 0) : (p.ach[a.id] ? 1 : 0)), 0);
+    this.achSubT.setText(achGot + ' / ' + SS_ACH.length);
+
+    /* THE SIGN BADGES (v0.78.0): the twelve campaign signs take the rest of
+       the page as a 3×4 grid of true badges — the drawn constellations at
+       badge size in glass shields, replacing the one-row strip that drew
+       them at l.u(0.085) ("incredibly tiny"). Everything the strip said
+       still reads here: cleared signs burn gold and unplayed hang dim
+       (v0.23.0's inks), and a played sign wears its level in a roundel at
+       the badge's crown instead of the old tucked numeral (v0.69.0's
+       signWheelLv tag rides the numeral for the suites). Each asterism is
+       fitted to its own badge box — one global scale left the wide signs
+       tiny, which is the strip's whole disease. */
+    SS_ZODIAC.forEach((z, i) => {
+      const col = i % 3, row = Math.floor(i / 3);
+      const x = l.x(-128 + col * 128), y = l.y(336 + row * 114);
+      const sr = p.signs[z.id];
+      const cleared = !!(sr && sr.clears > 0);
+      const played = !!(sr && ((sr.xp | 0) > 0 || (sr.runs | 0) > 0 || (sr.clears | 0) > 0 || (sr.eBest | 0) > 0));
+      this.add.image(x, y, ssZodBadgeTex(this, cleared)).setDisplaySize(l.u(118), l.u(106));
+      if (cleared) {
+        this.add.image(x, y - l.u(8), 'glowbig').setDisplaySize(l.u(132), l.u(96))
+          .setTint(0xffd77a).setAlpha(0.1).setBlendMode('ADD');
+      }
+      const src = z.stars ? z : SS_BEASTS[z.beast];
+      let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+      for (const pt of src.stars) {
+        x0 = Math.min(x0, pt[0]); x1 = Math.max(x1, pt[0]);
+        y0 = Math.min(y0, pt[1]); y1 = Math.max(y1, pt[1]);
+      }
+      const k = Math.min(86 / Math.max(1, x1 - x0), 58 / Math.max(1, y1 - y0), 0.55);
+      // centre the asterism's own bounding box in the glyph cell — several
+      // signs are authored off-centre and would lean out of a small badge
+      const gx = x - l.u(((x0 + x1) / 2) * k), gy = y - l.u(10) - l.u(((y0 + y1) / 2) * k);
+      ssZodiacGlyph(this, z, l.u(k), gx, gy, cleared ? 0xffd77a : 0x39406b, cleared ? 1 : 0.8);
+      const nm = ssTxt(this, x, y + l.u(38), z.name, l.u(9.5), cleared ? '#ffd77a' : '#5a6390')
+        .setOrigin(0.5).setLetterSpacing(l.u(1.5));
+      if (cleared) nm.setShadow(0, 0, '#c9a94f', l.u(5), true, true);
+      if (nm.width > l.u(106)) nm.setScale(l.u(106) / nm.width);
+      if (played) {
+        this.add.circle(x + l.u(41), y - l.u(36), l.u(11), 0x141a33, 0.92)
+          .setStrokeStyle(Math.max(1, l.u(1.2)), cleared ? 0xc9a84c : 0x4a5480, 1);
+        ssTxt(this, x + l.u(41), y - l.u(36), String(ssSignLv(z.id)), l.u(10), cleared ? '#ffd77a' : '#8a94c4')
+          .setOrigin(0.5).setShadow(0, 0, '#0a0e1f', l.u(4), true, true).setData('signWheelLv', z.id);
+      }
+      /* THE DOOR (v0.85.0, Skylar 9/3: "when you click the sign … each
+         sign needs to open up its own page"): every badge — played or not
+         — opens the sign's page. One zone the size of the whole cell rides
+         ABOVE the shield and its dress (topOnly: display order IS input
+         order), 118×106 units, far past the 44-pt law. */
+      const bz = this.add.zone(x, y, l.u(118), l.u(106)).setOrigin(0.5).setInteractive({ useHandCursor: true });
+      bz.setData('signDoor', z.id);
+      bz.on('pointerdown', () => this.zodSheet(z));
+    });
+
+    ssTxt(this, l.x(0), l.y(784), 'seal: ' + SSNET.uid().slice(0, 12) + ' · ' + (SSNET.mode === 'local' ? 'offline' : 'synced'), l.u(9), '#39406b').setOrigin(0.5);
+  }
+  /* ---------- THE SIGIL GALLERY (v0.43.0, door re-cut v0.78.0) ----------
+     The gallery has to be reachable from somewhere that is not a battle,
+     because the whole point of the sleeping list is the bar you are chasing
+     between runs. The door reads the sky as it stands RIGHT NOW — what the
+     drip handed over since this scene was built belongs above the STILL
+     SLEEPING rule, not under it. */
+  openSkies() {
+    if (this.anySheet()) return;
+    SFX.ui();
+    this.skiesP = ssSigilPanel(this, {
+      sigils: ssSigilOpen().map((s) => s.id), sleeping: true, title: 'skiesTitle', depth: 120,
+      onClose: () => { this.skiesP = null; this.dressSkies(); },
+    });
+  }
+  /* ---------- THE STATS SHEET (v0.78.0, Skylar 9/2) ----------
+     "We also want to put the stats from runs begun all the way down to
+     versus victories into a button that says Stats." The nine-row ledger,
+     the same values in the same formats the page always printed — and the
+     endless row is still the frontier flag's door (v0.77.0): the little
+     flag in your jar, the '  ›', and a 44-pt zone onto the flag sheet,
+     which opens ABOVE this one. Zones and the flag land AFTER c.add(items)
+     — the topOnly law. */
+  statsSheet() {
+    if (this.anySheet()) return;
+    SFX.ensure(); SFX.ui();
+    const l = ssLayout(this);
+    const c = this.statsP = this.add.container(0, 0).setDepth(600);
+    const close = () => { if (this.statsP !== c) return; this.statsP = null; this.rowFlag = null; c.destroy(); };
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setInteractive();
+    this.tweens.add({ targets: veil, alpha: 0.66, duration: 200 });
+    veil.on('pointerdown', () => { SFX.ui(); close(); });
+    c.add(veil);
+    const p = SS.prof;
+    const PH = 380, py = (d) => l.y(400 - PH / 2 + d);
+    const items = [];
+    items.push(this.add.image(l.x(0), py(PH / 2), 'endpanel').setDisplaySize(l.u(372), l.u(PH)).setInteractive());
+    const xB = ssTxt(this, l.x(164), py(28), '✕', l.u(15), '#8a94c4').setOrigin(0.5).setInteractive({ useHandCursor: true });
+    xB.on('pointerdown', () => { SFX.ui(); close(); });
+    items.push(xB);
+    const tk = ssGoldTex(this, SS_T('pfStats'), 17);
+    const tsc = Math.min(1, 280 / tk.w);
+    items.push(this.add.image(l.x(0), py(46), tk.key).setDisplaySize(l.u(tk.w * tsc), l.u(tk.h * tsc)));
+    const rows = [
+      ['stRuns', p.runs], ['stRunsWon', p.wins], ['stBeasts', p.beasts],
+      ['stWords', p.words], ['stFinest', p.longest ? p.longest.toUpperCase() : '—'],
+      ['stBigHit', p.bigHit || '—'], ['stBestQuick', p.bestQuick || '—'],
+      // the endless climb's high-water mark (v0.68.0): level first, the
+      // score beside it — the same order the endless board ranks by. Once a
+      // flag stands the row is the door to it (v0.77.0), and says so.
+      ['stEndless', p.endless.bestLevel ? SS_T('endLvlShort', p.endless.bestLevel) + ' · ' + p.endless.bestScore + '  ›' : '—'],
+      ['stVsWins', p.vsWins || '—'],
+    ];
+    let labEnd = -150;
+    rows.forEach(([k, v], i) => {
+      const y = py(88 + i * 30);
+      const lab = ssTxt(this, l.x(-150), y, SS_T(k), l.u(13), '#8a94c4').setOrigin(0, 0.5);
+      if (lab.width > l.u(140)) lab.setScale(l.u(140) / lab.width);
+      const val = ssTxt(this, l.x(150), y, String(v), l.u(13), '#f0e8d2').setOrigin(1, 0.5).setData('stVal', k);
+      if (val.width > l.u(140)) val.setScale(l.u(140) / val.width);
+      items.push(lab, val);
+      if (k === 'stEndless') labEnd = -150 + (lab.width * lab.scaleX) / l.s;
+    });
+    c.add(items);
+    /* the frontier flag rides its row — added AFTER the interactive window
+       (display order IS the law), stood in the gap the localized label
+       actually leaves. this.rowFlag keeps its v0.77.0 name: the flag sheet
+       repaints it live on a jar pick. */
+    if (p.endless.bestLevel > 0) {
+      const fy = py(88 + 7 * 30);
+      this.rowFlag = ssFlag(this, { name: '', color: p.flag, w: 30, x: l.x(labEnd + 16), y: fy + l.u(10) });
+      c.add(this.rowFlag);
+      const fz = this.add.zone(l.x(0), fy, l.u(360), l.u(30)).setOrigin(0.5).setInteractive({ useHandCursor: true });
+      fz.setData('flagRow', 1);
+      fz.on('pointerdown', () => this.flagSheet());
+      c.add(fz);
+    }
+    items.forEach((it) => { it.y += l.u(12); it.alpha = 0; });
+    this.tweens.add({ targets: items, y: '-=' + l.u(12), alpha: 1, duration: 240, ease: 'Cubic.easeOut' });
+    ssHealBlankTexts(this, 'stats-sheet');
+  }
+  /* ---------- THE ACHIEVEMENTS SHEET (v0.78.0, Skylar 9/2) ----------
+     "When you open up the achievements, they could be much bigger and you
+     can scroll through them, especially if we add more. Right now they're
+     incredibly tiny and very hard to read." One BIG row per achievement —
+     icon, name and story at half again the old grid's size — in the sigil
+     panel's own masked drag-scroll dress, sized for any roster the sky
+     grows. The hard family keeps its ONE evolving row (n / 12, the crown's
+     whole dress at twelve) and the tally counts display rows, so the
+     fraction always matches the list. */
+  achSheet() {
+    if (this.anySheet()) return;
+    SFX.ui();
+    const l = ssLayout(this);
+    const c = this.achP = this.add.container(0, 0).setDepth(600);
+    const close = () => {
+      if (this.achP !== c || c.getData('closed')) return;
+      c.setData('closed', true);
+      this.achP = null;
+      this.tweens.add({ targets: c, alpha: 0, duration: 150, onComplete: () => { if (c.active) c.destroy(); } });
+    };
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setInteractive();
+    this.tweens.add({ targets: veil, alpha: 0.72, duration: 200 });
+    veil.on('pointerdown', () => { SFX.ui(); close(); });
+    c.add(veil);
+    const p = SS.prof;
+    const RH = 64, GAP = 8, HEAD = 76, FOOT = 28;
+    const n = SS_ACH.length;
+    const contentH = n * RH + (n - 1) * GAP;
+    const viewH = Math.min(contentH, 552);
+    const winH = HEAD + viewH + FOOT;
+    const top = 400 - winH / 2;
+    const wc = this.add.container(0, 0);
+    const win = this.add.image(l.x(0), l.y(top + winH / 2), 'endpanel')
+      .setDisplaySize(l.u(372), l.u(winH)).setInteractive();
+    wc.add(win);
+    const tk = ssGoldTex(this, SS_T('pfAch'), 16);
+    const tsc = Math.min(1, 250 / tk.w);
+    wc.add(this.add.image(l.x(-6), l.y(top + 28), tk.key).setDisplaySize(l.u(tk.w * tsc), l.u(tk.h * tsc)));
+    const achGot = SS_ACH.reduce((g, a) => g + (a.famIds ? (a.famIds.some((id) => p.ach[id]) ? 1 : 0) : (p.ach[a.id] ? 1 : 0)), 0);
+    wc.add(ssTxt(this, l.x(-6), l.y(top + 52), achGot + ' / ' + SS_ACH.length, l.u(10), '#c9b676')
+      .setOrigin(0.5).setLetterSpacing(l.u(2)).setData('achTally', 1));
+    const xT = ssTxt(this, l.x(164), l.y(top + 29), '✕', l.u(17), '#8a94c4').setOrigin(0.5);
+    const xZ = this.add.zone(l.x(164), l.y(top + 29), l.u(46), l.u(46)).setOrigin(0.5).setInteractive({ useHandCursor: true });
+    xZ.on('pointerdown', () => { SFX.ui(); close(); });
+    wc.add([xT, xZ]);
+    wc.add(ssTxt(this, l.x(0), l.y(top + winH - 15), SS_T('inspSub'), l.u(9.5), '#5a6390', 'italic').setOrigin(0.5));
+
+    // rows live in a masked container; dragging the window scrolls them.
+    // A famIds row lights on its FIRST member, prints the family's running
+    // count, and wears its crown's whole dress once every member is earned.
+    const rc = this.add.container(0, 0);
+    SS_ACH.forEach((a, k) => {
+      const yk = top + HEAD + k * (RH + GAP) + RH / 2;
+      const famN = a.famIds ? a.famIds.filter((id) => p.ach[id]).length : 0;
+      const crowned = !!(a.crown && p.ach[a.crown.id]);
+      const got = a.famIds ? famN > 0 : !!p.ach[a.id];
+      const icon = crowned ? a.crown.icon : a.icon;
+      const name = crowned ? a.crown.name : a.name;
+      const desc = crowned ? a.crown.desc : a.famIds ? a.desc + '  ' + famN + ' / ' + a.famIds.length : a.desc;
+      if (k < n - 1) rc.add(this.add.rectangle(l.x(0), l.y(yk + RH / 2 + GAP / 2), l.u(330), Math.max(1, l.u(1)), 0x2b3157, 0.55));
+      // '@blades' is the trophy grid's glyph seam (9/10 sweep): the versus
+      // trophy wears the drawn crossed blades, never the U+2694 emoji
+      if (icon === '@blades') rc.add(this.add.image(l.x(-148), l.y(yk), vsSwordsTex(this)).setDisplaySize(l.u(27), l.u(27)).setAlpha(got ? 1 : 0.35));
+      else rc.add(ssTxt(this, l.x(-148), l.y(yk), icon, l.u(24), got ? '#ffd77a' : '#39406b').setOrigin(0.5)
+        .setShadow(0, 0, got ? '#c9a94f' : '#0a0e1f', l.u(got ? 8 : 4), true, true));
+      const nmT = ssTxt(this, l.x(-116), l.y(yk - 13), name, l.u(14), got ? '#f0e8d2' : '#4a5480')
+        .setOrigin(0, 0.5).setData('achName', a.id);
+      if (nmT.width > l.u(240)) nmT.setScale(l.u(240) / nmT.width);
+      rc.add(nmT);
+      const dsT = ssTxt(this, l.x(-116), l.y(yk + 12), desc, l.u(11), got ? '#8a94c4' : '#39406b', 'italic')
+        .setOrigin(0, 0.5).setData('achDesc', a.id);
+      if (dsT.width > l.u(292)) dsT.setScale(l.u(292) / dsT.width);
+      rc.add(dsT);
+    });
+    wc.add(rc);
+
+    const maxOff = Math.max(0, l.u(contentH - viewH));
+    if (maxOff > 0) {
+      const mg = this.make.graphics();
+      mg.fillRect(l.x(-186), l.y(top + HEAD), l.u(372), l.u(viewH));
+      rc.setMask(mg.createGeometryMask());
+      // a slim gold thumb tracks where you are in the list
+      const trackH = l.u(viewH), thumbH = trackH * (l.u(viewH) / l.u(contentH));
+      const thumb = this.add.rectangle(l.x(172), l.y(top + HEAD) + thumbH / 2, l.u(3), thumbH, 0xd7b45c, 0.45).setOrigin(0.5);
+      wc.add(thumb);
+      let drag = null, off = 0;
+      win.on('pointerdown', (pt) => { drag = { y: pt.y, off }; });
+      const mv = (pt) => {
+        if (!drag) return;
+        if (!pt.isDown) { drag = null; return; }
+        off = clamp(drag.off + (drag.y - pt.y), 0, maxOff);
+        rc.y = -off;
+        thumb.y = l.y(top + HEAD) + thumbH / 2 + (off / maxOff) * (trackH - thumbH);
+      };
+      const up = () => { drag = null; };
+      this.input.on('pointermove', mv);
+      this.input.on('pointerup', up);
+      c.once('destroy', () => { this.input.off('pointermove', mv); this.input.off('pointerup', up); mg.destroy(); });
+    }
+
+    c.add(wc);
+    wc.y = l.u(14); wc.alpha = 0;
+    this.tweens.add({ targets: wc, y: 0, alpha: 1, duration: 240, ease: 'Cubic.easeOut' });
+    ssHealBlankTexts(this, 'ach-sheet');
+  }
+  /* ---------- THE FLAG SHEET (v0.77.0, Skylar 9/3) ----------
+     "Allow the player in the character's profile screen to change the color
+     of their flag. They can choose from all of the GVT colors of troops."
+     The big flag in your jar with your name across it, how far it stands,
+     and the ten troop-colour jars — tap one and the flag repaints LIVE:
+     persisted, synced, and redressed onto the standing board row so every
+     other climber's sky repaints too (SSNET.dressFlag). langSheet pattern:
+     veil + ✕ close, ref nulled at create (stale-ref law). Zones stay OUT of
+     the entrance tween — a Zone has no alpha and detaches from its cell. */
+  flagSheet() {
+    // opens ABOVE the stats sheet (its door since v0.78.0) — only another
+    // veil-owning sheet blocks it
+    if (this.flagP || this.skiesP || this.achP) return;
+    SFX.ensure(); SFX.ui();
+    const l = ssLayout(this);
+    const c = this.flagP = this.add.container(0, 0).setDepth(700);
+    const close = () => { if (this.flagP !== c) return; this.flagP = null; c.destroy(); };
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setInteractive();
+    this.tweens.add({ targets: veil, alpha: 0.66, duration: 200 });
+    veil.on('pointerdown', () => { SFX.ui(); close(); });
+    c.add(veil);
+    const PH = 470, py = (d) => l.y(400 - PH / 2 + d);
+    const items = [];
+    items.push(this.add.image(l.x(0), py(PH / 2), 'endpanel').setDisplaySize(l.u(336), l.u(PH)).setInteractive());
+    const xB = ssTxt(this, l.x(146), py(28), '✕', l.u(15), '#8a94c4').setOrigin(0.5).setInteractive({ useHandCursor: true });
+    xB.on('pointerdown', () => { SFX.ui(); close(); });
+    items.push(xB);
+    const tk = ssGoldTex(this, SS_T('flagTitle'), 17);
+    const tsc = Math.min(1, 280 / tk.w);
+    items.push(this.add.image(l.x(0), py(46), tk.key).setDisplaySize(l.u(tk.w * tsc), l.u(tk.h * tsc)));
+    items.push(ssTxt(this, l.x(0), py(296), SS_T('flagStands', SS.prof.endless.bestLevel), l.u(11.5), '#c9c3ae', 'italic').setOrigin(0.5));
+    items.push(ssTxt(this, l.x(0), py(326), '— ' + SS_T('flagJars') + ' —', l.u(10.5), '#c9b676').setOrigin(0.5));
+    // the ten jars, 48 apart so every padded 44-pt hit stands on its own
+    const ring = this.add.circle(0, 0, l.u(19)).setStrokeStyle(Math.max(1, l.u(2)), 0xffe9a8, 1);
+    const jarXY = (i) => ({ x: l.x(-96 + (i % 5) * 48), y: py(358 + Math.floor(i / 5) * 48) });
+    const zones = [];
+    SS_FLAG_COLORS.forEach((jc, i) => {
+      const { x, y } = jarXY(i);
+      items.push(this.add.circle(x, y, l.u(15), parseInt(jc.hex.slice(1), 16))
+        .setStrokeStyle(Math.max(1, l.u(1)), 0x242a4a, 1));
+      const z = this.add.zone(x, y, l.u(40), l.u(40)).setOrigin(0.5).setInteractive({ useHandCursor: true });
+      z.setData('flagJar', jc.id);
+      z.on('pointerdown', () => {
+        if (SS.prof.flag === jc.id) return;
+        SFX.ui();
+        SS.prof.flag = jc.id;
+        SS.save(); SS.sync();
+        SSNET.dressFlag(jc.id, !!SS.prof.rhide);   // the standing row repaints for every climber's sky
+        ring.setPosition(x, y);
+        plant();
+        if (this.rowFlag && this.rowFlag.scene) {  // the stats row's little flag follows
+          const rx = this.rowFlag.x, ry = this.rowFlag.y;
+          const parent = this.rowFlag.parentContainer;   // it lives in the stats sheet (v0.78.0)
+          this.rowFlag.destroy();
+          this.rowFlag = ssFlag(this, { name: '', color: jc.id, w: 30, x: rx, y: ry });
+          if (parent && parent.scene) parent.add(this.rowFlag);
+        }
+      });
+      zones.push(z);
+      if (SS.prof.flag === jc.id) ring.setPosition(x, y);
+    });
+    items.push(ring);
+    items.push(ssTxt(this, l.x(0), py(446), SS_T('flagJarsHint'), l.u(9), '#5a6390', 'italic').setOrigin(0.5));
+    c.add(items);
+    /* Display order is the law here (topOnly input hands taps to the TOPMOST
+       object — the v0.70 lesson): the interactive win panel went in first,
+       so the flag and the jar zones must land AFTER it or the panel both
+       hides the cloth and eats every jar tap. */
+    let flag = null;
+    const plant = () => {
+      if (flag && flag.scene) { this.tweens.killTweensOf(flag); flag.destroy(); }
+      flag = ssFlag(this, { name: SSNET.myName(), color: SS.prof.flag, level: SS.prof.endless.bestLevel, w: 190, x: l.x(-64), y: py(268), sway: true });
+      flag.setAlpha(0);
+      this.tweens.add({ targets: flag, alpha: 1, duration: 260 });
+      c.add(flag);
+    };
+    plant();
+    zones.forEach((z) => c.add(z));
+    items.forEach((it) => { it.y += l.u(12); it.alpha = 0; });
+    this.tweens.add({ targets: items, y: '-=' + l.u(12), alpha: 1, duration: 240, ease: 'Cubic.easeOut' });
+  }
+  /* ---------- THE SIGN PAGE (v0.85.0, Skylar 9/3) ----------
+     "When you click the sign on the Profile Page … each sign needs to open
+     up its own page." Every badge is a door now, and this sheet is the
+     sign's home: its painted plate across the crown, its LEVEL with the XP
+     bar toward the next (the picker's own SS_SIGNLV math — the summit
+     renders a full, celebratory bar, never a broken fraction), what the
+     sign does in game at the HELD level (SS_ZOD — generated from the
+     dials, never hand-copied), the ledger of what was done under it, and
+     one fun fact in Q3's blend voice (SS_ZFACT). The four new ledger
+     columns (eScore / eRuns / word / hit) are LOCAL-ONLY by Q2's stamp and
+     start honest — an em-dash stands where nothing is recorded yet. One
+     sheet at a time (anySheet); ✕ closes; statsSheet's dress throughout. */
+  zodSheet(z) {
+    if (this.anySheet()) return;
+    SFX.ensure(); SFX.ui();
+    const l = ssLayout(this);
+    const c = this.signP = this.add.container(0, 0).setDepth(600);
+    const close = () => { if (this.signP !== c) return; this.signP = null; c.destroy(); };
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setInteractive();
+    this.tweens.add({ targets: veil, alpha: 0.7, duration: 200 });
+    veil.on('pointerdown', () => { SFX.ui(); close(); });
+    c.add(veil);
+    const sr = SS.prof.signs[z.id] || null;
+    const lv = ssSignLv(z.id);
+    const tint = SS_ELEMENTS[z.el];
+    const hexC = '#' + ('000000' + tint.toString(16)).slice(-6);
+    const t = SS_ZOD(z, lv);
+    const PH = 656, py = (d) => l.y(400 - PH / 2 + d);   // 72..728, the ach sheet's proven band
+    const items = [];
+    items.push(this.add.image(l.x(0), py(PH / 2), 'endpanel').setDisplaySize(l.u(372), l.u(PH)).setInteractive());
+    /* the crown: the sign's own painted plate, cover-cropped into a wide
+       band — width-true, the vertical spill trimmed by setCrop with the
+       visible slice aimed at the plate's upper third, where the figure
+       lives (the picker's cover-fill law turned on its side). Fallback is
+       the night-sky wash with the asterism drawn over it. The name rides
+       the band's foot on the baked scrim; the element rim frames it. */
+    const BW = 336, BH = 170, bandC = 14 + BH / 2;
+    const artKey = ssZodArtKey(this, z.id);
+    if (artKey) {
+      const art = this.add.image(l.x(0), 0, artKey);
+      const fw = art.frame.realWidth || art.frame.width, fh = art.frame.realHeight || art.frame.height;
+      const k = l.u(BW) / fw;                      // display px per frame px, width-true
+      art.setDisplaySize(l.u(BW), fh * k);
+      const cropH = l.u(BH) / k;                   // the band, in frame px
+      const cropY = Math.max(0, fh * 0.38 - cropH / 2);
+      art.setCrop(0, cropY, fw, cropH);
+      art.y = py(bandC) - (cropY + cropH / 2 - fh / 2) * k;
+      items.push(art);
+    } else {
+      items.push(this.add.image(l.x(0), py(bandC), ssZodSkyTex(this)).setDisplaySize(l.u(BW), l.u(BH)));
+      items.push(this.add.image(l.x(0), py(bandC - 6), 'glowbig').setDisplaySize(l.u(BW * 0.7), l.u(BH * 0.85))
+        .setTint(tint).setBlendMode('ADD').setAlpha(0.16));
+      items.push(ssZodiacGlyph(this, z, l.u(0.55), l.x(0), py(bandC - 10)));
+    }
+    items.push(this.add.image(l.x(0), py(14 + BH), ssZodScrimTex(this)).setOrigin(0.5, 1).setDisplaySize(l.u(BW), l.u(96)));
+    items.push(ssTxt(this, l.x(0), py(bandC + 52), z.name, l.u(21), hexC).setOrigin(0.5)
+      .setShadow(0, 0, hexC, l.u(9), true, true));
+    items.push(ssTxt(this, l.x(0), py(bandC + 74), t.title, l.u(10.5), '#d8d2bd', 'italic').setOrigin(0.5));
+    const rim = this.add.graphics();
+    rim.lineStyle(Math.max(1, l.u(1.4)), tint, 0.7);
+    rim.strokeRect(l.x(-BW / 2), py(14), l.u(BW), l.u(BH));
+    items.push(rim);
+    // the ✕ rides the art's corner — dark halo, the full-bleed picker's dress
+    const xB = ssTxt(this, l.x(164), py(29), '✕', l.u(15), '#c3cae6').setOrigin(0.5)
+      .setShadow(0, 0, '#0a0e1f', l.u(7), true, true).setInteractive({ useHandCursor: true });
+    ssHitPad(xB, 46);
+    xB.on('pointerdown', () => { SFX.ui(); close(); });
+    items.push(xB);
+    /* the level moment — the gold plate with a breathing halo in the
+       element's own light; at the summit the halo burns gold and the bar
+       stands full under LEVEL 50 · AT ITS HEIGHT */
+    const atMax = lv >= SS_SIGNLV.max;
+    const ga = atMax ? 0.3 : 0.14;
+    const glow = this.add.image(l.x(0), py(210), 'glowbig').setDisplaySize(l.u(240), l.u(64))
+      .setTint(atMax ? 0xffd77a : tint).setBlendMode('ADD').setAlpha(ga);
+    items.push(glow);
+    const lk = ssGoldTex(this, atMax ? SS_T('svLevelMax') : SS_T('svLevel', lv), 15);
+    const lsc = Math.min(1, 250 / lk.w);
+    items.push(this.add.image(l.x(0), py(210), lk.key).setDisplaySize(l.u(lk.w * lsc), l.u(lk.h * lsc)));
+    const xp = sr ? (sr.xp | 0) : 0;
+    const frac = atMax ? 1
+      : clamp((xp - SS_SIGNLV.cum[lv]) / Math.max(1, SS_SIGNLV.cum[lv + 1] - SS_SIGNLV.cum[lv]), 0, 1);
+    const BARW = 220;
+    items.push(this.add.image(l.x(-BARW / 2), py(234), 'bartrough').setOrigin(0, 0.5).setDisplaySize(l.u(BARW), l.u(8)));
+    const fill = this.add.image(l.x(-BARW / 2 + 1), py(234), 'barfill-gold').setOrigin(0, 0.5).setDisplaySize(l.u(BARW - 2), l.u(6));
+    fill.setCrop(0, 0, fill.frame.width * frac, fill.frame.height);
+    fill.setData('zsBar', frac);
+    items.push(fill);
+    if (!atMax) {
+      items.push(ssTxt(this, l.x(0), py(250), SS_T('zsToNext', SS_SIGNLV.cum[lv + 1] - xp), l.u(8.5), '#8a94c4', 'italic').setOrigin(0.5));
+    }
+    // what the sign does in game, at the held level — generated, no drift
+    const desc = ssTextBlock(this, l.x(0), py(268), t.desc, {
+      fontSize: l.u(11) + 'px', color: '#e6dfc8', fontStyle: 'italic', shadow: true,
+      wrapW: l.u(320), align: 'center', ox: 0.5, oy: 0,
+    });
+    desc.setData('zsDesc', z.id);
+    items.push(desc);
+    items.push(this.add.rectangle(l.x(0), py(322), l.u(300), Math.max(1, l.u(1)), 0x2b3157, 0.6));
+    /* the ledger — what this sign has actually done. Empty records read as
+       an em-dash beat, never a fake zero (the honest-columns law). */
+    const dash = '—';
+    const eB = sr ? sr.eBest | 0 : 0, eS = sr ? sr.eScore | 0 : 0;
+    const hardOn = !!(sr && (sr.hardClears | 0) > 0);
+    const rowsZ = [
+      ['zsClears', sr && sr.clears > 0 ? String(sr.clears) : dash],
+      ['zsBest', sr && sr.best > 0 ? String(sr.best) : dash],
+      ['stEndless', eB > 0 ? SS_T('endLvlShort', eB) + (eS > 0 ? ' · ' + eS : '') : dash],
+      ['stFinest', sr && sr.word ? sr.word.toUpperCase() : dash],
+      ['stBigHit', sr && (sr.hit | 0) > 0 ? String(sr.hit) : dash],
+      ['zsHard', hardOn ? String(sr.hardClears) : dash],
+      ['stRuns', sr && ((sr.runs | 0) + (sr.eRuns | 0)) > 0 ? String((sr.runs | 0) + (sr.eRuns | 0)) : dash],
+    ];
+    rowsZ.forEach(([k2, v], i) => {
+      const y = py(344 + i * 27);
+      const lab = ssTxt(this, l.x(-150), y, SS_T(k2), l.u(12), '#8a94c4').setOrigin(0, 0.5);
+      if (lab.width > l.u(150)) lab.setScale(l.u(150) / lab.width);
+      const val = ssTxt(this, l.x(150), y, String(v), l.u(12), k2 === 'zsHard' && hardOn ? '#ff8a70' : '#f0e8d2')
+        .setOrigin(1, 0.5).setData('zsVal', k2);
+      if (val.width > l.u(130)) val.setScale(l.u(130) / val.width);
+      items.push(lab, val);
+    });
+    items.push(this.add.rectangle(l.x(0), py(528), l.u(300), Math.max(1, l.u(1)), 0x2b3157, 0.6));
+    // one fun fact — the stars' own voice at the page's foot
+    items.push(ssTxt(this, l.x(0), py(548), '— ' + SS_T('zsFact') + ' —', l.u(10), '#c9b676')
+      .setOrigin(0.5).setLetterSpacing(l.u(2)));
+    const fact = ssTextBlock(this, l.x(0), py(566), SS_ZFACT(z), {
+      fontSize: l.u(10.5) + 'px', color: '#c9c3ae', fontStyle: 'italic', shadow: true,
+      wrapW: l.u(330), align: 'center', ox: 0.5, oy: 0,
+    });
+    fact.setData('zsFactOf', z.id);
+    items.push(fact);
+    c.add(items);
+    /* the entrance — statsSheet's rise, except the halo, which fades to
+       its own resting alpha and then breathes (two tweens on one alpha
+       would fight; the breath waits for the entrance, and the sweep on
+       destroy keeps a repeat-forever tween from outliving the sheet —
+       the meadow's orphan-tween lesson) */
+    const rise = items.filter((it) => it !== glow);
+    rise.forEach((it) => { it.y += l.u(12); it.alpha = 0; });
+    this.tweens.add({ targets: rise, y: '-=' + l.u(12), alpha: 1, duration: 240, ease: 'Cubic.easeOut' });
+    glow.y += l.u(12); glow.alpha = 0;
+    this.tweens.add({ targets: glow, y: '-=' + l.u(12), alpha: ga, duration: 240, ease: 'Cubic.easeOut' });
+    const breath = this.tweens.add({
+      targets: glow, alpha: ga + 0.08, delay: 500, duration: 1600,
+      yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+    });
+    c.once('destroy', () => { try { breath.stop(); } catch (e) { } });
+    ssHealBlankTexts(this, 'zod-sheet');
+  }
+  editName(l) {
+    SFX.ui();
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.maxLength = 18;
+    inp.value = SSNET.myName();
+    inp.style.cssText = 'position:fixed;left:50%;top:18%;transform:translateX(-50%);z-index:9999;font:700 ' +
+      Math.round(l.u(20)) + 'px Georgia,serif;text-align:center;background:#141a33;color:#f3e5b4;border:2px solid #c9a94f;border-radius:10px;padding:8px 14px;outline:none;width:70%;max-width:320px;';
+    // commitOnShutdown: backing out mid-rename still keeps what was typed
+    ssDomInput(this, inp, (v) => {
+      const n = SSNET.setName(v);
+      if (this.nameT.active) this.nameT.setText(n);
+      SS.sync();
+    }, true);
+    inp.select();
+  }
+}
+
+/* ============================================================
+   LEADERBOARD — the night's finest, held like a ceremony:
+   a medallion podium for the top three, glass pills for the
+   roll below, your own row in gold wherever you stand, and
+   the reset clock ticking over both boards.
+   ============================================================ */
+class Board extends Phaser.Scene {
+  constructor() { super('board'); }
+  create(data) {
+    const l = ssLayout(this);
+    ssMakeTextures(this);
+    ssStarfield(this, 110);
+    // a faint gold dawn crowns the summit of the list
+    this.add.image(l.x(0), l.y(160), 'glowbig').setScale(l.u(2.6)).setTint(0xd7b45c).setAlpha(0.05).setBlendMode('ADD');
+
+    // back goes to whoever opened the board — the profile since v0.52.0 —
+    // and the meadow when nobody said (a scene restart, a stray call)
+    this.from = data && data.from === 'profile' ? 'profile' : 'home';
+    // Phaser keeps a scene's last start data for a start() that passes none
+    // — spend it, so a bare restart of the board comes home, not somewhere stale
+    this.scene.settings.data = {};
+    const back = ssTxt(this, l.x(-195), l.y(24), '‹ ' + SS_T(this.from), l.u(14), '#9fb0e8').setOrigin(0, 0.5).setInteractive({ useHandCursor: true });
+    back.on('pointerdown', () => { SFX.ui(); this.scene.start(this.from); });
+
+    // the title in the wordmark's gold letterpress, flanked by flourishes
+    const tk = ssGoldTex(this, SS_T('lbTitle'), 19);
+    const tsc = Math.min(1, 320 / tk.w);
+    this.add.image(l.x(0), l.y(58), tk.key).setDisplaySize(l.u(tk.w * tsc), l.u(tk.h * tsc));
+    for (const s of [-1, 1]) {
+      ssTxt(this, l.x(s * (tk.w * tsc / 2 + 20)), l.y(58), '✦', l.u(12), '#c9b676').setOrigin(0.5)
+        .setShadow(0, 0, '#c9b676', l.u(6), true, true);
+    }
+
+    // tabs: three pills — the active board wears the gold (ENDLESS joined in
+    // v0.68.0; HARD, the all-time ledger of campaign hard clears, in v0.70.0;
+    // DAILY left the row in v0.87.0 — the Daily Hunt sheet is the daily
+    // board's one home now, so the row breathes back to the v0.68.0 width
+    // and the board opens on the week)
+    this.tab = 'weekly';
+    this.tabBtns = {};
+    this.tabW = 118;
+    const mkTab = (key, dx, label) => {
+      const bg = this.add.image(l.x(dx), l.y(104), ssBtn(this, true, this.tabW, 38)).setDisplaySize(l.u(this.tabW), l.u(38)).setInteractive({ useHandCursor: true });
+      ssHitPad(bg, 44);   // a 38-tall pill alone is under the 44-pt law
+      const lab = ssTxt(this, l.x(dx), l.y(104), label, l.u(12.5), '#5a6390').setOrigin(0.5);
+      // a long word for the pill (WÖCHENTLICH, CLASSEMENT kin) fits, never spills
+      if (lab.width > l.u(this.tabW - 16)) lab.setScale(l.u(this.tabW - 16) / lab.width);
+      bg.on('pointerdown', () => this.setTab(key));
+      this.tabBtns[key] = { bg, lab };
+    };
+    mkTab('weekly', -125, SS_T('lbWeekly'));
+    mkTab('endless', 0, SS_T('endless'));
+    mkTab('hard', 125, SS_T('hardLbl'));
+    this.dressTabs(l);
+
+    // the reset clock, ticking every second. The weekly flip is Monday 00:00
+    // UTC so the countdown is the same for the whole planet, worded in the
+    // player's own units.
+    this.cdT = ssTxt(this, l.x(0), l.y(138), '', l.u(11.5), '#c9b676').setOrigin(0.5);
+    this.time.addEvent({ delay: 1000, loop: true, callback: () => this.tickCd() });
+    this.tickCd();
+
+    if (SSNET.mode === 'local') {
+      ssTxt(this, l.x(0), l.y(772), '· ' + SS_T('lbLocal') + ' ·', l.u(9.5), '#8c5a5a', 'italic').setOrigin(0.5);
+    }
+    this.rowsC = this.add.container(0, 0);
+    this.loadingT = ssTxt(this, l.x(0), l.y(340), SS_T('lbLoading'), l.u(13), '#5a6390', 'italic').setOrigin(0.5);
+    this.refresh();
+  }
+  dressTabs(l) {
+    for (const [key, t] of Object.entries(this.tabBtns)) {
+      const on = key === this.tab;
+      t.bg.setTexture(ssBtn(this, !on, this.tabW, 38)).setDisplaySize(l.u(this.tabW), l.u(38));
+      // setTexture hands the hit area back to the bare frame — re-pad to the
+      // 44-pt law every dress (ssHitPad is never cumulative)
+      ssHitPad(t.bg, 44);
+      t.lab.setColor(on ? BTN_INK() : '#5a6390');
+    }
+  }
+  tickCd() {
+    if (!this.cdT || !this.cdT.active) return;
+    // the endless ladder never resets — its line is the ledger's own, still
+    // — and the hard board keeps the same all-time stillness in its OWN
+    // words (v0.70.0: "the endless ledger" would be a lie on this tab)
+    if (this.tab === 'endless') { this.cdT.setText('✦ ' + SS_T('lbAllTime')); return; }
+    if (this.tab === 'hard') { this.cdT.setText('✦ ' + SS_T('lbHardTime')); return; }
+    this.cdT.setText('✦ ' + SS_T('lbWeekEnds', ssCountdownLive(SSNET.msToNextWeek())));
+  }
+  setTab(t) {
+    if (this.tab === t) return;
+    SFX.ui();
+    this.tab = t;
+    this.dressTabs(ssLayout(this));
+    this.tickCd();
+    this.refresh();
+  }
+  async refresh() {
+    const l = ssLayout(this);
+    if (this.rowsC.list.length) this.tweens.killTweensOf(this.rowsC.list);
+    this.rowsC.removeAll(true);
+    this.loadingT.setVisible(true);
+    const tab = this.tab;
+    const b = await SSNET.getBoard(tab, ssGameLang());
+    if (this.tab !== tab || !this.scene.isActive()) return;
+    this.loadingT.setVisible(false);
+    if (!b.rows.length) {
+      this.rowsC.add(ssTxt(this, l.x(0), l.y(340), SS_T('lbEmpty'), l.u(13), '#5a6390', 'italic').setOrigin(0.5));
+      return;
+    }
+    const meId = SSNET.uid();
+    const isE = tab === 'endless';        // rows carry BOTH level and score there
+    const ent = [];                       // entrance-animated, in cascade order
+    const trim = (t2, w) => { while (t2.width > l.u(w) && t2.text.length > 2) t2.setText(t2.text.slice(0, -2) + '…'); return t2; };
+
+    // ---- the podium: three medallions afloat in the dusk, champion highest ----
+    const POD = [
+      { dx: 0, my: 216, r: 38, big: 18, glow: 0xffd77a, ga: 0.2 },
+      { dx: -132, my: 240, r: 29, big: 14, glow: 0xcfd8ff, ga: 0.11 },
+      { dx: 132, my: 248, r: 26, big: 13, glow: 0xe8b57f, ga: 0.1 },
+    ];
+    b.rows.slice(0, 3).forEach((r, i) => {
+      const P = POD[i], me = r.id === meId;
+      const glow = this.add.image(l.x(P.dx), l.y(P.my), 'glowbig').setDisplaySize(l.u(P.r * 5.2), l.u(P.r * 5.2))
+        .setTint(P.glow).setAlpha(P.ga).setBlendMode('ADD');
+      this.rowsC.add(glow);
+      if (i === 0) this.tweens.add({ targets: glow, alpha: P.ga * 0.45, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      const grp = [];
+      grp.push(this.add.image(l.x(P.dx), l.y(P.my), ssMedalTex(this, i)).setDisplaySize(l.u(P.r * 2), l.u(P.r * 2)));
+      grp.push(ssTxt(this, l.x(P.dx), l.y(P.my), String(i + 1), l.u(P.r * 0.95), SS_MEDAL_INK[i]).setOrigin(0.5, 0.55));
+      if (me) grp.push(ssTxt(this, l.x(P.dx), l.y(P.my - P.r - 14), '✦ ' + SS_T('lbYou') + ' ✦', l.u(10), '#ffe9a8').setOrigin(0.5)
+        .setShadow(0, 0, '#c9b676', l.u(6), true, true));
+      const pnm = trim(ssTxt(this, l.x(P.dx), l.y(P.my + P.r + 15), r.name, l.u(i === 0 ? 13.5 : 12), me ? '#ffe9a8' : '#e8e0c8').setOrigin(0.5), 124)
+        .setInteractive({ useHandCursor: true });
+      pnm.on('pointerdown', () => ssRatingCard(this, r.ghost ? { name: r.name, rating: r.rating, rhide: r.rhide } : { uid: r.id, name: r.name }));
+      grp.push(pnm);
+      // a hard run wears its small ember mark on the weekly (v0.70.0)
+      if (r.hard && tab === 'weekly') grp.push(ssTxt(this, l.x(P.dx) + pnm.displayWidth / 2 + l.u(4), l.y(P.my + P.r + 15), '⚑', l.u(9), '#ff8a70').setOrigin(0, 0.5)
+        .setShadow(0, 0, '#e05e2a', l.u(4), true, true));
+      // the endless podium wears the LEVEL as its gold plate — the score and
+      // finest word ride the italic line beneath
+      const gk = ssGoldTex(this, isE ? SS_T('endLvlShort', r.level | 0) : String(r.score), P.big);
+      grp.push(this.add.image(l.x(P.dx), l.y(P.my + P.r + 37), gk.key).setDisplaySize(l.u(gk.w), l.u(gk.h)));
+      const sub = isE ? String(r.score) + (r.word ? ' · ' + r.word : '') : r.word;
+      if (sub) grp.push(trim(ssTxt(this, l.x(P.dx), l.y(P.my + P.r + 56), sub, l.u(9), '#8a94c4', 'italic').setOrigin(0.5), 124));
+      ent.push(...grp);
+      this.rowsC.add(grp);
+    });
+    // gold motes crown the champion as the podium settles
+    this.time.delayedCall(280, () => {
+      if (this.tab !== tab || !this.scene.isActive()) return;
+      const em = this.add.particles(0, 0, 'dot', {
+        speed: { min: 20, max: 90 }, lifespan: { min: 400, max: 1000 }, scale: { start: 0.6, end: 0 },
+        alpha: { start: 0.9, end: 0 }, tint: [0xffd77a, 0xfff2c9], blendMode: 'ADD', emitting: false,
+      });
+      this.rowsC.add(em);
+      em.emitParticleAt(l.x(0), l.y(216), 16);
+      this.time.delayedCall(1200, () => em.destroy());
+    });
+
+    // ---- the roll: ranks 4-10 on glass pills ----
+    b.rows.slice(3, 10).forEach((r, k) => {
+      const y = l.y(392 + k * 40), me = r.id === meId;
+      const grp = [];
+      grp.push(this.add.image(l.x(0), y, 'ribbon').setDisplaySize(l.u(384), l.u(34)));
+      if (me) grp.push(this.add.rectangle(l.x(0), y, l.u(376), l.u(28), 0xd7b45c, 0.13));
+      grp.push(ssTxt(this, l.x(-172), y, '#' + (k + 4), l.u(11), me ? '#ffd77a' : '#8a94c4').setOrigin(0, 0.5));
+      const rnm = trim(ssTxt(this, l.x(-140), y, r.name, l.u(13), me ? '#ffe9a8' : '#f0e8d2').setOrigin(0, 0.5), 176)
+        .setInteractive({ useHandCursor: true });
+      rnm.on('pointerdown', () => ssRatingCard(this, r.ghost ? { name: r.name, rating: r.rating, rhide: r.rhide } : { uid: r.id, name: r.name }));
+      grp.push(rnm);
+      if (r.hard && tab === 'weekly') grp.push(ssTxt(this, rnm.x + rnm.displayWidth + l.u(4), y, '⚑', l.u(9), '#ff8a70').setOrigin(0, 0.5)
+        .setShadow(0, 0, '#e05e2a', l.u(4), true, true));
+      // the endless roll prints "L 23 · 4180" — wider than a bare score, so
+      // the finest-word column stands down there
+      if (r.word && !isE) grp.push(ssTxt(this, l.x(64), y, r.word, l.u(9.5), '#5a6390', 'italic').setOrigin(0, 0.5));
+      grp.push(ssTxt(this, l.x(172), y, isE ? SS_T('endLvlShort', r.level | 0) + ' · ' + r.score : String(r.score), l.u(13.5), me ? '#ffe9a8' : '#d8d2bd').setOrigin(1, 0.5));
+      ent.push(...grp);
+      this.rowsC.add(grp);
+    });
+
+    // ---- you, wherever you stand ----
+    if (b.me >= 0) {
+      const grp = [];
+      if (b.me >= 10 && b.rows[b.me]) {
+        const y = l.y(688), r = b.rows[b.me];
+        grp.push(this.add.image(l.x(0), y, 'ribbon').setDisplaySize(l.u(384), l.u(34)));
+        grp.push(this.add.rectangle(l.x(0), y, l.u(376), l.u(28), 0xd7b45c, 0.13));
+        grp.push(ssTxt(this, l.x(-172), y, '#' + (b.me + 1), l.u(11), '#ffd77a').setOrigin(0, 0.5));
+        const ynm = trim(ssTxt(this, l.x(-130), y, r.name, l.u(13), '#ffe9a8').setOrigin(0, 0.5), 166)
+          .setInteractive({ useHandCursor: true });
+        ynm.on('pointerdown', () => ssRatingCard(this, { own: true }));
+        grp.push(ynm);
+        if (r.hard && tab === 'weekly') grp.push(ssTxt(this, ynm.x + ynm.displayWidth + l.u(4), y, '⚑', l.u(9), '#ff8a70').setOrigin(0, 0.5)
+          .setShadow(0, 0, '#e05e2a', l.u(4), true, true));
+        if (r.word && !isE) grp.push(ssTxt(this, l.x(64), y, r.word, l.u(9.5), '#8a94c4', 'italic').setOrigin(0, 0.5));
+        grp.push(ssTxt(this, l.x(172), y, isE ? SS_T('endLvlShort', r.level | 0) + ' · ' + r.score : String(r.score), l.u(13.5), '#ffe9a8').setOrigin(1, 0.5));
+      }
+      grp.push(ssTxt(this, l.x(0), l.y(b.me >= 10 ? 718 : 700), SS_T('lbYouRank', b.me + 1, b.total), l.u(11.5), '#c9b676').setOrigin(0.5));
+      ent.push(...grp);
+      this.rowsC.add(grp);
+    }
+
+    // entrance: the podium pops first, the roll follows in a soft cascade
+    ent.forEach((o, i) => {
+      const ty = o.y;
+      o.y = ty + l.u(10); o.alpha = 0;
+      this.tweens.add({ targets: o, y: ty, alpha: 1, duration: 300, delay: Math.min(620, i * 22), ease: 'Cubic.easeOut' });
+    });
+  }
+}
+
+/* ============================================================
+   Boot
+   ============================================================ */
+let game = null;
+// versus.js registers its scenes at load time, which now happens before the game exists on
+// the ?art=1 path. Queue them until boot.
+const SS_LATE_SCENES = [];
+function ssAddScene(key, cls) {
+  if (game) game.scene.add(key, cls); else SS_LATE_SCENES.push([key, cls]);
+}
+function ssBoot() {
+  // the probes are over: from here the same GL throw would be the REAL game
+  // dying, and compat.js must stay loud about it
+  window.__ssProbing = false;
+  game = new Phaser.Game({
+    // CANVAS only when the raster probe proved this device's GL is a software
+    // rasterizer and its Canvas2D is faster (see SS_REND) — same resolution,
+    // same art, just the rasterizer that actually has a GPU behind it.
+    type: SS_REND.mode === 'cv' ? Phaser.CANVAS : SS_REND.mode === 'gl' ? Phaser.WEBGL : Phaser.AUTO,
+    width: Math.round(window.innerWidth * DPR),
+    height: Math.round(window.innerHeight * DPR),
+    backgroundColor: '#0a0d1c',
+    scale: { mode: Phaser.Scale.NONE },
+    // canvas mode keeps smoothing on: no MSAA to pay for, and NEAREST-scaled
+    // painted art goes crunchy. The DPR<2 rule is the GL/MSAA-at-retina one.
+    render: { antialias: SS_REND.mode === 'cv' ? true : DPR < 2, powerPreference: 'high-performance' },
+    scene: [Home, Battle, Profile, Board],
+  });
+  window.game = game;
+  DIAG('rend ' + SS_REND.mode + '/' + SS_REND.why + (SS_REND.p ? ' gl ' + SS_REND.p.glMs + ' cv ' + SS_REND.p.cvMs + ' ms/f' : ''));
+  // renderer may not exist until Phaser's own boot — install the shim both
+  // ways (it no-ops unless the renderer really is Canvas; AUTO can land there
+  // too, e.g. headless without GPU)
+  ssCanvasTintShim();
+  game.events.once('ready', ssCanvasTintShim);
+  while (SS_LATE_SCENES.length) { const [k, c] = SS_LATE_SCENES.shift(); game.scene.add(k, c); }
+  game.events.once('ready', fitCanvas);
+  game.events.once('ready', () => ssPerfWatch(game));
+  game.events.once('ready', () => ssDeviceBeat('ready'));
+  game.events.once('ready', ssBlankWatch);
+}
+function fitCanvas() {
+  const c = game && game.canvas;
+  if (!c) return;
+  ssReadInsets();          // rotation moves the notch: re-measure before laying out
+  // the stage is ours: whatever a POOLED canvas arrived wearing, the real game
+  // is opaque, in normal flow and takes taps. Belt to the probe's braces (see
+  // gone()) — this runs on 'ready' and on every viewport settle, so a recycled
+  // canvas can never leave the game faint or untappable again.
+  c.style.opacity = ''; c.style.pointerEvents = '';
+  c.style.position = ''; c.style.left = ''; c.style.top = '';
+  c.style.width = window.innerWidth + 'px';
+  c.style.height = window.innerHeight + 'px';
+  // We own the canvas CSS size (Scale.NONE), and Phaser caches the canvas bounding rect to
+  // map pointer coords into game space. It must be told after we change that rect or
+  // displayScale stays 1 while the canvas is really 1/DPR of the back-buffer — every tap
+  // then lands at a third of where it should and nothing is clickable. Latent until the
+  // ?art=1 deferred boot ran ssBoot() after document-complete and flipped the order.
+  if (game.scale) game.scale.refresh();
+}
+/* ---- the device report + the crisp sentinel (v0.50.0) ------------------
+   Wyatt's phone rendered v0.49.0 uniformly SOFT in the TestFlight app —
+   every surface a 2–3× upscale of a small buffer — and headless Chrome at
+   the same CSS size and DPR is pixel-crisp. Nothing in the game told us a
+   single number about his device, so this is the instrument, not a fix:
+   one compact object built after `ready` and after every viewport settle,
+   written to devices/<uid> in the RTDB (the same channel SS.sync rides,
+   the same uid as players/<uid>), kept in a 5-deep localStorage ring
+   (`beta3.devlog`), painted into the ?diag=1 box, and read back with
+   `node tools/device-rows.mjs`. No player-facing strings, no secrets.
+   The sentinel: the back-buffer must be round(css × DPR) on both axes, and
+   under WebGL the drawing buffer must match the canvas (iOS can silently
+   allocate a smaller one — Phaser never checks). A miss is DIAGed, recorded
+   (`crisp:false` with the numbers as found) and healed ONCE per beat by
+   re-running the resize/fit path; on every desktop browser and every
+   harness the measure simply agrees and nothing moves. */
+const SS_DEV = { last: null, heals: 0, found: null, sentAt: 0, sentSig: '', diagSig: '' };
+window.__ssdev = SS_DEV;
+function ssCrispMeasure() {
+  const c = game && game.canvas;
+  if (!c || !game.isBooted) return null;
+  const r = (v) => Math.round(v);
+  const m = { cw: c.width, ch: c.height, cc: [c.clientWidth, c.clientHeight], ok: true, why: '' };
+  m.ew = r(m.cc[0] * DPR); m.eh = r(m.cc[1] * DPR);
+  if (m.cw !== m.ew || m.ch !== m.eh) { m.ok = false; m.why = 'buffer ' + m.cw + 'x' + m.ch + ' ≠ css×dpr ' + m.ew + 'x' + m.eh; }
+  try {
+    const gl = game.renderer && game.renderer.type === Phaser.WEBGL ? game.renderer.gl : null;
+    if (gl) {
+      m.db = [gl.drawingBufferWidth, gl.drawingBufferHeight];
+      if (m.db[0] !== m.cw || m.db[1] !== m.ch) { m.ok = false; m.why += (m.why ? ' · ' : '') + 'drawingBuffer ' + m.db[0] + 'x' + m.db[1] + ' ≠ canvas ' + m.cw + 'x' + m.ch; }
+    }
+  } catch (e) { }
+  // a forced ?dpr= (a stale Home-Screen bookmark would carry one) is not a
+  // buffer fault the fit path can heal — named separately, never "healed"
+  const want = Math.min(window.devicePixelRatio || 1, 3);
+  if (Math.abs(DPR - want) > 0.01) m.dprOff = want;
+  return m;
+}
+function ssTextCount() {
+  let n = 0;
+  const walk = (list) => { for (const o of list || []) { if (o.type === 'Text') n++; if (o.list) walk(o.list); } };
+  try { for (const sc of game.scene.getScenes(true)) walk(sc.children.list); } catch (e) { }
+  return n;
+}
+function ssDeviceReport(tag, m) {
+  const c = game.canvas, P = SS_REND, pp = P.p || {}, vv = window.visualViewport;
+  let cs = null;
+  try { const s = getComputedStyle(c); cs = [parseFloat(s.width), parseFloat(s.height)]; } catch (e) { }
+  let sa = false;
+  try { sa = !!navigator.standalone || !!(window.matchMedia && matchMedia('(display-mode: standalone)').matches); } catch (e) { }
+  const rep = {
+    ts: Date.now(), build: BUILD, tag,
+    ua: String(navigator.userAgent || '').replace(/Mozilla\/5\.0 |\(KHTML, like Gecko\) /g, '').slice(0, 150),
+    shell: (window.__STARSHELL && (window.__STARSHELL.platform + ' ' + window.__STARSHELL.build)) || '',
+    sa, q: String(location.search || '').slice(0, 80),
+    iw: window.innerWidth, ih: window.innerHeight,
+    vv: vv ? [Math.round(vv.width), Math.round(vv.height), Math.round((vv.scale || 1) * 100) / 100] : null,
+    dpr: window.devicePixelRatio || 1, DPR,
+    cw: m.cw, ch: m.ch, cc: m.cc, cs,
+    gw: game.scale.width, gh: game.scale.height,
+    rend: game.renderer.type === Phaser.WEBGL ? 'gl' : 'cv', mode: P.mode, why: P.why,
+    probe: pp.glMs != null ? [pp.glMs, pp.cvMs, pp.probeMs || 0, (pp.glHow || '') + '/' + (pp.cvHow || '')] : null,
+    gpu: String(pp.gpu || '').slice(0, 40),
+    db: m.db || null,
+    mem: navigator.deviceMemory || 0, hc: navigator.hardwareConcurrency || 0,
+    inset: [SS_INSET.top, SS_INSET.bottom],
+    ncv: document.querySelectorAll('canvas').length, ntx: ssTextCount(),
+    ntex: Object.keys(game.textures.list).length,
+    crisp: m.ok && !m.dprOff, heals: SS_DEV.heals,
+  };
+  if (SS_DEV.found) rep.found = SS_DEV.found;   // the last miss as found, sticky for the session
+  if (m.dprOff) rep.dprOff = m.dprOff;
+  if (!m.ok) rep.miss = m.why;
+  if (SS_DEV.sd != null) rep.sd = SS_DEV.sd;
+  if (SS_SHARP.best) { rep.shp = [SS_SHARP.best.r, SS_SHARP.best.e, SS_SHARP.best.e2, SS_SHARP.best.w, SS_SHARP.best.h, SS_SHARP.best.x, SS_SHARP.best.y]; if (SS_SHARP.best.png) rep.shot = SS_SHARP.best.png; }
+  return rep;
+}
+function ssDeviceDiag(rep) {
+  DIAG('dev ' + rep.tag + ' · ' + rep.ua.slice(0, 90) + (rep.shell ? ' · ' + rep.shell : '') + (rep.sa ? ' · standalone' : '') + (rep.q ? ' · q ' + rep.q : ''));
+  DIAG('dev vp ' + rep.iw + 'x' + rep.ih + (rep.vv ? ' vv ' + rep.vv[0] + 'x' + rep.vv[1] + '@' + rep.vv[2] : '') +
+    ' dpr ' + rep.dpr + ' chose ' + rep.DPR + ' inset ' + rep.inset[0] + '/' + rep.inset[1] + ' mem ' + rep.mem + ' hc ' + rep.hc);
+  DIAG('dev buf ' + rep.cw + 'x' + rep.ch + ' css ' + rep.cc[0] + 'x' + rep.cc[1] + (rep.cs ? ' style ' + rep.cs[0] + 'x' + rep.cs[1] : '') +
+    ' game ' + rep.gw + 'x' + rep.gh + (rep.db ? ' gl ' + rep.db[0] + 'x' + rep.db[1] : '') + ' · canvases ' + rep.ncv + ' texts ' + rep.ntx + ' tex ' + rep.ntex);
+  DIAG('dev rend ' + rep.rend + ' ' + rep.mode + '/' + rep.why + (rep.probe ? ' probe gl ' + rep.probe[0] + ' cv ' + rep.probe[1] + ' ' + rep.probe[2] + 'ms' : '') +
+    (rep.gpu ? ' · ' + rep.gpu : '') + ' · ' + (rep.crisp ? 'CRISP' : 'NOT CRISP ' + (rep.miss || '') + (rep.dprOff ? ' dpr forced ' + rep.DPR + ' vs ' + rep.dprOff : '')) +
+    (rep.heals ? ' heals ' + rep.heals : ''));
+}
+function ssDeviceSend(rep) {
+  // never the harnesses' shared test identities (unless a run asks for it)
+  if (/^test_/.test(SSNET.uid()) && QS.get('devreport') !== '1') return;
+  const sig = JSON.stringify(Object.assign({}, rep, { ts: 0, tag: '' }));
+  if (sig === SS_DEV.sentSig && rep.ts - SS_DEV.sentAt < 60000) return;
+  SS_DEV.sentSig = sig; SS_DEV.sentAt = rep.ts;
+  SSNET.connect().then((m) => { if (m === 'firebase') return SSNET.dbSet('devices/' + SSNET.uid(), SS_DEV.last); }).catch(() => { });
+}
+/* ---- the sharpness readback (v0.102.2) ----------------------------------
+   The v0.50.0 sentinel proves the buffer is css×dpr — and Wyatt's iPhone 12
+   (9/21, iOS 26.6, the Canvas2D verdict) still shows every surface ~3× soft
+   while the iOS simulator draws the same build pixel-crisp on BOTH
+   renderers. Size was never the question; the FRAME is. So after a beat's
+   next postrender the largest live Text's bounds are copied straight out of
+   the game canvas (drawImage — valid for GL only inside the frame, hence
+   postrender), scored — mean |Laplacian| of luminance against the same crop
+   pushed through a 1/3 downscale, a crisp 3× frame ≫ 1, a stretched small
+   buffer ≈ 1 — and the first two crops ride home as PNGs (devices/<uid>.shot)
+   so we can SEE what the phone drew, not infer it. */
+const SS_SHARP = { pending: false, best: null };
+function ssTextTarget() {
+  // the largest Text that is really on screen: visible up its parent chain and
+  // (near) opaque — the home's rise tweens alpha, and a crop taken mid-rise
+  // reads as blank (Wyatt's phone, 9/21: edge 0.22 / 0.77 on a crisp screen)
+  let best = null, area = 0;
+  const opaque = (o) => { let a = 1, p = o; while (p) { if (p.visible === false) return 0; if (typeof p.alpha === 'number') a *= p.alpha; p = p.parentContainer; } return a; };
+  const walk = (list) => {
+    for (const o of list || []) {
+      if (o.type === 'Text' && o.text && o.getBounds && opaque(o) >= 0.95) {
+        const b = o.getBounds(), ar = b.width * b.height;
+        if (ar > area && b.width >= 40 && b.height >= 12) { area = ar; best = b; }
+      }
+      if (o.list) walk(o.list);
+    }
+  };
+  try { for (const sc of game.scene.getScenes(true)) walk(sc.children.list); } catch (e) { }
+  return best;
+}
+function ssSharpFrame(prev) {
+  const c = game && game.canvas;
+  if (!c) return null;
+  const b = ssTextTarget();
+  if (!b) return null;
+  // the first sighting is a peek; the crop is taken only once the target has
+  // held still for the half second since (the rise, a battle's slide)
+  if (!prev || Math.abs(prev.x - b.x) > 1 || Math.abs(prev.y - b.y) > 1) return { moving: b };
+  const x = Math.max(0, Math.floor(b.x)), y = Math.max(0, Math.floor(b.y));
+  const w = Math.min(Math.ceil(b.width), 480, c.width - x), h = Math.min(Math.ceil(b.height), 120, c.height - y);
+  if (w < 8 || h < 8) return null;
+  const s = document.createElement('canvas'); s.width = w; s.height = h;
+  const cx = s.getContext('2d', { willReadFrequently: true });
+  cx.drawImage(c, x, y, w, h, 0, 0, w, h);
+  const png = s.toDataURL('image/png');
+  const L = (d, i) => 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+  const lap = (d) => {
+    let sum = 0, n = 0; const W4 = w * 4;
+    for (let j = 1; j < h - 1; j++) for (let i = 1; i < w - 1; i++) {
+      const k = (j * w + i) * 4;
+      sum += Math.abs(4 * L(d, k) - L(d, k - 4) - L(d, k + 4) - L(d, k - W4) - L(d, k + W4)); n++;
+    }
+    return n ? sum / n : 0;
+  };
+  const e = lap(cx.getImageData(0, 0, w, h).data);
+  const t = document.createElement('canvas'); t.width = Math.max(1, Math.round(w / 3)); t.height = Math.max(1, Math.round(h / 3));
+  const tx = t.getContext('2d'); tx.imageSmoothingEnabled = true; tx.drawImage(s, 0, 0, t.width, t.height);
+  cx.imageSmoothingEnabled = true; cx.clearRect(0, 0, w, h); cx.drawImage(t, 0, 0, w, h);
+  const e2 = lap(cx.getImageData(0, 0, w, h).data);
+  return { b, x, y, w, h, e: +e.toFixed(2), e2: +e2.toFixed(2), r: e2 > 0 ? +(e / e2).toFixed(2) : null, png: png.length < 300000 ? png : '' };
+}
+function ssSharpSchedule(rep) {
+  if (SS_SHARP.pending || !game || !game.events) return;
+  SS_SHARP.pending = true;
+  // the ready/settle beats can land before any Text exists (the intro's
+  // wordless rise) — keep looking, half a second apart, for ~30s; two crops
+  // 4s apart, the sharper one is the verdict and rides every report after
+  let tries = 0, prev = null, got = 0, best = null;
+  const attempt = () => game.events.once('postrender', () => {
+    try {
+      const f = ssSharpFrame(prev);
+      if (!f || f.moving) {
+        prev = f ? f.moving : null;
+        if (++tries < 60) { setTimeout(attempt, 500); return; }
+        SS_SHARP.pending = false; DIAG('sharp: no still text to read'); return;
+      }
+      got++;
+      if (!best || f.e > best.e) best = f;
+      if (got < 2) { prev = f.b; setTimeout(attempt, 4000); return; }
+      SS_SHARP.pending = false;
+      SS_SHARP.best = best;
+      DIAG('sharp ' + best.r + ' (edge ' + best.e + ' vs ' + best.e2 + ' at 1/3) ' + best.w + 'x' + best.h + ' @' + best.x + ',' + best.y + (best.png ? ' · shot ' + Math.round(best.png.length / 1024) + 'k' : ''));
+      rep.shp = [best.r, best.e, best.e2, best.w, best.h, best.x, best.y];
+      if (best.png) rep.shot = best.png;
+      if (SS_DEV.sd != null) rep.sd = SS_DEV.sd;
+      SS_DEV.last = rep;
+      ssDeviceSend(rep);
+    } catch (e) { SS_SHARP.pending = false; DIAG('sharp failed: ' + ((e && e.message) || e)); }
+  });
+  attempt();
+}
+/* ---- the blank-canvas watch (v0.102.3) -----------------------------------
+   Wyatt, 9/21, first open after a phone restart: 'a black screen, I waited
+   like a minute, nothing happened' — yet his device row from that launch
+   shows the game RUNNING (settle beats, 9 texts, the buffer 1170x2532) while
+   the crop read back out of the canvas was flat (edge 0.22). Closing and
+   reopening the app drew it crisp on the very same canvas verdict. A dead
+   backing store under a live game is healed by one reload — here it heals
+   itself: five 48px patches (corners + centre) are read back every 3s for
+   the first ~40s after ready; a live frame has gradient and stars in some
+   of them, a dead one reads flat everywhere. Two flat reads in a row →
+   ONE reload per two minutes (sessionStorage guard), announced home first.
+   Every device report carries the last reading as `sd`. */
+function ssBlankStat() {
+  const c = game.canvas, N = 48;
+  const s = document.createElement('canvas'); s.width = N; s.height = N;
+  const cx = s.getContext('2d', { willReadFrequently: true });
+  const pts = [[0, 0], [c.width - N, 0], [0, c.height - N], [c.width - N, c.height - N], [(c.width - N) >> 1, (c.height - N) >> 1]];
+  let maxSd = 0;
+  for (const [x, y] of pts) {
+    cx.clearRect(0, 0, N, N); cx.drawImage(c, Math.max(0, x), Math.max(0, y), N, N, 0, 0, N, N);
+    const d = cx.getImageData(0, 0, N, N).data, n = N * N, L = new Float32Array(n);
+    let m = 0; for (let i = 0; i < n; i++) { L[i] = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2]; m += L[i]; }
+    m /= n; let v = 0; for (let i = 0; i < n; i++) v += (L[i] - m) * (L[i] - m);
+    const sd = Math.sqrt(v / n); if (sd > maxSd) maxSd = sd;
+  }
+  return +maxSd.toFixed(2);
+}
+function ssBlankWatch() {
+  const K = 'beta3.blankReload';
+  let reads = 0, blanks = 0;
+  const tick = () => {
+    if (!game || !game.isBooted || !game.canvas) return;
+    game.events.once('postrender', () => {
+      let sd;
+      try { sd = ssBlankStat(); } catch (e) { DIAG('blank watch failed: ' + ((e && e.message) || e)); return; }
+      reads++;
+      SS_DEV.sd = sd;
+      blanks = sd < 0.5 ? blanks + 1 : 0;
+      if (blanks >= 2) {
+        let last = 0; try { last = +sessionStorage.getItem(K) || 0; } catch (e) { }
+        if (Date.now() - last > 120000) {
+          try { sessionStorage.setItem(K, String(Date.now())); } catch (e) { }
+          DIAG('blank canvas ×' + blanks + ' (sd ' + sd + ') — reloading');
+          try { if (typeof ssDiagLog === 'function') ssDiagLog('blank canvas (sd ' + sd + ') — self-reload'); } catch (e) { }
+          try { if (SS_DEV.last) { SS_DEV.last.blank = true; SS_DEV.last.sd = sd; ssDeviceSend(SS_DEV.last); } } catch (e) { }
+          setTimeout(() => location.reload(), 500);
+          return;
+        }
+      }
+      SS_DEV.sdMin = SS_DEV.sdMin == null ? sd : Math.min(SS_DEV.sdMin, sd);
+      if (reads < 13) setTimeout(tick, 3000);
+      else DIAG('blank watch: ' + reads + ' reads, sd min ' + SS_DEV.sdMin + ' last ' + sd + ' — canvas alive');
+    });
+  };
+  setTimeout(tick, 4000);
+}
+// `found` is the measure taken BEFORE the fit path ran (a settle measures
+// the canvas as the viewport left it); the beat measures again after it
+function ssDeviceBeat(tag, found) {
+  if (!game || !game.isBooted || !game.canvas) return null;
+  let m = ssCrispMeasure();
+  if (!m) return null;
+  if (found && !found.ok) { DIAG('crisp: found ' + found.why + ' before the fit'); SS_DEV.found = [tag, found.cw, found.ch, found.cc[0], found.cc[1]].concat(found.db || []); }
+  if (!m.ok) {
+    DIAG('crisp: ' + m.why + ' — healing');
+    SS_DEV.heals++;
+    const asFound = m;
+    try { game.scale.resize(Math.round(window.innerWidth * DPR), Math.round(window.innerHeight * DPR)); fitCanvas(); } catch (e) { }
+    m = ssCrispMeasure() || asFound;
+    SS_DEV.found = [tag, asFound.cw, asFound.ch, asFound.cc[0], asFound.cc[1]].concat(asFound.db || []);
+    DIAG('crisp: ' + (m.ok ? 'healed → ' + m.cw + 'x' + m.ch : 'STILL ' + m.why));
+  }
+  const rep = ssDeviceReport(tag, m);
+  SS_DEV.last = rep;
+  try {
+    const K = 'beta3.devlog';
+    let a = JSON.parse(localStorage.getItem(K) || '[]'); a.push(Object.assign({}, rep, { shot: undefined }));
+    if (a.length > 5) a = a.slice(a.length - 5);
+    localStorage.setItem(K, JSON.stringify(a));
+  } catch (e) { }
+  // the settle loop re-polls a kick four times: paint the four lines only
+  // when something in them changed, or the 14-line box is all chatter
+  const dsig = JSON.stringify(Object.assign({}, rep, { ts: 0, tag: '' }));
+  if (tag === 'ready' || dsig !== SS_DEV.diagSig) ssDeviceDiag(rep);
+  SS_DEV.diagSig = dsig;
+  ssDeviceSend(rep);
+  ssSharpSchedule(rep);
+  return rep;
+}
+window.__ssDevBeat = ssDeviceBeat;
+// Textures are built inside the first scene's create(), so the art has to be decoded before
+// Phaser starts. Capped at 2.5s — a slow or dead image never blocks the game, it just falls
+// back to the procedural art. Without ?art=1 this is a straight synchronous boot as before.
+if (LAB) {
+  /* ?lab=1: lab.js owns boot — it builds and destroys its own Phaser games
+     stage by stage, and the fixed-size stages must not be restarted under
+     the meter, so the viewport machinery below stands down too. SSNET still
+     connects: the lab reports home through it. */
+} else {
+  // renderer verdict first (cached or forced: resolves instantly; first boot:
+  // ~1-1.5s of workload probing, hard-capped), then the art gate as before
+  ssReadInsets();
+  ssRenderVerdict().then(() => {
+    if (ART) {
+      let booted = false;
+      const go = () => { if (!booted) { booted = true; ssBoot(); } };
+      setTimeout(() => { if (!booted) DIAG('art TIMEOUT — procedural'); go(); }, 2500);
+      ssLoadArt().then(go);
+    } else ssBoot();
+  });
+}
+// a profile row for everyone who ever opened the game — friend links and
+// rating cards look names up there, and a first-time inviter has played nothing
+SSNET.connect().then((m) => { if (m === 'firebase') SS.sync(); });
+/* ---------- viewport: resize + rotation ----------
+   iOS Safari can fire resize while innerWidth/Height still report the OLD
+   orientation, and doesn't always fire again once they settle — trusting the
+   event's numbers once left the canvas laid out landscape in a portrait
+   window, bottom half cut off. So any viewport signal starts a short settle
+   loop: re-fit now, keep re-checking until the numbers hold still, and only
+   relayout against the dims the scenes were actually built for.
+   The game is portrait-only on phones: while the CSS rotate-veil covers a
+   landscape coarse-pointer screen, the loop just sleeps the game and waits —
+   no landscape relayout, nothing to mangle — then lays out once, upright,
+   when the device turns back.
+   iOS also fires resize when the URL bar collapses (height-only, ~50-115px)
+   — that must NOT restart scenes or it cuts the ascent and resets battles;
+   only a real reshape (rotation / window drag) relays out. */
+let vpW = window.innerWidth, vpH = window.innerHeight;   // the dims the scenes are laid out for
+let vpTimer = null, vpPolls = 0;
+function ssVeiled() {
+  try { return window.matchMedia('(orientation: landscape) and (pointer: coarse)').matches; } catch (e) { return false; }
+}
+function ssVpSettle() {
+  vpTimer = null;
+  // not made yet (?art=1 defers boot until the art decodes) or mid-boot
+  // (scale.resize before the renderer exists throws) — come back shortly
+  if (!game || !game.isBooted) { vpTimer = setTimeout(ssVpSettle, 300); return; }
+  if (ssVeiled()) {
+    if (game.loop.running) game.loop.sleep();
+    vpPolls = Math.max(vpPolls, 2);      // relayout checks still owed once we're upright
+    vpTimer = setTimeout(ssVpSettle, 350);
+    return;
+  }
+  if (!game.loop.running) game.loop.wake();
+  const w = window.innerWidth, h = window.innerHeight;
+  const found = ssCrispMeasure();   // the canvas as the viewport left it
+  game.scale.resize(Math.round(w * DPR), Math.round(h * DPR));
+  fitCanvas();
+  ssDeviceBeat('settle', found);
+  const major = Math.abs(w - vpW) > 4 || Math.abs(h - vpH) > 200;
+  DIAG('vp ' + w + 'x' + h + (major ? ' MAJOR → scene restart' : ' minor'));
+  if (major) {
+    vpW = w; vpH = h;
+    // every active scene, versus included — restart() with no args keeps the
+    // original scene data, so a vsbattle rejoins its room by seal code
+    for (const sc of game.scene.getScenes(true)) sc.scene.restart();
+  }
+  if (vpPolls-- > 0) vpTimer = setTimeout(ssVpSettle, 300);
+}
+function ssVpKick() {
+  vpPolls = 4;                           // ~1.3s of re-checks outlasts iOS's stale reports
+  clearTimeout(vpTimer);
+  vpTimer = setTimeout(ssVpSettle, 60);
+}
+if (!LAB) {
+  window.addEventListener('resize', ssVpKick);
+  window.addEventListener('orientationchange', ssVpKick);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', ssVpKick);
+  ssVpKick();   // opened in landscape? park under the veil from the very start
+}
