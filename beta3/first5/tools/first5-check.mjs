@@ -41,6 +41,7 @@ ok('shim handles ?reset=1 and scrubs it from the URL', shim.includes("searchPara
 ok("game.js art repointed to ../art (2 sites)", (gameSrc.match(/im\.src = '\.\.\/art\//g) || []).length === 2 && !/im\.src = 'art\//.test(gameSrc));
 ok('packs.js dictionary writes ../words-<lang>.js', packSrc.includes('src="../words-'));
 for (let n = 1; n <= 7; n++) ok('F5-GRAFT-' + n + ' seam present in game.js', gameSrc.includes('F5-GRAFT-' + n));
+ok('F5-CARD-04 seams: the rig, the kind bag, the beats, the ember tune', ['SS_F5_RIG', 'SS_F5_FLOOR', 'SS_F5_EMBER_MULT', 'f5Kind(', 'f5CastBeats(', 'f5StarWrite(', 'f5Encore('].every((t) => gameSrc.includes(t)));
 const BUILD = (gameSrc.match(/const BUILD = '([^']+)'/) || [])[1];
 ok('game.js copy carries a BUILD', !!BUILD, BUILD);
 try {
@@ -118,6 +119,40 @@ for (let i = 0; i < 20 && !lured; i++) { const st = await ev("window.__ssftue ? 
 ok('the tap launches the ascent (lure → rise)', !!lured, String(lured));
 ok('…and the same gesture ARMED THE SOUND (riser audible)', await ev("typeof SFX !== 'undefined' && SFX.ok === true && SFX.ctx && SFX.ctx.state === 'running'"), String(await ev("typeof SFX !== 'undefined' && SFX.ctx ? SFX.ctx.state : 'no ctx'")));
 ok('zero exceptions through the lure', errs.length === 0, errs.slice(0, 2).join(' | '));
+
+/* ======== §2c THE SKY LEANS IN (card 04) ======== */
+console.log('— §2c the sky leans in —');
+let b1 = false; // ride the lure-tapped ascent into the first fight
+for (let i = 0; i < 90 && !b1; i++) { b1 = await ev("(()=>{try{const b=game.scene.getScene('battle');return !!(b&&b.scene.isActive()&&b.state==='pick')}catch(e){return false}})()"); if (!b1) await sleep(1000); }
+ok('the first fight stands after the lure', b1);
+const ehp = await ev("(()=>{try{const b=game.scene.getScene('battle');return b.beast?b.beast.hp:null}catch(e){return null}})()");
+ok('THE EMBER MINUTE tuning: pinned VULPES at 33 hp', ehp === 33, String(ehp));
+ok('the en rig letters are all in the en bag', await ev("['m','o','n','s','e','a'].every(c=>SS_PACKS.en.bag[c])"));
+ok('the en floor word stands in the dictionary', await ev("WORDSET.has('moons')"));
+await sleep(2500); // the deal's bounce settles before probe taps (house law)
+const cast1 = await ev("(()=>{const b=game.scene.getScene('battle');const deal=['s','t','a','r'];const used=[];for(const ch of deal){let f=-1;for(let i=0;i<16;i++){if(used.includes(i))continue;if(b.board[i]&&b.board[i].ch===ch){f=i;break}}if(f<0)return 'missing '+ch;used.push(f)}used.forEach(i=>b.tapTile(i));b.tryCast();return 'cast'})()");
+ok('the first cast flies (S·T·A·R, real scene taps)', cast1 === 'cast', String(cast1));
+let sw = false;
+for (let i = 0; i < 12 && !sw; i++) { sw = (await ev('window.__f5starwrite | 0')) >= 1; if (!sw) await sleep(400); }
+ok('THE WORD WRITTEN IN STARS hangs on the first cast', sw);
+await sleep(3200); // the rigged refill lands and settles
+const dens = await ev("(()=>{const b=game.scene.getScene('battle');const counts={};for(const s of b.board)if(s&&!s.blk)counts[s.ch]=(counts[s.ch]|0)+1;const fits=(w)=>{if(w.includes('q'))return false;const c=Object.assign({},counts);for(const ch of w){if(!c[ch])return false;c[ch]--}return true};let n4=0,n5=0,n6=0;for(const w of WORDSET){const L=w.length;if(L===4&&n4<9&&fits(w))n4++;else if(L===5&&n5<9&&fits(w))n5++;else if(L===6&&n6<9&&fits(w))n6++;if(n4>8&&n5>8&&n6>8)break}return [n4,n5,n6]})()");
+ok('THE DENSITY GATE: >=3 findable words at 4/5/6 after the rig (en)', dens && dens[0] >= 3 && dens[1] >= 3 && dens[2] >= 3, String(dens));
+const trio = await ev("(()=>{const b=game.scene.getScene('battle');return b.rollSigilOpts().map(o=>o.id).join()})()");
+ok('the first-ever sigil trio is curated: QUILL / SALVE / FIRST LIGHT', trio === 'quill,salve,first', trio);
+await ev("(()=>{const b=game.scene.getScene('battle');b.f5LastTap=b.time.now-31000;b.f5Glinted=true;b.f5Encored=false;return 1})()");
+let enc = false;
+for (let i = 0; i < 10 && !enc; i++) { enc = (await ev('window.__f5encore | 0')) >= 1; if (!enc) await sleep(500); }
+ok('the 30s rescue encore walks the best word (idle rescue)', enc);
+const w5 = await ev("(()=>{const b=game.scene.getScene('battle');if(b.state!=='pick')return 'state '+b.state;const tiles=b.board.map((s,i)=>s&&!s.blk?{i,ch:s.ch}:null).filter(Boolean);const pick=(w)=>{const used=[];for(const ch of w){let f=-1;for(const t of tiles){if(used.includes(t.i))continue;if(t.ch===ch){f=t.i;break}}if(f<0)return null;used.push(f)}return used};for(const w of WORDSET){if(w.length!==5||w.includes('q'))continue;const u=pick(w);if(u){u.forEach(i=>b.tapTile(i));b.tryCast();return w}}return 'none'})()");
+ok('a 5-letter word stands on the rigged board and CASTS', !!w5 && w5 !== 'none' && !String(w5).startsWith('state'), String(w5));
+let r5 = false;
+for (let i = 0; i < 10 && !r5; i++) { r5 = (await ev('window.__f5ladder5 | 0')) === 1; if (!r5) await sleep(400); }
+ok('the first 5+ pays the shooting star (ladder rung 5)', r5);
+await ev("(()=>{const b=game.scene.getScene('battle');b.f5CastBeats('zzzzzzz', 7);return 1})()");
+await sleep(1200);
+ok('rungs 6 and 7 cue and draw clean (sky swell + gold rain)', ((await ev('window.__f5ladder6 | 0')) + (await ev('window.__f5ladder7 | 0'))) === 2);
+ok('zero exceptions through the leaning sky', errs.length === 0, errs.slice(0, 2).join(' | '));
 
 /* ================= §3 the run engine plays (demo solver) ================= */
 console.log('— §3 the run engine plays —');

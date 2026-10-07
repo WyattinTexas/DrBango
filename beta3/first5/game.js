@@ -1896,6 +1896,17 @@ function ssF5SkipFloor(scene, startedAt) { return scene.time.now - startedAt >= 
    it with the real cue. An empty slot draws nothing — the beat script
    already carries the hook, which is this graft's whole job. */
 function ssF5TomorrowCue(scene) { window.__f5tomorrow = (window.__f5tomorrow | 0) + 1; /* card 06 */ }
+/* ---- F5-CARD-04: THE SKY LEANS IN — the rig's authored letters ----------
+   The fight-1 refill queue (the page's own M·O·N·S beat: MOON free, the
+   board secretly dense) and the skill-floor drop (no 5+ by cast 5 → the
+   queue deals the near-assembled word). en is the VALIDATED tongue — the
+   harness's density gate proves ≥3 findable words at 4/5/6 after the rig
+   lands; the other four are drafts that MUST pass the same validator plus
+   native review at integration (the page's "single highest-leverage
+   missing piece"). */
+const SS_F5_RIG = { en: ['m', 'o', 'n', 's'], es: ['m', 'a', 'r', 'e', 's'], fr: ['l', 'u', 'n', 'e', 's'], pt: ['c', 'a', 's', 'a', 's'], de: ['s', 't', 'e', 'r', 'n'] };
+const SS_F5_FLOOR = { en: ['m', 'o', 'o', 'n', 's'], es: ['l', 'u', 'n', 'a', 's'], fr: ['l', 'u', 'n', 'e', 's'], pt: ['c', 'a', 's', 'a', 's'], de: ['s', 't', 'e', 'r', 'n', 'e'] };
+const SS_F5_EMBER_MULT = 1.1;   // VULPES 30 → 33 hp: the ember minute always arrives (page §IV)
 function ssFtueDone() {
   if (SS.prof && SS.prof.ftue !== 1) { SS.prof.ftue = 1; SS.save(); DIAG('ftue: done'); }
 }
@@ -8668,6 +8679,11 @@ class Battle extends Phaser.Scene {
         const vi = this.fights.findIndex((f) => f.id === 'vulpes');
         if (vi > 0 && vi < 4) { this.fights[vi].id = this.fights[0].id; this.fights[0].id = 'vulpes'; }
         else if (vi < 0) this.fights[0].id = 'vulpes';
+        /* F5-CARD-04: THE EMBER MINUTE's tuning — 33 hp, atk 8, so
+           "strikes in 1 cast" always arrives with the beast at a sliver:
+           race it or eat it, manufactured on day one at stakes of 8. */
+        this.fights[0].mult = SS_F5_EMBER_MULT;
+        this.fights[0].atkAdd = 0;
       }
       planSeed = Math.floor(rng() * 1e9);       // daily: seeded stream → every hunter shares the schedule
     }
@@ -8768,6 +8784,10 @@ class Battle extends Phaser.Scene {
     if (this.ftue) this.ftueStart();   // the first open: curated deal landed above; the finger follows
 
     if (DEMO) this.demoTimer = this.time.addEvent({ delay: 1400, loop: true, callback: () => this.demoStep() });
+    /* F5-CARD-04: THE SKY LEANS IN — the rig. Fight 1's refills ride the
+       authored queue; after it drains, the KIND BAG (f5Kind) fades
+       100→50→0% by fight 4. The run's cue rungs start unfired. */
+    if (this.mode === 'quick') { this.f5Queue = this.ftue ? (SS_F5_RIG[PACK.lang] || SS_F5_RIG.en).slice() : []; this.f5Rungs = {}; }
     /* F5-GRAFT-5: feed the stalled speller — the stall clock. Any tap
        anywhere re-arms it; the glint itself fires from update(). */
     this.f5LastTap = 0; this.f5Glinted = false;
@@ -8807,7 +8827,115 @@ class Battle extends Phaser.Scene {
         const best = this.bestWord();
         if (best && best.length) this.f5Glint(this.board[best[0]]);
       }
+      /* F5-CARD-04: the rescue's second rung — 30s of stall brings the
+         gesture back once (the best word's tiles glint in walking order). */
+      else if (!this.f5Encored && this.time.now - this.f5LastTap > 30000) { this.f5Encored = true; this.f5Encore(); }
     }
+  }
+  /* F5-CARD-04: THE KIND BAG. Fades 100→50→0% by fight 4. Statistically
+     invisible kindness: a drawn letter may be traded for a second draw when
+     the first would hurt the board — a 3rd+ duplicate, or a rare consonant
+     while the board is starved of the working set. No dictionary scan, no
+     hitch; the authored queue carries the real density, this keeps the bag
+     from undoing it. FOR SKYLAR (dial): the fade table and the working set. */
+  f5Kind(ch) {
+    if (this.mode !== 'quick' || !this.f5Rungs) return ch;
+    const p = [1, 1, 0.5][this.run.fightIdx | 0] || 0;
+    if (!p || rng() >= p) return ch;
+    const counts = {};
+    for (const s of this.board) if (s) counts[s.ch] = (counts[s.ch] | 0) + 1;
+    const dup = (counts[ch] | 0) >= 2;
+    const rare = 'jqxzvwk'.includes(ch) && !VOWELS.includes(ch);
+    if (!dup && !rare) return ch;
+    let alt = rpick(BAG);
+    alt = PACK.digraph[alt] || alt;
+    if ((counts[alt] | 0) >= 2) alt = rpick(['r', 's', 't', 'l', 'n', 'e']);
+    return alt;
+  }
+  /* F5-CARD-04: the cast's leaning-in beats — called from tryCast on every
+     quick-run cast, AFTER the run tallies moved. */
+  f5CastBeats(word, letters) {
+    if (this.mode !== 'quick' || !this.f5Rungs) return;
+    /* THE WORD WRITTEN IN STARS — the first cast of the first night hangs
+       as new stars threaded gold beside the beast, holds one breath, then
+       collapses toward the blow. A parallel overlay: the shipped cast path
+       (the hottest function in the game, per the critic) is untouched. */
+    if (this.ftue && this.run.words === 1) this.f5StarWrite(word);
+    /* THE LADDER OF CUES — each new length rung pays a one-shot sky cue:
+       a shooting star at 5+, the sky swelling at 6+, gold rain at 7+. */
+    if (letters >= 5 && !this.f5Rungs[5]) { this.f5Rungs[5] = 1; this.f5Cue5(); }
+    if (letters >= 6 && !this.f5Rungs[6]) { this.f5Rungs[6] = 1; this.f5Cue6(); }
+    if (letters >= 7 && !this.f5Rungs[7]) { this.f5Rungs[7] = 1; this.f5Cue7(); }
+    /* THE SKILL FLOOR — no 5+ by cast 4 means the ladder would never fire
+       for the bottom half: the next refill deals the floor word nearly
+       assembled (en validated; other tongues integration-gated). */
+    if (this.ftue && this.run.words === 4 && !this.f5Rungs[5] && !this.f5Floored) {
+      this.f5Floored = true;
+      this.f5Queue.push(...(SS_F5_FLOOR[PACK.lang] || SS_F5_FLOOR.en));
+    }
+  }
+  f5StarWrite(word) {
+    window.__f5starwrite = (window.__f5starwrite | 0) + 1;
+    if (!this.textures.exists('spark4')) return;
+    const l = this.L, n = word.length;
+    const cx = l.x(0), cy = l.y(206);                  // beside the beast's ground
+    const items = [];
+    const pts = [];
+    for (let k = 0; k < n; k++) {
+      const x = cx + l.u(-((n - 1) * 34) / 2 + k * 34 + (k % 2 ? 6 : -6)), y = cy + l.u(k % 2 ? 14 : -10);
+      pts.push({ x, y });
+      const st = this.add.image(x, y, 'spark4').setScale(0).setAlpha(0).setDepth(560).setBlendMode('ADD').setTint(0xffe9a8);
+      items.push(st);
+      this.tweens.add({ targets: st, scale: 1.1, alpha: 0.95, delay: 120 + k * 90, duration: 220, ease: 'Back.easeOut' });
+    }
+    const g = this.add.graphics().setDepth(559).setAlpha(0);
+    g.lineStyle(l.u(1.6), 0xd9b96a, 0.8);
+    for (let k = 1; k < n; k++) { g.moveTo(pts[k - 1].x, pts[k - 1].y); g.lineTo(pts[k].x, pts[k].y); }
+    g.strokePath();
+    items.push(g);
+    this.tweens.add({ targets: g, alpha: 0.7, delay: 160 + n * 90, duration: 240 });
+    this.time.delayedCall(1050, () => {               // one breath, then the collapse
+      for (const o of items) {
+        this.tweens.killTweensOf(o);
+        this.tweens.add({ targets: o, x: cx, y: cy + l.u(26), alpha: 0, scale: 0.1, duration: 330, ease: 'Quad.easeIn', onComplete: () => o.destroy() });
+      }
+    });
+  }
+  f5Cue5() {   // a shooting star crosses the upper sky
+    window.__f5ladder5 = 1;
+    if (!this.textures.exists('spark4')) return;
+    const l = this.L;
+    const st = this.add.image(l.x(-170), l.y(90), 'spark4').setScale(1.2).setAlpha(0).setDepth(558).setBlendMode('ADD');
+    this.tweens.add({ targets: st, alpha: 0.95, duration: 120 });
+    this.tweens.add({ targets: st, x: l.x(150), y: l.y(150), duration: 900, ease: 'Sine.easeIn', onComplete: () => st.destroy() });
+    for (let k = 1; k <= 5; k++) this.time.delayedCall(k * 140, () => {
+      if (!st.scene) return;
+      const tr = this.add.image(st.x, st.y, 'spark4').setScale(0.6).setAlpha(0.5).setDepth(557).setBlendMode('ADD');
+      this.tweens.add({ targets: tr, alpha: 0, scale: 0.1, duration: 420, onComplete: () => tr.destroy() });
+    });
+  }
+  f5Cue6() {   // the sky itself swells — one additive breath across the top
+    window.__f5ladder6 = 1;
+    if (!this.textures.exists('glowbig')) { return; }
+    const l = this.L;
+    const sw = this.add.image(l.x(0), l.y(110), 'glowbig').setDisplaySize(l.u(520), l.u(240))
+      .setTint(0x7fe9c3).setAlpha(0).setDepth(556).setBlendMode('ADD');
+    this.tweens.add({ targets: sw, alpha: 0.32, duration: 520, yoyo: true, ease: 'Sine.easeInOut', onComplete: () => sw.destroy() });
+  }
+  f5Cue7() {   // gold rain across the zenith
+    window.__f5ladder7 = 1;
+    if (!this.starBurst) return;
+    const l = this.L;
+    for (let k = 0; k < 7; k++) this.time.delayedCall(k * 70, () => this.starBurst.emitParticleAt(l.x(-150 + k * 50), l.y(80 + (k % 3) * 24), 6));
+  }
+  /* F5-CARD-04: the idle rescue's second rung — at 30s the gesture returns
+     once: the best word's tiles glint in walking order (the ghost hand's
+     lesson without its sprite). Once per run. */
+  f5Encore() {
+    window.__f5encore = (window.__f5encore | 0) + 1;
+    const best = this.bestWord();
+    if (!best || !best.length) return;
+    best.forEach((bi, k) => this.time.delayedCall(k * 180, () => { if (this.board[bi]) this.f5Glint(this.board[bi]); }));
   }
   /* F5-GRAFT-5: one glint — a single breath of scale and one spark on a
      tile that starts a real word. No copy, no arrow, no repeat. */
@@ -9313,10 +9441,16 @@ class Battle extends Phaser.Scene {
       if (this.skyAsh[i]) continue;
       let ch;
       if (deal) ch = deal[i];
-      else {
+      else if (this.f5Queue && this.f5Queue.length) {
+        /* F5-CARD-04: the rigged refill — authored letters land first (the
+           fight-1 density, then any skill-floor drop), then the bag. */
+        ch = this.f5Queue.shift();
+        ch = PACK.digraph[ch] || ch;
+      } else {
         ch = rpick(BAG);
         if (this.boardVowels() < 5 && !VOWELS.includes(ch)) ch = rpick(['a', 'e', 'i', 'o', 'u']);
         ch = PACK.digraph[ch] || ch;
+        ch = this.f5Kind(ch);   /* F5-CARD-04: the kind bag, fading by fight */
       }
       // the pending queue (v0.66.0): each empty slot takes one owed bonus
       // tile — GILDED DAWN's start (one gilded; two; two stars at its
@@ -10161,6 +10295,7 @@ class Battle extends Phaser.Scene {
     SS.prof.words++;
     if (letters > this.run.longest.length) this.run.longest = word;
     if (word.length > SS.prof.longest.length) SS.prof.longest = word;
+    if (this.mode === 'quick') this.f5CastBeats(word, letters);   /* F5-CARD-04 */
     if (dmg > SS.prof.bigHit) SS.prof.bigHit = dmg;
     /* the sign's own ledger takes the word and the blow (v0.85.0, Skylar:
        "longest word played with that sign"). Only campaign and endless
@@ -11046,6 +11181,14 @@ class Battle extends Phaser.Scene {
     return { rare: 0.10, leg: 0.03 };
   }
   rollSigilOpts() {
+    /* F5-CARD-04: the first-ever sigil trio is curated legible — QUILL /
+       SALVE / FIRST LIGHT (damage, sustain, the first-word double), the
+       page's own pick. The six rolls the stock path would spend are burned
+       so the stream downstream never moves (the draw-order law). */
+    if (this.ftue && !this.run.sigils.length) {
+      const trio = ['quill', 'salve', 'first'].map((id) => SS_SIGILS.find((s) => s.id === id)).filter(Boolean);
+      if (trio.length === 3) { for (let k = 0; k < 6; k++) rng(); return trio; }
+    }
     const { rare, leg } = this.sigilChances();
     /* THE DRIP'S ONE GATE. Every solo pick — quick, campaign and daily alike
        — draws from ssSigilOpen(), so a locked sigil can never be offered.
