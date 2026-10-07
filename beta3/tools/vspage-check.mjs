@@ -104,6 +104,28 @@ ok('the searching theater is real: the rolled beat, the found gate, the ticking 
 ok('the harness seams stand: ?vsfind pins the roll, ?botpace shrinks the reply rhythm',
   /QS\.get\('vsfind'\)/.test(vsSrc) && /QS\.get\('botpace'\)/.test(readFileSync('rival.js', 'utf8')));
 ok('the near sky + the plaque rows are in the served set', /SS_NEAR/.test(vsSrc) && /VS_PEND/.test(vsSrc) && /pendRows/.test(vsSrc));
+// ---- THE DUELING GROUND, FILLED (v0.112.0, the 10/7 build) ----
+ok('THE FILL is in the source: frozen rank, the circle constant, the fill law against the doors',
+  /VS_FILL_CIRCLE = 3/.test(vsSrc) && /rankPicks\(\)/.test(vsSrc) && /this\.fillPicks = this\.rankPicks\(\)/.test(vsSrc)
+  && /fillCount\(/.test(vsSrc) && /safeB - 188 - 24/.test(vsSrc) && /rosterRows/.test(vsSrc));
+ok('THE TRUNCATION LAW is machinery, not hope: the bucket pill + the shared row core, no 5.5-pt tag loop anywhere',
+  /function vsPill/.test(vsSrc) && /Math\.ceil\(\(t\.width \/ l\.u\(1\) \+ 28\) \/ 10\) \* 10/.test(vsSrc)
+  && /function vsRowCore/.test(vsSrc) && (vsSrc.match(/vsPill\(this, l/g) || []).length >= 3 && !/fs > 5\.5/.test(vsSrc));
+ok('the plaques dropped to 350 (the air cure) and the fold chips seat at 581',
+  /this\.plaque\(l, r, 350 \+ i \* 58\)/.test(vsSrc) && /l\.y\(581\)/.test(vsSrc));
+ok('THE HERO FLEX: three scales through one seat (1.5 · 1.85 · 2.0), the zenith riding',
+  /setHeroScale\(/.test(vsSrc) && /rows\.length \? 1\.5 : 1\.85/.test(vsSrc) && /setHeroScale\(2\)/.test(vsSrc)
+  && /this\.heroHs/.test(vsSrc));
+ok('the funnel doors JOIN the safeB family and the retry anchors',
+  /safeB - 370/.test(vsSrc) && /safeB - 296/.test(vsSrc) && /safeB - 222/.test(vsSrc) && (vsSrc.match(/safeB - 158/g) || []).length >= 2);
+ok('THE QUIET GROUND: six lines stopped rendering — versus.js reads none of their keys (strings.js keeps all six ×5)',
+  !/vsVict|vsGhost|vsChFriendSub|vsChWorldSub|vsAddFriendSub|vsInviteNewSub/.test(vsSrc)
+  && !/whisperT|setWhisper/.test(vsSrc)
+  && ['vsVict', 'vsGhost', 'vsChFriendSub', 'vsChWorldSub', 'vsAddFriendSub', 'vsInviteNewSub']
+    .every((k) => (strSrc.match(new RegExp(k + ':', 'g')) || []).length === 5));
+ok('the caption teaches on the funnel alone', /this\.capT\.setVisible\(!!funnel\)/.test(vsSrc) && /setVisible\(false\)/.test(vsSrc.slice(vsSrc.indexOf('vsAsync') - 400, vsSrc.indexOf('vsAsync') + 400)));
+ok('the sheet regrew: panel 448, a FOURTH recent at the 38 pitch',
+  /const PH = 448/.test(vsSrc) && /recentList\(4\)/.test(vsSrc) && /top \+ 196 \+ i \* 38/.test(vsSrc));
 // 9/3 feedback card 01: the summons copy wears two sparkles (unchanged law —
 // the ✨ is share TEXT, Skylar's stamp; the no-emoji law governs game ART)
 const ANSWER_TAILS = /to answer|para responder|pour répondre|um zu antworten/;
@@ -148,6 +170,9 @@ async function client(port, dir, tag) {
   const send = (m, p) => new Promise((res) => { const i = ++id; pend.set(i, res); ws.send(JSON.stringify({ id: i, method: m, params: p })); });
   await send('Runtime.enable'); await send('Page.enable'); await send('Network.enable');
   await send('Network.setCacheDisabled', { cacheDisabled: true });
+  // a PHONE box, enforced — --window-size is ignored (the 9/8 lesson) and
+  // the filled ground's geometry pins are phone-true seat numbers
+  await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 3, mobile: true });
   const ev = async (e) => {
     const r = await send('Runtime.evaluate', { expression: e, returnByValue: true, awaitPromise: true });
     if (r?.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description || 'eval failed');
@@ -230,22 +255,22 @@ for (const lang of LANGS) {
   if (!up) { ok(lang + ': the page', false, 'boot failed'); continue; }
   const tx = await deepTexts(A);
   const T = await A.ev(`JSON.stringify({ as: SS_T('vsAsync'), nr: SS_T('vsNoRecent'),
-    cw: SS_T('vsChWorld'), cws: SS_T('vsChWorldSub'), af: SS_T('vsAddFriend'), afs: SS_T('vsAddFriendSub'),
-    inv: SS_T('vsInviteNew'), invs: SS_T('vsInviteNewSub'), chip: '✧ ' + SSNET.myName() })`).then(JSON.parse);
+    cw: SS_T('vsChWorld'), af: SS_T('vsAddFriend'), inv: SS_T('vsInviteNew'), chip: '✧ ' + SSNET.myName() })`).then(JSON.parse);
   // the funnel IS exactly these texts — one exact set carries every absence
-  // at once: no heading, no doors band, no strip, no whisper, no stray key.
+  // at once: no heading, no doors band, no strip, no whisper — and since the
+  // quiet ground (the 10/7 build) NO door sublines: a door is its label.
   // ssTextBlock renders the fiction as its body PLUS wrapped lines (the
   // corr-check lesson) — fold every fragment of it out, then compare exact.
   const norm = (s) => s.replace(/\s+/g, ' ').trim();
   const fic = norm(T.nr);
   const uniq = [...new Set(tx)];
   const sawFic = uniq.some((t) => norm(t).length > 3 && fic.includes(norm(t)));
-  const want = JSON.stringify([...new Set(['‹ HOME', T.as, T.cw, T.cws, T.af, T.afs, T.inv, T.invs, T.chip])].sort());
+  const want = JSON.stringify([...new Set(['‹ HOME', T.as, T.cw, T.af, T.inv, T.chip])].sort());
   const got = JSON.stringify(uniq.filter((t) => !fic.includes(norm(t))).sort());
   const good = got === want && sawFic
     && await A.ev(`game.scene.getScene('vsmenu').recentRows === null && game.scene.getScene('vsmenu').socialC === null
       && game.scene.getScene('vsmenu').doorsMode === 'funnel' && !game.scene.getScene('vsmenu').chFriendB`);
-  ok(lang + ': the funnel is exactly its texts — fiction high, worldwide promoted, add + invite beneath', good, got.slice(0, 200));
+  ok(lang + ': the funnel is exactly its texts — fiction high, three label-alone doors, the teaching caption', good, got.slice(0, 200));
 }
 for (const lang of LANGS) {
   const r = await A.ev(`JSON.stringify((() => { const t = SS_STR['${lang}'];
@@ -268,16 +293,23 @@ const geo = await A.ev(`JSON.stringify((() => { const s = game.scene.getScene('v
   const flies = s.children.list.filter(o => o.texture && (o.__ssBaseTex || o.texture.key) === 'dot' && o.tintTopLeft === 0xffdf8f).length;
   return { wmKey: wm.texture.key, wmX: wm.x, wmY: wm.y, cx: l.x(0), y62: l.y(62),
     nB: blades.length, bY: blades.map(b => Math.round(b.y)), bSym: blades.length === 2 ? Math.abs((blades[0].x - l.x(0)) + (blades[1].x - l.x(0))) : 99,
-    capY: cap ? cap.y : -1, y94: l.y(94),
+    capY: cap ? cap.y : -1, capVis: cap ? cap.visible : null, y94: l.y(94),
     chip: s.idChipT ? s.idChipT.text : null, chipHit: css(s.idChipB), chipRight: s.idChipB ? s.idChipB.getBounds().right : -1, W: s.scale.width,
     worldY: world.centerY, addY: add.centerY, invY: inv.centerY, order: world.centerY < add.centerY && add.centerY < inv.centerY,
+    aWorld: l.y(s.safeB - 370), aAdd: l.y(s.safeB - 296), aInv: l.y(s.safeB - 222),
+    subTexts: [SS_T('vsChWorldSub'), SS_T('vsAddFriendSub'), SS_T('vsInviteNewSub')].filter(t =>
+      s.children.list.some(o => o.text === t) || (s.doorsC && s.doorsC.list.some(o => o.text === t))),
     hits: [css(s.chWorldB), css(s.addDoorB), css(s.invDoorB)],
     safeBpx: s.scale.height - SS_INSET.bottom * DPR, noteY: s.noteT.y, moon, flies } })())`).then(JSON.parse);
 ok('the wordmark is the gold letterpress of SS_T(versus), centred at the page head',
   !geo.missing && geo.wmKey === 'gold@23@VERSUS' && Math.abs(geo.wmX - geo.cx) < 1 && Math.abs(geo.wmY - geo.y62) < 1, geo.wmKey);
 ok('two drawn blades flank it symmetrically at its height',
   !geo.missing && geo.nB === 2 && geo.bSym < 1.5 && geo.bY.every((y) => Math.abs(y - Math.round(geo.wmY)) <= 1));
-ok('the caption rides beneath the wordmark', !geo.missing && Math.abs(geo.capY - geo.y94) < 1);
+ok('the caption rides beneath the wordmark and TEACHES on the funnel (visible here, nowhere else)',
+  !geo.missing && Math.abs(geo.capY - geo.y94) < 1 && geo.capVis === true);
+ok('the funnel doors JOIN the safeB family — anchored at −370 / −296 / −222, label-alone (no sublines render)',
+  !geo.missing && Math.abs(geo.worldY - geo.aWorld) < 2 && Math.abs(geo.addY - geo.aAdd) < 2 && Math.abs(geo.invY - geo.aInv) < 2
+  && geo.subTexts.length === 0, JSON.stringify([geo.worldY, geo.aWorld, geo.subTexts]));
 ok("the identity chip wears the first-night dress '✧ name' (no rating yet), right-anchored, 44-pt",
   !geo.missing && /^✧ /.test(geo.chip || '') && !/·/.test(geo.chip || '') && geo.chipRight <= geo.W && geo.chipHit >= 43.5,
   geo.chip + ' hit ' + Math.round(geo.chipHit));
@@ -296,10 +328,16 @@ const hero = await A.ev(`JSON.stringify((() => { const s = game.scene.getScene('
   const zen = s.zenith;
   return { L: fig(s.heroL), R: fig(s.heroR), fly: s.heroFly, seen: window.__ssVsHeroSeen,
     u15: +(l.u(1.5)).toFixed(3), zx: zen ? Math.round(zen.x) : -1, zy: zen ? Math.round(zen.y) : -1,
+    hy: Math.round(s.heroL.y), y240: Math.round(l.y(240)), hs: +s.heroHs.toFixed(3),
+    zW: zen ? +(zen.displayWidth / l.u(1)).toFixed(1) : -1,
     cx: Math.round(l.x(0)), y128: Math.round(l.y(128)), zTex: zen ? (zen.__ssBaseTex || zen.texture.key) : null } })())`).then(JSON.parse);
-ok('two figures stand: 11 stars each with halos (22+ sprites), gold left, moon-blue right, the right one mirrored',
-  hero.L.stars >= 22 && hero.R.stars >= 22 && hero.L.sx === 1 && hero.R.sx === -1
-  && hero.L.tints.includes(0xd7b45c) && hero.R.tints.includes(0x9fb0e8), JSON.stringify([hero.L.tints, hero.R.tints]));
+const FHS = 2 / 1.5;   // the funnel wears the hero at 2.0× (Q4 FLEX AS SHOWN)
+ok('two figures stand: 11 stars each with halos (22+ sprites), gold left, moon-blue right, the right one mirrored — at the funnel\'s 2.0×',
+  hero.L.stars >= 22 && hero.R.stars >= 22 && Math.abs(hero.L.sx - FHS) < 0.01 && Math.abs(hero.R.sx + FHS) < 0.01
+  && Math.abs(hero.hs - FHS) < 0.01 && Math.abs(hero.hy - hero.y240) <= 2
+  && hero.L.tints.includes(0xd7b45c) && hero.R.tints.includes(0x9fb0e8), JSON.stringify([hero.L.sx, hero.hs, hero.hy, hero.y240]));
+ok('the zenith anchors the flex: its seat holds at y128 while its size rides (24 × 2.0/1.5 = 32)',
+  Math.abs(hero.zy - hero.y128) <= 1 && hero.zW >= 31 && hero.zW <= 33, 'zW ' + hero.zW);
 ok('this session\'s first visit FLEW the stars in, and the edges have risen', hero.fly === true && hero.seen === 1 && hero.L.gAlpha === 1 && hero.R.gAlpha === 1,
   'fly ' + hero.fly + ' gA ' + hero.L.gAlpha + '/' + hero.R.gAlpha);
 ok('the stars stand on the authored chart (star 0 at −58,−56 × the unit scale)',
@@ -327,7 +365,11 @@ ok('the invite row stands at the very bottom, under everything in the roll',
   await A.ev(`(() => { const s = game.scene.getScene('vsmenu'); const invTop = s.invB.getBounds().top;
     let bad = 0; const walk = (list) => list.forEach(o => { if (o.getBounds && o.getBounds().bottom > invTop + 2) bad++; if (o.list) walk(o.list); });
     walk(s.frC.list); return bad === 0 })()`));
-ok('invite copy inside the row', stx.includes(ST.inv) && stx.includes(ST.sub));
+ok('the invite plate carries its label ALONE (the door law — the subline stopped rendering)',
+  stx.includes(ST.inv) && !stx.includes(ST.sub));
+ok('the sheet regrew to 448 with the 38-pitch recents rail', await A.ev(`(() => { const s = game.scene.getScene('vsmenu');
+  const l = ssLayout(s); const panel = s.socialC.list.find(o => o.texture && o.texture.key === 'endpanel');
+  return Math.abs(panel.displayHeight / l.u(1) - 448) < 1 && Math.abs((panel.y - panel.displayHeight / 2 - l.y(0)) / l.u(1) - 176) < 1 })()`));
 ok('the +, the ✕ and the invite row all meet the 44-pt law',
   await A.ev(`(() => { const s = game.scene.getScene('vsmenu'); const css = (o) => { const D = game.scale.width / innerWidth;
       return Math.min(o.input.hitArea.width * Math.abs(o.scaleX), o.input.hitArea.height * Math.abs(o.scaleY)) / D; };
@@ -532,7 +574,7 @@ ok('SEARCHING stands and the clock ticks the wait up (Skylar 9/8: "some kind of 
   return /^\d+:\d\d$/.test(b || '') && b !== a;
 })());
 const found = await (async () => {
-  const cap2 = Math.max(3000, th.t0 + th.T + 5000 - Date.now());
+  const cap2 = Math.max(3000, th.t0 + th.T + 12000 - Date.now());
   for (let i = 0; i < cap2 / 250; i++) {
     if (await A.ev(`game.scene.getScene('vsbattle').searchT.text === SS_T('vsFound')`)) return Date.now();
     await sleep(250);
@@ -540,8 +582,12 @@ const found = await (async () => {
   return 0;
 })();
 const beat = found ? (found - th.t0) / 1000 : -1;
-ok('OPPONENT FOUND lands on the rolled beat — inside the 8–15s window, never early',
-  found > 0 && beat >= 7.8 && beat <= 16.5 && found >= th.t0 + th.T - 600, beat.toFixed(1) + 's of ' + (th.T / 1000).toFixed(1) + 's rolled');
+// NEVER EARLY is the fiction's law (the reveal waits out the rolled beat);
+// lateness is harness physics — the reveal rides a GAME-clock delayedCall
+// and the headless clock stretches under load (the 9/22 lesson: pin order,
+// never wall-clock caps — a 14.9s roll landed at 17.7s on a QUIET box).
+ok('OPPONENT FOUND lands on the rolled beat — never early, and within the stretch-tolerant cap',
+  found > 0 && found >= th.t0 + th.T - 600 && beat <= th.T / 1000 + 12, beat.toFixed(1) + 's of ' + (th.T / 1000).toFixed(1) + 's rolled');
 ok('…then straight into the turns duel — no waiting screen between', await A.until(`(() => { const s = game.scene.getScene('vsbattle');
   return s.state === 'pick' && s.room.status === 'active' && (!s.waitC.visible || s.waitC.alpha < 0.05) })()`, 20000));
 const foe = JSON.parse(await A.ev(`JSON.stringify((() => { const s = game.scene.getScene('vsbattle');
@@ -670,65 +716,89 @@ ok('a REAL incoming challenge lands as the plate and its ACCEPT claims the held 
   await B.park();
   return true;
 })());
-// b) the strip: an online friend leads, the night-clocked rival follows, the
-// circle glints and is NEVER labeled online; ALL MAGES opens the sheet
+// b) THE FILL (the 10/7 build): the ground beneath the plaques seats FULL
+// replay rows from the frozen rank — friend online first (green, "online",
+// DUEL), the rival with the night-clock (AGAIN), the circle glinting and
+// NEVER labeled online. Picks freeze at create(), so the fabricated truth
+// re-enters the scene the way a real open would.
+const reMenu = async (c) => {
+  await c.ev(`(() => { const s = game.scene.getScene('vsmenu'); if (s.socialC) s.closeSocial(); s.scene.start('home'); return 1 })()`);
+  await c.until(`game.scene.isActive('home')`, 15000);
+  await c.ev(`game.scene.getScene('home').scene.start('vsmenu'); 1`);
+  const r = await c.until(MENU, 20000); await sleep(800);
+  await c.ev(`game.scene.getScene('summons').scene.pause(); 1`);
+  return r;
+};
 await A.ev(`(() => { const now = Date.now();
+  localStorage.setItem('starspellGames', JSON.stringify([])); localStorage.setItem('starspellPending', JSON.stringify([]));
+  SSNET.FR.invites = {};
   SSNET.FR.friends = { f1: { name: 'Moonlit Hare', at: now } };
   SSNET.FR.presence = Object.assign({}, SSNET.FR.presence, { f1: { name: 'Moonlit Hare', at: now } });
   SSNET.FR.recent = { r1: { name: 'Dawn Scribe', at: now - 86400000 } };
   localStorage.setItem('starspellCircle', JSON.stringify([{ uid: 'c1', name: 'Ember Sage', rating: 1000 }]));
-  const s = game.scene.getScene('vsmenu');
-  if (s.stripC) { s.stripC.destroy(); s.stripC = null; s.chipRows = null; s.stripHeadT = null; }
-  s.pendKey = ''; s.refreshPend(); return 1 })()`);
-await sleep(1200);
-const strip = await A.ev(`JSON.stringify((() => { const s = game.scene.getScene('vsmenu');
+  return 1 })()`);
+ok('the fabricated truth re-enters the ground', await reMenu(A));
+const rows8 = await A.ev(`JSON.stringify((() => { const s = game.scene.getScene('vsmenu'); const l = ssLayout(s);
   const css = (o) => { const D = game.scale.width / innerWidth;
     return o && o.input ? Math.min(o.input.hitArea.width * Math.abs(o.scaleX), o.input.hitArea.height * Math.abs(o.scaleY)) / D : 0; };
-  const chips = (s.chipRows || []).map(c => ({ kind: c.kind, name: c.name, sub: c.subT.text, tag: c.tagT.text,
-    dot: c.dot.fillColor, hit: Math.round(css(c.pill)) }));
-  return { chips, head: s.stripHeadT ? { text: s.stripHeadT.text, vis: s.stripHeadT.visible } : null,
-    allHit: Math.round(css(s.allMagesB)) } })())`).then(JSON.parse);
-ok('the strip ranks once: the online friend first (green, "online", DUEL), the rival with the night-clock (AGAIN)',
-  strip.chips.length === 2 && strip.chips[0].kind === 'friend' && strip.chips[0].sub === 'online' && strip.chips[0].dot === 0x7fe0a0
-  && strip.chips[0].tag === await A.ev(`SS_T('vsDuelTag')`)
-  && strip.chips[1].kind === 'recent' && strip.chips[1].sub === 'last night' && strip.chips[1].tag === 'AGAIN', JSON.stringify(strip.chips));
-ok('the band head speaks and every chip meets the 44-pt law',
-  strip.head && strip.head.text === await A.ev(`SS_T('vsTonight')`) && strip.head.vis === true
-  && strip.chips.every((c) => c.hit >= 43.5) && strip.allHit >= 43.5, JSON.stringify(strip));
-ok('the tick REDRESSES and never reorders: the friend goes dark in place', await (async () => {
+  const dy = (py) => (py - l.y(0)) / l.u(1);
+  const fs = (t) => Math.round(parseFloat(t.style.fontSize) / l.u(1) * 2) / 2;
+  const rows = (s.rosterRows || []).map(r => ({ kind: r.kind, name: r.nameT.text, nameFs: fs(r.nameT),
+    sub: r.subT ? r.subT.text : null, pill: r.pillT.text, pillFs: fs(r.pillT), pillW: r.pillW,
+    dot: r.dot.fillColor, cy: +dy(r.pill.y).toFixed(1), hit: Math.round(css(r.pill)), rowHit: Math.round(css(r.row)) }));
+  let head = null; const walk = (list) => list.forEach(o => { if (o.text === SS_T('vsTonight')) head = { cy: +dy(o.y).toFixed(1), vis: o.visible }; if (o.list) walk(o.list); });
+  walk(s.children.list);
+  return { rows, head, hs: +s.heroHs.toFixed(3), fold: !!(s.stripC && s.stripC.visible) } })())`).then(JSON.parse);
+ok('the rank holds on full rows: friend (green, online, DUEL) → rival (night-clock, AGAIN) → the circle — at 374 + 58i under the y330 head',
+  rows8.rows.length >= 3 && rows8.rows[0].kind === 'friend' && rows8.rows[0].sub === 'online' && rows8.rows[0].dot === 0x7fe0a0
+  && rows8.rows[0].pill === await A.ev(`SS_T('vsDuelTag')`)
+  && rows8.rows[1].kind === 'recent' && rows8.rows[1].sub === 'last night' && rows8.rows[1].pill === 'AGAIN'
+  && rows8.rows[2].kind === 'circle'
+  && rows8.rows.every((r, i) => Math.abs(r.cy - (374 + 58 * i)) < 1)
+  && rows8.head && Math.abs(rows8.head.cy - 330) < 1, JSON.stringify(rows8.rows));
+ok('names fixed 13 and pills fixed 10 in their buckets; every pill and row meets the 44-pt law; the hero breathes 1.85×',
+  rows8.rows.every((r) => r.nameFs === 13 && r.pillFs === 10 && r.pillW >= 76 && r.pillW <= 128 && r.hit >= 43.5 && r.rowHit >= 43.5)
+  && Math.abs(rows8.hs - 1.85 / 1.5) < 0.01 && rows8.fold === false, JSON.stringify(rows8.rows.map((r) => [r.nameFs, r.pillFs, r.hit])));
+ok('the tick REDRESSES and never reorders: the friend goes dark in place, the pill follows', await (async () => {
   await A.ev(`delete SSNET.FR.presence.f1; 1`);
-  return A.until(`(() => { const s = game.scene.getScene('vsmenu'); const c = (s.chipRows || [])[0];
-    return c && c.kind === 'friend' && c.dot.fillColor === 0x39406b && c.subT.text === SS_T('vsOffline')
-      && (s.chipRows || [])[1].kind === 'recent' })()`, 8000);
+  return A.until(`(() => { const s = game.scene.getScene('vsmenu'); const r = (s.rosterRows || [])[0];
+    return r && r.kind === 'friend' && r.dot.fillColor === 0x39406b && r.subT.text === SS_T('vsOffline')
+      && (s.rosterRows || [])[1].kind === 'recent' })()`, 8000);
 })());
-ok('a circle mage glints ready and is NEVER labeled online (the quiet-player law)', await (async () => {
-  // rebuild the strip with the circle mage in reach (no friend online now)
-  await A.ev(`(() => { const s = game.scene.getScene('vsmenu');
-    SSNET.FR.friends = {}; SSNET.FR.recent = {};
-    if (s.stripC) { s.stripC.destroy(); s.stripC = null; s.chipRows = null; s.stripHeadT = null; }
-    s.pendKey = ''; s.refreshPend(); return 1 })()`);
-  await sleep(1200);
-  return A.ev(`(() => { const s = game.scene.getScene('vsmenu'); const c = (s.chipRows || [])[0];
-    if (!c || c.kind !== 'circle' || c.name !== 'Ember Sage') return false;
-    if (c.dot.fillColor !== 0xffd77a) return false;               // the glint
-    if (c.subT.text !== '') return false;                          // never a status word
-    if (c.tagT.text !== SS_T('vsDuelTag')) return false;           // a gold live-duel door
-    const texts = [c.nameT.text, c.subT.text, c.tagT.text].join(' ');
-    return !/online|en línea|en ligne/i.test(texts) })()`);
+ok('a circle mage holds a FULL row: gold glint, NO sub line at all, a gold DUEL pill — never the word online', await A.ev(`(() => {
+  const s = game.scene.getScene('vsmenu'); const r = (s.rosterRows || []).find(x => x.kind === 'circle');
+  if (!r || r.name !== 'Ember Sage') return false;
+  if (r.dot.fillColor !== 0xffd77a) return false;               // the glint
+  if (r.subT !== null) return false;                             // no sub object — the fiction holds
+  if (r.pillT.text !== SS_T('vsDuelTag')) return false;          // a gold live-duel door
+  return !/online|en línea|en ligne/i.test(r.nameT.text + ' ' + r.pillT.text) })()`));
+// c) THE FOLD: four standing rows compress the people into DETAGGED chips
+// (name at a fixed 10, the chip is the button) seated at 581; ALL MAGES
+// survives only here; six rows fold the band to three plaques + "+3 more"
+ok('four rows fold to detagged chips at 581; › ALL MAGES opens the sheet from the fold (a real tap)', await (async () => {
+  await A.ev(`(() => { const now = Date.now();
+    localStorage.setItem('starspellGames', JSON.stringify([1,2,3].map(i => ({ code: 'FG' + i + 'X', foe: { id: 'g' + i, name: 'Mage ' + i }, at: now - i * 1000, turn: 'g' + i, status: 'active', held: 0, seen: 0, settled: 0 }))));
+    SSNET.FR.invites = { xq1: { code: 'QMRW', mode: 'turns', at: Date.now(), name: 'Umbral Raven' } }; return 1 })()`);
+  if (!await reMenu(A)) return false;
+  const f4 = await A.ev(`JSON.stringify((() => { const s = game.scene.getScene('vsmenu'); const l = ssLayout(s);
+    const dy = (py) => (py - l.y(0)) / l.u(1);
+    const fs = (t) => Math.round(parseFloat(t.style.fontSize) / l.u(1) * 2) / 2;
+    const chips = (s.chipRows || []).map(c => ({ name: c.nameT.text, fs: fs(c.nameT), tag: !!c.tagT, sub: !!c.subT }));
+    return { n: (s.pendRows || []).length, rosterN: (s.rosterRows || []).length, chips,
+      stripVis: !!(s.stripC && s.stripC.visible), stripCy: s.stripC ? +dy(s.stripC.y + l.u(26)).toFixed(1) : -1,
+      hs: +s.heroHs.toFixed(3), tonightShown: (() => { let seen = false; const w = (list) => list.forEach(o => { if (o.text === SS_T('vsTonight') && o.visible) seen = true; if (o.list) w(o.list); }); w(s.pendC.list); return seen })() } })())`).then(JSON.parse);
+  if (!(f4.n === 4 && f4.rosterN === 0 && f4.stripVis === true && Math.abs(f4.stripCy - 581) < 1
+    && f4.chips.length === 2 && f4.chips.every((c) => !c.tag && !c.sub && c.fs === 10)
+    && Math.abs(f4.hs - 1) < 0.01 && !f4.tonightShown)) { ok('  (4-row fold shape)', false, JSON.stringify(f4)); return false; }
+  if (!await A.tapUntil(`game.scene.getScene('vsmenu').allMagesB`, SHEET, 10000)) return false;
+  await A.ev(`(() => { const s = game.scene.getScene('vsmenu'); if (s.socialC) s.closeSocial(); return 1 })()`);
+  return true;
 })());
-ok('› ALL MAGES opens the full social sheet (a real tap)', await A.tapUntil(`game.scene.getScene('vsmenu').allMagesB`, SHEET, 10000));
-await A.ev(`(() => { const s = game.scene.getScene('vsmenu'); if (s.socialC) s.closeSocial(); return 1 })()`);
-// c) the fold and the '+%1 more' row
-ok('four rows fold the strip to chips alone; six rows fold the band to three plaques + "+3 more"', await (async () => {
-  const G4 = `[1,2,3].map(i => ({ code: 'FG' + i + 'X', foe: { id: 'g' + i, name: 'Mage ' + i }, at: now - i * 1000, turn: 'g' + i, status: 'active', held: 0, seen: 0, settled: 0 }))`;
-  await A.ev(FAB(G4, `[]`, `{ xq1: { code: 'QMRW', mode: 'turns', at: Date.now(), name: 'Umbral Raven' } }`));
-  await sleep(1300);
-  const f4 = await A.ev(`JSON.stringify((() => { const s = game.scene.getScene('vsmenu');
-    return { n: (s.pendRows || []).length, headVis: s.stripHeadT ? s.stripHeadT.visible : null } })())`).then(JSON.parse);
-  if (!(f4.n === 4 && f4.headVis === false)) { ok('  (4-row fold)', false, JSON.stringify(f4)); return false; }
-  const G6 = `[1,2,3,4,5].map(i => ({ code: 'FG' + i + 'X', foe: { id: 'g' + i, name: 'Mage ' + i }, at: now - i * 1000, turn: 'g' + i, status: 'active', held: 0, seen: 0, settled: 0 }))`;
-  await A.ev(FAB(G6, `[]`, `{ xq1: { code: 'QMRW', mode: 'turns', at: Date.now(), name: 'Umbral Raven' } }`));
-  await sleep(1300);
+ok('six rows fold the band to three plaques + "+3 more" with every pip lit', await (async () => {
+  await A.ev(`(() => { const now = Date.now();
+    localStorage.setItem('starspellGames', JSON.stringify([1,2,3,4,5].map(i => ({ code: 'FG' + i + 'X', foe: { id: 'g' + i, name: 'Mage ' + i }, at: now - i * 1000, turn: 'g' + i, status: 'active', held: 0, seen: 0, settled: 0 }))));
+    SSNET.FR.invites = { xq1: { code: 'QMRW', mode: 'turns', at: Date.now(), name: 'Umbral Raven' } }; return 1 })()`);
+  if (!await reMenu(A)) return false;
   return A.ev(`(() => { const s = game.scene.getScene('vsmenu');
     const texts = s.pendC.list.filter(o => o.text).map(o => o.text);
     const pips = (s.capPips || []).filter(p => p.fillColor === 0xffd77a).length;
@@ -773,22 +843,38 @@ ok('a blocked sky boots to the meadow in local mode', await B.nav(BASE + '?fps=0
 await B.ev(`game.scene.getScene('home').scene.start('vsmenu'); 1`);
 ok('the versus page still BUILDS — the sky is local', await B.until(`game.scene.isActive('vsmenu') && !!game.scene.getScene('vsmenu').retryB`, 20000));
 await sleep(900);
-const off = await B.ev(`JSON.stringify((() => { const s = game.scene.getScene('vsmenu');
+const off = await B.ev(`JSON.stringify((() => { const s = game.scene.getScene('vsmenu'); const l = ssLayout(s);
+  const dy = (py) => (py - l.y(0)) / l.u(1);
+  const fs = (t) => Math.round(parseFloat(t.style.fontSize) / l.u(1) * 2) / 2;
   const walk = (list, out) => { list.forEach(o => { if (o.text !== undefined && o.text) out.push(o.text); if (o.list) walk(o.list, out); }); return out; };
   const css = (o) => { const D = game.scale.width / innerWidth;
     return o && o.input ? Math.min(o.input.hitArea.width * Math.abs(o.scaleX), o.input.hitArea.height * Math.abs(o.scaleY)) / D : 0; };
+  const g = s.ghostC ? s.ghostC.list : [];
+  const beds = g.filter(o => o.texture && /^btn(dark)?@344x50$/.test(o.texture.key)).map(o => +dy(o.y).toFixed(1));
+  const names = g.filter(o => o.text && fs(o) === 13).map(o => o.text);
+  const subs = g.filter(o => o.text && fs(o) === 9.5).map(o => o.text);
+  const dots = g.filter(o => o.fillColor !== undefined && o.radius).map(o => o.fillColor);
+  const pills = g.filter(o => o.texture && /^btn/.test(o.texture.key) && !/344x50/.test(o.texture.key)).length;
   return { texts: walk(s.children.list, []), chip: !!s.idChipT, heroA: [s.heroL.alpha, s.heroR.alpha],
     zen: s.zenith ? (s.zenith.__ssBaseTex || s.zenith.texture.key) : null, zenTint: s.zenith ? s.zenith.tintTopLeft : 0,
-    ghostA: s.ghostT ? +s.ghostT.alpha.toFixed(2) : -1, retryHit: Math.round(css(s.retryB)),
+    gA: s.ghostC ? +s.ghostC.alpha.toFixed(2) : -1, beds, names, subs, dots, pills,
+    retryHit: Math.round(css(s.retryB)), retryCy: +dy(s.retryB.y).toFixed(1), safeB: +s.safeB.toFixed(1),
+    hs: +s.heroHs.toFixed(3), capVis: s.capT ? s.capT.visible : null,
     wm: s.wordmark ? s.wordmark.texture.key : null } })())`).then(JSON.parse);
-ok('the shipped couplet stands in its rose ink, the wordmark above it',
-  off.texts.includes(await B.ev(`SS_T('vsNoSky')`)) && off.wm === 'gold@23@VERSUS');
-ok('the ghost ledger: the standing duels\' names at low alpha + the return line',
-  off.texts.includes('Quiet Owl · Umbral Raven') && off.texts.includes(await B.ev(`SS_T('vsGhost')`)) && off.ghostA === 0.55,
-  JSON.stringify(off.texts));
-ok('TRY THE SKY AGAIN stands at 44-pt; no identity chip on a dead sky', off.texts.includes(await B.ev(`SS_T('vsRetry')`)) && off.retryHit >= 43.5 && off.chip === false);
-ok('the Duelists stand dimmed and the shared star is unlit',
-  off.heroA[0] === 0.45 && off.heroA[1] === 0.45 && off.zen === 'dot' && off.zenTint === 0x4a5480, JSON.stringify(off.heroA));
+ok('the shipped couplet stands in its rose ink, the wordmark above it, the caption dark',
+  off.texts.includes(await B.ev(`SS_T('vsNoSky')`)) && off.wm === 'gold@23@VERSUS' && off.capVis === false);
+ok('the ghosts got their ROWS (the 10/7 build): beds at 430 + 58i, slate dots, names at 13, the duels\' own fiction as subs, NO pills, α .55 — and the vsGhost line is dead',
+  off.beds.length === 2 && off.beds.every((y, i) => Math.abs(y - (430 + 58 * i)) < 1)
+  && off.names.includes('Quiet Owl') && off.names.includes('Umbral Raven')
+  && off.subs.length === 2 && off.dots.every((d) => d === 0x39406b) && off.pills === 0 && off.gA === 0.55
+  && !off.texts.includes(await B.ev(`SS_T('vsGhost')`)),
+  JSON.stringify([off.beds, off.names, off.subs]));
+ok('TRY THE SKY AGAIN anchors to the true foot (safeB−158) at 44-pt; no identity chip on a dead sky',
+  off.texts.includes(await B.ev(`SS_T('vsRetry')`)) && off.retryHit >= 43.5 && Math.abs(off.retryCy - (off.safeB - 158)) < 1
+  && off.chip === false, JSON.stringify([off.retryCy, off.safeB]));
+ok('the Duelists stand dimmed at the offline 2.0× and the shared star is unlit',
+  off.heroA[0] === 0.45 && off.heroA[1] === 0.45 && off.zen === 'dot' && off.zenTint === 0x4a5480
+  && Math.abs(off.hs - 2 / 1.5) < 0.01, JSON.stringify([off.heroA, off.hs]));
 await B.send('Network.setBlockedURLs', { urls: [] });
 await B.park();
 
@@ -818,11 +904,11 @@ console.log('— THE ES DRESS —');
 await A.seed(BOOT('x2', null));
 ok('es boot lands the funnel', await A.nav(BASE + '?mpuid=' + VPU + '&fps=0&lang=es') && await A.until(READY, 60000) && await toMenu(A)
   && await A.ev(`game.scene.getScene('vsmenu').doorsMode === 'funnel'`));
-ok('the es funnel speaks Spanish: the fiction, the promoted door, the add door', await (async () => {
+ok('the es funnel speaks Spanish: the fiction, the promoted door, the add door — label alone (its subline died with the quiet ground)', await (async () => {
   const tx = await deepTexts(A);
   return tx.includes('aún sin rivales — tu primer duelo escribe aquí el primer nombre')
     && tx.includes(await A.ev(`SS_T('vsChWorld')`))
-    && tx.includes('AÑADIR AMIGO POR NOMBRE') && tx.includes('busca un mago entre las estrellas');
+    && tx.includes('AÑADIR AMIGO POR NOMBRE') && !tx.includes('busca un mago entre las estrellas');
 })());
 ok('the sheet speaks Spanish through the add door', await (async () => {
   if (!await openSheetFunnel(A)) return false;

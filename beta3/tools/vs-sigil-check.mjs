@@ -209,7 +209,7 @@ await L.seed(`try { sessionStorage.setItem('beta3.skipIntro', '1'); } catch (e) 
 ok('the local sky boots (Firebase blocked — no live rows from this client)',
   await L.nav(BASE + '?fps=0') && await L.until(`!!window.game && typeof SS_SIGILS !== 'undefined' && game.scene.isActive('home')`, 45000));
 ok('the game rides the local net', await L.ev(`SSNET.mode`) === 'local', await L.ev(`SSNET.mode`));
-ok('BUILD names this card\'s version', /v0\.111\./.test(await L.ev(`BUILD`)), await L.ev(`BUILD`));   // re-pinned by the v0.111.x pick-rows card (painted frames re-audit; dot-releases of the same card stay in-pin)
+ok('BUILD names a version that carries the vs-sigil law', /v0\.11[1-9]\./.test(await L.ev(`BUILD`)), await L.ev(`BUILD`));   // widened by the v0.112.0 dueling-ground card (zero pick-surface bytes; the law rides every later v0.11x)
 ok('the live pool IS the five survivors (SS_VS_SIGILS, order-free)',
   await L.ev(`JSON.stringify([...SS_VS_SIGILS].sort())`) === JSON.stringify([...FIVE].sort()),
   await L.ev(`SS_VS_SIGILS.join(' ')`));

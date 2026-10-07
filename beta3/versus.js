@@ -57,6 +57,14 @@ const VS_HP = 60;
 const VS_CORR_HP = 150;
 const VS_TURN_CASTS = 3;
 const VS_CAP = 5;   // ongoing duels at most, friend + worldwide together (Skylar's five)
+/* ---------- the filled ground (10/7 dueling-ground build) ----------
+   The vsmenu middle fills by law (the 9/22 design, Skylar's 10/7 go): full
+   replay ROWS drawn from the people the game already knows — friends online
+   → recent rivals → mages of the circle — as many as the ground grants.
+   Q2 ruled FILL WITH THE CIRCLE ★: on a quiet night up to this many circle
+   mages hold full rows, dressed byte-alike the humans. Skylar's rein —
+   "AT MOST ONE STRANGER" — is this one constant. */
+const VS_FILL_CIRCLE = 3;
 // a rematch wait is freed by the rival's word (rematchNo on the old room) or,
 // when no word can ever come (network death, a force-quit), by this belt —
 // no waiting screen in versus may be unescapable (9/8 card 02). ?rmbelt=MS
@@ -133,10 +141,12 @@ class VsMenu extends Phaser.Scene {
     this.frOff = null; this.frTimer = null;
     this.busyC = false;
     this.pendC = null; this.pendRows = null; this.pendKey = '';
-    this.doorsC = null; this.doorsMode = null; this.stripC = null; this.chipRows = null; this.stripHeadT = null;
+    this.doorsC = null; this.doorsMode = null; this.stripC = null; this.chipRows = null;
+    this.rosterRows = null; this.fillPicks = null; this.capT = null;
     this.chFriendB = null; this.chWorldB = null; this.addDoorB = null; this.invDoorB = null; this.retryB = null;
-    this.noteT = null; this.whisperT = null; this.idChipT = null; this.idChipB = null;
+    this.noteT = null; this.idChipT = null; this.idChipB = null;
     this.zenith = null; this.zenithHalo = null; this.zenBreath = null; this.zenFlare = 0;
+    this.heroHs = 1; this.heroSet = false; this.zenSizeTw = null;
     const back = ssTxt(this, l.x(-195), l.y(24), '‹ HOME', l.u(14), '#9fb0e8').setOrigin(0, 0.5).setInteractive({ useHandCursor: true });
     back.on('pointerdown', () => { SFX.ui(); this.scene.start('home'); });
 
@@ -149,7 +159,10 @@ class VsMenu extends Phaser.Scene {
     const woff = (wm.w * wsc) / 2 + 21;
     this.add.image(l.x(-woff), l.y(62), vsSwordsTex(this)).setDisplaySize(l.u(20), l.u(20)).setAlpha(0.95);
     this.add.image(l.x(woff), l.y(62), vsSwordsTex(this)).setDisplaySize(l.u(20), l.u(20)).setAlpha(0.95);
-    ssTxt(this, l.x(0), l.y(94), SS_T('vsAsync'), l.u(10.5), '#c9b676', 'italic').setOrigin(0.5);
+    // the header caption teaches what a duel is — on the FUNNEL only (the
+    // quiet ground, Wyatt's 9/22 cuts): everywhere else the wordmark stands
+    // alone and buildDoors flips this line's visibility
+    this.capT = ssTxt(this, l.x(0), l.y(94), SS_T('vsAsync'), l.u(10.5), '#c9b676', 'italic').setOrigin(0.5).setVisible(false);
 
     const offline = SSNET.mode === 'local';
     this.buildHero(l, offline);
@@ -166,22 +179,33 @@ class VsMenu extends Phaser.Scene {
     });
 
     if (offline) {
-      // STILL A PLACE (the review's offline state): the sky is local, so it
-      // still builds — the Duelists dimmed, the shared star unlit, the
-      // shipped couplet in its rose ink, then the ghost ledger: the standing
-      // duels this device remembers, at low alpha, waiting on the connection.
-      ssTxt(this, l.x(0), l.y(330), SS_T('vsNoSky'), l.u(14), '#8c5a5a', 'italic').setOrigin(0.5).setAlign('center');
-      const ghosts = [...new Set(vsGameRows().map((r) => r.name))].slice(0, 4);
-      if (ghosts.length) {
-        this.ghostT = ssTxt(this, l.x(0), l.y(408), ghosts.join(' · '), l.u(10.5), '#8a94c4').setOrigin(0.5).setAlpha(0.55);
-        while (this.ghostT.width > l.u(340) && this.ghostT.text.length > 4) this.ghostT.setText(this.ghostT.text.slice(0, -3) + '…');
-        ssTxt(this, l.x(0), l.y(428), SS_T('vsGhost'), l.u(8.5), '#5a6390', 'italic').setOrigin(0.5);
-      }
+      // STILL A PLACE (the review's offline state), FURNISHED now (the 10/7
+      // build): the Duelists dimmed at 2.0×, the shared star unlit, the
+      // shipped couplet in its rose ink — and the ghost ledger is ROWS in
+      // the replay-row anatomy: slate dot, the full name, the duel's own
+      // status fiction as the sub, no pills (nothing taps without a sky).
+      // The old ghost-line whisper died with the quiet ground — the rows speak.
+      this.setHeroScale(2);
+      ssTxt(this, l.x(0), l.y(372), SS_T('vsNoSky'), l.u(14), '#8c5a5a', 'italic').setOrigin(0.5).setAlign('center');
       // TRY THE SKY AGAIN — the one honest retry is a fresh boot (connect()
-      // is once-per-load by design), so the door reloads the page in place
-      const rb = this.retryB = this.add.image(l.x(0), l.y(496), ssBtn(this, true, 300, 54)).setDisplaySize(l.u(300), l.u(54)).setInteractive({ useHandCursor: true });
-      ssTxt(this, l.x(0), l.y(496), SS_T('vsRetry'), l.u(12.5), '#c9d0f0').setOrigin(0.5);
+      // is once-per-load by design), so the door reloads the page in place;
+      // it anchors to the true foot now (safeB−158, the door family's seat)
+      const rb = this.retryB = this.add.image(l.x(0), l.y(safeB - 158), ssBtn(this, true, 300, 54)).setDisplaySize(l.u(300), l.u(54)).setInteractive({ useHandCursor: true });
+      ssTxt(this, l.x(0), l.y(safeB - 158), SS_T('vsRetry'), l.u(12.5), '#c9d0f0').setOrigin(0.5);
       rb.on('pointerdown', () => { SFX.ui(); try { location.reload(); } catch (e) { } });
+      // the ghost rows: as many as keep ≥8 above the retry door (the air
+      // law's furniture gap), max four — each a dimmed replay row
+      const gC = this.ghostC = this.add.container(0, 0).setAlpha(0.55);
+      for (let gi = 0; gi < Math.min(4, vsGameRows().length); gi++) {
+        const yD = 430 + gi * 58;
+        if (yD + 25 > safeB - 158 - 27 - 8) break;
+        const r = vsGameRows()[gi], y = l.y(yD);
+        const core = vsRowCore(this, l, {
+          dotX: l.x(-152), nameX: l.x(-140), y, dotColor: 0x39406b,
+          name: r.name, nameCap: 168, sub: this.rowFiction(r), subColor: '#8a94c4',
+        });
+        gC.add([this.add.image(l.x(0), y, ssBtn(this, true, 344, 50)).setDisplaySize(l.u(344), l.u(50)), ...core.items]);
+      }
       return;
     }
     try { localStorage.removeItem('beta3.vsmode'); } catch (e) { }   // the mode choice is retired — sweep the dead key
@@ -199,12 +223,15 @@ class VsMenu extends Phaser.Scene {
     ssHitPad(idB, 44);
     idB.on('pointerdown', () => { SFX.ui(); ssRatingCard(this, { uid: vsUid(), name: vsName() }); });
 
-    // the record whisper over the fireflies — the one synced record the game
-    // keeps; at zero wins the fireflies own the foot alone
-    this.whisperT = ssTxt(this, l.x(0), l.y(safeB - 44), '', l.u(9.5), '#c9b676').setOrigin(0.5).setAlpha(0.85);
+    // (the ✦-victories whisper died with the quiet ground — Wyatt's 9/22
+    // word; noteT keeps the safeB−44 seat for transient notes alone)
 
-    // the middle of the page — plaques, strip, doors — rebuilds itself when
-    // its truth changes; the 1s tick also redresses chips and the zenith star
+    // THE FILL's picks — the strip's own rank grown to the ground: ranked
+    // ONCE per page open and FROZEN; geometry only chooses how many show
+    this.fillPicks = this.rankPicks();
+
+    // the middle of the page — plaques, rows, doors — rebuilds itself when
+    // its truth changes; the 1s tick also redresses rows and the zenith star
     this.pendC = this.add.container(0, 0);
     this.refreshPend();
     this.time.addEvent({ delay: 1000, loop: true, callback: () => this.refreshPend() });
@@ -214,16 +241,14 @@ class VsMenu extends Phaser.Scene {
     if (FRDEMO === 'host' || FRDEMO === 'invite') this.time.delayedCall(800, () => this.frDemo());
   }
   // feedback lands where the eye is: on the sheet's own line while it is
-  // open, on the page line otherwise (the whisper steps aside for a note)
+  // open, on the page line otherwise
   note(s, ms) {
     const t = (this.socialC && this.shNoteT && this.shNoteT.active) ? this.shNoteT : this.noteT;
     if (!t || !t.active) return;
     t.setText(s || '');
-    if (t === this.noteT && this.whisperT && this.whisperT.active) this.whisperT.setVisible(!s && !!this.whisperT.text);
     if (this.noteTimer) { this.noteTimer.remove(false); this.noteTimer = null; }
     if (s && ms) this.noteTimer = this.time.delayedCall(ms, () => {
       if (t.active) t.setText('');
-      if (t === this.noteT && this.whisperT && this.whisperT.active) this.whisperT.setVisible(!!this.whisperT.text);
     });
   }
 
@@ -242,7 +267,9 @@ class VsMenu extends Phaser.Scene {
     const c = this.socialC = this.add.container(0, 0).setDepth(600);
     const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0.62).setInteractive();
     veil.on('pointerdown', () => this.closeSocial());
-    const PH = 380, top = this.shTop = 400 - PH / 2;
+    // the panel regrown (the 10/7 build, slice E): 380 → 448 tall — the
+    // freed height seats a FOURTH recent rival at the roomier 38 pitch
+    const PH = 448, top = this.shTop = 400 - PH / 2;
     c.add(veil);
     c.add(this.add.image(l.x(0), l.y(400), 'endpanel').setDisplaySize(l.u(372), l.u(PH)));
     const head = ssTxt(this, l.x(0), l.y(top + 26), SS_T('vsFriends'), l.u(12), '#c9b676').setOrigin(0.5);
@@ -261,13 +288,13 @@ class VsMenu extends Phaser.Scene {
     // share carries the STARSPELL app link (VS_APP_URL), never a web page.
     // pointerUP law: iOS grants share/clipboard only inside a user activation.
     const invB = this.add.image(l.x(0), l.y(top + PH - 44), ssBtn(this, false, 320, 54)).setDisplaySize(l.u(320), l.u(54)).setInteractive({ useHandCursor: true });
-    const invT = ssTxt(this, l.x(0), l.y(top + PH - 53), SS_T('vsInviteNew'), l.u(13.5), BTN_INK()).setOrigin(0.5);
+    // the invite plate carries its label alone, centered (the quiet ground:
+    // every door drops its subline — the sub key goes unread)
+    const invT = ssTxt(this, l.x(0), l.y(top + PH - 44), SS_T('vsInviteNew'), l.u(13.5), BTN_INK()).setOrigin(0.5);
     for (let fs = 13.5; invT.width > l.u(296) && fs > 9; fs -= 0.5) invT.setFontSize(l.u(fs));
-    const invS = ssTxt(this, l.x(0), l.y(top + PH - 33), SS_T('vsInviteNewSub'), l.u(9), BTN_INK2(), 'italic').setOrigin(0.5);
-    for (let fs = 9; invS.width > l.u(300) && fs > 7; fs -= 0.5) invS.setFontSize(l.u(fs));
     vsOnTap(invB, () => { SFX.ensure(); SFX.ui(); this.inviteNew(); });
     this.invB = invB;
-    c.add([invB, invT, invS]);
+    c.add([invB, invT]);
     this.shNoteT = ssTextBlock(this, l.x(0), l.y(top + PH + 22), '', {
       fontSize: l.u(10.5) + 'px', color: '#c9b676', fontStyle: 'italic', shadow: true,
       wrapW: l.u(340), align: 'center', ox: 0.5, oy: 0.5,
@@ -303,38 +330,37 @@ class VsMenu extends Phaser.Scene {
     const shown = friends.length > ROWS ? friends.slice(0, ROWS - 1) : friends;
     shown.forEach((f, i) => {
       const y = rowY(i);
-      const dot = this.add.circle(l.x(-160), y, l.u(4.5), f.online ? 0x7fe0a0 : 0x39406b);
-      if (f.online) {
-        dot.setStrokeStyle(l.u(1), 0xbfffd8, 0.6);
-        this.tweens.add({ targets: dot, alpha: 0.45, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-      }
-      items.push(dot);
-      const nm = ssTxt(this, l.x(-146), y - l.u(7), f.name, l.u(13), f.online ? '#f0e8d2' : '#a9a99a').setOrigin(0, 0.5).setInteractive({ useHandCursor: true });
-      while (nm.width > l.u(118) && nm.text.length > 2) nm.setText(nm.text.slice(0, -2) + '…');
-      ssHitPad(nm, 30);
-      nm.on('pointerdown', () => ssRatingCard(this, { uid: f.id, name: f.name }));
-      items.push(nm);
       const p = FR.presence[f.id];
       const status = f.online ? (f.busy ? SS_T('vsInDuel') : SS_T('vsOnline'))
         : (p && p.at ? SS_T('vsSeen', vsAgo(Date.now() - p.at)) : SS_T('vsOffline'));
-      items.push(ssTxt(this, l.x(-146), y + l.u(9), status, l.u(9), f.online ? (f.busy ? '#e8a87f' : '#7fe0a0') : '#5a6390', 'italic').setOrigin(0, 0.5));
+      // the shared row anatomy (§III — one builder serves page and sheet)
+      const core = vsRowCore(this, l, {
+        dotX: l.x(-160), nameX: l.x(-146), y, dotColor: f.online ? 0x7fe0a0 : 0x39406b,
+        name: f.name, nameCap: 128, nameColor: f.online ? '#f0e8d2' : '#a9a99a',
+        sub: status, subColor: f.online ? (f.busy ? '#e8a87f' : '#7fe0a0') : '#5a6390',
+      });
+      if (f.online) {
+        core.dot.setStrokeStyle(l.u(1), 0xbfffd8, 0.6);
+        this.tweens.add({ targets: core.dot, alpha: 0.45, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      }
+      core.nameT.setInteractive({ useHandCursor: true });
+      ssHitPad(core.nameT, 30);
+      core.nameT.on('pointerdown', () => ssRatingCard(this, { uid: f.id, name: f.name }));
+      items.push(...core.items);
       // every friend row carries the challenge (Skylar 9/2): the drawn glyph
-      // + the button. Ready = gold; away or mid-duel = the dark dress, and
-      // the tap lands the standing summons the by-name door already speaks.
+      // + the bucket pill. Ready = gold; away or mid-duel = the dark dress,
+      // and the tap lands the standing summons the by-name door speaks.
       const ready = f.online && !f.busy;
       const glyph = this.add.image(l.x(36), y, vsSwordsTex(this)).setDisplaySize(l.u(20), l.u(20)).setAlpha(ready ? 1 : 0.55);
       items.push(glyph);
-      const cb = this.add.image(l.x(102), y, ssBtn(this, !ready, 96, 30)).setDisplaySize(l.u(96), l.u(30)).setInteractive({ useHandCursor: true });
-      ssHitPad(cb, 30);
-      const ct = ssTxt(this, l.x(102), y, SS_T('vsChallenge'), l.u(10), ready ? BTN_INK() : '#9fb0e8').setOrigin(0.5);
-      for (let fs = 10; ct.width > l.u(88) && fs > 7; fs -= 0.5) ct.setFontSize(l.u(fs));
-      cb.on('pointerdown', () => { SFX.ensure(); SFX.ui(); this.challenge({ id: f.id, name: f.name, away: !f.online, busy: f.online && f.busy }); });
-      items.push(cb, ct);
+      const pill = vsPill(this, l, l.x(150), y, SS_T('vsChallenge'), ready, 34);
+      pill.b.on('pointerdown', () => { SFX.ensure(); SFX.ui(); this.challenge({ id: f.id, name: f.name, away: !f.online, busy: f.online && f.busy }); });
+      items.push(pill.b, pill.t);
       const rm = ssTxt(this, l.x(176), y, '✕', l.u(11), '#39406b').setOrigin(0.5).setInteractive({ useHandCursor: true });
       ssHitPad(rm, 30);
       rm.on('pointerdown', () => { SFX.ui(); FR.remove(f.id); });
       items.push(rm);
-      this.frRows.push({ id: f.id, name: f.name, cb, ct, glyph, rm, nameT: nm, online: f.online, busy: f.busy });
+      this.frRows.push({ id: f.id, name: f.name, cb: pill.b, ct: pill.t, glyph, rm, nameT: core.nameT, online: f.online, busy: f.busy });
     });
     if (friends.length > ROWS) {
       items.push(ssTxt(this, l.x(0), rowY(ROWS - 1), SS_T('vsMore', friends.length - shown.length), l.u(10.5), '#5a6390', 'italic').setOrigin(0.5));
@@ -348,7 +374,7 @@ class VsMenu extends Phaser.Scene {
        CIRCLE answers through the rival engine. A first-night player sees one
        quiet line. `+` befriends without a duel. */
     items.push(ssTxt(this, l.x(0), l.y(top + 170), SS_T('vsRecentHead'), l.u(10.5), '#c9b676').setOrigin(0.5));
-    const recent = FR.recentList(3);
+    const recent = FR.recentList(4);   // the regrown panel seats a FOURTH rival
     this.recentRows = [];
     if (!recent.length) {
       items.push(ssTextBlock(this, l.x(0), l.y(top + 228), SS_T('vsNoRecent'), {
@@ -358,38 +384,36 @@ class VsMenu extends Phaser.Scene {
     }
     const circle = (typeof SS_RIVAL !== 'undefined') ? SS_RIVAL.circle() : [];
     recent.forEach((r, i) => {
-      const y = l.y(top + 196 + i * 32);
+      const y = l.y(top + 196 + i * 38);
       const ofCircle = circle.some((c) => c.uid === r.id);
       const lit = r.online || ofCircle;   // a mage of the circle always answers — it glints ready
-      const dot = this.add.circle(l.x(-160), y, l.u(4), lit ? (r.busy ? 0xe8a87f : 0x7fe0a0) : 0x39406b);
+      // the same anatomy as everywhere (§III): name 13 over the night-clock
+      // sub; the circle wears its gold glint here too, never a status word
+      const core = vsRowCore(this, l, {
+        dotX: l.x(-160), nameX: l.x(-146), y,
+        dotColor: ofCircle ? 0xffd77a : r.online ? (r.busy ? 0xe8a87f : 0x7fe0a0) : 0x39406b,
+        name: r.name, nameCap: 128, nameColor: lit ? '#f0e8d2' : '#a9a99a',
+        sub: vsNightsAgo(Date.now() - r.at), subColor: '#5a6390',
+      });
       if (lit && !r.busy) {
-        dot.setStrokeStyle(l.u(1), 0xbfffd8, 0.6);
-        this.tweens.add({ targets: dot, alpha: 0.45, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+        core.dot.setStrokeStyle(l.u(1), 0xbfffd8, 0.6);
+        this.tweens.add({ targets: core.dot, alpha: 0.45, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
       }
-      items.push(dot);
-      const nm = ssTxt(this, l.x(-146), y, r.name, l.u(12), lit ? '#f0e8d2' : '#a9a99a').setOrigin(0, 0.5);
-      while (nm.width > l.u(118) && nm.text.length > 2) nm.setText(nm.text.slice(0, -2) + '…');
-      items.push(nm);
-      const ago = ssTxt(this, l.x(-22), y, vsNightsAgo(Date.now() - r.at), l.u(9), '#5a6390', 'italic').setOrigin(0, 0.5);
-      while (ago.width > l.u(78) && ago.text.length > 3) ago.setText(ago.text.slice(0, -2) + '…');
-      items.push(ago);
-      // the whole row is the door; the small gold AGAIN says so
-      const ab = this.add.image(l.x(112), y, ssBtn(this, false, 76, 24)).setDisplaySize(l.u(76), l.u(24)).setInteractive({ useHandCursor: true });
-      ssHitPad(ab, 30);
-      const at = ssTxt(this, l.x(112), y, SS_T('vsAgain'), l.u(9.5), BTN_INK()).setOrigin(0.5);
-      for (let fs = 9.5; at.width > l.u(70) && fs > 7; fs -= 0.5) at.setFontSize(l.u(fs));
+      items.push(...core.items);
+      // the whole row is the door; the gold AGAIN (a bucket pill) says so
+      const pill = vsPill(this, l, l.x(150), y, SS_T('vsAgain'), lit, 34);
       const go = () => { SFX.ensure(); SFX.ui(); this.rematch(r, ofCircle); };
-      ab.on('pointerdown', go);
-      const zone = this.add.zone(l.x(-30), y, l.u(280), l.u(28)).setOrigin(0.5).setInteractive({ useHandCursor: true });
+      pill.b.on('pointerdown', go);
+      const zone = this.add.zone(l.x(-30), y, l.u(280), l.u(34)).setOrigin(0.5).setInteractive({ useHandCursor: true });
       zone.on('pointerdown', go);
-      items.push(zone, ab, at);
+      items.push(zone, pill.b, pill.t);
       if (!r.friend) {
         const add = ssTxt(this, l.x(176), y, '+', l.u(14), '#9fb0e8').setOrigin(0.5).setInteractive({ useHandCursor: true });
         ssHitPad(add, 30);
         add.on('pointerdown', () => { SFX.ui(); add.setColor('#5a6390'); FR.add(r.id, r.name).then(() => vsNotify(SS_T('frAdded', r.name))); });
         items.push(add);
       }
-      this.recentRows.push({ id: r.id, name: r.name, row: zone, again: ab, nameT: nm, agoT: ago, circle: ofCircle });
+      this.recentRows.push({ id: r.id, name: r.name, row: zone, again: pill.b, nameT: core.nameT, agoT: core.subT, circle: ofCircle });
     });
     this.frC.add(items);
   }
@@ -474,6 +498,41 @@ class VsMenu extends Phaser.Scene {
       this.zenBreath = this.tweens.add({ targets: this.zenithHalo, alpha: 0.08, duration: 2600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     }
   }
+  /* ---------- the hero flex (Q4, FLEX AS SHOWN ★) ----------
+     THE DUELISTS own the crown slack: 1.5× with plaques standing (the
+     shipped base), 1.85× at zero plaques, 2.0× on the funnel and offline
+     pages. The shared zenith star is the anchor — it keeps its seat while
+     the mages push down and out — and the fly-in rides inside the scaled
+     containers for free. The first seat snaps (it lands before the first
+     paint); live flips glide; reduced motion always snaps. */
+  setHeroScale(k) {
+    const hs = k / 1.5;
+    if (!this.heroL || !this.heroL.active) return;
+    if (Math.abs(hs - this.heroHs) < 0.001) { this.heroSet = true; return; }
+    const l = ssLayout(this);
+    const snap = !this.heroSet || ssReduceMotion();
+    this.heroHs = hs; this.heroSet = true;
+    const seats = [
+      [this.heroL, l.x(-24 * hs), l.y(128 + 84 * hs), hs],
+      [this.heroR, l.x(24 * hs), l.y(128 + 84 * hs), -hs],
+    ];
+    for (const [c, x, y, sx] of seats) {
+      if (!c || !c.active) continue;
+      if (snap) { c.setPosition(x, y); c.setScale(sx, hs); }
+      else this.tweens.add({ targets: c, x, y, scaleX: sx, scaleY: hs, duration: 420, ease: 'Sine.easeInOut' });
+    }
+    if (this.zenith && this.zenith.active) {
+      if (this.zenithHalo) {
+        // one size truth: a running flex tween dies before anyone (the flex
+        // or the flare) seats a new size — they were fighting over the star
+        if (this.zenSizeTw) { this.zenSizeTw.stop(); this.zenSizeTw = null; }
+        const zw = l.u((this.zenFlare ? 34 : 24) * hs);
+        if (snap) this.zenith.setDisplaySize(zw, zw);
+        else this.zenSizeTw = this.tweens.add({ targets: this.zenith, displayWidth: zw, displayHeight: zw, duration: 420, ease: 'Sine.easeInOut' });
+        this.zenithHalo.setScale(l.u(0.5) * hs);
+      } else this.zenith.setScale(1.1 * hs);   // the offline page's unlit dot
+    }
+  }
 
   /* ---------- the middle of the page ----------
      One truth for every standing duel (9/8 card 04): vsGameRows() —
@@ -492,18 +551,59 @@ class VsMenu extends Phaser.Scene {
     const games = vsGameRows().filter((g) => !sums.some((s) => s.code === g.code));
     const rows = [...sums, ...games];
     const funnel = !rows.length && !SSNET.FR.list().length && !SSNET.FR.recentList(1).length;
-    const key = JSON.stringify([funnel ? 'f' : 'd', vsOngoingCount(), rows.map((r) => r.kind + r.code + r.name)]);
+    // the pendKey carries the shown-row-count + picks too (the fill law):
+    // a plaque landing or leaving changes how many replay rows fit
+    const picks = this.fillPicks || [];
+    const key = JSON.stringify([funnel ? 'f' : 'd', vsOngoingCount(), rows.map((r) => r.kind + r.code + r.name),
+      funnel ? 0 : this.fillCount(rows, picks), picks.map((p) => p.kind + p.id)]);
     if (key !== this.pendKey) { this.pendKey = key; this.buildBand(rows, funnel); }
     this.tickDress();
+  }
+  /* ---------- THE FILL (the 10/7 build, §II of the design) ----------
+     The strip's own rank grown to the whole ground: friends online first,
+     then recent rivals, then mages of the circle (at most VS_FILL_CIRCLE —
+     Q2's ★ with Skylar's rein one constant away). Ranked ONCE per page
+     open and FROZEN; the fill law only chooses how many show. */
+  rankPicks() {
+    const FR = SSNET.FR;
+    const circle = (typeof SS_RIVAL !== 'undefined') ? SS_RIVAL.circle() : [];
+    const inCircle = (id) => circle.some((p) => p.uid === id);
+    const picks = []; const seen = new Set();
+    for (const f of FR.list()) { if (picks.length >= 5) break; if (f.online && !seen.has(f.id)) { picks.push({ kind: 'friend', id: f.id, name: f.name }); seen.add(f.id); } }
+    for (const r of FR.recentList(6)) { if (picks.length >= 5) break; if (!seen.has(r.id)) { picks.push({ kind: 'recent', id: r.id, name: r.name, at: r.at, circle: inCircle(r.id) }); seen.add(r.id); } }
+    let nc = 0;
+    for (const p of circle) { if (picks.length >= 5 || nc >= VS_FILL_CIRCLE) break; if (!seen.has(p.uid)) { picks.push({ kind: 'circle', id: p.uid, name: p.name, circle: true }); seen.add(p.uid); nc++; } }
+    return picks;
+  }
+  /* the fill law, the one ruler: rows keep coming while the NEXT row's
+     bottom stays ≥24 pts above the doors' top edge (safeB−188) — max five,
+     picks willing. At zero duels the head takes y330 and rows fall at
+     374 + 58i; under plaques the head sits 12 under the last plaque and the
+     rows 12 under the head (the air law's own seats). */
+  fillAnchor(nPlaques) {
+    return nPlaques ? 350 + (nPlaques - 1) * 58 + 25 + 19 : 330;
+  }
+  fillCount(rows, picks) {
+    if ((rows.length > 4 ? 4 : rows.length) >= 4) return 0;   // the fold owns four
+    const anchor = this.fillAnchor(Math.min(rows.length, 3));
+    let m = 0;
+    while (m < 5 && m < picks.length && anchor + 44 + m * 58 + 25 <= this.safeB - 188 - 24) m++;
+    return m;
   }
   buildBand(rows, funnel) {
     const l = ssLayout(this);
     this.pendC.removeAll(true);
     this.pendRows = [];
+    this.rosterRows = [];
     if (this.doorsMode !== (funnel ? 'funnel' : 'duels')) this.buildDoors(funnel);
-    if (funnel) { if (this.stripC) this.stripC.setVisible(false); this.setWhisper(false); return; }
-    // the plaques — up to four; a fifth folds into the shipped '+%1 more'
+    if (funnel) { if (this.stripC) this.stripC.setVisible(false); this.setHeroScale(2); return; }
+    // the plaques — up to four; a fifth folds into the shipped '+%1 more'.
+    // One air-law move on the band (§VI law 12): the plaques dropped 14
+    // (336 → 350) so the head finally clears the first plaque's top rail.
     const shown = rows.length > 4 ? rows.slice(0, 3) : rows;
+    const fold = (rows.length > 4 ? 4 : shown.length) >= 4;
+    // the hero flex (Q4): 1.5× while any plaque stands, 1.85× at zero
+    this.setHeroScale(rows.length ? 1.5 : 1.85);
     let items = [];
     if (rows.length) {
       // the band head + five cap pips: one lit per standing duel, so the
@@ -517,27 +617,105 @@ class VsMenu extends Phaser.Scene {
         this.capPips.push(p); items.push(p);
       }
     }
-    shown.forEach((r, i) => { items = items.concat(this.plaque(l, r, 336 + i * 58)); });
-    if (rows.length > 4) items.push(ssTxt(this, l.x(0), l.y(336 + 3 * 58 - 8), SS_T('vsMore', rows.length - 3), l.u(10.5), '#5a6390', 'italic').setOrigin(0.5));
-    this.pendC.add(items);
-    // the strip rides under the plaques and folds (head off) when four rows
-    // stand — it never vanishes: the players who duel most keep their rematch
-    const rowsEnd = rows.length ? 336 + (Math.min(shown.length, 4) - (rows.length > 4 ? 0 : 1)) * 58 + 29 : 306;
-    if (!this.stripC) this.buildStrip(l);
-    if (this.stripC) {
-      const fold = (rows.length > 4 ? 4 : shown.length) >= 4;
-      if (this.stripHeadT) this.stripHeadT.setVisible(!fold);
-      this.stripC.setVisible(true);
-      this.stripC.y = l.y(fold ? rowsEnd + 10 : rowsEnd + 10) - (fold ? l.u(26) : 0);
+    shown.forEach((r, i) => { items = items.concat(this.plaque(l, r, 350 + i * 58)); });
+    if (rows.length > 4) items.push(ssTxt(this, l.x(0), l.y(350 + 3 * 58 - 8), SS_T('vsMore', rows.length - 3), l.u(10.5), '#5a6390', 'italic').setOrigin(0.5));
+    if (!fold) {
+      // THE FILL (§II): the people worth re-fighting take the leftover
+      // ground as full replay rows — the void dies by construction
+      const picks = this.fillPicks || [];
+      const m = this.fillCount(rows, picks);
+      if (m > 0) {
+        const anchor = this.fillAnchor(Math.min(rows.length, 3));
+        items.push(ssTxt(this, l.x(0), l.y(anchor), SS_T('vsTonight'), l.u(9.5), '#8a94c4', 'italic').setOrigin(0.5));
+        for (let i = 0; i < m; i++) items = items.concat(this.rosterRow(l, picks[i], anchor + 44 + i * 58));
+      }
+      if (this.stripC) this.stripC.setVisible(false);
+    } else {
+      // THE FOLD (§II): at four plaques the rows compress into the pill
+      // strip, detagged — seated by the air law at last-plaque-bottom + 32
+      if (!this.stripC) this.buildStrip(l);
+      if (this.stripC) { this.stripC.setVisible(true); this.stripC.y = l.y(581) - l.u(26); }
     }
-    this.setWhisper(true);
+    this.pendC.add(items);
+    this.dressRows();
   }
-  // the record whisper: only with a number to say, never over a live note
-  setWhisper(onPage) {
-    if (!this.whisperT || !this.whisperT.active) return;
-    const n = SS.prof.vsWins | 0;
-    this.whisperT.setText(onPage && n > 0 ? SS_T('vsVict', n) : '');
-    this.whisperT.setVisible(!!this.whisperT.text && !(this.noteT && this.noteT.active && this.noteT.text));
+  /* ---------- one replay row (§III: the plaque's furniture spent on a
+     person) ---------- bed 344×50, presence dot r4.5, the name at a fixed
+     13 (ellipsis at 168 — never a font shrink), the presence sub at 9.5
+     (a circle row carries NO sub — the shipped fiction), the bucket pill.
+     The whole row and the pill open the same cap-gated doors the strip
+     chips rode; the records ship as rosterRows for the suites. */
+  rosterRow(l, p, yD) {
+    const y = l.y(yD);
+    const items = [this.add.image(l.x(0), y, ssBtn(this, true, 344, 50)).setDisplaySize(l.u(344), l.u(50))];
+    const core = vsRowCore(this, l, {
+      dotX: l.x(-152), nameX: l.x(-140), y, dotColor: 0x39406b,
+      name: p.name, nameCap: 168,
+      sub: p.kind === 'circle' ? null : '', subColor: '#8a94c4',
+    });
+    items.push(...core.items);
+    const word = SS_T(p.kind === 'recent' ? 'vsAgain' : 'vsDuelTag');
+    const pill = vsPill(this, l, l.x(160), y, word, true);
+    const go = () => {
+      SFX.ensure(); SFX.ui();
+      if (p.kind === 'friend') this.challenge({ id: p.id, name: p.name, away: !SSNET.FR.isOnline(p.id), busy: SSNET.FR.isOnline(p.id) && SSNET.FR.isBusy(p.id) });
+      else this.rematch({ id: p.id, name: p.name, at: p.at }, !!p.circle || p.kind === 'circle');
+    };
+    pill.b.on('pointerdown', go);
+    const zone = this.add.zone(l.x(-30), y, l.u(284), l.u(50)).setOrigin(0.5).setInteractive({ useHandCursor: true });
+    zone.on('pointerdown', go);
+    items.push(zone, pill.b, pill.t);
+    this.rosterRows.push({
+      kind: p.kind, id: p.id, name: p.name, at: p.at || 0, circle: !!p.circle || p.kind === 'circle',
+      row: zone, pill: pill.b, pillT: pill.t, pillW: pill.w, dot: core.dot, nameT: core.nameT, subT: core.subT, pulse: null, lit: null,
+    });
+    return items;
+  }
+  // the 1-second redress for the replay rows — dots recolor, subs refresh,
+  // pills flip gold/dark in place; nothing ever reorders under a finger
+  dressRows() {
+    if (!this.rosterRows) return;
+    const l0 = ssLayout(this);
+    const FR = SSNET.FR;
+    const pend = FR.pending() || [];
+    for (const r of this.rosterRows) {
+      if (!r.dot.active) continue;
+      const online = FR.isOnline(r.id), busy = FR.isBusy(r.id);
+      // a circle mage glints ready, and is never labeled online (the law)
+      const lit = r.circle ? 'circle' : online ? (busy ? 'busy' : 'on') : 'off';
+      const called = pend.some((inv) => inv.from === r.id);
+      const state = lit + (called ? '!' : '');
+      if (state !== r.lit) {
+        r.lit = state;
+        if (r.pulse) { r.pulse.stop(); r.pulse = null; }
+        r.dot.setAlpha(1);
+        r.dot.setFillStyle(called ? 0xffd77a : r.circle ? 0xffd77a : online ? (busy ? 0xe8a87f : 0x7fe0a0) : 0x39406b);
+        if (r.circle || (online && !busy) || called) {
+          r.pulse = this.tweens.add({ targets: r.dot, alpha: 0.45, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+        }
+        const gold = r.circle || (online && !busy);
+        // a swapped texture resets the hit rect to the frame (the lantern
+        // lesson) — re-pad to the 44-pt law after every flip
+        r.pill.setTexture(ssBtn(this, !gold, r.pillW, 30));
+        ssHitPad(r.pill, 44);
+        r.pillT.setColor(gold ? BTN_INK() : '#9fb0e8');
+      }
+      const sub = r.kind === 'friend' ? (online ? (busy ? SS_T('vsInDuel') : SS_T('vsOnline')) : SS_T('vsOffline'))
+        : r.kind === 'recent' ? vsNightsAgo(Date.now() - r.at) : '';
+      if (r.subT && r.subT.active && r.subT.text !== sub) {
+        r.subT.setText(sub);
+        while (r.subT.width > l0.u(168) && r.subT.text.length > 3) r.subT.setText(r.subT.text.slice(0, -2) + '…');
+      }
+    }
+  }
+  // the duel's own status fiction — ONE mapping serves the plaques and the
+  // offline ghost rows (the quiet ground let the rows speak for themselves)
+  rowFiction(r) {
+    return r.kind === 'sum' ? SS_T('vsSumRow')
+      : r.kind === 'move' ? SS_T('vsYourMove') : r.kind === 'theirs' ? SS_T('vsTheirMove', r.name)
+        : r.kind === 'done' ? SS_T('vsPendDone')
+          : r.kind === 'declined' ? SS_T('vsDeclined', r.name)
+            : SS_T(r.p && r.p.away ? 'vsWaitAway' : r.p && r.p.busy ? 'vsWaitBusy' : 'vsWaitAnswer', r.name);
   }
   /* one seal-plaque: nine-slice dark panel, drawn-blades glyph, the rival's
      name over the shipped status fiction, the affair's own doors at the
@@ -556,11 +734,7 @@ class VsMenu extends Phaser.Scene {
     const nm = ssTxt(this, l.x(-132), y - l.u(8), r.name, l.u(12), r.kind === 'move' || r.kind === 'sum' ? '#ffe9a8' : '#d8d2bd').setOrigin(0, 0.5);
     while (nm.width > l.u(150) && nm.text.length > 2) nm.setText(nm.text.slice(0, -2) + '…');
     items.push(nm);
-    const status = r.kind === 'sum' ? SS_T('vsSumRow')
-      : r.kind === 'move' ? SS_T('vsYourMove') : r.kind === 'theirs' ? SS_T('vsTheirMove', r.name)
-        : r.kind === 'done' ? SS_T('vsPendDone')
-          : r.kind === 'declined' ? SS_T('vsDeclined', r.name)
-            : SS_T(r.p && r.p.away ? 'vsWaitAway' : r.p && r.p.busy ? 'vsWaitBusy' : 'vsWaitAnswer', r.name);
+    const status = this.rowFiction(r);
     const st = ssTxt(this, l.x(-132), y + l.u(9), status, l.u(8.5),
       r.kind === 'move' || r.kind === 'sum' ? '#ffd77a' : r.kind === 'declined' ? '#e8a87f' : '#8a94c4', 'italic').setOrigin(0, 0.5);
     while (st.width > l.u(r.kind === 'sum' ? 190 : 228) && st.text.length > 4) st.setText(st.text.slice(0, -2) + '…');
@@ -650,34 +824,38 @@ class VsMenu extends Phaser.Scene {
     if (this.doorsC) { this.doorsC.destroy(); this.doorsC = null; }
     const c = this.doorsC = this.add.container(0, 0);
     this.chFriendB = null; this.chWorldB = null; this.addDoorB = null; this.invDoorB = null;
-    const prim = (y, key, subKey, cb) => {
+    // the header caption teaches on the funnel alone (the quiet ground)
+    if (this.capT && this.capT.active) this.capT.setVisible(!!funnel);
+    // THE QUIET GROUND (Wyatt's 9/22 cuts): a door carries its label alone,
+    // centered — the sublines stopped rendering (the keys go unread), the
+    // geometry holds, and the gold fit loops keep their floors
+    const prim = (y, key, cb) => {
       const b = this.add.image(l.x(0), l.y(y), ssBtn(this, false, 320, 60)).setDisplaySize(l.u(320), l.u(60)).setInteractive({ useHandCursor: true });
-      const t = ssTxt(this, l.x(0), l.y(y - 10), SS_T(key), l.u(17), BTN_INK()).setOrigin(0.5);
+      const t = ssTxt(this, l.x(0), l.y(y), SS_T(key), l.u(17), BTN_INK()).setOrigin(0.5);
       for (let fs = 17; t.width > l.u(296) && fs > 11; fs -= 0.5) t.setFontSize(l.u(fs));
-      const s = ssTxt(this, l.x(0), l.y(y + 12), SS_T(subKey), l.u(9.5), BTN_INK2(), 'italic').setOrigin(0.5);
-      for (let fs = 9.5; s.width > l.u(300) && fs > 7; fs -= 0.5) s.setFontSize(l.u(fs));
       b.on('pointerdown', cb);
-      c.add([b, t, s]);
+      c.add([b, t]);
       return b;
     };
-    const dark = (y, key, subKey, cb, onUp) => {
+    const dark = (y, key, cb, onUp) => {
       const b = this.add.image(l.x(0), l.y(y), ssBtn(this, true, 320, 56)).setDisplaySize(l.u(320), l.u(56)).setInteractive({ useHandCursor: true });
-      const t = ssTxt(this, l.x(0), l.y(y - 9), SS_T(key), l.u(12.5), '#c9d0f0').setOrigin(0.5);
+      const t = ssTxt(this, l.x(0), l.y(y), SS_T(key), l.u(12.5), '#c9d0f0').setOrigin(0.5);
       for (let fs = 12.5; t.width > l.u(296) && fs > 9; fs -= 0.5) t.setFontSize(l.u(fs));
-      const s = ssTxt(this, l.x(0), l.y(y + 11), SS_T(subKey), l.u(8.5), '#5a6390', 'italic').setOrigin(0.5);
-      for (let fs = 8.5; s.width > l.u(300) && fs > 7; fs -= 0.5) s.setFontSize(l.u(fs));
       if (onUp) vsOnTap(b, cb); else b.on('pointerdown', cb);
-      c.add([b, t, s]);
+      c.add([b, t]);
       return b;
     };
     if (funnel) {
-      const fic = ssTextBlock(this, l.x(0), l.y(330), SS_T('vsNoRecent'), {
+      // the funnel's doors JOIN the safeB family (the 10/7 build, slice D) —
+      // they used to sit at fixed y and open a foot gap on tall phones
+      const safeB = this.safeB;
+      const fic = ssTextBlock(this, l.x(0), l.y(364), SS_T('vsNoRecent'), {
         fontSize: l.u(11) + 'px', color: '#5a6390', fontStyle: 'italic', shadow: true,
         wrapW: l.u(320), align: 'center', ox: 0.5, oy: 0.5,
       });
       c.add(fic);
-      this.chWorldB = prim(414, 'vsChWorld', 'vsChWorldSub', () => { SFX.ensure(); SFX.ui(); this.match('turns'); });
-      this.addDoorB = dark(488, 'vsAddFriend', 'vsAddFriendSub', () => {
+      this.chWorldB = prim(safeB - 370, 'vsChWorld', () => { SFX.ensure(); SFX.ui(); this.match('turns'); });
+      this.addDoorB = dark(safeB - 296, 'vsAddFriend', () => {
         SFX.ensure(); SFX.ui();
         // the by-name door opens the sheet AND the name field — after the
         // add, the new friend stands on the roll behind the prompt
@@ -685,48 +863,40 @@ class VsMenu extends Phaser.Scene {
         if (this.socialC) this.addPrompt(l);
       });
       // the share must fire on pointerUP (iOS user-activation law)
-      this.invDoorB = dark(562, 'vsInviteNew', 'vsInviteNewSub', () => { SFX.ensure(); SFX.ui(); this.inviteNew(); }, true);
+      this.invDoorB = dark(safeB - 222, 'vsInviteNew', () => { SFX.ensure(); SFX.ui(); this.inviteNew(); }, true);
     } else {
       const safeB = this.safeB;
-      this.chFriendB = prim(safeB - 158, 'vsChFriend', 'vsChFriendSub', () => { SFX.ensure(); SFX.ui(); this.openSocial(); });
-      this.chWorldB = prim(safeB - 90, 'vsChWorld', 'vsChWorldSub', () => { SFX.ensure(); SFX.ui(); this.match('turns'); });
+      this.chFriendB = prim(safeB - 158, 'vsChFriend', () => { SFX.ensure(); SFX.ui(); this.openSocial(); });
+      this.chWorldB = prim(safeB - 90, 'vsChWorld', () => { SFX.ensure(); SFX.ui(); this.match('turns'); });
     }
   }
-  /* ---------- UNDER THIS SKY TONIGHT — the presence strip ----------
-     Up to two pill chips + › ALL MAGES: friends online first (green pulse),
-     then recent rivals with the night-clock, then mages of the circle — who
-     glint ready but are NEVER labeled online (their quiet-player fiction
-     holds). Every action is dressed as a button (gold = a live duel starts
-     now, dark = a summons will wait) and routes through the same cap gate as
-     the doors. Ranked once per page open; the tick only redresses. */
+  /* ---------- THE FOLD — the detagged pill strip (§II) ----------
+     The strip survives ONLY at four plaques now (the replay rows own every
+     other state): the first two frozen picks as pill chips, DETAGGED — a
+     verb that had to live at 5.5 pt should not exist; the chip is the
+     button, the freed width goes to the name at a fixed 10 (ellipsis at
+     78), and › ALL MAGES keeps the sheet door alive, bucket-sized like
+     every button. Built once; the tick only redresses the dots. */
   buildStrip(l) {
-    const FR = SSNET.FR;
-    const circle = (typeof SS_RIVAL !== 'undefined') ? SS_RIVAL.circle() : [];
-    const inCircle = (id) => circle.some((p) => p.uid === id);
-    const picks = []; const seen = new Set();
-    for (const f of FR.list()) { if (picks.length >= 2) break; if (f.online && !seen.has(f.id)) { picks.push({ kind: 'friend', id: f.id, name: f.name }); seen.add(f.id); } }
-    for (const r of FR.recentList(6)) { if (picks.length >= 2) break; if (!seen.has(r.id)) { picks.push({ kind: 'recent', id: r.id, name: r.name, at: r.at, circle: inCircle(r.id) }); seen.add(r.id); } }
-    for (const p of circle) { if (picks.length >= 2) break; if (!seen.has(p.uid)) { picks.push({ kind: 'circle', id: p.uid, name: p.name, circle: true }); seen.add(p.uid); } }
+    const picks = (this.fillPicks || []).slice(0, 2);
     if (!picks.length) return;   // nothing under this sky tonight — no strip
     const c = this.stripC = this.add.container(0, 0);
-    this.stripHeadT = ssTxt(this, l.x(0), 0, SS_T('vsTonight'), l.u(9.5), '#8a94c4', 'italic').setOrigin(0.5);
-    c.add(this.stripHeadT);
     this.chipRows = [];
-    const widths = picks.map(() => 118).concat([96]);
+    const allT = ssTxt(this, 0, l.u(26), SS_T('vsAllMages'), l.u(10), '#9fb0e8').setOrigin(0.5);
+    const aw = Math.min(128, Math.max(76, Math.ceil((allT.width / l.u(1) + 28) / 10) * 10));
+    while (allT.width > l.u(aw - 16) && allT.text.length > 4) allT.setText(allT.text.slice(0, -2) + '…');
+    const widths = picks.map(() => 118).concat([aw]);
     const total = widths.reduce((a, w) => a + w + 8, -8);
     let cx = -total / 2;
-    picks.forEach((p, i) => {
+    picks.forEach((p) => {
       const x = l.x(cx + 59); cx += 126;
       const pill = this.add.image(x, l.u(26), ssBtn(this, true, 118, 36)).setDisplaySize(l.u(118), l.u(36)).setInteractive({ useHandCursor: true });
       ssHitPad(pill, 44);
       const dot = this.add.circle(x - l.u(45), l.u(26), l.u(4), 0x39406b);
-      const nm = ssTxt(this, x - l.u(36), l.u(26) - l.u(7), p.name, l.u(9), '#f0e8d2').setOrigin(0, 0.5);
-      while (nm.width > l.u(44) && nm.text.length > 2) nm.setText(nm.text.slice(0, -2) + '…');
-      const sub = ssTxt(this, x - l.u(36), l.u(26) + l.u(7), '', l.u(7), '#5a6390', 'italic').setOrigin(0, 0.5);
-      const tagB = this.add.image(x + l.u(36), l.u(26), ssBtn(this, true, 48, 20)).setDisplaySize(l.u(48), l.u(20));
-      const tagT = ssTxt(this, x + l.u(36), l.u(26), '', l.u(7.5), '#8a94c4').setOrigin(0.5);
-      c.add([pill, dot, nm, sub, tagB, tagT]);
-      const row = { kind: p.kind, id: p.id, name: p.name, at: p.at || 0, circle: !!p.circle, pill, dot, nameT: nm, subT: sub, tagB, tagT, pulse: null, lit: null };
+      const nm = ssTxt(this, x - l.u(36), l.u(26), p.name, l.u(10), '#f0e8d2').setOrigin(0, 0.5);
+      while (nm.width > l.u(78) && nm.text.length > 2) nm.setText(nm.text.slice(0, -2) + '…');
+      c.add([pill, dot, nm]);
+      const row = { kind: p.kind, id: p.id, name: p.name, at: p.at || 0, circle: !!p.circle || p.kind === 'circle', pill, dot, nameT: nm, pulse: null, lit: null };
       pill.on('pointerdown', () => {
         SFX.ensure(); SFX.ui();
         if (row.kind === 'friend') this.challenge({ id: row.id, name: row.name, away: !SSNET.FR.isOnline(row.id), busy: SSNET.FR.isOnline(row.id) && SSNET.FR.isBusy(row.id) });
@@ -734,20 +904,18 @@ class VsMenu extends Phaser.Scene {
       });
       this.chipRows.push(row);
     });
-    const allB = this.add.image(l.x(cx + 48), l.u(26), ssBtn(this, true, 96, 36)).setDisplaySize(l.u(96), l.u(36)).setInteractive({ useHandCursor: true });
+    const allB = this.add.image(l.x(cx + aw / 2), l.u(26), ssBtn(this, true, aw, 36)).setDisplaySize(l.u(aw), l.u(36)).setInteractive({ useHandCursor: true });
     ssHitPad(allB, 44);
-    const allT = ssTxt(this, allB.x, l.u(26), SS_T('vsAllMages'), l.u(8.5), '#9fb0e8').setOrigin(0.5);
-    for (let fs = 8.5; allT.width > l.u(86) && fs > 6.5; fs -= 0.5) allT.setFontSize(l.u(fs));
+    allT.setX(allB.x);
     allB.on('pointerdown', () => { SFX.ensure(); SFX.ui(); this.openSocial(); });
     c.add([allB, allT]);
     this.allMagesB = allB;
     this.dressChips();
   }
-  // the 1-second redress: dots recolor, words refresh, the zenith star
-  // flares while a summons stands — nothing ever reorders under a finger
+  // the fold chips' 1-second redress: the dots alone now (the chips are
+  // detagged and subless) — nothing ever reorders under a finger
   dressChips() {
     if (!this.chipRows) return;
-    const l0 = ssLayout(this);
     const FR = SSNET.FR;
     const pend = FR.pending() || [];
     for (const r of this.chipRows) {
@@ -765,21 +933,12 @@ class VsMenu extends Phaser.Scene {
         if (r.circle || (online && !busy) || called) {
           r.pulse = this.tweens.add({ targets: r.dot, alpha: 0.45, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
         }
-        const gold = r.circle || (online && !busy);
-        r.tagB.setTexture(ssBtn(this, !gold, 48, 20));
-        r.tagT.setText(SS_T(r.kind === 'recent' ? 'vsAgain' : 'vsDuelTag')).setColor(gold ? BTN_INK() : '#8a94c4');
-        for (let fs = 7.5; r.tagT.width > l0.u(44) && fs > 5.5; fs -= 0.5) r.tagT.setFontSize(l0.u(fs));
-      }
-      const sub = r.kind === 'friend' ? (online ? (busy ? SS_T('vsInDuel') : SS_T('vsOnline')) : SS_T('vsOffline'))
-        : r.kind === 'recent' ? vsNightsAgo(Date.now() - r.at) : '';
-      if (r.subT.active && r.subT.text !== sub) {
-        r.subT.setText(sub);
-        while (r.subT.width > l0.u(44) && r.subT.text.length > 3) r.subT.setText(r.subT.text.slice(0, -2) + '…');
       }
     }
   }
   tickDress() {
     this.dressChips();
+    this.dressRows();
     // the zenith star flares while a summons stands — the sky announcing it
     const want = (SSNET.FR.pending() || []).length ? 1 : 0;
     if (want !== this.zenFlare && this.zenith && this.zenith.active && this.zenithHalo) {
@@ -787,7 +946,9 @@ class VsMenu extends Phaser.Scene {
       const l = ssLayout(this);
       if (this.zenBreath) { this.zenBreath.stop(); this.zenBreath = null; }
       this.zenithHalo.setAlpha(want ? 0.3 : 0.13);
-      this.zenith.setDisplaySize(l.u(want ? 34 : 24), l.u(want ? 34 : 24));
+      if (this.zenSizeTw) { this.zenSizeTw.stop(); this.zenSizeTw = null; }   // the flex tween yields to the flare
+      const zw = l.u((want ? 34 : 24) * this.heroHs);   // the flare rides the hero flex
+      this.zenith.setDisplaySize(zw, zw);
       if (!ssReduceMotion()) {
         this.zenBreath = this.tweens.add({ targets: this.zenithHalo, alpha: want ? 0.16 : 0.08, duration: want ? 900 : 2600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
       }
@@ -887,6 +1048,42 @@ class VsMenu extends Phaser.Scene {
     };
     tick();
   }
+}
+
+/* ---------- the replay-row anatomy (the 10/7 build, §III) ----------
+   ONE row core serves the page rows, the offline ghost rows and both sheet
+   rolls: the presence dot, a name that NEVER shrinks (fixed size, ellipsis
+   at its cap), the fixed-9.5 sub beneath it. THE TRUNCATION LAW lives here
+   and in vsPill: words never shrink to fit furniture — furniture sizes to
+   words, and only names ellipsize. A row built with sub: null (a circle
+   mage's — the shipped fiction) centers its name and carries no sub line. */
+function vsRowCore(scene, l, o) {
+  const items = [];
+  const dot = scene.add.circle(o.dotX, o.y, l.u(o.dotR || 4.5), o.dotColor != null ? o.dotColor : 0x39406b);
+  items.push(dot);
+  const nm = ssTxt(scene, o.nameX, o.sub == null ? o.y : o.y - l.u(8), o.name, l.u(o.nameSize || 13), o.nameColor || '#f0e8d2').setOrigin(0, 0.5);
+  while (nm.width > l.u(o.nameCap) && nm.text.length > 2) nm.setText(nm.text.slice(0, -2) + '…');
+  items.push(nm);
+  let sub = null;
+  if (o.sub != null) {
+    sub = ssTxt(scene, o.nameX, o.y + l.u(10), o.sub, l.u(9.5), o.subColor || '#8a94c4', 'italic').setOrigin(0, 0.5);
+    while (sub.width > l.u(o.nameCap) && sub.text.length > 3) sub.setText(sub.text.slice(0, -2) + '…');
+    items.push(sub);
+  }
+  return { items, dot, nameT: nm, subT: sub };
+}
+/* THE BUCKET PILL (§III law 1): the word never shrinks — the pill grows to
+   it instead. Width = ceil((textWidth + 28) / 10) · 10 in design units,
+   clamped 76–128, font fixed 10 pt — the old shrink loops died with this.
+   Gold = a duel starts now, dark = the summons will wait. xRight pins the
+   pill's right edge so every bucket hangs off one rail. */
+function vsPill(scene, l, xRight, y, word, gold, pad) {
+  const t = ssTxt(scene, 0, y, word, l.u(10), gold ? BTN_INK() : '#9fb0e8').setOrigin(0.5);
+  const w = Math.min(128, Math.max(76, Math.ceil((t.width / l.u(1) + 28) / 10) * 10));
+  const b = scene.add.image(0, y, ssBtn(scene, !gold, w, 30)).setDisplaySize(l.u(w), l.u(30)).setInteractive({ useHandCursor: true });
+  b.setX(xRight - b.displayWidth / 2); t.setX(b.x);
+  ssHitPad(b, pad || 44);
+  return { b, t, w };
 }
 
 // the RECENT roll's coarse clock: "tonight" / "last night" / "3 nights ago"
@@ -3698,6 +3895,10 @@ class VsBattle extends Phaser.Scene {
 }
 VsBattle.prototype.buildTrie = Battle.prototype.buildTrie;
 VsBattle.prototype.bestWord = Battle.prototype.bestWord;
+// the borrowed solver asks castMinLen (v0.109's LONG ROAD law) — a duel has
+// no daily sky, so the duel's own floor answers: two letters, the shipped
+// validWord law. Without this the vsdemo/botduel solver threw at the borrow.
+VsBattle.prototype.castMinLen = function () { return 2; };
 
 /* ============================================================
    THE SUMMONS — a transparent overlay scene that runs above every
