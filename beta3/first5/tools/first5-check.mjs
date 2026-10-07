@@ -104,6 +104,21 @@ for (let i = 0; i < 30 && !f1; i++) { f1 = await ev("(()=>{try{const b=game.scen
 ok('fight one is pinned VULPES, every day of the week (graft 1)', f1 === 'vulpes', String(f1));
 ok('zero page exceptions through the open', errs.length === 0, errs.slice(0, 2).join(' | '));
 
+/* ======== §2b the lure — the rise, heard (card 03) ======== */
+console.log('— §2b the lure: the rise is heard —');
+await go(BASE + '?reset=1');
+let lure = false;
+for (let i = 0; i < 180 && !lure; i++) { lure = (await ev("window.__ssftue ? window.__ssftue.state : null")) === 'lure'; if (!lure) await sleep(1000); }
+ok('one firefly asks — the lure stands after the settle', lure);
+// a REAL tap, anywhere on screen (the verify-with-clicks law)
+await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: 195, y: 420, button: 'left', clickCount: 1 });
+await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: 195, y: 420, button: 'left', clickCount: 1 });
+let lured = null;
+for (let i = 0; i < 20 && !lured; i++) { const st = await ev("window.__ssftue ? window.__ssftue.state : null"); if (st === 'lured' || st === 'rise' || st === 'board') lured = st; if (!lured) await sleep(400); }
+ok('the tap launches the ascent (lure → rise)', !!lured, String(lured));
+ok('…and the same gesture ARMED THE SOUND (riser audible)', await ev("typeof SFX !== 'undefined' && SFX.ok === true && SFX.ctx && SFX.ctx.state === 'running'"), String(await ev("typeof SFX !== 'undefined' && SFX.ctx ? SFX.ctx.state : 'no ctx'")));
+ok('zero exceptions through the lure', errs.length === 0, errs.slice(0, 2).join(' | '));
+
 /* ================= §3 the run engine plays (demo solver) ================= */
 console.log('— §3 the run engine plays —');
 await go(BASE + '?reset=1&demo=1');

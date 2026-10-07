@@ -7143,9 +7143,55 @@ class Home extends Phaser.Scene {
       delay: 350, loop: true, callback: () => {
         if (this.introPlaying || this.ascending || this.descending || this.arrived) return;
         if (this.ftueWait) { this.ftueWait.remove(false); this.ftueWait = null; }
-        this.time.delayedCall(850, () => this.ftueRise());
+        /* F5-CARD-03 (verdict 8: LURE TAP — HEAR THE RISE): the settled
+           meadow asks with ONE FIREFLY instead of rising unasked. The
+           player's tap — anywhere — launches the ascent and arms the audio
+           in the same gesture, so the riser and the arrival chime are heard
+           on a true first open for the first time in the game's history.
+           Reduced motion keeps the shipped 850ms auto-rise untouched. */
+        if (ssReduceMotion()) { this.time.delayedCall(850, () => this.ftueRise()); return; }
+        this.f5Lure(l);
       },
     });
+  }
+  /* F5-CARD-03: one firefly asks. It breathes the hand's own gold push-ring;
+     the ladder is the page's own graft — ring at once, a brighter pulse at
+     2.5s, and a 5s fallback auto-rise (silent, exactly the shipped open) so
+     a watcher who never taps is never stranded. Zero words. */
+  f5Lure(l) {
+    if (this.f5LureOn || this.ascending || this.arrived || !this.scene.isActive()) return;
+    this.f5LureOn = true;
+    window.__ssftue.state = 'lure';
+    DIAG('ftue: lure');
+    const cx = l.x(0), cy = l.y(470);
+    const items = [];
+    const fly = this.add.image(cx, cy, 'spark4').setScale(0.9).setAlpha(0).setDepth(560).setBlendMode('ADD').setTint(0xffe9a8);
+    items.push(fly);
+    this.tweens.add({ targets: fly, alpha: 0.95, duration: 500 });
+    this.tweens.add({ targets: fly, scale: 1.3, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    this.tweens.add({ targets: fly, y: cy - l.u(14), duration: 1700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    const ringK = ssFxTex(this, 'ring', 0xffe9a8);
+    const breathe = (big) => {
+      if (!this.f5LureOn || !this.scene.isActive()) return;
+      const ring = this.add.image(cx, fly.y, ringK).setDisplaySize(l.u(30), l.u(30)).setAlpha(big ? 0.9 : 0.7).setDepth(559).setBlendMode('ADD');
+      this.tweens.add({ targets: ring, displayWidth: l.u(big ? 124 : 88), displayHeight: l.u(big ? 124 : 88), alpha: 0, duration: big ? 1000 : 850, ease: 'Sine.easeOut', onComplete: () => ring.destroy() });
+    };
+    breathe(false);
+    const ringT = this.time.addEvent({ delay: 1200, loop: true, callback: () => breathe(false) });
+    const launch = (p) => {
+      if (!this.f5LureOn) return;
+      this.f5LureOn = false;
+      SFX.ensure();                       // the same gesture wakes the sound
+      if (p) ssF5TapSpark(this, p.x, p.y);
+      ringT.remove(false);
+      if (fallT) fallT.remove(false);
+      this.input.off('pointerdown', launch);
+      window.__ssftue.state = 'lured';
+      for (const o of items) { this.tweens.killTweensOf(o); this.tweens.add({ targets: o, alpha: 0, duration: 260, onComplete: () => o.destroy() }); }
+      this.ftueRise();
+    };
+    this.input.on('pointerdown', launch);
+    const fallT = this.time.delayedCall(5000, () => launch(null));
   }
   ftueRise() {
     if (!this.ftueBare || this.ascending || this.arrived || !this.scene.isActive()) return;
