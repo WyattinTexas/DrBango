@@ -41,6 +41,7 @@ ok('shim handles ?reset=1 and scrubs it from the URL', shim.includes("searchPara
 ok("game.js art repointed to ../art (2 sites)", (gameSrc.match(/im\.src = '\.\.\/art\//g) || []).length === 2 && !/im\.src = 'art\//.test(gameSrc));
 ok('packs.js dictionary writes ../words-<lang>.js', packSrc.includes('src="../words-'));
 for (let n = 1; n <= 7; n++) ok('F5-GRAFT-' + n + ' seam present in game.js', gameSrc.includes('F5-GRAFT-' + n));
+ok('F5-CARD-06 seams: seats, the rite, the ledger, the kept sky', ['SS_F5_SEATS', 'f5LightSky(', 'f5Ledger(', 'ssF5DrawLitSky(', 'returns to the sky'].every((t) => gameSrc.includes(t)));
 ok('F5-CARD-05 seams: prompt table + five triggers', ['SS_F5_PROMPTS', 'ssF5Prompt(', 'f5InkTaught', 'THE PLANTED GLOW'].every((t) => gameSrc.includes(t)) && (gameSrc.match(/F5-CARD-05/g) || []).length >= 6);
 ok('the en prompt table carries all five lessons', ['tile1', 'tile2', 'tile3', 'ink', 'scry'].every((k) => new RegExp(k + ':').test(gameSrc.slice(gameSrc.indexOf('SS_F5_PROMPTS'), gameSrc.indexOf('SS_F5_PROMPTS') + 900))));
 ok('F5-CARD-04 seams: the rig, the kind bag, the beats, the ember tune', ['SS_F5_RIG', 'SS_F5_FLOOR', 'SS_F5_EMBER_MULT', 'f5Kind(', 'f5CastBeats(', 'f5StarWrite(', 'f5Encore('].every((t) => gameSrc.includes(t)));
@@ -180,6 +181,34 @@ for (let round = 0; round < 6 && !p1; round++) {
 }
 ok('the ORANGE lesson speaks on the real forge/plant chain', p1);
 ok('zero exceptions through the lessons', errs.length === 0, errs.slice(0, 2).join(' | '));
+
+/* ======== §2e the lit sky (card 06) ======== */
+console.log('— §2e the lit sky —');
+ok('every quick-5 beast has an authored zenith seat', await ev("SS_QUICK_POOL.concat(['draco']).every(id=>SS_F5_SEATS[id])"));
+// drive a FELL through the true chain: the beast drops to a sliver and one
+// real cast fells it (unless §2d's march already felled one via its pick)
+let fell = 'pending';
+for (let round = 0; round < 8 && fell !== 'felled'; round++) {
+  if (await ev("(window.__f5lit||[]).length >= 1")) { fell = 'already lit'; break; }
+  fell = await ev("(()=>{const b=game.scene.getScene('battle');if(!b)return 'no battle';if(b.state==='sigil'||b.state==='upgrade'){const cards=[];const scan=(ls)=>ls.forEach(o=>{if(o.getData&&o.getData('sigilCard'))cards.push(o);else if(o.list)scan(o.list)});scan(b.overlayC.list);if(cards.length){cards[0].emit('pointerdown');return 'picked'}}if(b.state==='pick'&&!b.sel.length){if(b.beast)b.beast.hpNow=1;const w=b.bestWord();if(w){w.forEach(i=>b.tapTile(i));b.tryCast();return 'felled'}}return b.state})()");
+  if (fell !== 'felled') await sleep(1400);
+}
+let vlit = false;
+for (let i = 0; i < 15 && !vlit; i++) { vlit = await ev("(window.__f5lit||[]).length >= 1"); if (!vlit) await sleep(800); }
+const lit1 = await ev("JSON.stringify(ssF5LitList())");
+ok('the fell WRITES the mark through the true chain', vlit && lit1 !== '[]', lit1 + ' · via ' + fell);
+const conv = await ev("(()=>{const b=game.scene.getScene('battle');const free=Object.keys(SS_F5_SEATS).find(id=>!ssF5LitList().includes(id));const ms=b.f5LightSky(free);const again=b.f5LightSky(free);return [free,ms,again,ssF5LitList().length]})()");
+ok('a later first-species fell CONVERGES (~600ms beat, no full rite)', conv && conv[1] > 0 && conv[1] <= 600, String(conv));
+ok('a species already in the sky never re-lights', conv && conv[2] === 0);
+await ev("(()=>{const b=game.scene.getScene('battle');b.f5Ledger();ssF5TomorrowCue(b);return 1})()");
+await sleep(1200);
+ok('the graduation ledger and the tomorrow cue draw clean', (await ev('window.__f5ledger | 0')) >= 1 && (await ev('window.__f5tomorrow | 0')) >= 1);
+ok('zero exceptions through the lighting', errs.length === 0, errs.slice(0, 2).join(' | '));
+await go(BASE);   // the morning after — a plain reopen still wears the kept sky
+let kept = null;
+for (let i = 0; i < 40 && !kept; i++) { const v = await ev("typeof SS !== 'undefined' && SS.prof ? JSON.stringify(ssF5LitList()) : null"); if (v && v !== 'null' && v !== '[]') kept = v; if (!kept) await sleep(1000); }
+ok('the morning after: the kept sky survives the reopen (2+ marks)', !!kept && kept.split(',').length >= 2, String(kept));
+ok('zero exceptions on the kept-sky boot', errs.length === 0, errs.slice(0, 2).join(' | '));
 
 /* ================= §3 the run engine plays (demo solver) ================= */
 console.log('— §3 the run engine plays —');

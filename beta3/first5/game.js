@@ -1895,7 +1895,73 @@ function ssF5SkipFloor(scene, startedAt) { return scene.time.now - startedAt >= 
    fell of the first night (the ruled place); card 06 (THE LIT SKY) fills
    it with the real cue. An empty slot draws nothing — the beat script
    already carries the hook, which is this graft's whole job. */
-function ssF5TomorrowCue(scene) { window.__f5tomorrow = (window.__f5tomorrow | 0) + 1; /* card 06 */ }
+/* ---- F5-CARD-06: THE LIT SKY (verdict 6: the tomorrow-driver) -----------
+   The fell doesn't scatter the constellation to die — its stars rise and
+   seat at the zenith, permanently: written to the profile, drawn on every
+   boot thereafter. Scope per the ruling: the MARK and its payoffs only —
+   the dark-world opening lost to LEANS IN and is not here. THE SEATS are
+   the integration card's warned "new design work": authored here for the
+   14 beasts a quick-5 night can meet (the full 26-chart stays a data fill,
+   not a rework). Layout units: x in l.x() half-widths, y in l.y() rows;
+   minis draw at scroll-factor 0 so the meadow, the climb and the battle
+   all wear the same kept sky. */
+const SS_F5_SEATS = {
+  draco: [0, 52],
+  vulpes: [-130, 96], lepus: [-62, 70], serpens: [8, 98], cancer: [78, 68], corvus: [146, 96],
+  ursa: [-150, 150], aranea: [-78, 132], delphinus: [-8, 156], columba: [64, 132], lacerta: [136, 152],
+  cygnus: [-110, 192], pavo: [-20, 198], aquila: [72, 192],
+};
+const SS_F5_SEAT_SC = 0.22;
+const SS_F5_STRINGS = { en: { returns: ' · returns to the sky', lit: 'constellations lit · %1 of 26' } };
+function ssF5LitList() { try { return (SS.prof && SS.prof.f5lit) || []; } catch (e) { return []; } }
+function ssF5DrawMini(scene, id, alpha, depth) {
+  const seat = SS_F5_SEATS[id], b = SS_BEASTS[id];
+  if (!seat || !b || !scene.textures.exists('dot')) return [];
+  const l = scene.L || (scene.L = ssLayout(scene)), sc = SS_F5_SEAT_SC, cx = l.x(seat[0]), cy = l.y(seat[1]);
+  const items = [];
+  const g = scene.add.graphics().setScrollFactor(0).setDepth(depth).setAlpha(alpha);
+  g.lineStyle(l.u(1), 0xd9b96a, 0.75);
+  for (const [a, b2] of b.edges) {
+    g.moveTo(cx + l.u(b.stars[a][0] * sc), cy + l.u(b.stars[a][1] * sc));
+    g.lineTo(cx + l.u(b.stars[b2][0] * sc), cy + l.u(b.stars[b2][1] * sc));
+  }
+  g.strokePath();
+  items.push(g);
+  for (const [sx, sy] of b.stars) {
+    items.push(scene.add.image(cx + l.u(sx * sc), cy + l.u(sy * sc), 'dot').setScrollFactor(0)
+      .setDepth(depth + 1).setScale(0.5).setTint(0xffe9a8).setAlpha(alpha).setBlendMode('ADD'));
+  }
+  return items;
+}
+/* every boot wears the kept sky — the morning-after proof */
+function ssF5DrawLitSky(scene) {
+  for (const id of ssF5LitList()) {
+    const items = ssF5DrawMini(scene, id, 0, 5);
+    items.forEach((o, k) => {
+      scene.tweens.add({ targets: o, alpha: k === 0 ? 0.34 : 0.48, duration: 900, delay: 300 });
+      if (k > 0) scene.tweens.add({ targets: o, alpha: 0.3, delay: 1600 + (k * 211) % 900, duration: 1400 + (k * 97) % 800, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    });
+  }
+}
+function ssF5TomorrowCue(scene) {
+  window.__f5tomorrow = (window.__f5tomorrow | 0) + 1;
+  /* the graft-3 slot, filled: before 5:00 the kept marks pulse once and
+     the dark seats ghost beside them — what you light, the sky keeps;
+     more waits. Wordless. */
+  try {
+    const l = scene.L, lit = ssF5LitList();
+    for (const id of Object.keys(SS_F5_SEATS)) {
+      if (lit.includes(id)) {
+        const items = ssF5DrawMini(scene, id, 0.85, 925);
+        items.forEach((o) => scene.tweens.add({ targets: o, alpha: 0, delay: 1500, duration: 700, onComplete: () => o.destroy() }));
+      } else {
+        const seat = SS_F5_SEATS[id];
+        const d = scene.add.image(l.x(seat[0]), l.y(seat[1]), 'dot').setScrollFactor(0).setDepth(924).setScale(0.6).setTint(0x8a90b8).setAlpha(0).setBlendMode('ADD');
+        scene.tweens.add({ targets: d, alpha: 0.28, duration: 420, yoyo: true, hold: 900, onComplete: () => d.destroy() });
+      }
+    }
+  } catch (e) { /* the slot never breaks the fell */ }
+}
 /* ---- F5-CARD-04: THE SKY LEANS IN — the rig's authored letters ----------
    The fight-1 refill queue (the page's own M·O·N·S beat: MOON free, the
    board secretly dense) and the skill-floor drop (no 5+ by cast 5 → the
@@ -6508,6 +6574,7 @@ class Home extends Phaser.Scene {
        ride), but the answer is never silence: every tap sparks where the
        finger landed. */
     this.input.on('pointerdown', (p) => { if (this.introPlaying || this.ascending) ssF5TapSpark(this, p.x, p.y); });
+    ssF5DrawLitSky(this);   /* F5-CARD-06: the meadow wears the kept sky — the morning-after proof */
     this.events.on('ss-achproxy', (def) => ssAchToast(this, def));
 
     // crickets sing while we stand in the grass — at dawn, the birds do.
@@ -8825,6 +8892,7 @@ class Battle extends Phaser.Scene {
        authored queue; after it drains, the KIND BAG (f5Kind) fades
        100→50→0% by fight 4. The run's cue rungs start unfired. */
     if (this.mode === 'quick') { this.f5Queue = this.ftue ? (SS_F5_RIG[PACK.lang] || SS_F5_RIG.en).slice() : []; this.f5Rungs = {}; }
+    if (this.mode === 'quick') ssF5DrawLitSky(this);   /* F5-CARD-06: the battle wears the kept sky */
     /* F5-GRAFT-5: feed the stalled speller — the stall clock. Any tap
        anywhere re-arms it; the glint itself fires from update(). */
     this.f5LastTap = 0; this.f5Glinted = false;
@@ -8976,6 +9044,69 @@ class Battle extends Phaser.Scene {
     const best = this.bestWord();
     if (!best || !best.length) return;
     best.forEach((bi, k) => this.time.delayedCall(k * 180, () => { if (this.board[bi]) this.f5Glint(this.board[bi]); }));
+  }
+  /* F5-CARD-06: THE FIRST LIGHTING / the converge. The felled beast's own
+     chart rises from the battle ground and seats at the zenith, written to
+     the profile forever. FTUE first fell = the full rite (~2.6s, nameplate,
+     the graft-7 law: taps ACCELERATE the stagger — timeScale, never a cut —
+     and the 1.5s floor holds by construction); every later first-species
+     fell = a ~600ms converge inside the shipped beat (the page's own scope
+     cut that saves the M). Returns the ms the fell flow should hold. */
+  f5LightSky(id) {
+    if (!SS_F5_SEATS[id] || !SS_BEASTS[id] || !this.textures.exists('dot')) return 0;
+    const lit = SS.prof.f5lit = SS.prof.f5lit || [];
+    if (lit.includes(id)) return 0;
+    lit.push(id); SS.save();
+    window.__f5lit = (window.__f5lit || []).concat(id);
+    const l = this.L, b = SS_BEASTS[id], seat = SS_F5_SEATS[id];
+    const first = this.ftue && lit.length === 1;
+    const sc = SS_F5_SEAT_SC, cx = l.x(seat[0]), cy = l.y(seat[1]);
+    const from = { x: l.x(0), y: l.y(206) };
+    const tws = [];
+    const stars = b.stars.map(([sx, sy], k) => {
+      const d = this.add.image(from.x + l.u(sx * 0.5), from.y + l.u(sy * 0.5), 'dot')
+        .setScrollFactor(0).setDepth(930).setScale(0.85).setTint(0xffe9a8).setAlpha(0).setBlendMode('ADD');
+      tws.push(this.tweens.add({
+        targets: d, alpha: 0.95, x: cx + l.u(sx * sc), y: cy + l.u(sy * sc), scale: 0.5,
+        delay: (first ? 260 : 60) + k * (first ? 95 : 16), duration: first ? 900 : 420, ease: 'Sine.easeInOut',
+      }));
+      return d;
+    });
+    const total = first ? 260 + b.stars.length * 95 + 1500 : 600;
+    this.time.delayedCall(Math.max(400, total - 500), () => {
+      if (!this.scene.isActive()) return;
+      stars.forEach((d) => this.tweens.add({ targets: d, alpha: 0, duration: 420, onComplete: () => { if (d.active) d.destroy(); } }));
+      const items = ssF5DrawMini(this, id, 0, 920);   // the permanent mark takes the seat
+      items.forEach((o, k) => this.tweens.add({ targets: o, alpha: k === 0 ? 0.4 : 0.55, duration: 600 }));
+    });
+    if (first) {
+      const t = ssTxt(this, l.x(0), cy + l.u(36), b.name + ((SS_F5_STRINGS[PACK.lang] || SS_F5_STRINGS.en).returns), l.u(15), '#f3e5b4', 'italic')
+        .setOrigin(0.5).setDepth(931).setAlpha(0).setScrollFactor(0).setShadow(0, 0, '#0a0d1c', l.u(8), true, true);
+      this.tweens.add({ targets: t, alpha: 0.95, delay: total - 900, duration: 420 });
+      this.tweens.add({ targets: t, alpha: 0, delay: total + 1200, duration: 500, onComplete: () => t.destroy() });
+      const accel = () => tws.forEach((tw) => { if (tw && tw.isPlaying()) tw.timeScale = 2.2; });
+      this.input.on('pointerdown', accel);
+      this.time.delayedCall(total + 300, () => this.input.off('pointerdown', accel));
+      return Math.max(SS_F5_CEREMONY_FLOOR_MS, total - 500);
+    }
+    return 300;   // the converge rides mostly inside the shipped 1150ms beat
+  }
+  /* F5-CARD-06: the graduation ache — the kept marks stand, the dark seats
+     ghost for a breath, and one ledger line names the pictured next. */
+  f5Ledger() {
+    window.__f5ledger = (window.__f5ledger | 0) + 1;
+    const l = this.L, lit = ssF5LitList();
+    for (const id of lit) ssF5DrawMini(this, id, 0.5, 920);
+    for (const id of Object.keys(SS_F5_SEATS)) {
+      if (lit.includes(id)) continue;
+      const seat = SS_F5_SEATS[id];
+      const d = this.add.image(l.x(seat[0]), l.y(seat[1]), 'dot').setScrollFactor(0).setDepth(919).setScale(0.6).setTint(0x8a90b8).setAlpha(0).setBlendMode('ADD');
+      this.tweens.add({ targets: d, alpha: 0.26, duration: 420, yoyo: true, hold: 1100, onComplete: () => d.destroy() });
+    }
+    const line = ssTxt(this, l.x(0), l.y(224), (SS_F5_STRINGS[PACK.lang] || SS_F5_STRINGS.en).lit.replace('%1', String(lit.length)), l.u(13), '#b9b3d0', 'italic')
+      .setOrigin(0.5).setDepth(921).setAlpha(0).setScrollFactor(0).setShadow(0, 0, '#0a0d1c', l.u(8), true, true);
+    this.tweens.add({ targets: line, alpha: 0.9, duration: 420 });
+    this.tweens.add({ targets: line, alpha: 0, delay: 4200, duration: 600, onComplete: () => line.destroy() });
   }
   /* F5-GRAFT-5: one glint — a single breath of scale and one spark on a
      tile that starts a real word. No copy, no arrow, no repeat. */
@@ -10705,7 +10836,11 @@ class Battle extends Phaser.Scene {
     /* F5-GRAFT-3: tomorrow inside the window — the ruled slot is the second
        fell of the first night; card 06 fills it with THE LIT SKY's cue. */
     if (this.mode === 'quick' && this.ftue && this.run.fightIdx === 2) ssF5TomorrowCue(this);
-    this.time.delayedCall(1150, () => {
+    /* F5-CARD-06: the fell lights the sky — the full rite on the first
+       night's first fell, the quick converge after; the flow holds for it. */
+    let f5riteMs = 0;
+    if (this.mode === 'quick') f5riteMs = this.f5LightSky(this.fights[this.run.fightIdx - 1].id) | 0;
+    this.time.delayedCall(1150 + f5riteMs, () => {
       // the final win ends the run — endRun settles and announces for itself
       if (this.run.fightIdx >= this.fights.length) { this.endRun(true); return; }
       // THE CADENCE (v0.65.0): only a fight the plan marks pays an offer.
@@ -11640,6 +11775,8 @@ class Battle extends Phaser.Scene {
     }
     if (this.mode === 'campaign') ssClearCampaign();
     if (this.mode === 'quick') localStorage.removeItem('beta3.quickck');   /* F5-GRAFT-4: the run ended by a real door — nothing left to hold */
+    /* F5-CARD-06: the graduation ache rides the end screen's settle */
+    if (this.mode === 'quick') this.time.delayedCall(1600, () => { if (this.scene.isActive()) this.f5Ledger(); });
     let streak = null;
     if (this.mode === 'daily') {
       SS.award('daily-devout', this.game);
