@@ -40,6 +40,7 @@ ok('shim prefixes get/set/remove on Storage.prototype', ['getItem', 'setItem', '
 ok('shim handles ?reset=1 and scrubs it from the URL', shim.includes("searchParams.delete('reset')"));
 ok("game.js art repointed to ../art (2 sites)", (gameSrc.match(/im\.src = '\.\.\/art\//g) || []).length === 2 && !/im\.src = 'art\//.test(gameSrc));
 ok('packs.js dictionary writes ../words-<lang>.js', packSrc.includes('src="../words-'));
+for (let n = 1; n <= 7; n++) ok('F5-GRAFT-' + n + ' seam present in game.js', gameSrc.includes('F5-GRAFT-' + n));
 const BUILD = (gameSrc.match(/const BUILD = '([^']+)'/) || [])[1];
 ok('game.js copy carries a BUILD', !!BUILD, BUILD);
 try {
@@ -98,6 +99,9 @@ for (let i = 0; i < 150 && !rose; i++) {
   if (!rose) await sleep(1000);
 }
 ok('the ascent rises by itself into the first fight', !!rose, 'ftue state ' + rose);
+let f1 = null; // graft 1: the battle scene stands moments after the rise
+for (let i = 0; i < 30 && !f1; i++) { f1 = await ev("(()=>{try{const b=game.scene.getScene('battle');return b&&b.fights&&b.fights[0]?b.fights[0].id:null}catch(e){return null}})()"); if (!f1) await sleep(1000); }
+ok('fight one is pinned VULPES, every day of the week (graft 1)', f1 === 'vulpes', String(f1));
 ok('zero page exceptions through the open', errs.length === 0, errs.slice(0, 2).join(' | '));
 
 /* ================= §3 the run engine plays (demo solver) ================= */
@@ -107,7 +111,35 @@ let stat = null;
 for (let i = 0; i < 120 && !stat; i++) { const s = await ev("localStorage.getItem('beta3.stat')"); if (s) { const j = JSON.parse(s); if (j.words >= 1) stat = j; } if (!stat) await sleep(1500); }
 ok('the solver weaves real words in the sandbox', !!stat, stat && ('fight ' + stat.fight + ' · ' + stat.words + ' words · score ' + stat.score));
 ok('demo stat rides the prefix too', await ev("localStorage.getItem('beta3.stat') === null || true") && await ev("(()=>{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k==='beta3.stat')return false}return true})()"));
+let qk = null; // graft 4: the first fell writes the held fight
+for (let i = 0; i < 150 && !qk; i++) { const c = await ev("localStorage.getItem('beta3.quickck')"); if (c) { const j = JSON.parse(c); if (j.fightIdx >= 1) qk = j; } if (!qk) await sleep(1500); }
+ok('the fell writes the held fight (graft 4: beta3.quickck)', !!qk, qk && ('fight ' + qk.fightIdx + ' · qseed kept ' + Number.isFinite(qk.qseed)));
 ok('zero exceptions mid-run', errs.length === 0, errs.slice(0, 2).join(' | '));
+
+/* ======== §3b the pocket, the glint, the two refusals ======== */
+console.log('— §3b the pocket, the glint, the two refusals —');
+await go(BASE); // an app kill mid-run: plain reopen, held fight standing
+let resumed = false;
+for (let i = 0; i < 90 && !resumed; i++) { resumed = await ev("(()=>{try{const b=game.scene.getScene('battle');return !!(b&&b.scene.isActive()&&b.mode==='quick'&&b.state==='pick')}catch(e){return false}})()"); if (!resumed) await sleep(1000); }
+const rIdx = await ev("(()=>{try{return game.scene.getScene('battle').run.fightIdx}catch(e){return -1}})()");
+ok('a pocketed phone relaunches into the held fight (graft 4)', resumed && qk && rIdx === qk.fightIdx, 'resumed at fight ' + rIdx + ' (held ' + (qk && qk.fightIdx) + ')');
+ok('the intro was NOT replayed over the held run (graft 4)', await ev("window.__ssftue && window.__ssftue.on === false"));
+await sleep(2500); // the deal's bounce settles before probe taps (house law)
+await ev("(()=>{const b=game.scene.getScene('battle');b.f5LastTap=b.time.now-11000;b.f5Glinted=false;return 1})()");
+let glinted = false;
+for (let i = 0; i < 10 && !glinted; i++) { glinted = (await ev('window.__f5glint | 0')) >= 1; if (!glinted) await sleep(500); }
+ok('the stalled speller is fed — one viable-tile glint (graft 5)', glinted);
+await ev("(()=>{const b=game.scene.getScene('battle');b.tapTile(0);b.tryCast();return 1})()");
+await sleep(600);
+ok('a single tile BOUNCES HOME (graft 6: too short)', (await ev('window.__f5refusal')) === 'home' && await ev("game.scene.getScene('battle').sel.length === 0"));
+const pair = await ev("(()=>{const b=game.scene.getScene('battle');for(let i=0;i<16;i++)for(let j=0;j<16;j++){if(i===j)continue;const w=b.board[i].ch+b.board[j].ch;if(!WORDSET.has(w))return [i,j]}return null})()");
+ok('a non-word pair exists on the board to refuse', !!pair, String(pair));
+if (pair) {
+  await ev("(()=>{const b=game.scene.getScene('battle');b.tapTile(" + pair[0] + ");b.tapTile(" + pair[1] + ");b.tryCast();return 1})()");
+  await sleep(700);
+  ok('a word the sky never heard CRUMBLES TO DUST (graft 6)', (await ev('window.__f5refusal')) === 'dust' && await ev("game.scene.getScene('battle').sel.length === 0"));
+}
+ok('zero exceptions through the pocket round', errs.length === 0, errs.slice(0, 2).join(' | '));
 
 /* ================= §4 the reset door ================= */
 console.log('— §4 the reset door —');

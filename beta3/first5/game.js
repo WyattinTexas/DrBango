@@ -1870,6 +1870,32 @@ function ssSigilPlayedBefore(p) {
    1 = down forever); it drops here when the first game ENDS by any door —
    endRun (win or loss) and goHome (the back-arrow abandon) both call it. */
 function ssFtuePending() { return !!SS.prof && SS.prof.ftue === 0; }
+/* ---- F5 GRAFTS (batch ss-2026-10-07-first-night, card 02) ----------------
+   The seven grafts every critic converged on, ruled in 8/8 by Skylar 10/7.
+   Tagged F5-GRAFT-<n> at every seam so the later integration card can walk
+   them. These helpers are the shared kit; the seams live where they bite. */
+/* F5-GRAFT-2: no dead taps — a tap during a scripted beat always answers
+   with a spark at the fingertip, even inside a skip-arm window. */
+function ssF5TapSpark(scene, x, y) {
+  if (!scene.textures.exists('spark4')) return;
+  for (let i = 0; i < 5; i++) {
+    const a = Math.random() * Math.PI * 2, d = 10 + Math.random() * 26;
+    const s = scene.add.image(x, y, 'spark4').setScrollFactor(0).setDepth(940)
+      .setScale(0.5 + Math.random() * 0.5).setAlpha(0.9).setBlendMode('ADD');
+    scene.tweens.add({ targets: s, x: x + Math.cos(a) * d, y: y + Math.sin(a) * d, alpha: 0, scale: 0.1, duration: 320 + Math.random() * 140, ease: 'Quad.easeOut', onComplete: () => s.destroy() });
+  }
+}
+/* F5-GRAFT-7: the first ceremony cannot hard-cut before ~1.5s — taps
+   accelerate the stagger, never cut it. Ceremonies built by cards 04-06
+   (the star-write, the first lighting) gate their skip on this; every
+   later ceremony keeps the shipped 380ms arm. */
+const SS_F5_CEREMONY_FLOOR_MS = 1500;
+function ssF5SkipFloor(scene, startedAt) { return scene.time.now - startedAt >= SS_F5_CEREMONY_FLOOR_MS; }
+/* F5-GRAFT-3: tomorrow INSIDE the window — the slot. Called at the second
+   fell of the first night (the ruled place); card 06 (THE LIT SKY) fills
+   it with the real cue. An empty slot draws nothing — the beat script
+   already carries the hook, which is this graft's whole job. */
+function ssF5TomorrowCue(scene) { window.__f5tomorrow = (window.__f5tomorrow | 0) + 1; /* card 06 */ }
 function ssFtueDone() {
   if (SS.prof && SS.prof.ftue !== 1) { SS.prof.ftue = 1; SS.save(); DIAG('ftue: done'); }
 }
@@ -6406,12 +6432,18 @@ class Home extends Phaser.Scene {
        hands boot to lab.js, ?mpuid is a harness identity); every excluded
        boot behaves exactly as it always did. ?ftue=1 forces the flow (the
        dev seam, ?dawn's pattern); ?ftue=0 stands it down. */
+    /* F5-GRAFT-4: the run must survive a pocket. A held quick fight (an app
+       killed mid-run) outranks every open, the first included — the player
+       relaunches into the fight they were standing in, never into a replayed
+       intro over an orphaned run. The door itself rides the boot chain below. */
+    const qck = (!entry && !deep && !DEMO && !bypassed && QS.get('vsdemo') !== '1' && !QS.get('frdemo')
+      && !QS.get('botduel') && QS.get('lab') !== '1' && !QS.get('mpuid')) ? this.quickCheckpoint() : null;
     const ftue = (ssFtuePending() || QS.get('ftue') === '1') && QS.get('ftue') !== '0'
       && !entry && !DEMO && QS.get('vsdemo') !== '1' && !QS.get('frdemo') && !QS.get('botduel')
       && QS.get('daily') !== '1' && QS.get('quick') !== '1' && QS.get('endless') !== '1'
-      && QS.get('lab') !== '1' && !QS.get('mpuid') && !deep && !bypassed;
+      && QS.get('lab') !== '1' && !QS.get('mpuid') && !deep && !bypassed && !qck;
     window.__ssftue = { on: ftue, state: ftue ? 'gate' : 'off' };   // headless verification reads this
-    const intro = !entry && !INTRO_SEEN && !DEMO && QS.get('vsdemo') !== '1' && !QS.get('frdemo') && !QS.get('botduel') && QS.get('daily') !== '1' && QS.get('quick') !== '1' && !deep && !bypassed;
+    const intro = !entry && !INTRO_SEEN && !DEMO && QS.get('vsdemo') !== '1' && !QS.get('frdemo') && !QS.get('botduel') && QS.get('daily') !== '1' && QS.get('quick') !== '1' && !deep && !bypassed && !qck /* F5-GRAFT-4 */;
     if (ftue) this.ftueOpen(l, intro);
     else if (entry) this.time.delayedCall(0, () => { if (this.sys.isActive()) this.buildMeadowUi(l); });
     else if (intro) this.playIntro(l);
@@ -6423,6 +6455,11 @@ class Home extends Phaser.Scene {
     this.time.addEvent({ delay: 1000, loop: true, callback: () => this.updateDailyChip() });
 
     this.input.once('pointerdown', () => SFX.ensure());
+    /* F5-GRAFT-2: no dead taps during the scripted open — the skip/advance
+       arms exactly as shipped (the launching tap must never skip its own
+       ride), but the answer is never silence: every tap sparks where the
+       finger landed. */
+    this.input.on('pointerdown', (p) => { if (this.introPlaying || this.ascending) ssF5TapSpark(this, p.x, p.y); });
     this.events.on('ss-achproxy', (def) => ssAchToast(this, def));
 
     // crickets sing while we stand in the grass — at dawn, the birds do.
@@ -6481,6 +6518,16 @@ class Home extends Phaser.Scene {
       // the door knocks until the meadow is free — a one-shot call landing
       // mid-intro was eaten by busy() and stranded the boot on the meadow
       const knock = () => { if (this.busy()) { this.time.delayedCall(250, knock); return; } this.startMode(mode); };
+      this.time.delayedCall(400, knock);
+    } else if (qck) {
+      /* F5-GRAFT-4: the held fight relaunches — same knock pattern as the
+         QS doors. A held FIGHT 1 of the first night brings the finger back
+         (its lessons replay on the curated board, checkpoint semantics are
+         fight-start); any later fight resumes plain. */
+      const knock = () => {
+        if (this.busy()) { this.time.delayedCall(250, knock); return; }
+        this.beginAscent({ mode: 'quick', resume: qck, ascended: true, ftue: qck.ftue && !(qck.fightIdx | 0) ? 1 : 0 });
+      };
       this.time.delayedCall(400, knock);
     }
   }
@@ -8256,6 +8303,14 @@ class Home extends Phaser.Scene {
     if (!SS_ACTS[ck.actIdx]) ck.actIdx = Math.min(SS_ACTS.length - 1, Math.floor(ck.fightIdx / 5));
     return ck;
   }
+  /* F5-GRAFT-4: the held quick fight — validated the campaign way, plus the
+     seed that rebuilds the identical fight list (the endless eseed law). */
+  quickCheckpoint() {
+    let ck = null;
+    try { ck = JSON.parse(localStorage.getItem('beta3.quickck')); } catch (e) { return null; }
+    if (!ck || typeof ck !== 'object' || typeof ck.fightIdx !== 'number' || !(ck.fightIdx >= 0) || !Number.isFinite(ck.qseed)) return null;
+    return ck;
+  }
   busy() { return this.ascending || this.descending || this.introPlaying || SS_RITE.busy; }
   startMode(mode) {
     if (this.busy()) return;
@@ -8507,7 +8562,12 @@ class Battle extends Phaser.Scene {
     // daily: same-language hunters share one seeded sky; the pack salt keeps
     // a language switch from replaying today's English board with new letters
     if (this.mode === 'daily') setSeed(SSNET.dayKey() ^ ssPackSeed(PACK.lang));
-    else setSeed(Math.floor(Math.random() * 1e9));
+    else if (this.mode === 'quick') {
+      /* F5-GRAFT-4: the quick run's draws ride a KEPT seed, so a pocketed
+         phone rebuilds the identical fight list on resume (the eseed law). */
+      this.qseed = this.resume && Number.isFinite(this.resume.qseed) ? this.resume.qseed : Math.floor(Math.random() * 1e9);
+      setSeed(this.qseed);
+    } else setSeed(Math.floor(Math.random() * 1e9));
     this.fights = [];
     let planSeed;
     if (this.mode === 'campaign') {
@@ -8552,6 +8612,17 @@ class Battle extends Phaser.Scene {
       const pool = court ? [...court.kings] : [...SS_QUICK_POOL];
       for (let i = 0; i < 4; i++) this.fights.push({ id: pool.splice(Math.floor(rng() * pool.length), 1)[0], actIdx: 0, mult: court ? court.mults[i] : 1 + i * 0.12, atkAdd: court ? 0 : Math.floor(i / 2), umbral: false });
       this.fights.push({ id: court ? court.crown : SS_QUICK_BOSS, actIdx: 0, mult: 1, atkAdd: 0, umbral: false });
+      /* F5-GRAFT-1 (pin fight one): the first night's fight 1 is VULPES,
+         every day of the week — "the 2.5× dice roll is the cheapest bug on
+         this page." The four splice rolls above are BURNED exactly as stock
+         (the draw-order law: the board's deal never moves); the pin only
+         rearranges what they chose. Tuning lands with THE EMBER MINUTE
+         (card 04); the pin itself is this line's whole job. */
+      if (this.ftue) {
+        const vi = this.fights.findIndex((f) => f.id === 'vulpes');
+        if (vi > 0 && vi < 4) { this.fights[vi].id = this.fights[0].id; this.fights[0].id = 'vulpes'; }
+        else if (vi < 0) this.fights[0].id = 'vulpes';
+      }
       planSeed = Math.floor(rng() * 1e9);       // daily: seeded stream → every hunter shares the schedule
     }
     /* THE DYING NAMES (v0.110.0): the curse ladder — one letter per fight,
@@ -8588,7 +8659,7 @@ class Battle extends Phaser.Scene {
       sigils: this.resume.sigils || [], words: this.resume.words | 0, longest: this.resume.longest || '',
       totalDmg: this.resume.totalDmg | 0, scried: !!this.resume.scried, featherUsed: !!this.resume.featherUsed,
       letters: this.resume.letters | 0, bigHit: this.resume.bigHit | 0,
-      playMs: ssClockInherit(this.resume, this.mode === 'endless' ? 'beta3.endless' : 'beta3.campaign'),
+      playMs: ssClockInherit(this.resume, this.mode === 'endless' ? 'beta3.endless' : this.mode === 'quick' ? 'beta3.quickck' /* F5-GRAFT-4 */ : 'beta3.campaign'),
       overkill: this.resume.overkill | 0, tiers: this.resume.tiers || {},
       // the flag beats already rung this climb (v0.77.0) — a resumed climb
       // re-reads the ledger but never repeats a ceremony
@@ -8651,6 +8722,10 @@ class Battle extends Phaser.Scene {
     if (this.ftue) this.ftueStart();   // the first open: curated deal landed above; the finger follows
 
     if (DEMO) this.demoTimer = this.time.addEvent({ delay: 1400, loop: true, callback: () => this.demoStep() });
+    /* F5-GRAFT-5: feed the stalled speller — the stall clock. Any tap
+       anywhere re-arms it; the glint itself fires from update(). */
+    this.f5LastTap = 0; this.f5Glinted = false;
+    this.input.on('pointerdown', () => { this.f5LastTap = this.time.now; this.f5Glinted = false; });
     this.input.on('pointerdown', () => SFX.ensure());
     this.game.events.on('ss-ach', this.onAch, this);
     this.events.once('shutdown', () => { this.clockPersist(); this.game.events.off('ss-ach', this.onAch, this); });
@@ -8674,6 +8749,32 @@ class Battle extends Phaser.Scene {
     // the visible+focused gates above already hold for it (hard mode's
     // 10s, or THE FALLING SKY's 12s — this.strikeMs is the one truth)
     if (this.strikeMs) this.hardTick(dt);
+    /* F5-GRAFT-5: feed the stalled speller — 10s without a tap in free play
+       (first night's quick run, finger retired or absent, nothing staged)
+       lands ONE viable-tile glint. Wordless, once per stall, invisible to
+       anyone who doesn't need it; the demo solver is nobody's student. */
+    if (this.mode === 'quick' && !DEMO && this.state === 'pick' && !this.sel.length
+      && (!this.ftue || this.ftueGone)) {
+      if (!this.f5LastTap) this.f5LastTap = this.time.now;
+      else if (!this.f5Glinted && this.time.now - this.f5LastTap > 10000) {
+        this.f5Glinted = true;
+        const best = this.bestWord();
+        if (best && best.length) this.f5Glint(this.board[best[0]]);
+      }
+    }
+  }
+  /* F5-GRAFT-5: one glint — a single breath of scale and one spark on a
+     tile that starts a real word. No copy, no arrow, no repeat. */
+  f5Glint(t) {
+    if (!t || !t.c || !t.c.scene) return;
+    window.__f5glint = (window.__f5glint | 0) + 1;
+    const c = t.c, s0 = c.scaleX;
+    this.tweens.add({ targets: c, scaleX: s0 * 1.14, scaleY: s0 * 1.14, duration: 260, yoyo: true, ease: 'Sine.easeInOut', onComplete: () => c.setScale(s0) });
+    if (this.textures.exists('spark4')) {
+      const sp = this.add.image(0, -this.L.u(16), 'spark4').setScale(0.8).setAlpha(0.95).setBlendMode('ADD');
+      c.add(sp);
+      this.tweens.add({ targets: sp, y: -this.L.u(34), alpha: 0, scale: 0.2, duration: 620, ease: 'Quad.easeOut', onComplete: () => sp.destroy() });
+    }
   }
   /* ---- THE STRIKE CLOCK (v0.70.0; generalized v0.110.0) ----
      One engine, two flags: hard mode dials it to SS_HARD.strikeMs, THE
@@ -8766,6 +8867,7 @@ class Battle extends Phaser.Scene {
     // back-arrow abandon — completes the first open for good; the woken
     // (or re-created) meadow builds its full chrome
     if (this.ftue) ssFtueDone();
+    if (this.mode === 'quick') localStorage.removeItem('beta3.quickck');   /* F5-GRAFT-4: the back-arrow abandon is a door, not a pocket */
     const h = this.scene.get('home');
     if (!data.dawn && h && h.sys.isSleeping()) { this.scene.wake('home', data); this.scene.stop(); }
     else this.scene.start('home', data);
@@ -9951,9 +10053,45 @@ class Battle extends Phaser.Scene {
     // THE LONG ROAD (v0.109.0): a word under the sky's floor is refused in
     // the very grammar an invalid word uses — shake, wiggle, nothing spent
     if (this.sel.length < 2 || word.length < this.castMinLen() || !WORDSET.has(word)) {
+      /* F5-GRAFT-6: split the refusal grammar — the most frequent negative
+         event of a stranger's first night stops being ambiguous, still with
+         zero words. A REAL word below the floor (or a single tile) BOUNCES
+         HOME — the board takes its letters back, gently. A word the sky has
+         never heard CRUMBLES TO DUST where it stands. Nothing is spent. */
+      const tooShort = this.sel.length < 2 || (WORDSET.has(word) && word.length < this.castMinLen());
       SFX.invalid();
-      this.cameras.main.shake(120, 0.004);
-      this.tweens.add({ targets: this.lineC, x: this.lineC.x + l.u(8), duration: 50, yoyo: true, repeat: 3, onComplete: () => this.lineC.setX(l.x(0)) });
+      window.__f5refusal = tooShort ? 'home' : 'dust';
+      const flying = this.lineTiles; this.lineTiles = [];
+      const sel = this.sel.slice(); this.sel = [];
+      const homes = flying.map((mc, k) => {
+        try {
+          const bm = this.board[sel[k]].c.getWorldTransformMatrix();
+          const lm = this.lineC.getWorldTransformMatrix();
+          return { x: bm.tx - lm.tx, y: bm.ty - lm.ty };
+        } catch (e) { return { x: mc.x, y: mc.y - l.u(150) }; }
+      });
+      for (const i of sel) if (this.board[i]) this.board[i].c.setAlpha(1);
+      this.layoutLine();
+      if (tooShort) {
+        flying.forEach((mc, k) => this.tweens.add({
+          targets: mc, x: homes[k].x, y: homes[k].y, alpha: 0.2, scale: 0.9,
+          delay: k * 28, duration: 300, ease: 'Back.easeIn', onComplete: () => mc.destroy(),
+        }));
+      } else {
+        this.cameras.main.shake(120, 0.004);
+        flying.forEach((mc, k) => {
+          this.tweens.add({
+            targets: mc, y: mc.y + l.u(30), angle: k % 2 ? 9 : -9, alpha: 0, scale: 0.88,
+            delay: k * 36, duration: 360, ease: 'Quad.easeIn', onComplete: () => mc.destroy(),
+          });
+          if (this.textures.exists('spark4')) for (let d = 0; d < 3; d++) {
+            const sp = this.add.image(mc.x + (Math.random() - 0.5) * l.u(22), mc.y + (Math.random() - 0.5) * l.u(14), 'spark4')
+              .setTint(0x8a8398).setScale(0.45).setAlpha(0.8);
+            this.lineC.add(sp);
+            this.tweens.add({ targets: sp, y: sp.y + l.u(26 + Math.random() * 18), alpha: 0, scale: 0.1, delay: k * 36, duration: 430, ease: 'Quad.easeIn', onComplete: () => sp.destroy() });
+          }
+        });
+      }
       return;
     }
     this.state = 'anim';
@@ -10318,7 +10456,10 @@ class Battle extends Phaser.Scene {
     // edge — the climb is UNBOUNDED, so the exhausted-fights win below must
     // stay unreachable there (the same seed grows the same ladder)
     if (this.mode === 'endless' && this.run.fightIdx >= this.fights.length - 2) this.extendEndless();
-    if (this.mode === 'campaign' || this.mode === 'endless') this.saveCheckpoint();
+    if (this.mode === 'campaign' || this.mode === 'endless' || this.mode === 'quick' /* F5-GRAFT-4 */) this.saveCheckpoint();
+    /* F5-GRAFT-3: tomorrow inside the window — the ruled slot is the second
+       fell of the first night; card 06 fills it with THE LIT SKY's cue. */
+    if (this.mode === 'quick' && this.ftue && this.run.fightIdx === 2) ssF5TomorrowCue(this);
     this.time.delayedCall(1150, () => {
       // the final win ends the run — endRun settles and announces for itself
       if (this.run.fightIdx >= this.fights.length) { this.endRun(true); return; }
@@ -10377,6 +10518,22 @@ class Battle extends Phaser.Scene {
     if (!ssSigilAnnounce(this, pend, () => { if (this.state === 'rite') this.state = 'pick'; })) this.state = 'pick';
   }
   saveCheckpoint() {
+    /* F5-GRAFT-4: the run must survive a pocket — the quick run checkpoints
+       under its own key with fight-start semantics, exactly the campaign's
+       law. The ftue flag rides along so a killed FIRST night relaunches
+       with the finger's lessons intact (fight 1 only). */
+    if (this.mode === 'quick') {
+      if (this.run.fightIdx >= this.fights.length) { localStorage.removeItem('beta3.quickck'); return; }
+      localStorage.setItem('beta3.quickck', JSON.stringify({
+        fightIdx: this.run.fightIdx, hp: this.run.hp, hpMax: this.run.hpMax,
+        sigils: this.run.sigils, tiers: this.run.tiers, words: this.run.words, longest: this.run.longest,
+        totalDmg: this.run.totalDmg, scried: this.run.scried, featherUsed: this.run.featherUsed,
+        letters: this.run.letters, bigHit: this.run.bigHit, playMs: this.runElapsed(),
+        overkill: this.run.overkill | 0, qseed: this.qseed, clockV: 2,
+        ftue: this.ftue ? 1 : undefined,
+      }));
+      return;
+    }
     // the endless climb survives an app kill exactly as the campaign does
     // (v0.68.0): the seed rebuilds the identical ladder, the level and the
     // active-play clock ride along, and the same fight-start semantics hold
@@ -10919,7 +11076,7 @@ class Battle extends Phaser.Scene {
         // vessel, data-read so the ladder and the pick can never disagree
         if (sg.id === 'aegis') { this.run.hpMax += ssSigilVal('aegis', 'hp', 1); this.run.hp = this.run.hpMax; }
         this.repaintChips();   // a letter-bonus sigil shows on the standing board at once
-        if (this.mode === 'campaign' || this.mode === 'endless') this.saveCheckpoint();
+        if (this.mode === 'campaign' || this.mode === 'endless' || this.mode === 'quick' /* F5-GRAFT-4 */) this.saveCheckpoint();
         sparks.emitParticleAt(card.x, card.y, tier === 2 ? 26 : 12);
         this.tweens.add({ targets: card, scale: 1.05, duration: 130, yoyo: true });
         for (const it of items) if (it !== card && it !== sparks) this.tweens.add({ targets: it, alpha: 0, duration: 200 });
@@ -10983,7 +11140,7 @@ class Battle extends Phaser.Scene {
         this.run.hpMax += d; this.heal(d);
       }
       this.repaintChips();   // a choir/runes step shows on the standing board at once
-      if (this.mode === 'campaign' || this.mode === 'endless') this.saveCheckpoint();
+      if (this.mode === 'campaign' || this.mode === 'endless' || this.mode === 'quick' /* F5-GRAFT-4 */) this.saveCheckpoint();
       const glow = this.add.image(row.x, row.y + rc.y, 'glowbig').setDisplaySize(l.u(440), l.u(180))
         .setTint(GD.glow).setAlpha(0).setBlendMode('ADD');
       this.overlayC.add(glow);
@@ -11215,6 +11372,7 @@ class Battle extends Phaser.Scene {
       }
     }
     if (this.mode === 'campaign') ssClearCampaign();
+    if (this.mode === 'quick') localStorage.removeItem('beta3.quickck');   /* F5-GRAFT-4: the run ended by a real door — nothing left to hold */
     let streak = null;
     if (this.mode === 'daily') {
       SS.award('daily-devout', this.game);
