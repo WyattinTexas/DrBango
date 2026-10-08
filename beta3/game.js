@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.112.0';
+const BUILD = 'STARSPELL v0.113.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -7522,6 +7522,61 @@ class Home extends Phaser.Scene {
      separate "completed the daily" board would list the same names: the score
      list IS the completion list, and RTDB prunes past days, so the streak
      shown here is the player's own, kept in the local profile log.) */
+  /* THE SKY'S OWN WINDOW (Skylar 10/8). Tonight's rule, said in plain
+     words: the sky's glyph and name, its one-line law, and THE HOW — what
+     the day actually asks of you (sky*How, five tongues, keyed off the same
+     def so a new sky card carries its own explanation or none).
+     It is parented INTO the sheet's container, so closing the sheet can
+     never orphan it, and added last so it rides above the sheet's own
+     furniture; the open flag lives on that container too, so a destroyed
+     sheet can never leave the door jammed shut. Its own veil swallows the
+     taps the sheet beneath would otherwise take. */
+  skyLawWindow(parent, sky) {
+    if (!sky || !parent || !parent.active || parent.getData('skyLaw')) return;
+    const how = SS_T(sky.nameKey.replace('Name', 'How'));
+    if (!how) return;
+    parent.setData('skyLaw', 1);
+    SFX.ui();
+    const l = ssLayout(this);
+    const kit = [];
+    const PH = 300, top = 400 - PH / 2;
+    const py = (d) => l.y(top + d);
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setInteractive();
+    this.tweens.add({ targets: veil, alpha: 0.55, duration: 180 });
+    kit.push(veil);
+    kit.push(this.add.image(l.x(0), py(PH / 2), 'endpanel').setDisplaySize(l.u(324), l.u(PH)).setInteractive());
+    const xB = ssTxt(this, l.x(140), py(26), '✕', l.u(14), '#8a94c4').setOrigin(0.5).setInteractive({ useHandCursor: true });
+    kit.push(xB);
+    kit.push(this.add.image(l.x(0), py(62), ssSkyGlyphTex(this, sky)).setDisplaySize(l.u(34), l.u(34)));
+    const nk = ssGoldTex(this, SS_T(sky.nameKey), 17);
+    const nsc = Math.min(1, 262 / nk.w);
+    kit.push(this.add.image(l.x(0), py(98), nk.key).setDisplaySize(l.u(nk.w * nsc), l.u(nk.h * nsc)));
+    kit.push(ssTxt(this, l.x(0), py(117), SS_T('skyRung', ssSkyWeekday(SSNET.dayKey())), l.u(8), '#8a94c4')
+      .setOrigin(0.5).setLetterSpacing(l.u(0.8)));
+    kit.push(this.add.rectangle(l.x(0), py(132), l.u(268), Math.max(1, l.u(1)), 0xc9a84c, 0.3));
+    // the law, then the how — each a single-line-children block (the
+    // one-line-per-text law), the pair centred so two lines or six compose
+    const lawB = ssTextBlock(this, l.x(0), py(150), SS_T(sky.lineKey), {
+      fontSize: l.u(10.5), color: '#ffe9a8', fontStyle: 'italic',
+      wrapW: l.u(272), lineSpacing: l.u(3), align: 'center', ox: 0.5, oy: 0,
+    });
+    const howB = ssTextBlock(this, l.x(0), py(210), how, {
+      fontSize: l.u(10.5), color: '#c9b676',
+      wrapW: l.u(272), lineSpacing: l.u(4), align: 'center', ox: 0.5, oy: 0,
+    });
+    const gap = l.u(15);
+    const startY = py(212) - (lawB.height + gap + howB.height) / 2;
+    lawB.setY(startY);
+    howB.setY(startY + lawB.height + gap);
+    kit.push(lawB, howB);
+    const close = () => {
+      if (parent.active) parent.setData('skyLaw', 0);
+      kit.forEach((o) => { if (o && o.active) o.destroy(); });
+    };
+    veil.on('pointerdown', close);
+    xB.on('pointerdown', close);
+    for (const o of kit) parent.add(o);
+  }
   dailySheet() {
     if (this.busy() || this.dailyC || this.langC || this.setC || this.mapC || this.confirmC || this.signC || this.streakC || this.riteC) return;
     SFX.ensure(); SFX.ui();
@@ -7555,7 +7610,7 @@ class Home extends Phaser.Scene {
     const hk = ssGoldTex(this, '☀ ' + SS_T('daily'), 21);
     const hsc = Math.min(1, 300 / hk.w);
     items.push(this.add.image(l.x(0), py(46), hk.key).setDisplaySize(l.u(hk.w * hsc), l.u(hk.h * hsc)));
-    items.push(ssTxt(this, l.x(0), py(76), SSNET.dayKeyISO() + ' · ' + SS_T('dpOneSky'), l.u(11), '#8a94c4', 'italic').setOrigin(0.5));
+    items.push(ssTxt(this, l.x(0), py(76), SSNET.dayKeyISO(), l.u(11), '#8a94c4', 'italic').setOrigin(0.5));
     const cdT = ssTxt(this, l.x(0), py(98), '', l.u(12), '#c9b676').setOrigin(0.5);
     // The countdown IS the streak's clock once a flame stands and tonight is
     // still unhunted — same seconds, but they now measure something you own.
@@ -7583,7 +7638,8 @@ class Home extends Phaser.Scene {
        sky's promise. */
     const sky = ssSkyToday();
     const rung = ssSkyWeekday(SSNET.dayKey());
-    items.push(this.add.image(l.x(0), py(152), ssSkyBandTex(this)).setDisplaySize(l.u(316), l.u(56)));
+    const band = this.add.image(l.x(0), py(152), ssSkyBandTex(this)).setDisplaySize(l.u(316), l.u(56));
+    items.push(band);
     items.push(this.add.image(l.x(-134), py(152), ssSkyGlyphTex(this, sky)).setDisplaySize(l.u(30), l.u(30)));
     const bandName = ssTxt(this, l.x(-112), py(141), sky ? SS_T(sky.nameKey) : SS_T('daily'), l.u(11.5), '#ffe9a8')
       .setOrigin(0, 0.5).setLetterSpacing(l.u(1));
@@ -7609,28 +7665,45 @@ class Home extends Phaser.Scene {
     }
     items.push(ssTxt(this, l.x(106), py(158), SS_T('skyRung', rung), l.u(7.5), '#8a94c4')
       .setOrigin(0.5).setLetterSpacing(l.u(0.8)));
+    /* THE BAND IS A DOOR (Skylar 10/8): "when you click on whatever the
+       daily is it should open a small window that explains what you have to
+       do for this daily." The whole band takes the tap; a faint ⓘ in its
+       corner says so without stealing room from the law. */
+    if (sky) {
+      band.setInteractive({ useHandCursor: true });
+      band.on('pointerdown', () => this.skyLawWindow(c, sky));
+      const info = ssTxt(this, l.x(146), py(170), 'ⓘ', l.u(10), '#c9a84c').setOrigin(0.5).setAlpha(0.75)
+        .setInteractive({ useHandCursor: true });
+      info.on('pointerdown', () => this.skyLawWindow(c, sky));
+      items.push(info);
+    }
 
-    // your standing under today's sky
+    /* your standing under today's sky. THE QUIET UNHUNTED SKY (Skylar
+       10/8): "today's sky awaits you" is gone — an unplayed sky says
+       NOTHING here. So this block can no longer be laid out from a fixed
+       first line: it gathers whatever it actually has to say (your score if
+       you have hunted, the lantern's night, where the grace night stands)
+       and centres that on the breathing room between the band and the rule,
+       so one line, two or none all read as composed. The lantern lines keep
+       their own words and their tap into the lantern sheet. */
     const played = SS.prof.daily[String(SSNET.dayKey())] | 0;
-    items.push(ssTxt(this, l.x(0), py(196), played ? SS_T('dpPlayed', played) : SS_T('dpAwait'),
-      l.u(13.5), played ? '#f0e8d2' : '#ffe9a8').setOrigin(0.5)
-      .setShadow(0, 0, played ? 'rgba(0,0,0,0.45)' : '#c9b676', l.u(played ? 2 : 8), true, true));
-    // the lantern's own number, in the same words the end screen uses, and —
-    // when there is anything to say — where the grace night stands. Tapping
-    // either opens the lantern sheet, where the week of nights is drawn.
     const sState = ssStreakState();
     const streak = sState.n;
-    if (streak >= 2) {
-      items.push(ssTxt(this, l.x(0), py(214), '🔥 ' + SS_T('stkNight', streak), l.u(11), '#ffb457').setOrigin(0.5)
-        .setShadow(0, 0, '#a8520d', l.u(6), true, true));
-    }
-    if (streak >= 1 || !sState.held) {
-      const gl = ssGraceLine(sState);
-      const gT = ssTxt(this, l.x(0), py(streak >= 2 ? 232 : 220), gl.text, l.u(9.5), gl.color, 'italic')
-        .setOrigin(0.5).setInteractive({ useHandCursor: true });
-      gT.on('pointerdown', () => { SFX.ui(); closeSheet(); this.streakSheet(); });
-      items.push(gT);
-    }
+    const stand = [];
+    if (played) stand.push({ str: SS_T('dpPlayed', played), size: 13.5, color: '#f0e8d2', sh: ['rgba(0,0,0,0.45)', 2] });
+    if (streak >= 2) stand.push({ str: '🔥 ' + SS_T('stkNight', streak), size: 11, color: '#ffb457', sh: ['#a8520d', 6] });
+    if (streak >= 1 || !sState.held) stand.push({ str: ssGraceLine(sState).text, size: 9.5, color: ssGraceLine(sState).color, italic: 1, lantern: 1 });
+    const STAND_MID = 211, STAND_STEP = 18;
+    stand.forEach((row, i) => {
+      const t = ssTxt(this, l.x(0), py(STAND_MID - ((stand.length - 1) * STAND_STEP) / 2 + i * STAND_STEP),
+        row.str, l.u(row.size), row.color, row.italic ? 'italic' : undefined).setOrigin(0.5);
+      if (row.sh) t.setShadow(0, 0, row.sh[0], l.u(row.sh[1]), true, true);
+      if (row.lantern) {
+        t.setInteractive({ useHandCursor: true });
+        t.on('pointerdown', () => { SFX.ui(); closeSheet(); this.streakSheet(); });
+      }
+      items.push(t);
+    });
     rule(246);
 
     // today's board — live from RTDB while the sheet stands open
