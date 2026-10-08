@@ -3,13 +3,17 @@
 Harness for the FIRST5 sandbox (the first-night tutorial test build at
 drbango.com/beta3/first5/ — batch `ss-2026-10-07-first-night`).
 
-**first5-check.mjs** — the stage suite (25 checks): static seams (script
-order, no Firebase, `../` repoints, one `?v=f5-*` stamp), then live boots in
-headless Chrome at DPR 3 — virgin first open with the FTUE gate owed, every
-storage key under the `first5.` prefix, the ascent rising by itself (read
-from the game's own `window.__ssftue` beacon; swiftshader stretches the
-intro, hence the generous window), a `?demo=1` solver run that weaves, and
-`?reset=1` restoring the virgin open and scrubbing itself from the URL.
+**first5-check.mjs** — the whole-batch suite (76 checks, cards 01-06):
+static seams, then live at DPR 3 — the virgin first open (ftue owed, prefix
+isolation, `window.__ssftue`), the LURE (real CDP click launches the rise
+and arms the sound), THE SKY LEANS IN (ember 33hp, real-tap STAR cast,
+star-write, the density gate vs the full dictionary, curated trio, encore,
+a real 5-letter cast firing the cue ladder), THE TEACHING SCRIPTS (real
+dewTile/blackTile prompts, once-per-run dedupe, the forge/plant chain),
+THE LIT SKY (a fell through the true chain writes the mark, the converge,
+the ledger, the kept sky surviving reopen), the demo solver, the pocket
+round (quickck write + relaunch + glint + both refusals), and the reset
+door. Run it from first5/ — ~6 min.
 
     cd beta3/first5 && perl -e 'alarm 580; exec @ARGV' node tools/first5-check.mjs
 
