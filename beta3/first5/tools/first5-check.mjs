@@ -1,23 +1,31 @@
 // FIRST5-CHECK — the stage (batch ss-2026-10-07-first-night, card 01;
-// + fix round ss-2026-10-08-first5-fixes card 01 THE CLEAN REFRESH).
+// + fix round ss-2026-10-08-first5-fixes cards 01 THE CLEAN REFRESH and
+// 02 THE STRAY SIGNS).
 // Proves the first5 sandbox is a true first night that cannot touch live
 // beta3: static seams (script order, no Firebase, repointed shared assets),
 // then live boots in headless Chrome at DPR 3 — fresh first open with the
 // FTUE gate open, storage fully namespaced 'first5.', a ?demo=1 solver run
 // that actually plays, THE CLEAN REFRESH law (a player refresh wipes the
 // night; the game's own scripted reloads — proven through the REAL versus
-// retry door — carry it via the one-shot __f5survive flag), and ?reset=1
-// still honored, out-ranking even a survive flag.
+// retry door — carry it via the one-shot __f5survive flag), ?reset=1
+// still honored, out-ranking even a survive flag, and THE STRAY SIGNS law
+// (F5-FIX1-02: the quick fight view owns NO standing kept marks — not at
+// boot, not across fells — proven by object census, a DPR-3 screenshot and
+// a pixel probe at the circled seat, while the rite, the ledger and the
+// meadow's morning-after sky all still light).
 //
 // Serves the REPO ROOT (first5 reaches ../vendor, ../words.js, ../art) on
 // :8901 if nothing does — NOT the standing :8899 beta3 server, which roots
 // at beta3/ and cannot serve ../. Chrome on :9476, /tmp/cdp-first5 wiped.
 //
-//   cd beta3/first5 && perl -e 'alarm 420; exec @ARGV' node tools/first5-check.mjs
+//   cd beta3/first5 && perl -e 'alarm 840; exec @ARGV' node tools/first5-check.mjs
 //
 import { spawn, execSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 const PORT = 9476, SRV = 8901;
+// the standing-marks census: every ssF5DrawMini item carries a 'f5mark'
+// data tag (F5-FIX1-02), so "the fight view is clean" is one honest count
+const CENSUS = (key) => "(()=>{try{const s=game.scene.getScene('" + key + "');if(!s||!s.scene.isActive())return 'inactive';return s.children.list.filter(o=>o.active&&o.getData&&o.getData('f5mark')).length}catch(e){return 'err:'+e.message}})()";
 const BASE = 'http://localhost:' + SRV + '/beta3/first5/index.html';
 const ROOT = '../..'; // repo root, relative to first5/ where this runs
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
@@ -54,6 +62,10 @@ for (const [f, src] of [['first5.js', shim], ['compat.js', readFileSync('compat.
 }
 ok('every scripted reload announces itself first (ground-truthed, 3 sites)', sites.length === 3 && sites.every((s) => s.endsWith('✓')), sites.join(' '));
 ok('F5-FIX1-01 seams tagged at every site (2 in game.js, 1 in versus.js)', (gameSrc.match(/F5-FIX1-01/g) || []).length === 2 && (versusSrc.match(/F5-FIX1-01/g) || []).length === 1);
+/* — F5-FIX1-02 THE STRAY SIGNS seams — */
+ok('the stray-sign law: the battle no longer draws the kept sky at boot', !/'quick'\) ssF5DrawLitSky/.test(gameSrc) && !gameSrc.includes('the battle wears the kept sky'));
+ok('…the meadow keeps its one draw (the morning-after proof)', (gameSrc.match(/ssF5DrawLitSky\(this\)/g) || []).length === 1 && gameSrc.includes('the meadow wears the kept sky'));
+ok('F5-FIX1-02 seams: six tagged sites, the tracked sweep, the census tag', (gameSrc.match(/F5-FIX1-02/g) || []).length === 6 && (gameSrc.match(/f5ClearSeatMarks\(\)/g) || []).length === 3 && (gameSrc.match(/setData\('f5mark'/g) || []).length === 2);
 ok("game.js art repointed to ../art (2 sites)", (gameSrc.match(/im\.src = '\.\.\/art\//g) || []).length === 2 && !/im\.src = 'art\//.test(gameSrc));
 ok('packs.js dictionary writes ../words-<lang>.js', packSrc.includes('src="../words-'));
 for (let n = 1; n <= 7; n++) ok('F5-GRAFT-' + n + ' seam present in game.js', gameSrc.includes('F5-GRAFT-' + n));
@@ -91,6 +103,7 @@ ws.onmessage = (m) => {
 };
 const send = (method, params) => new Promise((r) => { const i = ++id; pend.set(i, r); ws.send(JSON.stringify({ id: i, method, params })); });
 const ev = async (expr) => { const r = await send('Runtime.evaluate', { expression: expr, returnByValue: true }); return r?.result?.value; };
+const evp = async (expr) => { const r = await send('Runtime.evaluate', { expression: expr, returnByValue: true, awaitPromise: true }); return r?.result?.value; };
 await new Promise((r) => { ws.onopen = r; });
 await send('Runtime.enable', {});
 await send('Page.enable', {});
@@ -216,6 +229,23 @@ ok('the fell WRITES the mark through the true chain', vlit && lit1 !== '[]', lit
 const conv = await ev("(()=>{const b=game.scene.getScene('battle');const free=Object.keys(SS_F5_SEATS).find(id=>!ssF5LitList().includes(id));const ms=b.f5LightSky(free);const again=b.f5LightSky(free);return [free,ms,again,ssF5LitList().length]})()");
 ok('a later first-species fell CONVERGES (~600ms beat, no full rite)', conv && conv[1] > 0 && conv[1] <= 600, String(conv));
 ok('a species already in the sky never re-lights', conv && conv[2] === 0);
+/* — fix 02 THE STRAY SIGNS: the rite still SEATS its mark in the fight
+   view (the fell's own ceremony is untouched), then the sweep clears the
+   zenith (the same f5ClearSeatMarks the next fight runs). Measure the
+   census as a DELTA off whatever the run already seated — NEVER reset
+   f5SeatMarks (that orphans live marks and the sweep could not clear
+   them). Both halves POLL: robust to the full rite's ~2.85s seat delay,
+   the 240ms sweep fade, and a loaded box whose game-loop starves between
+   wall-clock waits. */
+const base = await ev(CENSUS('battle'));
+const freeSeat = await ev("(()=>{const b=game.scene.getScene('battle');const free=Object.keys(SS_F5_SEATS).find(id=>!ssF5LitList().includes(id));if(!free)return null;b.f5LightSky(free);return free})()");
+let grew = false;
+for (let i = 0; i < 16 && !grew; i++) { grew = (await ev(CENSUS('battle'))) > base; if (!grew) await sleep(500); }
+ok('THE RITE STILL SEATS ITS MARK in the fight view (the ceremony draws)', grew, 'base ' + base + ' -> grew · seat ' + freeSeat);
+await ev("(()=>{game.scene.getScene('battle').f5ClearSeatMarks();return 1})()");
+let swept = false;
+for (let i = 0; i < 10 && !swept; i++) { swept = (await ev(CENSUS('battle'))) === 0; if (!swept) await sleep(400); }
+ok('…then the sweep clears EVERY standing mark (the fight view owns none)', swept, 'census ' + await ev(CENSUS('battle')));
 await ev("(()=>{const b=game.scene.getScene('battle');b.f5Ledger();ssF5TomorrowCue(b);return 1})()");
 await sleep(1200);
 ok('the graduation ledger and the tomorrow cue draw clean', (await ev('window.__f5ledger | 0')) >= 1 && (await ev('window.__f5tomorrow | 0')) >= 1);
@@ -231,6 +261,23 @@ for (let i = 0; i < 40 && !kept; i++) { const v = await ev("typeof SS !== 'undef
 ok('the kept sky survives a CARRIED reopen (2+ marks — the machinery holds)', !!kept && kept.split(',').length >= 2, String(kept));
 ok('the survive flag was consumed on sight (one-shot)', await ev("sessionStorage.getItem('__survive') === null"));
 ok('zero exceptions on the kept-sky boot', errs.length === 0, errs.slice(0, 2).join(' | '));
+// fix 02: the carried reopen resumes the held fight — and the battle must
+// boot a CLEAN zenith now (the old boot draw painted every kept mark here)
+let rb1 = false;
+for (let i = 0; i < 90 && !rb1; i++) { rb1 = await ev("(()=>{try{const b=game.scene.getScene('battle');return !!(b&&b.scene.isActive()&&b.state==='pick')}catch(e){return false}})()"); if (!rb1) await sleep(1000); }
+ok('THE RESUMED BATTLE BOOTS CLEAN — kept list stands, zero marks drawn', rb1 && (await ev(CENSUS('battle'))) === 0 && (await ev('ssF5LitList().length')) >= 1, 'census ' + (await ev(CENSUS('battle'))) + ' · lit ' + (await ev('ssF5LitList().length')));
+/* — fix 02: the mark's true home still lights. Drop the held fight, carry
+   a reopen — the boot lands on the MEADOW and the morning-after sky stands — */
+await ev("localStorage.removeItem('beta3.quickck')");
+await ev('window.__f5survive()');
+await go(BASE);
+let mMarks = null;
+for (let i = 0; i < 60 && mMarks === null; i++) {
+  const v = await ev(CENSUS('home'));
+  if (typeof v === 'number' && v > 0) mMarks = v; else await sleep(1000);
+}
+ok('THE MEADOW STILL WEARS THE KEPT SKY (the morning-after proof stands)', mMarks !== null && mMarks >= 2, String(mMarks) + ' mark items');
+ok('zero exceptions through the stray-sign sweep', errs.length === 0, errs.slice(0, 2).join(' | '));
 
 /* ================= §3 the run engine plays (demo solver) ================= */
 console.log('— §3 the run engine plays —');
@@ -243,6 +290,46 @@ let qk = null; // graft 4: the first fell writes the held fight
 for (let i = 0; i < 150 && !qk; i++) { const c = await ev("localStorage.getItem('beta3.quickck')"); if (c) { const j = JSON.parse(c); if (j.fightIdx >= 1) qk = j; } if (!qk) await sleep(1500); }
 ok('the fell writes the held fight (graft 4: beta3.quickck)', !!qk, qk && ('fight ' + qk.fightIdx + ' · qseed kept ' + Number.isFinite(qk.qseed)));
 ok('zero exceptions mid-run', errs.length === 0, errs.slice(0, 2).join(' | '));
+
+/* ======== §3a THE SKYLAR SCENE (fix 02: the stray signs) ========
+   Mid-run, a later fight standing, the kept list non-empty — the exact
+   screen Skylar circled. Pause the solver ATOMICALLY at 'pick' so no fell
+   can seat a rite mark mid-look (the rite is WANTED; standing marks are
+   not), prove 'pick' HELD for a beat (no cast in flight), then the count,
+   the DPR-3 screenshot, and the pixel probe at the circled seat. */
+console.log('— §3a THE SKYLAR SCENE: the circled corner is clean sky —');
+let mrHeld = false;
+for (let round = 0; round < 6 && !mrHeld; round++) {
+  let picked = false;
+  for (let i = 0; i < 90 && !picked; i++) { picked = await ev("(()=>{try{const b=game.scene.getScene('battle');if(!b||!b.scene.isActive())return false;if(b.state==='pick'&&b.run.fightIdx>=1&&ssF5LitList().length>=1){if(b.demoTimer)b.demoTimer.paused=true;return true}return false}catch(e){return false}})()"); if (!picked) await sleep(1000); }
+  if (!picked) break;
+  await sleep(1300); // a just-fired cast lands inside this; the sweep fade too
+  if (await ev("(()=>{try{return game.scene.getScene('battle').state==='pick'}catch(e){return false}})()")) mrHeld = true;
+  else await ev("(()=>{try{const b=game.scene.getScene('battle');if(b.demoTimer)b.demoTimer.paused=false;return 1}catch(e){return 0}})()");
+}
+const mrIdx = await ev("(()=>{try{return game.scene.getScene('battle').run.fightIdx}catch(e){return -1}})()");
+ok('mid-run stands still for the look: a later fight, the kept list lit', mrHeld, 'fight ' + (mrIdx + 1) + ' · lit ' + await ev("JSON.stringify(typeof ssF5LitList==='function'?ssF5LitList():null)"));
+// SETTLE-POLL: the previous fight's mark was swept at startFight, but its
+// 240ms fade can linger when a loaded game-loop starves between my waits —
+// give it a few seconds to reach zero. A mark that TRULY stands never does.
+let mrMarks = await ev(CENSUS('battle'));
+for (let i = 0; i < 10 && mrMarks !== 0; i++) { await sleep(400); mrMarks = await ev(CENSUS('battle')); }
+ok('THE STRAY SIGNS ARE GONE — zero standing marks in the fight view', mrMarks === 0, String(mrMarks));
+// the record for Skylar: the quick-play screen at iPhone DPR 3, final bytes
+try { mkdirSync('tools/shots-stray', { recursive: true }); } catch (e) { }
+const shot = await send('Page.captureScreenshot', { format: 'png' });
+if (shot && shot.data) writeFileSync('tools/shots-stray/midrun-clean-zenith.png', Buffer.from(shot.data, 'base64'));
+ok('the DPR-3 screenshot is on file (tools/shots-stray/)', !!(shot && shot.data), shot && shot.data ? Math.round(shot.data.length / 1024) + 'kb' : 'no data');
+// the pixel probe: the vulpes seat (the circled corner, clear of the gold
+// bar). Gold signature = warm pixel (R leads B); clean sky and white
+// starfield dots read cold. A standing mark paints hundreds of warm px.
+const probe = await evp("(()=>{return new Promise((res)=>{try{const b=game.scene.getScene('battle');const l=b.L;const x0=Math.round(l.x(-148)),y0=Math.round(l.y(80)),w=Math.round(l.u(38)),h=Math.round(l.u(34));const t=setTimeout(()=>res(['timeout']),8000);game.renderer.snapshotArea(x0,y0,w,h,(img)=>{try{clearTimeout(t);const c=document.createElement('canvas');c.width=img.width;c.height=img.height;const g=c.getContext('2d');g.drawImage(img,0,0);const d=g.getImageData(0,0,c.width,c.height).data;let gold=0,maxR=0;for(let i=0;i<d.length;i+=4){const r=d[i],bl=d[i+2];if(r>maxR)maxR=r;if(r>55&&r-bl>6)gold++}res([gold,maxR,img.width,img.height])}catch(e){res(['err',String(e)])}})}catch(e){res(['err',String(e)])}})})()");
+ok('THE CIRCLED CORNER IS CLEAN SKY (pixel probe at the vulpes seat)', Array.isArray(probe) && typeof probe[0] === 'number' && probe[0] < 60, 'warm px ' + String(probe));
+// and the header the circle grazed is unharmed: the YOU bar, its numbers,
+// the beast's constellation all stand exactly where they were
+const header = await ev("(()=>{try{const b=game.scene.getScene('battle');return [!!(b.hpBar&&b.hpBar.active),!!(b.hpT&&b.hpT.active&&b.hpT.text.length),!!(b.beastC&&b.beastC.active&&b.beastC.list.length>0),!!(b.beast&&b.beast.hpNow>0)].join('|')}catch(e){return 'err:'+e.message}})()");
+ok('the YOU bar and the beast constellation stand untouched', header === 'true|true|true|true', header);
+ok('zero exceptions through the look', errs.length === 0, errs.slice(0, 2).join(' | '));
 
 /* ======== §3b the carried night, the glint, the two refusals ======== */
 console.log('— §3b the carried night: the survive door, then the REAL retry door —');
@@ -268,6 +355,7 @@ for (let i = 0; i < 90 && !reResumed; i++) { reResumed = await ev("(()=>{try{con
 const rIdx2 = await ev("(()=>{try{return game.scene.getScene('battle').run.fightIdx}catch(e){return -1}})()");
 ok('THE REAL RETRY DOOR reloads WITHOUT losing the night (versus.js F5-FIX1-01)', reResumed && qk && rIdx2 === qk.fightIdx, 'resumed at fight ' + rIdx2 + ' (held ' + (qk && qk.fightIdx) + ')');
 ok('that flag too was consumed (one-shot)', await ev("sessionStorage.getItem('__survive') === null"));
+ok('…and this resumed fight too wears a CLEAN zenith (fix 02, every boot door)', (await ev(CENSUS('battle'))) === 0 && await ev("typeof ssF5LitList==='function' && ssF5LitList().length >= 1"));
 await sleep(2500); // the deal's bounce settles before probe taps (house law)
 await ev("(()=>{const b=game.scene.getScene('battle');b.f5LastTap=b.time.now-11000;b.f5Glinted=false;return 1})()");
 let glinted = false;

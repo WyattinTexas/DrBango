@@ -1919,7 +1919,9 @@ function ssF5DrawMini(scene, id, alpha, depth) {
   if (!seat || !b || !scene.textures.exists('dot')) return [];
   const l = scene.L || (scene.L = ssLayout(scene)), sc = SS_F5_SEAT_SC, cx = l.x(seat[0]), cy = l.y(seat[1]);
   const items = [];
-  const g = scene.add.graphics().setScrollFactor(0).setDepth(depth).setAlpha(alpha);
+  /* F5-FIX1-02: every mark item carries a census tag, so the harness can
+     prove the fight view clean (and the rite/ledger/meadow still lit) */
+  const g = scene.add.graphics().setScrollFactor(0).setDepth(depth).setAlpha(alpha).setData('f5mark', id);
   g.lineStyle(l.u(1), 0xd9b96a, 0.75);
   for (const [a, b2] of b.edges) {
     g.moveTo(cx + l.u(b.stars[a][0] * sc), cy + l.u(b.stars[a][1] * sc));
@@ -1929,7 +1931,7 @@ function ssF5DrawMini(scene, id, alpha, depth) {
   items.push(g);
   for (const [sx, sy] of b.stars) {
     items.push(scene.add.image(cx + l.u(sx * sc), cy + l.u(sy * sc), 'dot').setScrollFactor(0)
-      .setDepth(depth + 1).setScale(0.5).setTint(0xffe9a8).setAlpha(alpha).setBlendMode('ADD'));
+      .setDepth(depth + 1).setScale(0.5).setTint(0xffe9a8).setAlpha(alpha).setBlendMode('ADD').setData('f5mark', id));
   }
   return items;
 }
@@ -8895,7 +8897,13 @@ class Battle extends Phaser.Scene {
        authored queue; after it drains, the KIND BAG (f5Kind) fades
        100→50→0% by fight 4. The run's cue rungs start unfired. */
     if (this.mode === 'quick') { this.f5Queue = this.ftue ? (SS_F5_RIG[PACK.lang] || SS_F5_RIG.en).slice() : []; this.f5Rungs = {}; }
-    if (this.mode === 'quick') ssF5DrawLitSky(this);   /* F5-CARD-06: the battle wears the kept sky */
+    /* F5-FIX1-02: THE STRAY SIGNS (Skylar's circled verdict, 10/08) — the
+       battle NO LONGER wears the kept sky: the fight view owns no standing
+       marks, at boot or across fells (they crowded the YOU bar and the
+       quick-play corner). The marks' homes stand untouched: the meadow
+       (the morning-after proof), the fell's own rite, the second-fell
+       tomorrow cue, the end screen's ledger. */
+    this.f5SeatMarks = [];
     /* F5-GRAFT-5: feed the stalled speller — the stall clock. Any tap
        anywhere re-arms it; the glint itself fires from update(). */
     this.f5LastTap = 0; this.f5Glinted = false;
@@ -9079,7 +9087,10 @@ class Battle extends Phaser.Scene {
     this.time.delayedCall(Math.max(400, total - 500), () => {
       if (!this.scene.isActive()) return;
       stars.forEach((d) => this.tweens.add({ targets: d, alpha: 0, duration: 420, onComplete: () => { if (d.active) d.destroy(); } }));
-      const items = ssF5DrawMini(this, id, 0, 920);   // the permanent mark takes the seat
+      const items = ssF5DrawMini(this, id, 0, 920);   // the mark takes the seat for the fell's beat
+      /* F5-FIX1-02: tracked — the next fight (or the run's end) sweeps it;
+         the PROFILE keeps the permanence, the fight view stays clean */
+      this.f5SeatMarks = (this.f5SeatMarks || []).concat(items);
       items.forEach((o, k) => this.tweens.add({ targets: o, alpha: k === 0 ? 0.4 : 0.55, duration: 600 }));
     });
     if (first) {
@@ -9093,6 +9104,19 @@ class Battle extends Phaser.Scene {
       return Math.max(SS_F5_CEREMONY_FLOOR_MS, total - 500);
     }
     return 300;   // the converge rides mostly inside the shipped 1150ms beat
+  }
+  /* F5-FIX1-02: the seated mark leaves before the next beat owns the sky —
+     called at startFight (the new constellation assembles under a clean
+     zenith) and at endRun (the ledger below redraws the kept marks as the
+     end screen's ONE source). The rite itself is untouched. */
+  f5ClearSeatMarks() {
+    const ms = this.f5SeatMarks;
+    if (!ms || !ms.length) return;
+    this.f5SeatMarks = [];
+    for (const o of ms) {
+      if (!o || !o.active) continue;
+      this.tweens.add({ targets: o, alpha: 0, duration: 240, onComplete: () => { if (o.active) o.destroy(); } });
+    }
   }
   /* F5-CARD-06: the graduation ache — the kept marks stand, the dark seats
      ghost for a breath, and one ledger line names the pictured next. */
@@ -10181,6 +10205,7 @@ class Battle extends Phaser.Scene {
   startFight() {
     const l = this.L;
     const f = this.fights[this.run.fightIdx];
+    this.f5ClearSeatMarks();   /* F5-FIX1-02: the last fell's mark yields the zenith */
     /* F5-CARD-05: THE PLANTED GLOW — any special tile fight 1 never taught
        opens fight 2 planted (the page's own beat: "one planted gilded tile
        — the glow you now know how to chase"); and by fight 3 the SCRY
@@ -11778,6 +11803,7 @@ class Battle extends Phaser.Scene {
     }
     if (this.mode === 'campaign') ssClearCampaign();
     if (this.mode === 'quick') localStorage.removeItem('beta3.quickck');   /* F5-GRAFT-4: the run ended by a real door — nothing left to hold */
+    this.f5ClearSeatMarks();   /* F5-FIX1-02: the ledger below is the end screen's one source of kept marks */
     /* F5-CARD-06: the graduation ache rides the end screen's settle */
     if (this.mode === 'quick') this.time.delayedCall(1600, () => { if (this.scene.isActive()) this.f5Ledger(); });
     let streak = null;
