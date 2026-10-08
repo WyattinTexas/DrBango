@@ -1,9 +1,13 @@
-// FIRST5-CHECK — the stage (batch ss-2026-10-07-first-night, card 01).
+// FIRST5-CHECK — the stage (batch ss-2026-10-07-first-night, card 01;
+// + fix round ss-2026-10-08-first5-fixes card 01 THE CLEAN REFRESH).
 // Proves the first5 sandbox is a true first night that cannot touch live
 // beta3: static seams (script order, no Firebase, repointed shared assets),
 // then live boots in headless Chrome at DPR 3 — fresh first open with the
 // FTUE gate open, storage fully namespaced 'first5.', a ?demo=1 solver run
-// that actually plays, and ?reset=1 restoring the virgin first open.
+// that actually plays, THE CLEAN REFRESH law (a player refresh wipes the
+// night; the game's own scripted reloads — proven through the REAL versus
+// retry door — carry it via the one-shot __f5survive flag), and ?reset=1
+// still honored, out-ranking even a survive flag.
 //
 // Serves the REPO ROOT (first5 reaches ../vendor, ../words.js, ../art) on
 // :8901 if nothing does — NOT the standing :8899 beta3 server, which roots
@@ -38,6 +42,18 @@ const stamps = new Set(scripts.map((s) => (s.match(/\?v=(f5-[\d.]+)/) || [])[1])
 ok('one f5 stamp on every copy (release ritual)', stamps.size === 1, [...stamps].join());
 ok('shim prefixes get/set/remove on Storage.prototype', ['getItem', 'setItem', 'removeItem'].every((m) => shim.includes('P.' + m)));
 ok('shim handles ?reset=1 and scrubs it from the URL', shim.includes("searchParams.delete('reset')"));
+/* — F5-FIX1-01 THE CLEAN REFRESH seams — */
+const versusSrc = readFileSync('versus.js', 'utf8');
+ok('shim: the survive hook stands for scripted reloads', shim.includes('window.__f5survive'));
+ok('shim: wipe is the DEFAULT — no flag, no survival', shim.includes('reset || !survive'));
+ok('shim: the SANDBOX-ONLY law is written loud (never integrate the wipe)', shim.includes('SANDBOX-ONLY LAW') && shim.includes('NEVER wipe on'));
+const sites = [];
+for (const [f, src] of [['first5.js', shim], ['compat.js', readFileSync('compat.js', 'utf8')], ['strings.js', readFileSync('strings.js', 'utf8')], ['packs.js', packSrc], ['data.js', readFileSync('data.js', 'utf8')], ['seed-names.js', readFileSync('seed-names.js', 'utf8')], ['net.js', readFileSync('net.js', 'utf8')], ['audio.js', readFileSync('audio.js', 'utf8')], ['game.js', gameSrc], ['versus.js', versusSrc], ['rival.js', readFileSync('rival.js', 'utf8')]]) {
+  const re = /location\.(reload|replace)\(/g; let m;
+  while ((m = re.exec(src))) sites.push(f + ':' + src.slice(0, m.index).split('\n').length + (src.slice(Math.max(0, m.index - 340), m.index).includes('__f5survive') ? '✓' : '✗'));
+}
+ok('every scripted reload announces itself first (ground-truthed, 3 sites)', sites.length === 3 && sites.every((s) => s.endsWith('✓')), sites.join(' '));
+ok('F5-FIX1-01 seams tagged at every site (2 in game.js, 1 in versus.js)', (gameSrc.match(/F5-FIX1-01/g) || []).length === 2 && (versusSrc.match(/F5-FIX1-01/g) || []).length === 1);
 ok("game.js art repointed to ../art (2 sites)", (gameSrc.match(/im\.src = '\.\.\/art\//g) || []).length === 2 && !/im\.src = 'art\//.test(gameSrc));
 ok('packs.js dictionary writes ../words-<lang>.js', packSrc.includes('src="../words-'));
 for (let n = 1; n <= 7; n++) ok('F5-GRAFT-' + n + ' seam present in game.js', gameSrc.includes('F5-GRAFT-' + n));
@@ -204,10 +220,16 @@ await ev("(()=>{const b=game.scene.getScene('battle');b.f5Ledger();ssF5TomorrowC
 await sleep(1200);
 ok('the graduation ledger and the tomorrow cue draw clean', (await ev('window.__f5ledger | 0')) >= 1 && (await ev('window.__f5tomorrow | 0')) >= 1);
 ok('zero exceptions through the lighting', errs.length === 0, errs.slice(0, 2).join(' | '));
-await go(BASE);   // the morning after — a plain reopen still wears the kept sky
+// the morning after — ON THIS STAGE a plain reopen is a fresh night (THE
+// CLEAN REFRESH, F5-FIX1-01), so the kept-sky MACHINERY is proven through
+// the survive door: a carried reopen keeps the marks, as a scripted reload
+// would. (Integration note: live, a plain reopen keeps them — never the wipe.)
+await ev('window.__f5survive()');
+await go(BASE);
 let kept = null;
 for (let i = 0; i < 40 && !kept; i++) { const v = await ev("typeof SS !== 'undefined' && SS.prof ? JSON.stringify(ssF5LitList()) : null"); if (v && v !== 'null' && v !== '[]') kept = v; if (!kept) await sleep(1000); }
-ok('the morning after: the kept sky survives the reopen (2+ marks)', !!kept && kept.split(',').length >= 2, String(kept));
+ok('the kept sky survives a CARRIED reopen (2+ marks — the machinery holds)', !!kept && kept.split(',').length >= 2, String(kept));
+ok('the survive flag was consumed on sight (one-shot)', await ev("sessionStorage.getItem('__survive') === null"));
 ok('zero exceptions on the kept-sky boot', errs.length === 0, errs.slice(0, 2).join(' | '));
 
 /* ================= §3 the run engine plays (demo solver) ================= */
@@ -222,14 +244,30 @@ for (let i = 0; i < 150 && !qk; i++) { const c = await ev("localStorage.getItem(
 ok('the fell writes the held fight (graft 4: beta3.quickck)', !!qk, qk && ('fight ' + qk.fightIdx + ' · qseed kept ' + Number.isFinite(qk.qseed)));
 ok('zero exceptions mid-run', errs.length === 0, errs.slice(0, 2).join(' | '));
 
-/* ======== §3b the pocket, the glint, the two refusals ======== */
-console.log('— §3b the pocket, the glint, the two refusals —');
-await go(BASE); // an app kill mid-run: plain reopen, held fight standing
+/* ======== §3b the carried night, the glint, the two refusals ======== */
+console.log('— §3b the carried night: the survive door, then the REAL retry door —');
+// graft 4's resume rides the survive flag on this stage: a scripted reload
+// carries the night, a player refresh does not (§3c proves the wipe)
+await ev('window.__f5survive()');
+await go(BASE); // carried — the held fight must stand
 let resumed = false;
 for (let i = 0; i < 90 && !resumed; i++) { resumed = await ev("(()=>{try{const b=game.scene.getScene('battle');return !!(b&&b.scene.isActive()&&b.mode==='quick'&&b.state==='pick')}catch(e){return false}})()"); if (!resumed) await sleep(1000); }
 const rIdx = await ev("(()=>{try{return game.scene.getScene('battle').run.fightIdx}catch(e){return -1}})()");
-ok('a pocketed phone relaunches into the held fight (graft 4)', resumed && qk && rIdx === qk.fightIdx, 'resumed at fight ' + rIdx + ' (held ' + (qk && qk.fightIdx) + ')');
-ok('the intro was NOT replayed over the held run (graft 4)', await ev("window.__ssftue && window.__ssftue.on === false"));
+ok('a CARRIED reopen resumes the held fight (graft 4 rides the survive door)', resumed && qk && rIdx === qk.fightIdx, 'resumed at fight ' + rIdx + ' (held ' + (qk && qk.fightIdx) + ')');
+ok('the intro was NOT replayed over the carried run (graft 4)', await ev("window.__ssftue && window.__ssftue.on === false"));
+// now the REAL door — the versus offline retry button fires the actual
+// versus.js F5-FIX1-01 line: a true scripted reload through real game code
+await ev("(()=>{game.scene.start('vsmenu');return 1})()");
+let rbUp = false;
+for (let i = 0; i < 20 && !rbUp; i++) { rbUp = await ev("(()=>{try{const v=game.scene.getScene('vsmenu');return !!(v&&v.retryB&&v.retryB.input&&v.retryB.input.enabled)}catch(e){return false}})()"); if (!rbUp) await sleep(500); }
+ok('the offline dueling ground stands its retry door (sandbox is local)', rbUp);
+await Promise.race([ev("(()=>{game.scene.getScene('vsmenu').retryB.emit('pointerdown');return 1})()"), sleep(3000)]);
+await sleep(2500); // the reload the button fired lands
+let reResumed = false;
+for (let i = 0; i < 90 && !reResumed; i++) { reResumed = await ev("(()=>{try{const b=game.scene.getScene('battle');return !!(b&&b.scene.isActive()&&b.mode==='quick'&&b.state==='pick')}catch(e){return false}})()"); if (!reResumed) await sleep(1000); }
+const rIdx2 = await ev("(()=>{try{return game.scene.getScene('battle').run.fightIdx}catch(e){return -1}})()");
+ok('THE REAL RETRY DOOR reloads WITHOUT losing the night (versus.js F5-FIX1-01)', reResumed && qk && rIdx2 === qk.fightIdx, 'resumed at fight ' + rIdx2 + ' (held ' + (qk && qk.fightIdx) + ')');
+ok('that flag too was consumed (one-shot)', await ev("sessionStorage.getItem('__survive') === null"));
 await sleep(2500); // the deal's bounce settles before probe taps (house law)
 await ev("(()=>{const b=game.scene.getScene('battle');b.f5LastTap=b.time.now-11000;b.f5Glinted=false;return 1})()");
 let glinted = false;
@@ -247,11 +285,34 @@ if (pair) {
 }
 ok('zero exceptions through the pocket round', errs.length === 0, errs.slice(0, 2).join(' | '));
 
+/* ======== §3c THE CLEAN REFRESH — the fix itself (F5-FIX1-01) ======== */
+console.log('— §3c THE CLEAN REFRESH: a player refresh is a true first open —');
+// the night is standing (held fight, stats, marks). Put a sentinel beside
+// them, then refresh like a thumb would — Page.reload, NO survive flag
+await ev("localStorage.setItem('beta3.f5sentinel', 'standing')");
+ok('the night stands before the refresh (held fight in the pocket)', await ev("localStorage.getItem('beta3.quickck') !== null"));
+errs.length = 0;
+await send('Page.reload', {});
+await sleep(2500);
+let wiped = false;
+for (let i = 0; i < 40 && !wiped; i++) { wiped = await ev("localStorage.getItem('beta3.f5sentinel') === null && localStorage.getItem('beta3.quickck') === null && localStorage.getItem('beta3.stat') === null"); if (!wiped) await sleep(1000); }
+ok('PULL-TO-REFRESH WIPES THE NIGHT: sentinel, held fight and stat all gone', wiped);
+let virgin = false;
+for (let i = 0; i < 40 && !virgin; i++) { virgin = (await ev('typeof SS !== "undefined" && SS.prof ? SS.prof.ftue : null')) === 0; if (!virgin) await sleep(1000); }
+ok('the FTUE gate is OPEN again — the refresh made a stranger (ftue 0 = owed)', virgin);
+ok('the lit sky is empty again', (await ev("typeof ssF5LitList === 'function' ? ssF5LitList().length : null")) === 0);
+let start = null; // the tutorial at its VERY start: the lure asks, and waits
+for (let i = 0; i < 180 && !start; i++) { const st = await ev("window.__ssftue ? window.__ssftue.state : null"); if (st === 'lure') start = st; if (!start) await sleep(1000); }
+ok('the tutorial stands at its very start — the lure asks again', start === 'lure');
+ok('zero exceptions through the clean refresh', errs.length === 0, errs.slice(0, 2).join(' | '));
+
 /* ================= §4 the reset door ================= */
-console.log('— §4 the reset door —');
+console.log('— §4 the reset door (redundant now, still honored) —');
+await ev("localStorage.setItem('beta3.f5sentinel', 'reset-me')");
+await ev('window.__f5survive()');   // even CARRIED, an explicit reset wins
 await go(BASE + '?reset=1');
 await sleep(4000);
-ok('?reset=1 wiped the night — stat gone', await ev("localStorage.getItem('beta3.stat') === null"));
+ok('?reset=1 wiped the night — even over a survive flag (reset out-ranks)', await ev("localStorage.getItem('beta3.f5sentinel') === null && localStorage.getItem('beta3.stat') === null"));
 ok('?reset=1 scrubbed itself from the URL', await ev("!location.search.includes('reset')"), await ev('location.search'));
 let reborn = false;
 for (let i = 0; i < 20 && !reborn; i++) { reborn = (await ev('typeof SS !== "undefined" && SS.prof ? SS.prof.ftue : null')) === 0; if (!reborn) await sleep(1000); }

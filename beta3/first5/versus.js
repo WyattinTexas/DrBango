@@ -181,7 +181,9 @@ class VsMenu extends Phaser.Scene {
       // is once-per-load by design), so the door reloads the page in place
       const rb = this.retryB = this.add.image(l.x(0), l.y(496), ssBtn(this, true, 300, 54)).setDisplaySize(l.u(300), l.u(54)).setInteractive({ useHandCursor: true });
       ssTxt(this, l.x(0), l.y(496), SS_T('vsRetry'), l.u(12.5), '#c9d0f0').setOrigin(0.5);
-      rb.on('pointerdown', () => { SFX.ui(); try { location.reload(); } catch (e) { } });
+      /* F5-FIX1-01: a retry is the game reloading itself, not a fresh visit —
+         announce it so the first5 stage carries the night across (inert live) */
+      rb.on('pointerdown', () => { SFX.ui(); try { window.__f5survive && window.__f5survive(); } catch (e) { } try { location.reload(); } catch (e) { } });
       return;
     }
     try { localStorage.removeItem('beta3.vsmode'); } catch (e) { }   // the mode choice is retired — sweep the dead key

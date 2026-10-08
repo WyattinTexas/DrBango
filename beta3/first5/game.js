@@ -7653,6 +7653,9 @@ class Home extends Phaser.Scene {
         SFX.ui();
         // this reload is navigation, not a fresh visit — don't replay the intro
         try { sessionStorage.setItem('beta3.skipIntro', '1'); } catch (e) { }
+        /* F5-FIX1-01: the language turn is scripted, not a fresh visit —
+           the first5 stage carries the night across (inert live) */
+        try { window.__f5survive && window.__f5survive(); } catch (e) { }
         const u = new URL(location.href);
         u.searchParams.set('lang', k);
         location.replace(u.toString());
@@ -13248,7 +13251,9 @@ function ssBlankWatch() {
           DIAG('blank canvas ×' + blanks + ' (sd ' + sd + ') — reloading');
           try { if (typeof ssDiagLog === 'function') ssDiagLog('blank canvas (sd ' + sd + ') — self-reload'); } catch (e) { }
           try { if (SS_DEV.last) { SS_DEV.last.blank = true; SS_DEV.last.sd = sd; ssDeviceSend(SS_DEV.last); } } catch (e) { }
-          setTimeout(() => location.reload(), 500);
+          /* F5-FIX1-01: the self-heal reload keeps the night on the first5
+             stage — announced at the last moment before it fires (inert live) */
+          setTimeout(() => { try { window.__f5survive && window.__f5survive(); } catch (e) { } location.reload(); }, 500);
           return;
         }
       }
