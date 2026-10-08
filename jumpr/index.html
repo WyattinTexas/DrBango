@@ -642,6 +642,13 @@ async function pollStatus() {
       `<span class="chip">jumps <b>${s.jumps}</b>/${s.cap}</span>`
     ];
     if (s.watching) rows.push(`<span class="chip">now: <b>${s.watching.slice(0,34)}</b></span>`);
+    for (const r of (Array.isArray(s.remote) ? s.remote : [])) {   // 10/8 CARD-M1L: Maker 1 (the Air), the remote lane
+      const e = x => String(x == null ? "" : x).replace(/[&<>"]/g, "");
+      const c = (r.running || [])[0];
+      const what = c ? `<b>${e(c.id)}</b> ${e((c.title || "").slice(0, 22))} · ${Math.max(1, Math.round((c.for || 0) / 60))}m`
+                     : (r.online ? "idle" : "offline");
+      rows.push(`<span class="chip">💻 ${e(r.name || r.lane)}: ${what}${r.waiting_n ? ` · ${r.waiting_n} waiting` : ""}</span>`);
+    }
     if (s.guest_cap) rows.push(`<span class="chip">your notes today <b>${s.guest_today || 0}</b>/${s.guest_cap}</span>`);
     $("statrow").innerHTML = rows.join("");
     $("queuelines").textContent = (s.queue_lines || []).slice(0,6).join("\n");
