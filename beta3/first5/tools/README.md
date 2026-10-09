@@ -3,11 +3,19 @@
 Harness for the FIRST5 sandbox (the first-night tutorial test build at
 drbango.com/beta3/first5/ — batch `ss-2026-10-07-first-night` + fix round
 `ss-2026-10-08-first5-fixes` + `ss-2026-10-09-night-sky-live` card 03 +
-`ss-2026-10-09-first5-script` card 01).
+`ss-2026-10-09-first5-script` cards 01–02).
 
 **first5-check.mjs** — the whole-stage suite (cards 01-06 + fix 01 THE
 CLEAN REFRESH + fix 02 THE STRAY SIGNS + fix 03 THE SCRY LESSON + STRAIGHT
-INTO THE NIGHT + THE PAINTED FIRST FIVE): static seams (including the
+INTO THE NIGHT + THE PAINTED FIRST FIVE + THE GUIDED HAND, ORANGE): static
+seams (including THE GUIDED HAND's — twenty-four F5-GUIDED sites, the
+script table for all five tongues, the rig carrying every refill of the
+scripted fight, the lock on tile/CAST/SCRY, the held continuation, the
+showcase trigger, the reset-before-build — plus THE SIMULATION: every
+tongue's script dealt and cast exactly as the game does, against the REAL
+dictionaries in ../words*.js and the live damage math — word two must
+forge the orange, word three must start on it at exactly +6, VULPES must
+survive, the rig must be spent, the free board dense; and including the
 painted seams — thirteen F5-PAINTED sites, the live game's plate seat /
 zenith crown / fight frame (ssNightSkyTex · ssNightSkyCap · ssZenithSky)
 proven byte-for-byte against ../game.js, the painted wordmark branch, the
@@ -41,9 +49,21 @@ the painted word at playIntro's seat) captured as `live-zenith.png` +
 dependency-free PNG reader: the first fight's outer sky strips ≥95% within
 ±6, the title night's full frame ≥95% within ±8, the wordmark band ≥90%),
 the LURE (real CDP click at
-the TITLE launches the lean and arms the sound), THE SKY LEANS IN (ember 33hp, real-tap STAR cast, star-write,
-the density gate vs the full dictionary, curated trio, encore, a real
-5-letter cast firing the cue ladder), THE TEACHING SCRIPTS (real
+the TITLE launches the lean and arms the sound), THE SKY LEANS IN (ember 33hp, star-write,
+the density gate vs the full dictionary, curated trio, encore, the cue
+ladder), THE GUIDED HAND, ORANGE (§2c: REAL taps follow the finger through
+STAR, then — no free-typing gap — MOONS; the lock proven with real fingers:
+a tile off the road, SCRY, and CAST with MOON standing all refused while
+un-weaving stays allowed; MOONS forges the orange, which lands on cell 0
+with the hand resting on it and the +6 line spoken; the pointed tile is
+the first tap of SKY; the showcase HOLDS the fight — state anim, the cast
+cells still empty, the fuse unticked, VULPES shown at 3 — with 16 damage /
+plain 10 / +6 on the beacon, the light veil at 900, the showcase at 950,
+the hand raised to 960 on the number; a real tap past the 900ms floor lets
+go: the hand retires, n·o·s lands, the fuse ticks to 1, tiles answer
+freely, the free board is density-gated; three DPR-3 captures in
+`tools/shots-guided/` — finger-word2 · orange-intro · orange-showcase —
+untracked, never committed), THE TEACHING SCRIPTS (real
 dewTile/blackTile prompts, once-per-run dedupe, the forge/plant chain),
 THE LIT SKY (a fell through the true chain writes the mark, the converge,
 the rite still SEATING its mark + the sweep clearing the zenith, the
@@ -67,7 +87,7 @@ every depth home; real taps select and bounce again; a later stall only
 glints — the hand is never taken twice), THE CLEAN REFRESH itself
 (Page.reload with no flag wipes sentinel/quickck/stat, re-opens the FTUE
 gate, and the lure asks again, at the title), and the reset door (still honored,
-out-ranking even a survive flag). Run from first5/ — ~12-17 min.
+out-ranking even a survive flag). Run from first5/ — ~13-18 min.
 
 Sandbox-only law: the wipe-on-refresh is THE STAGE'S law, never the live
 game's — see the SANDBOX-ONLY block atop first5.js before any integration.

@@ -34,6 +34,19 @@
 // (§6): the live game booted on the same server, its zenith and its title shade
 // captured as references, the first5 title night and first fight judged
 // against them within the sky-stays law (outer strips ±6, full frame ±8).
+// THE GUIDED HAND, ORANGE (10/9, card ss-2026-10-09-first5-script/02, F5-GUIDED
+// seams): the finger no longer lets go after the first word — it walks a
+// SCRIPT (STAR → MOONS → the orange's arrival → SKY → the damage showcase)
+// on authored letters, refusing every tap off the road (a tile, CAST before
+// the word stands, SCRY), so every player weaves the same three words and
+// sees the same numbers. Proven on paper (the seams; a SIMULATION of all five
+// tongues' scripts against their real dictionaries and the live damage
+// math), then live in §2c with REAL taps following the finger: the lock,
+// the orange forged by MOONS landing on cell 0, the point beat, the showcase
+// holding the fight (16 damage, plain 10, +6 — the board's cast cells still
+// empty, the hand on the number) and the release. DPR-3 captures in
+// tools/shots-guided/ (finger-word2 · orange-intro · orange-showcase —
+// untracked, never committed).
 // Run against the PUBLISHED page with F5BASE=https://drbango.com/beta3/first5/index.html
 // Proves the first5 sandbox is a true first night that cannot touch live
 // beta3: static seams (script order, no Firebase, repointed shared assets),
@@ -128,6 +141,66 @@ ok('the straight state dies with the open (stale-ref law)', gameSrc.includes('th
 ok('the lure stands at the title: scroll-fixed firefly + rings, the f5lure census tag; reduce-motion and the restart stand there too', gameSrc.includes("setData('f5lure', 1)") && gameSrc.includes('if (zen) fly.setScrollFactor(0);') && gameSrc.includes('if (zen) ring.setScrollFactor(0);') && gameSrc.includes('if (this.f5Straight) this.f5StandTitle(l);') && gameSrc.includes('else { this.buildMeadowUi(l); this.f5StandTitle(l); }'));
 /* — THE PAINTED FIRST FIVE (card ss-2026-10-09-first5-script/01) seams — */
 ok('painted seams: thirteen F5-PAINTED sites in game.js', (gameSrc.match(/F5-PAINTED/g) || []).length === 13, String((gameSrc.match(/F5-PAINTED/g) || []).length));
+/* — THE GUIDED HAND, ORANGE (card ss-2026-10-09-first5-script/02) seams — */
+ok('guided seams: twenty-four F5-GUIDED sites in game.js', (gameSrc.match(/F5-GUIDED/g) || []).length === 24, String((gameSrc.match(/F5-GUIDED/g) || []).length));
+ok('the script table stands for all five tongues, the rig carries every refill, the dials are declared', ['const SS_F5_GUIDE = {', 'const SS_F5_GUIDE_SETTLE_MS', 'const SS_F5_POINT_MS', 'const SS_F5_SHOW_MS', 'const SS_F5_SHOW_FLOOR_MS', 'const SS_F5_SHOW_VEIL'].every((t) => gameSrc.includes(t)) && /SS_F5_GUIDE = \{[\s\S]*?en:[\s\S]*?es:[\s\S]*?fr:[\s\S]*?pt:[\s\S]*?de:[\s\S]*?\n\};/.test(gameSrc));
+ok('the hand STAYS past the first cast (the old retire gated on no script; the cast hook after the damage is known)', gameSrc.includes('if (this.ftue && !this.ftueGone && !this.f5G) this.ftueRetire(true);') && gameSrc.includes('if (this.ftue && !this.ftueGone && this.f5G) this.f5GuideCast(word, tiles, dmg);'));
+ok('THE LOCK: a tile off the road, CAST before the word stands, SCRY — all refused under the hand; the button waits for the whole word', gameSrc.includes("if (this.f5GuideLocked() && !this.f5GuideAllows(i)) { this.f5GuideRefuse(i); return; }") && gameSrc.includes("if (this.f5GuideLocked() && word !== this.ftueWord.join('')) { this.f5GuideRefuse('cast'); return; }") && gameSrc.includes("if (this.f5GuideLocked()) { this.f5GuideRefuse('scry'); return; }") && gameSrc.includes('&& WORDSET.has(word) && !guided;'));
+ok('THE SHOWCASE holds the flow: the continuation parked in g.cont, started by beastHit when the drain settles, released by the lesson', gameSrc.includes("if (this.f5G && this.f5G.show && this.f5G.beat === 'cast' && this.beast.hpNow > 0) this.f5G.cont = cont;") && gameSrc.includes('else if (this.f5G && this.f5G.cont) this.f5GuideShow();') && gameSrc.includes('const cont = g.cont; g.cont = null;') && gameSrc.includes('if (cont) cont();'));
+ok('the orange word asks for the ORANGE tile itself; CAST lights only for the whole guided word', gameSrc.includes('if (g && g.idx === g.orange) for (let i = 0; i < 16; i++) {') && gameSrc.includes("WORDSET.has(word) && (!g || word === tt.join(''))) return 'cast';"));
+ok('the script state is reset BEFORE the hand builds it (stale-ref law), and dies quietly if the beast falls mid-script', /this\.f5G = null;[^\n]*\n\s*if \(this\.ftue\) this\.ftueStart\(\);/.test(gameSrc) && gameSrc.includes('if (this.ftue && !this.ftueGone && this.f5G) this.f5GuideEnd(false);'));
+ok('the showcase line stands in the en table (every other tongue falls back to en)', gameSrc.includes("orangeHit: 'That orange tile added +{x} — {d} damage, not {p}.'"));
+ok('the tile/dew/ink lessons share ONE seat under the strikes pill now (374 — none over it at 352)', gameSrc.includes("ssF5Prompt(this, 'tile' + tier, this.L.x(0), this.L.y(374))") && gameSrc.includes("ssF5Prompt(this, 'tile3', this.L.x(0), this.L.y(374))") && gameSrc.includes("ssF5Prompt(this, 'ink', l.x(0), l.y(374))") && !/ssF5Prompt\([^\n]*\(352\)/.test(gameSrc));
+/* THE SIMULATION: every tongue's script, dealt and cast exactly as the game
+   does (the curated deal, the finger's first-match walk with the orange
+   preference, the rig consumed in cell order, the pending forge landing in
+   the lowest emptied cell, unspent specials expiring, the live damage math)
+   against the REAL dictionaries (../words.js, ../words-<lang>.js). */
+const dataSrc = readFileSync('data.js', 'utf8');
+const lit = (s) => new Function('return ' + s)();
+const RIG = lit(gameSrc.match(/const SS_F5_RIG = (\{[\s\S]*?\n\});/)[1]);
+const GUIDE = lit(gameSrc.match(/const SS_F5_GUIDE = (\{[\s\S]*?\n\});/)[1]);
+const FTUE = lit(dataSrc.match(/const SS_FTUE = (\{[\s\S]*?\n\});/)[1]);
+const LENM = lit(gameSrc.match(/const LEN_MULT = (\[[^\]]*\]);/)[1]);
+const VALS = {}; for (const m of packSrc.matchAll(/lang: '(\w+)'[\s\S]*?vals: (\{[^}]*\})/g)) VALS[m[1]] = lit(m[2]);
+const EMBER = Math.round(30 * lit(gameSrc.match(/const SS_F5_EMBER_MULT = ([\d.]+);/)[1]));
+const dictOf = (lang) => { const s = readFileSync(lang === 'en' ? '../words.js' : '../words-' + lang + '.js', 'utf8'); const m = lang === 'en' ? s.match(/=\s*"([^"]+)"/) : s.match(/feed\('\w+',\s*"([^"]*)"/); return new Set(m[1].split(' ')); };
+const simGuide = (lang) => {
+  const W = dictOf(lang), vals = VALS[lang], board = FTUE[lang].board.map((ch) => ({ ch, tier: 0 })), queue = RIG[lang].slice(), pending = [];
+  const words = [FTUE[lang].word, ...GUIDE[lang].words], orange = GUIDE[lang].orange + 1; let hp = EMBER; const log = [];
+  for (let wi = 0; wi < words.length; wi++) {
+    const tt = words[wi], sel = [];
+    for (let k = 0; k < tt.length; k++) {
+      const need = tt[k]; let f = -1;
+      if (wi === orange) for (let i = 0; i < 16; i++) if (board[i] && board[i].tier === 1 && board[i].ch === need && !sel.includes(i)) { f = i; break; }
+      if (f < 0) for (let i = 0; i < 16; i++) if (board[i] && board[i].ch === need && !sel.includes(i)) { f = i; break; }
+      if (f < 0) return { err: 'word ' + wi + ' ' + tt.join('') + ' missing ' + need };
+      sel.push(f);
+    }
+    const word = sel.map((i) => board[i].ch).join('');
+    if (!W.has(word)) return { err: word + ' not in the ' + lang + ' dictionary' };
+    const tiles = sel.map((i) => board[i]), letters = tiles.reduce((a, s) => a + s.ch.length, 0);
+    const dmgOf = (ts) => { let base = 0, sm = 1; for (const s of ts) { base += (vals[s.ch] || vals[s.ch[0]] || 1) + (s.tier === 1 ? 6 : 0); if (s.tier === 2) sm = 1.5; } return Math.round(base * (LENM[Math.min(letters, 8)] || 2.3) * sm); };
+    const dmg = dmgOf(tiles), plain = dmgOf(tiles.map((s) => ({ ch: s.ch, tier: 0 })));
+    hp -= dmg;
+    const tier = letters >= 7 ? 2 : letters >= 5 ? 1 : 0;
+    log.push({ word, sel: sel.join(','), dmg, plain, extra: dmg - plain, orange: tiles.some((s) => s.tier === 1), startsOnOrange: tiles[0].tier === 1, forges: tier, hp });
+    if (hp <= 0) return { err: word + ' fells VULPES (' + hp + ')', log };
+    for (const i of sel) board[i] = null;
+    if (tier > 0) pending.push(tier);
+    for (const s of board) if (s && s.tier) s.tier = 0;
+    for (let i = 0; i < 16; i++) { if (board[i]) continue; if (!queue.length) { board[i] = { ch: '?', tier: pending.length ? pending.shift() : 0 }; continue; } board[i] = { ch: queue.shift(), tier: pending.length ? pending.shift() : 0 }; }
+  }
+  const counts = {}; for (const s of board) if (s && s.ch !== '?') counts[s.ch] = (counts[s.ch] | 0) + 1;
+  const fits = (w) => { if (w.includes('q')) return false; const c = { ...counts }; for (const ch of w) { if (!c[ch]) return false; c[ch]--; } return true; };
+  let n4 = 0, n5 = 0, n6 = 0; for (const w of W) { const L = w.length; if (L === 4 && n4 < 9 && fits(w)) n4++; else if (L === 5 && n5 < 9 && fits(w)) n5++; else if (L === 6 && n6 < 9 && fits(w)) n6++; if (n4 > 8 && n5 > 8 && n6 > 8) break; }
+  return { log, final: board.map((s) => s.ch + (s.tier ? '*' : '')).join(' '), density: [n4, n5, n6], queueLeft: queue.length, orange };
+};
+const simOk = (r) => !r.err && r.log.length === 3 && r.log[1].forges === 1 && !r.log[1].orange && r.log[2].orange && r.log[2].startsOnOrange && r.log[2].extra === 6 && r.queueLeft === 0 && r.density.every((n) => n >= 3);
+const fmtSim = (r) => r.err ? r.err : r.log.map((e) => e.word + ' ' + e.dmg + (e.orange ? '(plain ' + e.plain + ', +' + e.extra + ')' : '') + (e.forges ? ' forges' + e.forges : '') + ' hp→' + e.hp).join(' · ') + ' · free board ' + r.density.join('/');
+const simEn = simGuide('en');
+ok('THE SIMULATION (en): STAR → MOONS forges the orange → SKY starts on it, +6 exactly (16, not 10), VULPES left alive at 3, the queue spent, the free board dense', simOk(simEn) && simEn.log[0].word === 'star' && simEn.log[1].word === 'moons' && simEn.log[2].word === 'sky' && simEn.log[2].dmg === 16 && simEn.log[2].plain === 10 && simEn.log[2].hp === 3 && simEn.final === 'n e m o s l i r n e d e o t a u', fmtSim(simEn));
+for (const lang of ['es', 'fr', 'pt', 'de']) { const r = simGuide(lang); ok('THE SIMULATION (' + lang + ', a draft for native review): three dictionary words, the orange forged by word two, word three starting on it at +6, VULPES alive, the rig spent, the free board dense', simOk(r), fmtSim(r)); }
 ok("the boot waits (bounded 2.5s) for the opening's own two — the painted night + the painted wordmark — through ../art", gameSrc.includes('const SS_ART_GRACE_MS = 2500;') && gameSrc.includes("const soft = ['nightsky', 'title'];") && gameSrc.includes('Promise.race([softP, new Promise((res) => setTimeout(res, SS_ART_GRACE_MS))])') && gameSrc.includes("DIAG('art absent ' + n)"));
 ok('the live sky plumbing stands: ssNightSkyTex (one seat) · ssNightSkyCap (SS_SKY_CAP_U 180) · ssZenithSky', ['function ssNightSkyTex(', 'function ssNightSkyCap(', 'function ssZenithSky(', 'const SS_SKY_CAP_U = 180;'].every((t) => gameSrc.includes(t)));
 ok('the ride seats the plate under every sky, the crown over its top, the dawn under its veil', gameSrc.includes('const artSky = !!ssNightSkyTex(scene);') && gameSrc.includes("scene.add.image(l.W / 2, wy(0), 'nightskyart').setOrigin(0.5, 0).setDisplaySize(l.W, 2400 * l.s);") && gameSrc.includes('ssNightSkyCap(scene, l, wy(0));') && gameSrc.includes("if (artSky && opts.dawn) scene.add.image(l.W / 2, wy(0), 'skygrad-dawn-veil')") && gameSrc.includes("gradTex('skygrad-dawn-veil'"));
@@ -393,39 +466,122 @@ if (shotF && shotF.data) writeFileSync('tools/shots-straight/first-fight.png', B
 ok('DPR-3 capture 2/2 on file: the first fight frame (tools/shots-straight/first-fight.png)', !!(shotF && shotF.data), shotF && shotF.data ? Math.round(shotF.data.length / 1024) + 'kb' : 'no data');
 ok('zero exceptions through the lure', errs.length === 0, errs.slice(0, 2).join(' | '));
 
-/* ======== §2c THE SKY LEANS IN (card 04) ======== */
-console.log('— §2c the sky leans in —');
+/* ======== §2c THE SKY LEANS IN (card 04) · THE GUIDED HAND, ORANGE (card 02 of ss-2026-10-09-first5-script) ======== */
+console.log('— §2c the sky leans in · the guided hand, orange —');
 let b1 = false; // ride the lure-tapped ascent into the first fight
 for (let i = 0; i < 90 && !b1; i++) { b1 = await ev("(()=>{try{const b=game.scene.getScene('battle');return !!(b&&b.scene.isActive()&&b.state==='pick')}catch(e){return false}})()"); if (!b1) await sleep(1000); }
 ok('the first fight stands after the lure', b1);
 const ehp = await ev("(()=>{try{const b=game.scene.getScene('battle');return b.beast?b.beast.hp:null}catch(e){return null}})()");
 ok('THE EMBER MINUTE tuning: pinned VULPES at 33 hp', ehp === 33, String(ehp));
-ok('the en rig letters are all in the en bag', await ev("['m','o','n','s','e','a'].every(c=>SS_PACKS.en.bag[c])"));
+ok("every en rig letter is in the en bag (the whole script's refills)", await ev("SS_F5_RIG.en.every(c=>SS_PACKS.en.bag[c])"));
 ok('the en floor word stands in the dictionary', await ev("WORDSET.has('moons')"));
+// THE GUIDED HAND: the beacon, the walk, the lock, the orange, the showcase
+const B = "const b=game.scene.getScene('battle');";
+const guide = async () => JSON.parse((await ev('JSON.stringify(window.__f5guide||null)')) || 'null');
+const gs = async () => ev("(()=>{try{" + B + "const g=window.__f5guide||{};return {state:b.state,sel:b.sel.join(','),word:window.__ssftue.word,ft:window.__ssftue.state,pt:window.__ssftue.point,beat:g.beat,idx:g.idx,refused:g.refused,castRefused:g.castRefused,scryRefused:g.scryRefused,oc:g.orangeCell,shown:g.shown,released:g.released,ended:g.ended,holdMs:g.holdMs,hp:b.beast.hpNow,cnt:b.beast.count,words:b.run.words,board:b.board.map(s=>s?s.ch+(s.tier?'*':''):'_').join(' '),hand:!!(b.ftueHand&&b.ftueHand.active),handDepth:b.ftueHand?b.ftueHand.depth:null,gone:b.ftueGone,castT:b.castT.text,castA:+b.castB.alpha.toFixed(2),show:g.show,f5G:!!b.f5G,ehpShown:Math.round(b.ehpShown.v),tile1:(window.__f5prompt||{}).tile1|0}}catch(e){return {err:e.message}}})()");
+const gcss = async (gx, gy) => ev("(()=>{const r=game.canvas.getBoundingClientRect();const kx=r.width/game.scale.width,ky=r.height/game.scale.height;return {x:Math.round(r.left+" + gx + "*kx),y:Math.round(r.top+" + gy + "*ky)}})()");
+const slotCss = async (i) => { const p = await ev("(()=>{" + B + "const p=b.slotPos(" + i + ");return [p.x,p.y]})()"); return gcss(p[0], p[1]); };
+const btnCss = async (name) => { const p = await ev("(()=>{" + B + "return [b." + name + ".x,b." + name + ".y]})()"); return gcss(p[0], p[1]); };
+// follow the finger with REAL taps: the slot it points at, then CAST when it moves there
+const walk = async (max) => {
+  for (let i = 0; i < max; i++) {
+    await poke(i);
+    const pt = await ev("window.__ssftue ? window.__ssftue.point : null");
+    if (pt === 'cast') { await tap(await btnCss('castB')); await sleep(300); return 'cast'; }
+    if (pt && pt.startsWith('slot:')) { await tap(await slotCss(+pt.slice(5))); await sleep(420); continue; }
+    await sleep(300);
+  }
+  return 'stuck';
+};
+const until = async (fn, n, ms, burst) => { for (let i = 0; i < n; i++) { for (let k = 0; k < (burst || 1); k++) await poke(i * (burst || 1) + k); if (await fn()) return true; await sleep(ms); } return false; };
+const g0 = await guide();
+// the hand rises 1.5s after the deal lands (ftueStart's own delay) — poll for its seat, never read it once
+const handUp = await until(async () => (await ev("window.__ssftue ? window.__ssftue.point : null")) === 'slot:9', 30, 300, 1);
+ok("THE GUIDED HAND: the script stands at the deal — STAR → MOONS → SKY, the orange word third, the finger rising onto STAR's S (slot:9)", !!g0 && g0.words.join() === 'star,moons,sky' && g0.orange === 2 && g0.beat === 'word' && g0.idx === 0 && handUp, JSON.stringify(g0 && { words: g0.words, orange: g0.orange, beat: g0.beat, handUp }));
 await sleep(2500); // the deal's bounce settles before probe taps (house law)
-const cast1 = await ev("(()=>{const b=game.scene.getScene('battle');const deal=['s','t','a','r'];const used=[];for(const ch of deal){let f=-1;for(let i=0;i<16;i++){if(used.includes(i))continue;if(b.board[i]&&b.board[i].ch===ch){f=i;break}}if(f<0)return 'missing '+ch;used.push(f)}used.forEach(i=>b.tapTile(i));b.tryCast();return 'cast'})()");
-ok('the first cast flies (S·T·A·R, real scene taps)', cast1 === 'cast', String(cast1));
+const w1 = await walk(30);
+ok("the first cast flies on the finger's own road (S·T·A·R, REAL taps where it points)", w1 === 'cast', w1);
 let sw = false;
 for (let i = 0; i < 12 && !sw; i++) { sw = (await ev('window.__f5starwrite | 0')) >= 1; if (!sw) await sleep(400); }
 ok('THE WORD WRITTEN IN STARS hangs on the first cast', sw);
-await sleep(3200); // the rigged refill lands and settles
+// the hand STAYS — no free-typing gap: word two is guided the moment the refill settles
+const stayed = await until(async () => { const s = await gs(); return s.beat === 'word' && s.idx === 1 && s.state === 'pick' && s.pt === 'slot:0'; }, 60, 300, 2);
+const s2 = await gs();
+ok('…and the hand STAYS: word two is MOONS, the finger on its M (slot:0), the beacon "guide" — no free-typing gap', stayed && s2.word === 'moons' && s2.ft === 'guide' && s2.hand && !s2.gone, JSON.stringify({ beat: s2.beat, idx: s2.idx, word: s2.word, pt: s2.pt, ft: s2.ft }));
+ok("…the rigged refill dealt the page's own M·O·N·S into STAR's cells (0·4·7·9)", s2.board === 'm e m o o l i n n s d e o t a u', s2.board);
 const dens = await ev("(()=>{const b=game.scene.getScene('battle');const counts={};for(const s of b.board)if(s&&!s.blk)counts[s.ch]=(counts[s.ch]|0)+1;const fits=(w)=>{if(w.includes('q'))return false;const c=Object.assign({},counts);for(const ch of w){if(!c[ch])return false;c[ch]--}return true};let n4=0,n5=0,n6=0;for(const w of WORDSET){const L=w.length;if(L===4&&n4<9&&fits(w))n4++;else if(L===5&&n5<9&&fits(w))n5++;else if(L===6&&n6<9&&fits(w))n6++;if(n4>8&&n5>8&&n6>8)break}return [n4,n5,n6]})()");
 ok('THE DENSITY GATE: >=3 findable words at 4/5/6 after the rig (en)', dens && dens[0] >= 3 && dens[1] >= 3 && dens[2] >= 3, String(dens));
 const trio = await ev("(()=>{const b=game.scene.getScene('battle');return b.rollSigilOpts().map(o=>o.id).join()})()");
 ok('the first-ever sigil trio is curated: QUILL / SALVE / FIRST LIGHT', trio === 'quill,salve,first', trio);
+// THE LOCK — real fingers off the road do nothing
+await tap(await slotCss(15)); await sleep(500);
+let s3 = await gs();
+ok('a REAL tap on a tile off the road is REFUSED (the U at 15): nothing selected, the refusal counted, the hand still on the M', s3.sel === '' && s3.refused === 1 && s3.pt === 'slot:0', JSON.stringify({ sel: s3.sel, refused: s3.refused, pt: s3.pt }));
+await tap(await btnCss('scryB')); await sleep(600);
+s3 = await gs();
+ok('a REAL tap on SCRY is REFUSED under the hand: the board stands, the fuse untouched', s3.scryRefused === 1 && s3.board === 'm e m o o l i n n s d e o t a u' && s3.cnt === 3, JSON.stringify({ scryRefused: s3.scryRefused, cnt: s3.cnt }));
+for (let k = 0; k < 4; k++) { const pt = await ev("window.__ssftue.point"); if (pt && pt.startsWith('slot:')) { await tap(await slotCss(+pt.slice(5))); await sleep(420); } }
+s3 = await gs();
+ok('M·O·O·N woven by the finger: a real word, but the button WAITS for the whole lesson (dim, no preview), the finger on the S', s3.sel === '0,3,4,7' && s3.castT === 'CAST' && s3.castA <= 0.5 && s3.pt === 'slot:9', JSON.stringify({ sel: s3.sel, castT: s3.castT, castA: s3.castA, pt: s3.pt }));
+try { mkdirSync('tools/shots-guided', { recursive: true }); } catch (e) { }
+const shotG1 = await send('Page.captureScreenshot', { format: 'png' });
+if (shotG1 && shotG1.data) writeFileSync('tools/shots-guided/finger-word2.png', Buffer.from(shotG1.data, 'base64'));
+ok('DPR-3 capture 1/3 on file: the finger mid-guide on word two (tools/shots-guided/finger-word2.png)', !!(shotG1 && shotG1.data), shotG1 && shotG1.data ? Math.round(shotG1.data.length / 1024) + 'kb' : 'no data');
+await tap(await btnCss('castB')); await sleep(600);
+s3 = await gs();
+ok('a REAL tap on CAST with MOON standing is REFUSED: nothing flew, the weave kept', s3.castRefused === 1 && s3.words === 1 && s3.sel === '0,3,4,7' && s3.state === 'pick', JSON.stringify({ castRefused: s3.castRefused, words: s3.words, sel: s3.sel }));
+// un-weaving your own tiles stays allowed: the N comes home, the finger asks for it again
+await tap(await slotCss(7)); await sleep(500);
+s3 = await gs();
+ok('…un-weaving stays the player\'s (the N tapped home): the finger asks for it again', s3.sel === '0,3,4' && s3.pt === 'slot:7', JSON.stringify({ sel: s3.sel, pt: s3.pt }));
+const w2 = await walk(30);
+const flew2 = await until(async () => { const s = await gs(); return s.words === 2; }, 20, 300, 1);
+ok('MOONS flies on the finger\'s road (REAL taps) — the first 5+ pays rung 5', w2 === 'cast' && flew2 && (await ev('window.__f5ladder5 | 0')) === 1, w2);
+// THE ORANGE — forged by MOONS, landing where the script said, the hand on it
+const pointed = await until(async () => { const s = await gs(); return s.beat === 'point'; }, 80, 300, 3);
+await sleep(700);
+const s4 = await gs();
+ok('THE ORANGE ARRIVES where the script said: the forged tile on the S at cell 0 (k·y·r·e beside it), the hand resting on it, the beacon "orange"', pointed && s4.oc === 0 && s4.board === 's* e m k y l i r n e d e o t a u' && s4.pt === 'slot:0' && s4.ft === 'orange' && s4.word === 'sky' && s4.hp === 19, JSON.stringify({ oc: s4.oc, board: s4.board, pt: s4.pt, ft: s4.ft, hp: s4.hp }));
+ok('…and the +6 line spoke once, at its arrival', s4.tile1 === 1, 'tile1 ' + s4.tile1);
+const shotG2 = await send('Page.captureScreenshot', { format: 'png' });
+if (shotG2 && shotG2.data) writeFileSync('tools/shots-guided/orange-intro.png', Buffer.from(shotG2.data, 'base64'));
+ok('DPR-3 capture 2/3 on file: the orange-tile intro beat (tools/shots-guided/orange-intro.png)', !!(shotG2 && shotG2.data), shotG2 && shotG2.data ? Math.round(shotG2.data.length / 1024) + 'kb' : 'no data');
+// the pointed tile IS the first tap: a real tap on the orange during the point starts SKY on it
+await tap(await slotCss(0));
+const onOrange = await until(async () => { const s = await gs(); return s.beat === 'word' && s.sel === '0'; }, 10, 300, 1);
+ok('the pointed tile IS the first tap of the orange word (point → word, the orange S woven first, the finger on the K)', onOrange && (await ev("window.__ssftue.point")) === 'slot:3');
+const w3 = await walk(30);
+// THE SHOWCASE — the hit lands, the bar drains, then the fight HOLDS on the lesson
+const shown = await until(async () => { const s = await gs(); return (s.shown | 0) >= 1; }, 80, 250, 4);
+await sleep(700);
+const s5 = await gs();
+const showObjs = await ev("(()=>{" + B + "const veil=b.children.list.find(o=>o.type==='Image'&&o.depth===900&&o.texture&&o.texture.key==='veil');const show=b.children.list.filter(o=>o.active&&o.getData&&o.getData('f5show'));return {veil:!!veil,veilA:veil?+veil.alpha.toFixed(2):null,show:show.length,showDepth:show[0]?show[0].depth:null}})()");
+ok('THE SHOWCASE HOLDS THE MOMENT: SKY hit 16, the same word plain 10, the orange +6 — state anim, the cast cells STILL EMPTY (the refill waits), the fuse not yet ticked, VULPES shown at 3', w3 === 'cast' && shown && s5.state === 'anim' && !!s5.show && s5.show.dmg === 16 && s5.show.plain === 10 && s5.show.extra === 6 && s5.show.ch === 's' && s5.board === '_ e m _ _ l i r n e d e o t a u' && s5.cnt === 2 && s5.hp === 3 && s5.ehpShown === 3 && s5.words === 3, JSON.stringify({ show: s5.show, state: s5.state, board: s5.board, cnt: s5.cnt, hp: s5.hp, ehpShown: s5.ehpShown }));
+ok('…the lesson is DRAWN: the light veil at 900, the showcase at 950 (one f5show container), the hand raised above the veil and on the number (pose:1), the beacon "show"', !!showObjs && showObjs.veil && showObjs.veilA >= 0.3 && showObjs.show === 1 && showObjs.showDepth === 950 && s5.handDepth === 960 && s5.pt === 'pose:1' && s5.ft === 'show' && s5.hand, JSON.stringify(Object.assign({}, showObjs, { handDepth: s5.handDepth, pt: s5.pt, ft: s5.ft })));
+const shotG3 = await send('Page.captureScreenshot', { format: 'png' });
+if (shotG3 && shotG3.data) writeFileSync('tools/shots-guided/orange-showcase.png', Buffer.from(shotG3.data, 'base64'));
+ok('DPR-3 capture 3/3 on file: the damage showcase (tools/shots-guided/orange-showcase.png)', !!(shotG3 && shotG3.data), shotG3 && shotG3.data ? Math.round(shotG3.data.length / 1024) + 'kb' : 'no data');
+// the floor holds, then a real tap lets go
+await sleep(1000);
+await tap({ x: 195, y: 500 });
+const ended = await until(async () => { const s = await gs(); return (s.ended | 0) >= 1 && s.state === 'pick'; }, 60, 250, 4);
+await sleep(1200);
+const s6 = await gs();
+ok("…a tap past the floor LETS GO: the hand retires for good (beacon done, no script), the refill lands (n·o·s), the fuse ticks to 1, VULPES at 3 — the night is the player's", ended && s6.released === 1 && s6.holdMs >= 900 && s6.gone && !s6.hand && s6.ft === 'done' && !s6.f5G && s6.board === 'n e m o s l i r n e d e o t a u' && s6.cnt === 1 && s6.hp === 3 && s6.state === 'pick', JSON.stringify({ released: s6.released, holdMs: s6.holdMs, gone: s6.gone, ft: s6.ft, board: s6.board, cnt: s6.cnt, hp: s6.hp }));
+const dens2 = await ev("(()=>{const b=game.scene.getScene('battle');const counts={};for(const s of b.board)if(s&&!s.blk)counts[s.ch]=(counts[s.ch]|0)+1;const fits=(w)=>{if(w.includes('q'))return false;const c=Object.assign({},counts);for(const ch of w){if(!c[ch])return false;c[ch]--}return true};let n4=0,n5=0,n6=0;for(const w of WORDSET){const L=w.length;if(L===4&&n4<9&&fits(w))n4++;else if(L===5&&n5<9&&fits(w))n5++;else if(L===6&&n6<9&&fits(w))n6++;if(n4>8&&n5>8&&n6>8)break}return [n4,n5,n6]})()");
+ok('THE FREE BOARD after the script: >=3 findable words at 4/5/6 (en) — the player\'s own night begins dense', dens2 && dens2[0] >= 3 && dens2[1] >= 3 && dens2[2] >= 3, String(dens2));
+// a free tap answers again (the lock is gone with the hand)
+await tap(await slotCss(15)); await sleep(500);
+ok('tiles ANSWER freely once the hand has gone (a real tap selects the U)', (await ev("game.scene.getScene('battle').sel.join()")) === '15');
+await ev("(()=>{const b=game.scene.getScene('battle');b.unselectFrom(0);return 1})()");
 await ev("(()=>{const b=game.scene.getScene('battle');b.f5LastTap=b.time.now-31000;b.f5Glinted=true;b.f5Encored=false;return 1})()");
 let enc = false;
 for (let i = 0; i < 10 && !enc; i++) { enc = (await ev('window.__f5encore | 0')) >= 1; if (!enc) await sleep(500); }
 ok('the 30s rescue encore walks the best word (idle rescue)', enc);
-const w5 = await ev("(()=>{const b=game.scene.getScene('battle');if(b.state!=='pick')return 'state '+b.state;const tiles=b.board.map((s,i)=>s&&!s.blk?{i,ch:s.ch}:null).filter(Boolean);const pick=(w)=>{const used=[];for(const ch of w){let f=-1;for(const t of tiles){if(used.includes(t.i))continue;if(t.ch===ch){f=t.i;break}}if(f<0)return null;used.push(f)}return used};for(const w of WORDSET){if(w.length!==5||w.includes('q'))continue;const u=pick(w);if(u){u.forEach(i=>b.tapTile(i));b.tryCast();return w}}return 'none'})()");
-ok('a 5-letter word stands on the rigged board and CASTS', !!w5 && w5 !== 'none' && !String(w5).startsWith('state'), String(w5));
-let r5 = false;
-for (let i = 0; i < 10 && !r5; i++) { r5 = (await ev('window.__f5ladder5 | 0')) === 1; if (!r5) await sleep(400); }
-ok('the first 5+ pays the shooting star (ladder rung 5)', r5);
 await ev("(()=>{const b=game.scene.getScene('battle');b.f5CastBeats('zzzzzzz', 7);return 1})()");
 await sleep(1200);
 ok('rungs 6 and 7 cue and draw clean (sky swell + gold rain)', ((await ev('window.__f5ladder6 | 0')) + (await ev('window.__f5ladder7 | 0'))) === 2);
-ok('zero exceptions through the leaning sky', errs.length === 0, errs.slice(0, 2).join(' | '));
+ok('zero exceptions through the leaning sky and the guided hand', errs.length === 0, errs.slice(0, 2).join(' | '));
 
 const pc2 = await ev(PLATE);
 ok('…the SAME plate stood under the whole first lesson — no swap, no crossfade to the dot field (THE SKY STAYS)', plateOk(pc2) && pc2.same, JSON.stringify(pc2));
@@ -452,7 +608,7 @@ for (let round = 0; round < 6 && !p1; round++) {
   const st = await ev("(()=>{const b=game.scene.getScene('battle');if(b.state==='sigil'||b.state==='upgrade'){const cards=[];const scan=(ls)=>ls.forEach(o=>{if(o.getData&&o.getData('sigilCard'))cards.push(o);else if(o.list)scan(o.list)});scan(b.overlayC.list);if(cards.length){cards[0].emit('pointerdown');return 'picked'}}if(b.state==='pick'&&!b.sel.length){const w=b.bestWord();if(w){w.forEach(i=>b.tapTile(i));b.tryCast();return 'cast'}}return b.state})()");
   for (let i = 0; i < 12 && !p1; i++) { p1 = (await ev("(window.__f5prompt||{}).tile1 | 0")) >= 1; if (!p1) await sleep(700); }
 }
-ok('the ORANGE lesson speaks on the real forge/plant chain', p1);
+ok('the ORANGE lesson spoke once — at the guided orange\'s arrival (card 02\'s beat; the forge/plant march never needed)', p1 && (await ev("(window.__f5prompt||{}).tile1 | 0")) === 1);
 ok('zero exceptions through the lessons', errs.length === 0, errs.slice(0, 2).join(' | '));
 
 /* ======== §2e the lit sky (card 06) ======== */
