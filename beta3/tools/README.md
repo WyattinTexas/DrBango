@@ -2,6 +2,36 @@
 
 Thirty-three scripts, all dev-only — nothing here ships to the browser.
 
+## sky-stays.mjs — THE SKY STAYS: the fight stands on the painted night (v0.119.0)
+
+Skylar (10/9, off his phone recording of the preview): the ride up looked right and
+the destination was wrong — Battle's `create` laid `ssStarfield(this, 110)`, the
+pre-painting soft dots, so every fight crossfaded from the painted zenith to the old
+splotchy field. Now `ssZenithSky` lays the plate itself at the rise's landing frame
+(top at `l.y(0)`, 2400 design units tall — the same seat `ssSkyWorld` gives it at
+p = 1), crowns it with `ssNightSkyCap` (the plate's own first rows mirrored above the
+design frame's top, for viewports taller than 420×800 where a band of page colour
+used to stand), wears the home's three zenith aurora curtains and the thinned 27/16/8
+twinkle tiers (the zenith's share of the column's 40/25/14 at ⅓ size), and keeps the
+shooting stars. `ssNightSkyTex` is the one seat for the plate's texture (the home's
+ride and the fight ask the same question). Art absent: the 110-dot field, byte-for-byte.
+
+`node tools/sky-stays.mjs` (self-serves :8905, Chrome :9487, /tmp/cdp-stays, DPR-3
+390×844, Firebase blocked) → `tools/shots-stays/`: `home-zenith` (the settled home held
+at p = 1, grain hidden as the rise hides it — the reference frame), QUICK PLAY by the
+real `beginAscent` at the battle's entry and +5s, `daily-fight`, `endless-gate` +
+`endless-fight`, `campaign-fight` (cadence-check's door), plus `?art=0`. Beside the
+PNGs it censuses the scene — `skyPlate` is `nightskyart`, top at `l.y(0)`, 2400u tall,
+full width, the lowest child, the SAME object at +5s; exactly 51 standalone dots with 8
+on ADD, none past 0.24·l.s (the old field: 110, raw scales to 1.1) — 23 checks, zero
+page exceptions. The pixel judge lives in the session scratchpad (compare.py): the
+outer 28-css-px sky strips, rows 110–700, entry vs +5s and the zenith reference vs
+every fight, ≥97% within ±6 = no swap (final run: 99.6–99.97%).
+
+⚠ Census lesson: at DPR 3 the game runs at device pixels (`l.s` ≈ 2.79), so a
+"tiny" tier dot at 0.24·l.s has a RAW scale of 0.67 — inside the old field's 0.3–1.1.
+Judge dots by count and the l.s-relative cap, never by a raw-scale threshold.
+
 ## four suites re-aim — ONE SMALL SETTINGS DOOR AT THE MEADOW FOOT (v0.96.0)
 
 Skylar's call (9/10): "Bottom of the home screen move the languages, version
