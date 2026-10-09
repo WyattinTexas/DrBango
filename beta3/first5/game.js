@@ -426,6 +426,11 @@ function ssPerfWatch(gm) {
    forces that fallback for debugging. */
 const ART = QS.get('art') !== '0';
 const SSART = { ready: false, img: {} };
+// the boot's grace for the opening's own two files (the painted night + the
+// painted wordmark, ssLoadArt): waited for, bounded, never required
+// (F5-PAINTED: ported verbatim from live v0.118.0 — the first5 tutorial stands on
+// the same painted night the live game does, title and fight alike)
+const SS_ART_GRACE_MS = 2500;
 // sign-card art that ships (art/zod_<id>.webp) — see ssZodArtKey. The 12 MJ
 // portraits (flat-vector constellation set, art/ZODIAC-ART.md) are cut by
 // tools/zod-export.mjs from the full-res sources kept OUT of the repo;
@@ -449,13 +454,31 @@ function ssLoadArt() {
   // …and the pick sheet's painted frame rows (v0.111.0, the open-sky-sigils
   // verdicts): absent, ssSigilCard keeps its procedural chrome
   zod.push('sigrow_basic', 'sigrow_rare', 'sigrow_legend');
+  // THE OPENING'S OWN TWO (the 10/8 night-sky round's winners, Skylar's
+  // verdicts: S1 Quiet Night + L3 Golden Hand; live from v0.118.0): the
+  // painted night and the painted wordmark ARE the first descent, so the boot
+  // waits for them — bounded by SS_ART_GRACE_MS past the required set, and
+  // never required: slow or missing, the boot goes on and the procedural sky
+  // and the live-text wordmark draw exactly as before. (In the never-required
+  // lane they raced the boot: on a cold phone load the wordmark, the biggest
+  // file, landed last — after the opening had already dealt live text.)
+  // Asked for first so the browser serves them first. (F5-PAINTED: the same
+  // two files as live, reached through ../art on this stage — no new weight)
+  const soft = ['nightsky', 'title'];
+  const softP = Promise.all(soft.map((n) => new Promise((res) => {
+    const im = new Image();
+    im.onload = () => { SSART.img[n] = im; res(true); };
+    im.onerror = () => { DIAG('art absent ' + n); res(false); };
+    im.src = '../art/' + n + '.webp?v=' + encodeURIComponent(BUILD);
+  })));
   zod.forEach((n) => { const im = new Image(); im.onload = () => { SSART.img[n] = im; }; im.src = '../art/' + n + '.webp?v=' + encodeURIComponent(BUILD); });
   return Promise.all(names.map((n) => new Promise((res) => {
     const im = new Image();
     im.onload = () => { SSART.img[n] = im; res(true); };
     im.onerror = () => { DIAG('art MISSING ' + n); res(false); };
     im.src = '../art/' + n + '.webp?v=' + encodeURIComponent(BUILD);
-  }))).then((r) => { SSART.ready = r.every(Boolean); DIAG('art ' + (SSART.ready ? 'loaded' : 'FAILED — procedural')); });
+  }))).then((r) => { SSART.ready = r.every(Boolean); DIAG('art ' + (SSART.ready ? 'loaded' : 'FAILED — procedural')); })
+    .then(() => Promise.race([softP, new Promise((res) => setTimeout(res, SS_ART_GRACE_MS))]));
 }
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -2103,6 +2126,103 @@ function ssStarfield(scene, count) {
   }
 }
 
+/* F5-PAINTED (card ss-2026-10-09-first5-script/01, Skylar 10/9: "it's still
+   showing the old blurry background. It needs to be the one that is in the
+   live game now"): the live game's plate seat, the zenith's crown and the
+   fight's still frame, ported verbatim from v0.118.0 + v0.119.0. */
+// THE PAINTED NIGHT's plate, seated once per game (the TextureManager is
+// shared by every scene): the key when the art stands, null when it does not
+// (?art=0, a miss, a boot that outran the soft lane). Every sky that lays
+// the plate asks HERE — the home's ride (ssSkyWorld) and the fight's still
+// frame (ssZenithSky) can never disagree about whether the night is painted.
+function ssNightSkyTex(scene) {
+  if (!(ART && SSART.ready && SSART.img.nightsky)) return null;
+  if (!scene.textures.exists('nightskyart')) {
+    const im = SSART.img.nightsky, cap = ssMaxTex(scene);
+    if (Math.max(im.width, im.height) > cap) {
+      // a 4096-tall source: devices under that ceiling get a canvas downscale
+      const k = cap / Math.max(im.width, im.height);
+      const t = scene.textures.createCanvas('nightskyart', Math.round(im.width * k), Math.round(im.height * k));
+      t.context.drawImage(im, 0, 0, Math.round(im.width * k), Math.round(im.height * k));
+      t.refresh();
+    } else scene.textures.addImage('nightskyart', im);
+  }
+  return 'nightskyart';
+}
+
+// THE ZENITH'S CROWN: the plate's top edge is the design frame's top (l.y(0)),
+// and on a viewport taller than 420×800 — this is every iPhone in the shell,
+// and most Androids — a band of flat page colour stands above it where the
+// old dot field used to reach. The night continues through it as the plate's
+// own first rows mirrored (a 180-unit strip, far past the tallest band), laid
+// at the plate's top with its foot on the seam: the painted stars run to the
+// very top of the screen at the rise's landing, in the duel and for the whole
+// fight. Nothing on a viewport with no band (the plate reaches the top).
+const SS_SKY_CAP_U = 180;
+function ssNightSkyCap(scene, l, topY) {
+  if (l.y(0) <= 0.5 || !(ART && SSART.ready && SSART.img.nightsky)) return null;
+  const key = 'nightskycap';
+  if (!scene.textures.exists(key)) {
+    try {
+      const im = SSART.img.nightsky, rows = Math.round(im.height * SS_SKY_CAP_U / 2400);
+      const t = scene.textures.createCanvas(key, im.width, rows);
+      const c = t.context;
+      c.translate(0, rows); c.scale(1, -1);
+      c.drawImage(im, 0, 0, im.width, rows, 0, 0, im.width, rows);
+      t.refresh();
+    } catch (e) { if (scene.textures.exists(key)) scene.textures.remove(key); return null; }
+  }
+  return scene.add.image(l.W / 2, topY, key).setOrigin(0.5, 1).setDisplaySize(l.W, SS_SKY_CAP_U * l.s);
+}
+
+/* THE SKY STAYS (v0.119.0 — Skylar, 10/9: "the new background should stay …
+   not transition to the old blurry stars background"): a fight's backdrop IS
+   the painted night at its zenith — the exact frame the rise lands on
+   (ssSkyWorld at p = 1: the plate's top at l.y(0), 2400 design units tall,
+   the column's crown filling the screen) — laid still, under everything, for
+   the whole fight in every solo mode. No handoff: the 450ms crossfade at
+   arrive now blends the plate with itself. Over it the live tiers thin
+   exactly as the home's do over art (the scaled soft dots WERE the
+   splotches): the zenith's share of the column's 40/25/14 at a third of the
+   old size, twinkling a beat late, the near tier on ADD; the shooting stars
+   keep their cadence (the caller lays them). Art absent: the procedural
+   field of old, byte-for-byte. Returns the plate (null when procedural) so
+   the scene — and the harnesses — can census it. */
+function ssZenithSky(scene) {
+  const key = ssNightSkyTex(scene);
+  if (!key) { ssStarfield(scene, 110); return null; }
+  const l = ssLayout(scene);
+  const plate = scene.add.image(l.W / 2, l.y(0), key).setOrigin(0.5, 0).setDisplaySize(l.W, 2400 * l.s);
+  ssNightSkyCap(scene, l, l.y(0));
+  // the aurora exactly as the home wears it at the zenith — the three curtains
+  // in view at p = 1, same tints, seats, voice and drift (ssSkyWorld's list) —
+  // so the landing's crossfade blends like with like; the fight's old pair sat
+  // elsewhere, a shade dimmer, and the handoff still read as the sky changing
+  for (const [tint, dx, dy, a] of [[0x2fe0d0, -120, 160, 0.055], [0x8a5ae0, 130, 120, 0.055], [0xd7b45c, 0, 640, 0.055]]) {
+    const g = scene.add.image(l.x(dx), l.y(dy), 'glowbig').setScale(l.u(2.6)).setTint(tint).setAlpha(a).setBlendMode('ADD');
+    scene.tweens.add({ targets: g, x: g.x + l.u(30), y: g.y - l.u(20), scale: l.u(3.1), duration: 7000 + Math.random() * 4000, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+  }
+  const twinkles = [];
+  const tier = (n, s0, s1, twinkle, add) => {
+    for (let i = 0; i < n; i++) {
+      const sc = (s0 + Math.random() * (s1 - s0)) * l.s, a = 0.25 + Math.random() * 0.55;
+      const st = scene.add.image(Math.random() * l.W, Math.random() * l.H, 'dot')
+        .setScale(sc).setAlpha(a).setTint(SS_STAR_COLORS[Math.floor(Math.random() * SS_STAR_COLORS.length)]);
+      if (add) st.setBlendMode('ADD');
+      if (twinkle && Math.random() < 0.5) twinkles.push([st, a]);
+    }
+  };
+  tier(27, 0.1, 0.17, true, false);
+  tier(16, 0.12, 0.2, true, false);
+  tier(8, 0.15, 0.24, false, true);
+  // the twinkle tweens start a beat later, off the entry frame (the home's law)
+  scene.time.delayedCall(400, () => {
+    for (const [st, a] of twinkles)
+      if (st.active) scene.tweens.add({ targets: st, alpha: a * 0.35, duration: 1600 + Math.random() * 2600, yoyo: true, repeat: -1, delay: Math.random() * 2500 });
+  });
+  return plate;
+}
+
 // one shooting star, fired now — the ambient loop below uses it, and the
 // boot intro calls it directly (its 4-8s cadence would miss a 3s intro)
 function ssShootingStar(scene) {
@@ -2222,6 +2342,17 @@ function ssSkyTextures(scene, dawn) {
     [0, '#0a0d1c'], [0.09, '#0a0d1c'], [0.27, '#141c40'], [0.43, '#28376e'], [0.575, '#4d5da4'],
     [0.685, '#8f7cb8'], [0.76, '#d9a0ac'], [0.805, '#f2bd9c'], [0.83, '#ffd9a0'], [0.846, '#ffedc4'],
     [0.852, '#fff7dc'], [0.86, '#120d22'], [1, '#0b0716']]);
+  // (F5-PAINTED: the dawn veil, as live)
+  // THE DAWN OVER THE PAINTED NIGHT (v0.118.0): the same sunrise, carried as a
+  // veil that rides back over the night plate — clear at the zenith (the
+  // plate's night IS the dawn's zenith, both pinned #0a0d1c), closing to full
+  // by the mid column, so the crisp painted stars stand overhead while the
+  // sunrise owns the horizon and the meadow exactly as before. A real dawn:
+  // dark overhead, bright at the rim. Seated only when the plate is (ssSkyWorld).
+  if (dawn) gradTex('skygrad-dawn-veil', [
+    [0, 'rgba(10,13,28,0)'], [0.27, 'rgba(20,28,64,0)'], [0.43, 'rgba(40,55,110,0.6)'], [0.575, '#4d5da4'],
+    [0.685, '#8f7cb8'], [0.76, '#d9a0ac'], [0.805, '#f2bd9c'], [0.83, '#ffd9a0'], [0.846, '#ffedc4'],
+    [0.852, '#fff7dc'], [0.86, '#120d22'], [1, '#0b0716']]);
   mk('grain', 128, 128, (c, w, h) => {
     const im = c.createImageData(w, h), d = im.data;
     for (let i = 0; i < d.length; i += 4) { const v = Math.random() * 255; d[i] = d[i + 1] = d[i + 2] = v; d[i + 3] = 255; }
@@ -2332,6 +2463,30 @@ function ssSkyWorld(scene, opts) {
 
   // master gradient: spans the whole column, zenith top pinned to the game bg
   scene.add.image(l.W / 2, wy(0), opts.dawn ? 'skygrad-dawn' : 'skygrad').setOrigin(0.5, 0).setDisplaySize(l.W, 2400 * l.s);
+  // F5-PAINTED: the plate under the first5 title night, as live.
+  // THE PAINTED NIGHT (10/8 night-sky round, S1 Quiet Night): one tall plate
+  // over the gradient, under every live layer — crisp painted stars where the
+  // scaled dot sprites blurred. EVERY sky ride stands on it (10/9, Skylar:
+  // "the new transition whenever you open the app … or the transition for
+  // any of the different modes"): the dusk home's descent and every rise out
+  // of it, the duel's shared-seed rise, the dueling ground's still frame
+  // (under its navy veil — the same world, a darker hour) and the
+  // campaign-win dawn (under its own sunrise veil, below). Never required:
+  // absent, the gradient and the full-strength tiers below carry the sky as
+  // before. The asset's zenith is lifted to the same #0a0d1c the gradient
+  // pins, so the battle handoff stays invisible; its foot tucks behind the
+  // meadow plate's own sky.
+  // (texture seated by ssNightSkyTex — the fight's own still frame,
+  // ssZenithSky, lays this same plate at this same zenith, so the rise's
+  // landing and the battle are one picture: THE SKY STAYS, v0.119.0)
+  const artSky = !!ssNightSkyTex(scene);
+  if (artSky) {
+    scene.add.image(l.W / 2, wy(0), 'nightskyart').setOrigin(0.5, 0).setDisplaySize(l.W, 2400 * l.s);
+    ssNightSkyCap(scene, l, wy(0));
+  }
+  // the dawn's sunrise rides back over the plate from the mid column down (see
+  // ssSkyTextures): painted stars overhead, the dawn owns the rim and the meadow
+  if (artSky && opts.dawn) scene.add.image(l.W / 2, wy(0), 'skygrad-dawn-veil').setOrigin(0.5, 0).setDisplaySize(l.W, 2400 * l.s);
   // the versus hour: one navy veil deepens the same gradient into a later
   // night (no second gradient bake — the same world, a darker hour); stars,
   // aurora and meadow draw above it at full voice
@@ -2370,9 +2525,20 @@ function ssSkyWorld(scene, opts) {
     for (const st of twinkles)
       scene.tweens.add({ targets: st, alpha: st.baseA * 0.35, duration: 1600 + rnd() * 2600, yoyo: true, repeat: -1, delay: rnd() * 2500 });
   });
-  tier(0.55, 110, 0.28, 0.5, true);
-  const tierM = tier(0.70, 75, 0.42, 0.68, true);
-  const tierN = tier(0.85, 48, 0.66, 0.95, false);
+  // under the painted plate the live tiers all but stand down — the painting
+  // carries the star field crisp; a handful of TINY dots keep the twinkle
+  // and the descent's parallax stretch alive. The scaled-up soft dots WERE
+  // the blur complaint (10/9, Skylar's phone), so over art they never exceed
+  // a third of their procedural size. (F5-PAINTED)
+  if (artSky) {
+    tier(0.55, 40, 0.1, 0.17, true);
+    var tierM = tier(0.70, 25, 0.12, 0.2, true);
+    var tierN = tier(0.85, 14, 0.15, 0.24, false);
+  } else {
+    tier(0.55, 110, 0.28, 0.5, true);
+    var tierM = tier(0.70, 75, 0.42, 0.68, true);
+    var tierN = tier(0.85, 48, 0.66, 0.95, false);
+  }
   tierN.forEach((st) => st.setBlendMode('ADD'));
 
   // hero stars — the ones a player would wish on, in the meadow's dusk sky
@@ -2394,7 +2560,7 @@ function ssSkyWorld(scene, opts) {
 
   // clouds — parked in the climb band, crossed mid-flight
   for (const [cx, cy, cw, chh] of [[-51, -650, 242, 43], [108, -475, 280, 50], [-121, -313, 229, 38]]) {
-    const c = scene.add.image(l.x(cx), my(cy), 'cloudwisp').setDisplaySize(l.u(cw), l.u(chh)).setAlpha(opts.dawn ? 0.35 : 0.55);
+    const c = scene.add.image(l.x(cx), my(cy), 'cloudwisp').setDisplaySize(l.u(cw), l.u(chh)).setAlpha(opts.dawn ? 0.35 : artSky ? 0.3 : 0.55);   /* F5-PAINTED */
     scene.tweens.add({ targets: c, x: c.x + l.u(20), duration: 6000 + rnd() * 4000, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
   }
 
@@ -2473,7 +2639,7 @@ function ssSkyWorld(scene, opts) {
       flyTweens(f);
     }
   };
-  return { setP, scatterFlies, restoreFlies, grain, T };
+  return { setP, scatterFlies, restoreFlies, grain, T, art: artSky };   // F5-PAINTED: the home's halo reads this
 }
 
 // Assemble a constellation inside a container: stars fly in, lines fade up.
@@ -3822,6 +3988,23 @@ function ssClockInherit(resume, key) {
 // Returns { key, w, h, anchors } in design units; anchors are letter-tip
 // points (relative to the texture centre) where the home scene sets sparkles.
 function ssTitleTex(scene) {
+  // THE PAINTED WORDMARK (10/8 night-sky round, L3 Golden Hand — Skylar's
+  // ruling: painted English for every tongue). Never required: absent, the
+  // live-text treatment below draws any title exactly as before. Anchors are
+  // letter-tip fractions measured on the painted art (S flourish, second S,
+  // the final L, the swirl tail) so the home sparkles keep their perches.
+  // (F5-PAINTED: as live v0.118.0 — the first5 title night wears the painted word)
+  if (ART && SSART.img.title) {
+    const akey = 'title@art';
+    if (!scene.textures.exists(akey)) scene.textures.addImage(akey, SSART.img.title);
+    const f = scene.textures.get(akey).getSourceImage();
+    const w = 340, h = w * f.height / f.width;
+    const anchors = [
+      { x: -0.40 * w, y: -0.27 * h }, { x: 0.03 * w, y: -0.32 * h },
+      { x: 0.45 * w, y: -0.17 * h }, { x: -0.20 * w, y: 0.45 * h },
+    ];
+    return { key: akey, w, h, anchors };
+  }
   const R = Math.max(2, ssTexRes(scene));
   const key = 'title@' + SS_LANG;
   const text = SS_T('title'), px = 46 * R;
@@ -7179,6 +7362,9 @@ class Home extends Phaser.Scene {
       t.setScale(bs.sx * 1.12, bs.sy * 1.12);
       const glow = this.add.image(t.x, t.y, 'glowbig').setScale(l.u(2.1)).setTint(0xf3e5b4)
         .setBlendMode('ADD').setScrollFactor(0).setDepth(605).setAlpha(0);
+      // over the painted night the halo whispers — full voice over the darker
+      // procedural sky, where it was graded (10/9: it read as grey haze on art)
+      const ga = this.sky && this.sky.art ? 0.55 : 1;   // F5-PAINTED
       const em = this.add.particles(0, 0, 'dot', {
         speed: { min: 6, max: 46 }, lifespan: { min: 500, max: 1100 }, gravityY: -14,
         scale: { start: 0.5, end: 0 }, alpha: { start: 0.85, end: 0 },
@@ -7237,7 +7423,7 @@ class Home extends Phaser.Scene {
         if (this.introSkipFn) { this.input.off('pointerdown', this.introSkipFn); this.introSkipFn = null; }
         if (skipped) {   // mid-condense: snap the word landed, sweep a half-bloomed flourish
           this.tweens.killTweensOf([t, glow]);
-          t.setAlpha(1).setScale(bs.sx, bs.sy); glow.setAlpha(0.18);
+          t.setAlpha(1).setScale(bs.sx, bs.sy); glow.setAlpha(0.18 * ga);   /* F5-PAINTED */
           for (const fx of this.introFx) if (fx && fx.active) { this.tweens.killTweensOf(fx); fx.destroy(); }
           this.introFx = [];
         }
@@ -7253,7 +7439,7 @@ class Home extends Phaser.Scene {
       at(200, () => ssShootingStar(this));
       at(320, () => {
         if (!this.introPlaying) return;
-        this.tweens.add({ targets: glow, alpha: 0.32, duration: 550, yoyo: true, hold: 200 });
+        this.tweens.add({ targets: glow, alpha: 0.32 * ga, duration: 550, yoyo: true, hold: 200 });
         this.tweens.add({ targets: t, alpha: 1, duration: 750, ease: 'Sine.easeOut' });
         this.tweens.add({
           targets: t, scaleX: bs.sx, scaleY: bs.sy, duration: 950, ease: 'Back.easeOut',
@@ -7263,8 +7449,8 @@ class Home extends Phaser.Scene {
             if (!this.introPlaying) return;
             this.tweens.killTweensOf(glow);
             this.tweens.add({
-              targets: glow, alpha: 0.5, duration: 150, yoyo: true,
-              onComplete: () => { if (this.introPlaying) this.tweens.add({ targets: glow, alpha: 0.18, duration: 450 }); },
+              targets: glow, alpha: 0.5 * ga, duration: 150, yoyo: true,
+              onComplete: () => { if (this.introPlaying) this.tweens.add({ targets: glow, alpha: 0.18 * ga, duration: 450 }); },
             });
             const ring = this.add.image(t.x, t.y, 'glowbig').setScale(l.u(0.9)).setTint(0xffe9c9)
               .setBlendMode('ADD').setScrollFactor(0).setDepth(604).setAlpha(0.3);
@@ -7410,7 +7596,7 @@ class Home extends Phaser.Scene {
     const t = this.add.image(l.W / 2, l.H * 0.4, tk.key)
       .setDisplaySize(l.u(tk.w * tScale), l.u(tk.h * tScale)).setScrollFactor(0).setDepth(610);
     const glow = this.add.image(t.x, t.y, 'glowbig').setScale(l.u(2.1)).setTint(0xf3e5b4)
-      .setBlendMode('ADD').setScrollFactor(0).setDepth(605).setAlpha(0.18);
+      .setBlendMode('ADD').setScrollFactor(0).setDepth(605).setAlpha(0.18 * (this.sky && this.sky.art ? 0.55 : 1));   /* F5-PAINTED: the halo whispers over the painted night (playIntro's ga) */
     this.f5TitleFx = { t, glow, em: null };
     window.__ssintro = 'stands';
     DIAG('ftue: the title stands at the zenith (no cinematic)');
@@ -8806,10 +8992,18 @@ class Battle extends Phaser.Scene {
       this.cameras.main.setAlpha(0);
       this.tweens.add({ targets: this.cameras.main, alpha: 1, duration: 420, ease: 'Sine.easeOut' });
     }
-    ssStarfield(this, 110);
+    // THE SKY STAYS (v0.119.0): the painted night at its zenith — the frame
+    // the rise lands on — is the fight's ground, in every mode, for the whole
+    // fight; the 110-dot procedural field only when the art is absent. Every
+    // mode-specific sky (the daily's ribbon and dress, the campaign chart, the
+    // endless gate, the boss herald) stands ON it, as before — none replaced it.
+    // (F5-PAINTED: the first5 fight stands where the live game's does)
+    this.skyPlate = ssZenithSky(this);
     ssShootingStars(this);
     const tSky = performance.now();
-    for (const [tint, dx, dy] of [[0x2fe0d0, -140, 140], [0x8a5ae0, 140, 620]]) {
+    // the procedural sky's own aurora pair — over the plate the zenith sky
+    // lays the home's three curtains itself
+    if (!this.skyPlate) for (const [tint, dx, dy] of [[0x2fe0d0, -140, 140], [0x8a5ae0, 140, 620]]) {
       const a = this.add.image(l.x(dx), l.y(dy), 'glowbig').setScale(l.u(2.2)).setTint(tint).setAlpha(0.04).setBlendMode('ADD');
       this.tweens.add({ targets: a, x: a.x + l.u(24), scale: l.u(2.6), duration: 8000, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     }

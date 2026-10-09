@@ -2,11 +2,17 @@
 
 Harness for the FIRST5 sandbox (the first-night tutorial test build at
 drbango.com/beta3/first5/ — batch `ss-2026-10-07-first-night` + fix round
-`ss-2026-10-08-first5-fixes` + `ss-2026-10-09-night-sky-live` card 03).
+`ss-2026-10-08-first5-fixes` + `ss-2026-10-09-night-sky-live` card 03 +
+`ss-2026-10-09-first5-script` card 01).
 
 **first5-check.mjs** — the whole-stage suite (cards 01-06 + fix 01 THE
 CLEAN REFRESH + fix 02 THE STRAY SIGNS + fix 03 THE SCRY LESSON + STRAIGHT
-INTO THE NIGHT): static seams (including the straight seams — seventeen
+INTO THE NIGHT + THE PAINTED FIRST FIVE): static seams (including the
+painted seams — thirteen F5-PAINTED sites, the live game's plate seat /
+zenith crown / fight frame (ssNightSkyTex · ssNightSkyCap · ssZenithSky)
+proven byte-for-byte against ../game.js, the painted wordmark branch, the
+bounded boot wait for the opening's own two files through ../art, the old
+110-dot seat gone from Battle.create — and the straight seams — seventeen
 F5-STRAIGHT sites, the landing that STANDS instead of settling, the lean
 that RESUMES the shipped rise from the title's own frame, the riser sized
 to it, the stale-ref reset — and the
@@ -20,7 +26,21 @@ and the fight — min p ≥ 0.9 — the meadow chrome never showed, the grass
 grain never lit, the intro beacon read "stands" never "done"; proven on the
 untapped 5s fallback, under emulated reduce-motion, and on the REAL lure
 tap; the DPR-3 capture pair `tools/shots-straight/` title-night.png +
-first-fight.png — untracked, never committed), the LURE (real CDP click at
+first-fight.png — untracked, never committed), THE PAINTED FIRST FIVE (at
+the title: both art files landed, `sky.art`, the `nightskyart` plate seated
+2400u tall × full width right over the gradient, the standing word is
+`title@art`, its halo at the whisper 0.099, the tiers thinned to 79 dots
+none past 0.24·l.s; in the fight: the sky-stays plate census — the plate
+at l.y(0), the lowest child, the 27/16/8 tiers only, 8 on ADD — and the
+SAME plate object still standing after the whole first lesson; §5 the
+`?art=0` fallback — no plate, `title@en`, the full 233-dot tiers; §6 THE
+PIXEL LAW — the LIVE game booted on the same server (Firebase blocked),
+its zenith (grain hidden, p 1, chrome dark) and its title shade (p 0.92 +
+the painted word at playIntro's seat) captured as `live-zenith.png` +
+`live-title-shade.png`, and the first5 frames judged against them with a
+dependency-free PNG reader: the first fight's outer sky strips ≥95% within
+±6, the title night's full frame ≥95% within ±8, the wordmark band ≥90%),
+the LURE (real CDP click at
 the TITLE launches the lean and arms the sound), THE SKY LEANS IN (ember 33hp, real-tap STAR cast, star-write,
 the density gate vs the full dictionary, curated trio, encore, a real
 5-letter cast firing the cue ladder), THE TEACHING SCRIPTS (real
@@ -47,7 +67,7 @@ every depth home; real taps select and bounce again; a later stall only
 glints — the hand is never taken twice), THE CLEAN REFRESH itself
 (Page.reload with no flag wipes sentinel/quickck/stat, re-opens the FTUE
 gate, and the lure asks again, at the title), and the reset door (still honored,
-out-ranking even a survive flag). Run from first5/ — ~10-15 min.
+out-ranking even a survive flag). Run from first5/ — ~12-17 min.
 
 Sandbox-only law: the wipe-on-refresh is THE STAGE'S law, never the live
 game's — see the SANDBOX-ONLY block atop first5.js before any integration.
@@ -68,9 +88,14 @@ own chains; §3b2 clears the seed and owns the gate.
 
 Serves the REPO ROOT on :8901 if nothing does (first5 reaches ../vendor,
 ../words*, ../art — the standing :8899 beta3 server roots too deep to serve
-them). Chrome on :9476 with the desc-check swiftshader recipe
-(`--enable-unsafe-swiftshader --use-gl=angle --use-angle=swiftshader`);
-plain `--disable-gpu` has no WebGL and the fresh-profile raster probe aborts.
+them). Chrome on :9476 on the Mac's REAL GPU (THE GPU LAW, 10/9): plain
+`--headless=new` gives WebGL on the Radeon at 60 fps, the game's own phone
+pace. The old desc-check swiftshader recipe (`--enable-unsafe-swiftshader
+--use-gl=angle --use-angle=swiftshader`) is software GL — it left the game on
+its CANVAS renderer at ~5 fps, and once the painted plate stood under the
+fight (~2.6 fps) the real-time sections went red by the dozen (every one a
+timing miss). `F5SOFT=1` restores it for a box without a GPU; plain
+`--disable-gpu` has no WebGL and the fresh-profile raster probe aborts.
 
 House gotchas inherited from beta3/tools: never RETURN a Phaser object from
 an evaluate; the harness's own evaluates ride the first5 storage shim, so ask

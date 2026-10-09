@@ -23,6 +23,17 @@
 // the gate lifts, play resumes, and the lesson never takes the hand twice
 // (SS.prof.f5scry). §2/§3b pre-seed that flag so the older sections keep
 // testing THEIR cards; §3b2 clears it and stalls honestly.
+// THE PAINTED FIRST FIVE (10/9, card ss-2026-10-09-first5-script/01, F5-PAINTED
+// seams): the tutorial stands on the live game's painted night — the crisp
+// plate (../art/nightsky.webp) under the title night AND the fight (ssZenithSky,
+// the frame the rise lands on), the painted wordmark (../art/title.webp), the
+// soft dots thinned to the over-art tiers, the halo at its whisper; ?art=0
+// keeps the procedural night of old. Proven on paper (the ported functions are
+// the live game's byte for byte), by census at the title and in the fight (the
+// SAME plate through the whole first lesson), on ?art=0 (§5), and by pixels
+// (§6): the live game booted on the same server, its zenith and its title shade
+// captured as references, the first5 title night and first fight judged
+// against them within the sky-stays law (outer strips ±6, full frame ±8).
 // Run against the PUBLISHED page with F5BASE=https://drbango.com/beta3/first5/index.html
 // Proves the first5 sandbox is a true first night that cannot touch live
 // beta3: static seams (script order, no Firebase, repointed shared assets),
@@ -39,12 +50,14 @@
 //
 // Serves the REPO ROOT (first5 reaches ../vendor, ../words.js, ../art) on
 // :8901 if nothing does — NOT the standing :8899 beta3 server, which roots
-// at beta3/ and cannot serve ../. Chrome on :9476, /tmp/cdp-first5 wiped.
+// at beta3/ and cannot serve ../. Chrome on :9476 (the Mac's GPU — see THE GPU
+// LAW below), /tmp/cdp-first5 wiped.
 //
 //   cd beta3/first5 && perl -e 'alarm 1500; exec @ARGV' node tools/first5-check.mjs
 //
 import { spawn, execSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { inflateSync } from 'node:zlib';
 const PORT = 9476, SRV = 8901;
 // the standing-marks census: every ssF5DrawMini item carries a 'f5mark'
 // data tag (F5-FIX1-02), so "the fight view is clean" is one honest count
@@ -89,7 +102,7 @@ ok('F5-FIX1-01 seams tagged at every site (2 in game.js, 1 in versus.js)', (game
 ok('the stray-sign law: the battle no longer draws the kept sky at boot', !/'quick'\) ssF5DrawLitSky/.test(gameSrc) && !gameSrc.includes('the battle wears the kept sky'));
 ok('…the meadow keeps its one draw (the morning-after proof)', (gameSrc.match(/ssF5DrawLitSky\(this\)/g) || []).length === 1 && gameSrc.includes('the meadow wears the kept sky'));
 ok('F5-FIX1-02 seams: six tagged sites, the tracked sweep, the census tag', (gameSrc.match(/F5-FIX1-02/g) || []).length === 6 && (gameSrc.match(/f5ClearSeatMarks\(\)/g) || []).length === 3 && (gameSrc.match(/setData\('f5mark'/g) || []).length === 2);
-ok("game.js art repointed to ../art (2 sites)", (gameSrc.match(/im\.src = '\.\.\/art\//g) || []).length === 2 && !/im\.src = 'art\//.test(gameSrc));
+ok("game.js art repointed to ../art (3 sites: required · the opening's own two · never-required)", (gameSrc.match(/im\.src = '\.\.\/art\//g) || []).length === 3 && !/im\.src = 'art\//.test(gameSrc));
 ok('packs.js dictionary writes ../words-<lang>.js', packSrc.includes('src="../words-'));
 for (let n = 1; n <= 7; n++) ok('F5-GRAFT-' + n + ' seam present in game.js', gameSrc.includes('F5-GRAFT-' + n));
 ok('F5-CARD-06 seams: seats, the rite, the ledger, the kept sky', ['SS_F5_SEATS', 'f5LightSky(', 'f5Ledger(', 'ssF5DrawLitSky(', 'returns to the sky'].every((t) => gameSrc.includes(t)));
@@ -113,12 +126,40 @@ ok('the riser is sized to the lean; the word comes apart where it stands', gameS
 ok('the title night draws no kept marks; the morning-after meadow keeps its draw; no crickets at the zenith', gameSrc.includes('if (!this.f5Straight) ssF5DrawLitSky(this);') && gameSrc.includes('if (!this.introPlaying && !this.f5Straight'));
 ok('the straight state dies with the open (stale-ref law)', gameSrc.includes('this.f5Straight = false; this.f5TitleFx = null; this.f5Lean = null;'));
 ok('the lure stands at the title: scroll-fixed firefly + rings, the f5lure census tag; reduce-motion and the restart stand there too', gameSrc.includes("setData('f5lure', 1)") && gameSrc.includes('if (zen) fly.setScrollFactor(0);') && gameSrc.includes('if (zen) ring.setScrollFactor(0);') && gameSrc.includes('if (this.f5Straight) this.f5StandTitle(l);') && gameSrc.includes('else { this.buildMeadowUi(l); this.f5StandTitle(l); }'));
+/* — THE PAINTED FIRST FIVE (card ss-2026-10-09-first5-script/01) seams — */
+ok('painted seams: thirteen F5-PAINTED sites in game.js', (gameSrc.match(/F5-PAINTED/g) || []).length === 13, String((gameSrc.match(/F5-PAINTED/g) || []).length));
+ok("the boot waits (bounded 2.5s) for the opening's own two — the painted night + the painted wordmark — through ../art", gameSrc.includes('const SS_ART_GRACE_MS = 2500;') && gameSrc.includes("const soft = ['nightsky', 'title'];") && gameSrc.includes('Promise.race([softP, new Promise((res) => setTimeout(res, SS_ART_GRACE_MS))])') && gameSrc.includes("DIAG('art absent ' + n)"));
+ok('the live sky plumbing stands: ssNightSkyTex (one seat) · ssNightSkyCap (SS_SKY_CAP_U 180) · ssZenithSky', ['function ssNightSkyTex(', 'function ssNightSkyCap(', 'function ssZenithSky(', 'const SS_SKY_CAP_U = 180;'].every((t) => gameSrc.includes(t)));
+ok('the ride seats the plate under every sky, the crown over its top, the dawn under its veil', gameSrc.includes('const artSky = !!ssNightSkyTex(scene);') && gameSrc.includes("scene.add.image(l.W / 2, wy(0), 'nightskyart').setOrigin(0.5, 0).setDisplaySize(l.W, 2400 * l.s);") && gameSrc.includes('ssNightSkyCap(scene, l, wy(0));') && gameSrc.includes("if (artSky && opts.dawn) scene.add.image(l.W / 2, wy(0), 'skygrad-dawn-veil')") && gameSrc.includes("gradTex('skygrad-dawn-veil'"));
+ok('over the plate the tiers thin to 40/25/14 at ≤ 0.24·l.s, the wisps to 0.3, and the ride reports its art', gameSrc.includes('tier(0.55, 40, 0.1, 0.17, true);') && gameSrc.includes('var tierN = tier(0.85, 14, 0.15, 0.24, false);') && gameSrc.includes('artSky ? 0.3 : 0.55') && gameSrc.includes('return { setP, scatterFlies, restoreFlies, grain, T, art: artSky };'));
+ok("THE SKY STAYS: the fight stands on ssZenithSky — Battle.create's old 110-dot seat is GONE (the field survives only as ssZenithSky's ?art=0 fallback) and the procedural aurora pair stands down over the plate", gameSrc.includes('this.skyPlate = ssZenithSky(this);') && !gameSrc.includes('    ssStarfield(this, 110);\n    ssShootingStars(this);') && gameSrc.includes('if (!this.skyPlate) for (const [tint, dx, dy] of [[0x2fe0d0, -140, 140], [0x8a5ae0, 140, 620]])') && gameSrc.includes('if (!key) { ssStarfield(scene, 110); return null; }'));
+ok('the painted wordmark serves every tongue ahead of the live text (title@art, the live anchors)', gameSrc.includes("const akey = 'title@art';") && gameSrc.includes('if (ART && SSART.img.title) {') && gameSrc.includes('{ x: -0.40 * w, y: -0.27 * h }, { x: 0.03 * w, y: -0.32 * h },'));
+ok('the halo whispers over the painted night (ga 0.55): the condense, the snap, the static title', (gameSrc.match(/\* ga\b/g) || []).length === 4 && gameSrc.includes('const ga = this.sky && this.sky.art ? 0.55 : 1;') && gameSrc.includes('setAlpha(0.18 * (this.sky && this.sky.art ? 0.55 : 1))'));
+ok('no old backdrop texture remains referenced: no bare skygrad seat without the plate branch, no second zenith field', gameSrc.includes("scene.add.image(l.W / 2, wy(0), opts.dawn ? 'skygrad-dawn' : 'skygrad')") && (gameSrc.match(/ssStarfield\(this, 110\)/g) || []).length === 1 && /ssStarfield\(this, 110\);\s*\n\s*\/\/ the list of played and unplayed|class Board|ssStarfield\(this, 110\);/.test(gameSrc));
 const BUILD = (gameSrc.match(/const BUILD = '([^']+)'/) || [])[1];
 ok('game.js copy carries a BUILD', !!BUILD, BUILD);
 try {
-  const liveBuild = (readFileSync('../game.js', 'utf8').match(/const BUILD = '([^']+)'/) || [])[1];
+  const liveSrc = readFileSync('../game.js', 'utf8');
+  const liveBuild = (liveSrc.match(/const BUILD = '([^']+)'/) || [])[1];
   console.log('  i  live beta3 is ' + liveBuild + ' — first5 copy is ' + BUILD + (liveBuild === BUILD ? ' (in step)' : ' (DRIFTED — re-seed when the batch integrates)'));
-} catch (e) { }
+  // the ported sky is the live game's, byte for byte (the F5-PAINTED tag comments aside)
+  const fnOf = (s, name) => { const ls = s.split('\n'); const i = ls.findIndex((l) => l.startsWith('function ' + name + '(')); if (i < 0) return null; const j = ls.findIndex((l, k) => k > i && l === '}'); return ls.slice(i, j + 1); };
+  // the tag comments come off before the compare: a whole tag line goes, a
+  // trailing '(F5-PAINTED)' or '/* F5-PAINTED */' / '// F5-PAINTED…' is cut
+  const untag = (ls) => ls.flatMap((l) => {
+    if (!l.includes('F5-PAINTED')) return [l];
+    if (/^\s*\/\/.*F5-PAINTED/.test(l) && !/\(F5-PAINTED\)\s*$/.test(l)) return [];
+    return [l.replace(/\s*\(F5-PAINTED\)\s*$/, '').replace(/\s*(\/\*|\/\/)\s*F5-PAINTED.*$/, '')];
+  });
+  const same = {};
+  for (const name of ['ssNightSkyTex', 'ssNightSkyCap', 'ssZenithSky', 'ssSkyTextures', 'ssStarfield', 'ssSkyWorld']) {
+    const a = fnOf(liveSrc, name), b = fnOf(gameSrc, name);
+    same[name] = !!a && !!b && untag(a).join('\n') === untag(b).join('\n');
+  }
+  ok('the ported sky functions are the live game\'s, byte for byte (ssNightSkyTex · ssNightSkyCap · ssZenithSky · ssSkyTextures · ssStarfield · ssSkyWorld)', Object.values(same).every(Boolean), JSON.stringify(same));
+  const liveTitle = liveSrc.slice(liveSrc.indexOf('  if (ART && SSART.img.title) {'), liveSrc.indexOf("  const R = Math.max(2, ssTexRes(scene));\n  const key = 'title@' + SS_LANG;"));
+  ok('…and the painted-wordmark branch of ssTitleTex is the live one', liveTitle.length > 100 && gameSrc.includes(liveTitle));
+} catch (e) { console.log('  i  ../game.js unreadable here — the byte-for-byte check needs the repo tree'); }
 
 /* ================= server + browser ================= */
 try { execSync('rm -rf /tmp/cdp-first5'); } catch (e) { }
@@ -129,7 +170,17 @@ if (!(await serving())) {
   for (let i = 0; i < 40 && !(await serving()); i++) await sleep(250);
 }
 if (!(await serving())) { console.log('cannot serve repo root on :' + SRV); process.exit(2); }
-kids.push(spawn(CHROME, ['--headless=new', '--no-sandbox', '--mute-audio', '--enable-unsafe-swiftshader', '--use-gl=angle', '--use-angle=swiftshader', '--remote-debugging-port=' + PORT,
+// THE GPU LAW (10/9, THE PAINTED FIRST FIVE): the painted plate is a full-screen
+// textured quad under every frame of the fight. Under the old swiftshader recipe
+// (software GL — which also left the game on its CANVAS renderer) that cost the
+// fight ~2.6 fps against ~10 without the plate, and the real-time sections (fixed
+// sleeps around game-clock beats) went red by the dozen: 162/177 on the first
+// painted run, every red a timing miss, none a sky fault. headless=new drives
+// the Mac's real GPU by default: WebGL on the Radeon, 60 fps at the title and in
+// the fight, zero exceptions — a phone's pace. F5SOFT=1 keeps the software
+// recipe for a box without a GPU (expect the real-time sections to flake there).
+const GL = process.env.F5SOFT ? ['--enable-unsafe-swiftshader', '--use-gl=angle', '--use-angle=swiftshader'] : [];
+kids.push(spawn(CHROME, ['--headless=new', '--no-sandbox', '--mute-audio', ...GL, '--remote-debugging-port=' + PORT,
   '--user-data-dir=/tmp/cdp-first5', '--window-size=390,844', '--force-device-scale-factor=3', 'about:blank'], { stdio: 'ignore' }));
 let list = null;
 for (let i = 0; i < 60 && !list; i++) { try { list = await (await fetch('http://127.0.0.1:' + PORT + '/json/list')).json(); } catch (e) { await sleep(500); } }
@@ -182,6 +233,55 @@ const tap = async (p) => {
 // the old voice (glint + ribbon) and never veil the chain; §3b2 clears the
 // seed and owns the gate.
 const seedScry = () => ev("(()=>{try{if(typeof SS!=='undefined'&&SS.prof){SS.prof.f5scry=1;SS.save();return 1}}catch(e){}return 0})()");
+
+/* THE PAINTED FIRST FIVE: the plate census (sky-stays' law, ported) — a texture
+   key read through the Safari tint-bake ('dot#…' → 'dot'), the fight's plate
+   at the rise's landing frame, the thinned tiers counted by COUNT + the
+   l.s-relative cap (the DPR-3 census law: never a raw-scale threshold), the
+   shooting stars (depth 1, transient) left out, window.__ssplate = the same
+   object across the lesson. */
+const BASEKEY = "const base=(o)=>o.__ssBaseTex||(o.texture&&o.texture.key||'').split('#')[0];";
+const PLATE = "(()=>{try{const b=game.scene.getScene('battle');if(!b||!b.sys.isActive())return null;const L=b.L,p=b.skyPlate;" + BASEKEY + "const pips=new Set(b.pips||[]);const all=b.children.list.filter((o)=>o.type==='Image'&&!o.parentContainer&&!pips.has(o)&&base(o)==='dot');const dots=all.filter((o)=>o.depth!==1);const maxS=dots.length?+Math.max(...dots.map((o)=>o.scaleX)).toFixed(3):0;return {plate:!!p&&p.active,tex:p?base(p):null,y:p?+p.y.toFixed(2):null,y0:+L.y(0).toFixed(2),h:p?+p.displayHeight.toFixed(2):null,h0:+(2400*L.s).toFixed(2),w:p?+p.displayWidth.toFixed(2):null,W:L.W,lowest:!!p&&b.children.list.indexOf(p)===0,same:!!p&&window.__ssplate===p,dots:dots.length,add:dots.filter((o)=>o.blendMode===1).length,maxS,cap:+(0.24*L.s).toFixed(3),state:b.state,mode:b.mode}}catch(e){return {err:e.message}}})()";
+const plateOk = (c) => !!c && c.plate && c.tex === 'nightskyart' && c.y === c.y0 && c.h === c.h0 && c.w === c.W && c.lowest && c.dots === 51 && c.add === 8 && c.maxS <= c.cap;
+// a PNG reader for Chrome's own captures (8-bit RGB/RGBA, non-interlaced): the
+// chunks, one inflate, the five scanline filters — no dependency
+const readPNG = (path) => {
+  const b = readFileSync(path);
+  let p = 8, w = 0, h = 0, ct = 0, bd = 0, il = 0; const idat = [];
+  while (p < b.length) {
+    const len = b.readUInt32BE(p), type = b.toString('ascii', p + 4, p + 8), d = b.subarray(p + 8, p + 8 + len);
+    if (type === 'IHDR') { w = d.readUInt32BE(0); h = d.readUInt32BE(4); bd = d[8]; ct = d[9]; il = d[12]; }
+    else if (type === 'IDAT') idat.push(d);
+    else if (type === 'IEND') break;
+    p += 12 + len;
+  }
+  if (bd !== 8 || (ct !== 2 && ct !== 6) || il !== 0) throw new Error('png: unsupported ' + bd + '/' + ct + '/' + il);
+  const bpp = ct === 6 ? 4 : 3, stride = w * bpp, raw = inflateSync(Buffer.concat(idat)), out = Buffer.alloc(h * stride);
+  for (let y = 0; y < h; y++) {
+    const f = raw[y * (stride + 1)], s = y * (stride + 1) + 1, o = y * stride, po = o - stride;
+    for (let x = 0; x < stride; x++) {
+      const a = x >= bpp ? out[o + x - bpp] : 0, up = y > 0 ? out[po + x] : 0, c = (y > 0 && x >= bpp) ? out[po + x - bpp] : 0;
+      let v = raw[s + x];
+      if (f === 1) v += a; else if (f === 2) v += up; else if (f === 3) v += (a + up) >> 1;
+      else if (f === 4) { const pp = a + up - c, pa = Math.abs(pp - a), pb = Math.abs(pp - up), pc = Math.abs(pp - c); v += (pa <= pb && pa <= pc) ? a : (pb <= pc ? up : c); }
+      out[o + x] = v & 255;
+    }
+  }
+  return { w, h, bpp, data: out };
+};
+// agreement between two captures over a region: the share of pixels whose max
+// channel delta is within tol, and the mean delta (the sky-stays pixel law)
+const judge = (A, B, region, tol) => {
+  if (A.w !== B.w || A.h !== B.h) return { err: 'size ' + A.w + 'x' + A.h + ' vs ' + B.w + 'x' + B.h, pct: 0, mean: 999 };
+  let n = 0, within = 0, sum = 0;
+  for (let y = 0; y < A.h; y++) for (let x = 0; x < A.w; x++) {
+    if (!region(x, y)) continue;
+    const ia = (y * A.w + x) * A.bpp, ib = (y * B.w + x) * B.bpp;
+    let d = 0; for (let c = 0; c < 3; c++) d = Math.max(d, Math.abs(A.data[ia + c] - B.data[ib + c]));
+    n++; sum += d; if (d <= tol) within++;
+  }
+  return { n, pct: n ? +(100 * within / n).toFixed(2) : 0, mean: n ? +(sum / n).toFixed(2) : 0 };
+};
 
 /* ================= §2 the true first open ================= */
 console.log('— §2 the true first open —');
@@ -241,6 +341,25 @@ for (let i = 0; i < 180 && !lure; i++) { lure = (await ev("window.__ssftue ? win
 ok('one firefly asks — the lure stands at the TITLE (no settle, no meadow)', lure);
 const atTitle = await ev("(()=>{try{const h=game.scene.getScene('home');const p=-h.cameras.main.scrollY/h.sky.T;const fx=h.f5TitleFx;const fly=h.children.list.find(o=>o.active&&o.getData&&o.getData('f5lure'));return [!!(fx&&fx.t&&fx.t.active&&fx.t.alpha>0.99&&fx.t.scrollFactorX===0),!!(fly&&fly.scrollFactorX===0&&fx&&fly.y>fx.t.y),p.toFixed(3),h.introPlaying,h.uiItems.every(o=>!o.active||o.alpha===0)]}catch(e){return ['err:'+e.message]}})()");
 ok('…under the standing wordmark: the word at full voice and scroll-fixed, the firefly scroll-fixed below it, the sky at the zenith, the chrome dark', Array.isArray(atTitle) && atTitle[0] === true && atTitle[1] === true && Number(atTitle[2]) >= 0.9 && atTitle[3] === false && atTitle[4] === true, String(atTitle));
+/* THE PAINTED FIRST FIVE: the title night stands on the live game's plate, wears
+   the painted wordmark, and the soft dots that WERE the blur are the thinned tiers */
+// the halo's last tweens (the 0.32·ga yoyo, the 0.5·ga flourish, the 450ms settle
+// to 0.18·ga) can still be in flight when the lure lands — and a headless clock
+// can idle mid-tween — so the whisper is read off the tween TARGETS (every alpha
+// end on the glow is a 0.55-scaled value: 0.176 / 0.275 / 0.099), and off the
+// resting alpha only when no tween stands
+const glowR = await ev("(()=>{try{const h=game.scene.getScene('home');const g=h.f5TitleFx&&h.f5TitleFx.glow;if(!g)return null;const ends=[];for(const tw of h.tweens.getTweensOf(g)){for(const d of (tw.data||[]))if(d.key==='alpha')ends.push(+(+d.end).toFixed(3))}return {a:+g.alpha.toFixed(3),ends}}catch(e){return {err:e.message}}})()");
+const whisper = (v) => [0.099, 0.176, 0.275].some((w) => Math.abs(v - w) <= 0.004);
+// at rest the overlapping condense tweens leave the halo at 0.099–0.113 over
+// art (a 60 fps pace lands 0.113, a starved clock 0.099 — the live game's own
+// overlap); without the whisper it rests at 0.18–0.21 (§5's ?art=0 reads ~0.20)
+const glowOk = !!glowR && !glowR.err && (glowR.ends.length ? glowR.ends.every(whisper) && glowR.a <= 0.28 : glowR.a >= 0.09 && glowR.a <= 0.13);
+const paintedT = await ev("(()=>{try{const h=game.scene.getScene('home');const L=ssLayout(h);" + BASEKEY + "const kids=h.children.list;const plate=kids.find(o=>o.type==='Image'&&base(o)==='nightskyart');const tdots=kids.filter(o=>o.type==='Image'&&!o.parentContainer&&base(o)==='dot'&&o.scrollFactorY<1);const maxS=tdots.length?Math.max(...tdots.map(o=>o.scaleX)):0;const tb=h.f5TitleFx?h.f5TitleFx.t.getBounds():null;return {ready:SSART.ready,night:!!SSART.img.nightsky,title:!!SSART.img.title,art:h.sky.art===true,tex:h.textures.exists('nightskyart'),ttex:h.textures.exists('title@art'),word:h.f5TitleFx?base(h.f5TitleFx.t):null,plate:!!plate,idx:kids.indexOf(plate),ph:plate?+plate.displayHeight.toFixed(1):null,h0:+(2400*L.s).toFixed(1),pw:plate?+plate.displayWidth.toFixed(1):null,W:L.W,tdots:tdots.length,maxS:+maxS.toFixed(3),cap:+(0.24*L.s).toFixed(3),crown:!!kids.find(o=>o.texture&&o.texture.key==='nightskycap'),y0:+L.y(0).toFixed(1),tb:tb?[Math.round(tb.x),Math.round(tb.y),Math.round(tb.width),Math.round(tb.height)]:null,vp:[innerWidth,innerHeight,devicePixelRatio]}}catch(e){return {err:e.message}}})()");
+ok('THE PAINTED FIRST FIVE — the title night stands on the painted plate: both art files landed, sky.art, nightskyart seated as the plate (2400u tall, full width, right over the gradient)', !!paintedT && paintedT.ready && paintedT.night && paintedT.title && paintedT.art && paintedT.tex && paintedT.plate && paintedT.idx === 1 && paintedT.ph === paintedT.h0 && paintedT.pw === paintedT.W, JSON.stringify(paintedT));
+ok('…the standing word IS the painted wordmark (title@art) and its halo whispers over the plate (0.55×: rests at 0.09–0.13, never the full-voice 0.18–0.21; a tween in flight ends 0.55-scaled)', !!paintedT && paintedT.ttex && paintedT.word === 'title@art' && glowOk, 'word ' + (paintedT && paintedT.word) + ' · glow ' + JSON.stringify(glowR));
+ok('…the soft dots that were the blur are thinned: 79 tier dots (40/25/14), none past 0.24·l.s', !!paintedT && paintedT.tdots === 79 && paintedT.maxS <= paintedT.cap, paintedT && (paintedT.tdots + ' dots · max ' + paintedT.maxS + ' / cap ' + paintedT.cap));
+console.log('  i  the zenith crown (nightskycap) is ' + (paintedT && paintedT.crown ? 'laid' : 'not laid') + ' here: l.y(0) = ' + (paintedT && paintedT.y0) + ' on a ' + (paintedT && paintedT.vp && paintedT.vp.join('×')) + ' viewport — it is laid only where a band stands above the design frame (a 390×844 phone)');
+const titleBounds = paintedT && paintedT.tb, vp = paintedT && paintedT.vp;
 try { mkdirSync('tools/shots-straight', { recursive: true }); } catch (e) { }
 const shotT = await send('Page.captureScreenshot', { format: 'png' });
 if (shotT && shotT.data) writeFileSync('tools/shots-straight/title-night.png', Buffer.from(shotT.data, 'base64'));
@@ -265,6 +384,10 @@ ok('ONE TRANSITION: title → fight 1 (pinned VULPES) off the real tap — the c
 let hSleep = false;
 for (let i = 0; i < 60 && !hSleep; i++) { await poke(i); hSleep = (await ev("game.scene.isSleeping('home') === true")) === true; if (!hSleep) await sleep(250); }
 ok('…the lean rode the shipped curve: beta3.ascent stamped, the home scene asleep under the battle (the crossfade done), the standing word taken apart', await ev("localStorage.getItem('beta3.ascent') !== null") && hSleep && await ev("(()=>{const h=game.scene.getScene('home');return h.f5TitleFx===null&&h.f5Lean===null})()"), 'asleep ' + hSleep);
+const pc1 = await ev(PLATE);
+ok("THE SKY STAYS in the first fight: the painted plate at the rise's landing frame (nightskyart · top at l.y(0) · 2400u tall · full width · the lowest child)", !!pc1 && pc1.plate && pc1.tex === 'nightskyart' && pc1.y === pc1.y0 && pc1.h === pc1.h0 && pc1.w === pc1.W && pc1.lowest, JSON.stringify(pc1));
+ok('…no soft-dot field under the fight — the thinned 27/16/8 tiers only (51, the near eight on ADD, all ≤ 0.24·l.s)', !!pc1 && pc1.dots === 51 && pc1.add === 8 && pc1.maxS <= pc1.cap, pc1 && (pc1.dots + ' dots · ' + pc1.add + ' add · max ' + pc1.maxS + ' / cap ' + pc1.cap));
+await ev("(()=>{try{window.__ssplate=game.scene.getScene('battle').skyPlate;return 1}catch(e){return 0}})()");
 const shotF = await send('Page.captureScreenshot', { format: 'png' });
 if (shotF && shotF.data) writeFileSync('tools/shots-straight/first-fight.png', Buffer.from(shotF.data, 'base64'));
 ok('DPR-3 capture 2/2 on file: the first fight frame (tools/shots-straight/first-fight.png)', !!(shotF && shotF.data), shotF && shotF.data ? Math.round(shotF.data.length / 1024) + 'kb' : 'no data');
@@ -303,6 +426,9 @@ await ev("(()=>{const b=game.scene.getScene('battle');b.f5CastBeats('zzzzzzz', 7
 await sleep(1200);
 ok('rungs 6 and 7 cue and draw clean (sky swell + gold rain)', ((await ev('window.__f5ladder6 | 0')) + (await ev('window.__f5ladder7 | 0'))) === 2);
 ok('zero exceptions through the leaning sky', errs.length === 0, errs.slice(0, 2).join(' | '));
+
+const pc2 = await ev(PLATE);
+ok('…the SAME plate stood under the whole first lesson — no swap, no crossfade to the dot field (THE SKY STAYS)', plateOk(pc2) && pc2.same, JSON.stringify(pc2));
 
 /* ======== §2d the teaching scripts (card 05) ======== */
 console.log('— §2d the teaching scripts —');
@@ -466,12 +592,18 @@ ok('zero exceptions through the look', errs.length === 0, errs.slice(0, 2).join(
 console.log('— §3b the carried night: the survive door, then the REAL retry door —');
 // graft 4's resume rides the survive flag on this stage: a scripted reload
 // carries the night, a player refresh does not (§3c proves the wipe)
+// the checkpoint AS IT STANDS at the reopen: the solver kept felling past §3's
+// first read (on the GPU recipe it reaches the third fight before §3a pauses
+// it), and the held fight is whatever quickck says NOW — §3's read proves the
+// first fell wrote it; this read is the one the reopen must honour
+const qkNow = JSON.parse((await ev("localStorage.getItem('beta3.quickck')")) || 'null');
 await ev('window.__f5survive()');
 await go(BASE); // carried — the held fight must stand
 let resumed = false;
 for (let i = 0; i < 90 && !resumed; i++) { resumed = await ev("(()=>{try{const b=game.scene.getScene('battle');return !!(b&&b.scene.isActive()&&b.mode==='quick'&&b.state==='pick')}catch(e){return false}})()"); if (!resumed) await sleep(1000); }
 const rIdx = await ev("(()=>{try{return game.scene.getScene('battle').run.fightIdx}catch(e){return -1}})()");
-ok('a CARRIED reopen resumes the held fight (graft 4 rides the survive door)', resumed && qk && rIdx === qk.fightIdx, 'resumed at fight ' + rIdx + ' (held ' + (qk && qk.fightIdx) + ')');
+ok('a CARRIED reopen resumes the held fight (graft 4 rides the survive door)', resumed && qkNow && rIdx === qkNow.fightIdx, 'resumed at fight ' + rIdx + ' (held ' + (qkNow && qkNow.fightIdx) + ', §3 first saw ' + (qk && qk.fightIdx) + ')');
+const qkHeld = JSON.parse((await ev("localStorage.getItem('beta3.quickck')")) || 'null');   // the resumed run's own checkpoint — the retry door below must come back to it
 await seedScry();   // §3b tests the doors and the glint — §3b2 owns the gate
 ok('the intro was NOT replayed over the carried run (graft 4)', await ev("window.__ssftue && window.__ssftue.on === false"));
 // now the REAL door — the versus offline retry button fires the actual
@@ -485,7 +617,7 @@ await sleep(2500); // the reload the button fired lands
 let reResumed = false;
 for (let i = 0; i < 90 && !reResumed; i++) { reResumed = await ev("(()=>{try{const b=game.scene.getScene('battle');return !!(b&&b.scene.isActive()&&b.mode==='quick'&&b.state==='pick')}catch(e){return false}})()"); if (!reResumed) await sleep(1000); }
 const rIdx2 = await ev("(()=>{try{return game.scene.getScene('battle').run.fightIdx}catch(e){return -1}})()");
-ok('THE REAL RETRY DOOR reloads WITHOUT losing the night (versus.js F5-FIX1-01)', reResumed && qk && rIdx2 === qk.fightIdx, 'resumed at fight ' + rIdx2 + ' (held ' + (qk && qk.fightIdx) + ')');
+ok('THE REAL RETRY DOOR reloads WITHOUT losing the night (versus.js F5-FIX1-01)', reResumed && qkHeld && rIdx2 === qkHeld.fightIdx, 'resumed at fight ' + rIdx2 + ' (held ' + (qkHeld && qkHeld.fightIdx) + ')');
 ok('that flag too was consumed (one-shot)', await ev("sessionStorage.getItem('__survive') === null"));
 ok('…and this resumed fight too wears a CLEAN zenith (fix 02, every boot door)', (await ev(CENSUS('battle'))) === 0 && await ev("typeof ssF5LitList==='function' && ssF5LitList().length >= 1"));
 await sleep(2500); // the deal's bounce settles before probe taps (house law)
@@ -619,6 +751,59 @@ let reborn = false;
 for (let i = 0; i < 20 && !reborn; i++) { reborn = (await ev('typeof SS !== "undefined" && SS.prof ? SS.prof.ftue : null')) === 0; if (!reborn) await sleep(1000); }
 ok('the first open is VIRGIN again (ftue gate re-open)', reborn);
 ok('zero exceptions on the reborn open', errs.length === 0, errs.slice(0, 2).join(' | '));
+
+/* ================= §5 ?art=0 — the procedural fallback, as live ================= */
+console.log('— §5 ?art=0: the procedural night of old, as the live game keeps it —');
+await go(BASE + '?reset=1&art=0');
+let lure0 = false;
+for (let i = 0; i < 180 && !lure0; i++) { lure0 = (await ev("window.__ssftue ? window.__ssftue.state : null")) === 'lure'; if (!lure0) await sleep(1000); }
+ok('?art=0: the title stands and the lure asks (the fallback still opens straight)', lure0);
+const a0 = await ev("(()=>{try{const h=game.scene.getScene('home');const L=ssLayout(h);" + BASEKEY + "const kids=h.children.list;const tdots=kids.filter(o=>o.type==='Image'&&!o.parentContainer&&base(o)==='dot'&&o.scrollFactorY<1);return {art:h.sky.art,tex:h.textures.exists('nightskyart'),plate:!!kids.find(o=>o.type==='Image'&&base(o)==='nightskyart'),word:h.f5TitleFx?base(h.f5TitleFx.t):null,tdots:tdots.length,maxS:+Math.max(...tdots.map(o=>o.scaleX)).toFixed(3),cap:+(0.24*L.s).toFixed(3),glow:h.f5TitleFx?+h.f5TitleFx.glow.alpha.toFixed(3):null}}catch(e){return {err:e.message}}})()");
+ok('?art=0: no plate, the live-text wordmark (title@en), the full 110/75/48 tiers past the cap — the procedural night, byte for byte', !!a0 && a0.art === false && !a0.tex && !a0.plate && a0.word === 'title@en' && a0.tdots === 233 && a0.maxS > a0.cap, JSON.stringify(a0));
+ok('zero exceptions on the ?art=0 open', errs.length === 0, errs.slice(0, 2).join(' | '));
+
+/* ======== §6 the live game's own frames — the reference the first5 night is judged against ======== */
+console.log("— §6 THE PIXEL LAW: the live game on the same server, its zenith + its title shade, the first5 frames judged against them —");
+const LIVE = BASE.replace(/first5\/index\.html(\?.*)?$/, 'index.html');
+await send('Network.enable', {});
+await send('Network.setBlockedURLs', { urls: ['*firebaseio.com*', '*firebasedatabase.app*', '*firebase*', '*gstatic.com*'] });
+await go(LIVE + '?fps=0&ftue=0');
+let liveHome = false;
+for (let i = 0; i < 60 && !liveHome; i++) { await poke(i); liveHome = (await ev("(()=>{try{const h=game.scene.getScene('home');return !!(h&&h.sys.isActive()&&h.sky&&h.introPlaying===false)}catch(e){return false}})()")) === true; if (!liveHome) await sleep(1000); }
+const liveArt = await ev("(()=>{try{const h=game.scene.getScene('home');return {build:typeof BUILD==='string'?BUILD:null,ready:SSART.ready,night:!!SSART.img.nightsky,title:!!SSART.img.title,art:h.sky.art===true,tex:h.textures.exists('nightskyart')}}catch(e){return {err:e.message}}})()");
+ok('the live game boots on this server and stands on its painted plate (a real reference, not a mock)', liveHome && !!liveArt && liveArt.ready && liveArt.night && liveArt.title && liveArt.art && liveArt.tex, JSON.stringify(liveArt));
+// the frame the rise lands on — the home at the zenith, the grain hidden as the
+// rise hides it, the meadow chrome dark (the sky-stays reference, exactly)
+await ev("(()=>{try{const h=game.scene.getScene('home');h.sky.grain.setVisible(false);for(const o of h.uiItems)if(o&&o.active){h.tweens.killTweensOf(o);o.setAlpha(0)}h.sky.setP(1,0);return 1}catch(e){return 'err:'+e.message}})()");
+await poke(1); await sleep(500); await poke(2);
+const shotZ = await send('Page.captureScreenshot', { format: 'png' });
+if (shotZ && shotZ.data) writeFileSync('tools/shots-straight/live-zenith.png', Buffer.from(shotZ.data, 'base64'));
+// the title's own shade: the same world at p 0.92 with the painted word standing
+// where the intro lands it (playIntro's seat, the halo at its whisper)
+await ev("(()=>{try{const h=game.scene.getScene('home');const l=ssLayout(h);h.sky.setP(0.92,0);const tk=ssTitleTex(h);const ts=Math.min(1,384/tk.w);h.add.image(l.W/2,l.H*0.4,tk.key).setDisplaySize(l.u(tk.w*ts),l.u(tk.h*ts)).setScrollFactor(0).setDepth(610);h.add.image(l.W/2,l.H*0.4,'glowbig').setScale(l.u(2.1)).setTint(0xf3e5b4).setBlendMode('ADD').setScrollFactor(0).setDepth(605).setAlpha(0.18*0.55);return 1}catch(e){return 'err:'+e.message}})()");
+await poke(3); await sleep(500); await poke(4);
+const shotS = await send('Page.captureScreenshot', { format: 'png' });
+if (shotS && shotS.data) writeFileSync('tools/shots-straight/live-title-shade.png', Buffer.from(shotS.data, 'base64'));
+ok('two live references on file: live-zenith.png (the frame the fight blends FROM) + live-title-shade.png (the title at the zenith shade)', !!(shotZ && shotZ.data && shotS && shotS.data));
+console.log('  i  live-page exceptions (the live game, not first5 — informational): ' + (errs.length ? errs.slice(0, 2).join(' | ') : 'none'));
+try {
+  const dpr = (vp && vp[2]) || 3;
+  const F = readPNG('tools/shots-straight/first-fight.png'), Z = readPNG('tools/shots-straight/live-zenith.png');
+  const T = readPNG('tools/shots-straight/title-night.png'), Sh = readPNG('tools/shots-straight/live-title-shade.png');
+  const cssH = F.h / dpr;
+  const strips = (x, y) => (x < 28 * dpr || x >= F.w - 28 * dpr) && y >= 110 * dpr && y < Math.min(700, cssH - 10) * dpr;
+  const jF = judge(F, Z, strips, 6);
+  ok("THE PIXEL LAW — the first fight stands on the frame the live rise lands on: the outer sky strips (rows 110–" + Math.min(700, Math.round(cssH - 10)) + ") agree ≥ 95% within ±6", jF.pct >= 95, JSON.stringify(jF));
+  const jT = judge(T, Sh, () => true, 8);
+  ok("…the title night IS the live game's title at the zenith shade: the full frame agrees ≥ 95% within ±8 (the lure's firefly and the random tiers are the rest)", jT.pct >= 95, JSON.stringify(jT));
+  if (titleBounds) {
+    const [bx, by, bw, bh] = titleBounds.map((v) => v * dpr);
+    const jW = judge(T, Sh, (x, y) => x >= bx && x < bx + bw && y >= by && y < by + bh, 8);
+    ok('…the painted wordmark itself — the same art at the same seat: its band agrees ≥ 90% within ±8', jW.pct >= 90, JSON.stringify(jW));
+  } else ok('the title bounds were read at the lure (the wordmark band can be judged)', false);
+  const jOld = judge(T, F, strips, 6);
+  console.log('  i  (for scale: the title night vs the first fight on the same strips — different frames — ' + jOld.pct + '% within ±6, mean |Δ| ' + jOld.mean + ')');
+} catch (e) { ok('the pixel judge ran (png decode + compare)', false, String(e && e.message)); }
 
 console.log('\n' + pass + ' passed · ' + fail + ' failed');
 kids.forEach((k) => { try { k.kill(); } catch (e) { } });
