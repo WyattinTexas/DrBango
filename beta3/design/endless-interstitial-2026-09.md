@@ -284,3 +284,33 @@ channel that provably reads on a phone. Two honest options, both mocked:
 Design panel: 3 independent designs + 2 adversarial judges ran under this card;
 the shipped shape above is the judged synthesis. Nothing builds until Skylar's
 "done and agreed".*
+
+## §11 · 2026-10-09 refinement — THE CLEAR GATE (v0.116.0, BUILT)
+
+**Skylar (Skylar's console), 2026-10-09 ~10:55 AM, verbatim (voice-dictated):**
+"For Endless mode, we don't need the grayed-out blocked letters. Those
+shouldn't be there. Also, we don't need the player's health at the top or the
+Endless Sky at the top. The point total can stay there, and the Sidewall docket
+at the top right can stay there. We can also get rid of the Cast and Scribe
+button. It should just say the Endless Sky level, whatever level you're on, and
+then, if you don't tap in the first second, have a 'Tap to continue' come up."
+
+What changed on the shipped gate (§2's Dress + Hint lines are superseded):
+- **Dress**: the board + word-line go fully dark (alpha 0, no longer a tenth),
+  and the HUD goes with them — the header line "THE ENDLESS SKY · LEVEL N" with
+  its five level pips, the YOU row (label, trough, fill, counter), and the
+  CAST / SCRY row with the comet pips and the tome's eye (`gateHud`, sunk by
+  `gateSink`). What stays beside the card: the score (with the birth sign that
+  keeps watch beside it), the sigil dock ("the Sidewall docket"), and the back
+  arrow (the existing dismiss design keeps the HUD above the sky zone live, so
+  ‹ still abandons mid-climb from the gate). `startFight` hands every hidden
+  piece back: header to its 0.9 rest, the rest to full, CAST through
+  layoutLine's own validity alpha, the eye through its tome law.
+- **Hint**: "tap to continue" (`gateTap`, re-worded in all five tongues on the
+  unlock sheet's own `unlTap` wording) on EVERY gate, fading in 500 ms after
+  `SS_GATE_HINT_MS` (1000 ms) untapped; a tap before that never sees it (the
+  timer finds the card gone). Same dim italic u9.5 seat (y645). The
+  first-gate-of-a-session latch (`SS_GATE_HINTED`) is retired.
+- Beacon `window.__ssgate.hints` counts hint landings; gate-check grew the
+  clear-gate section (HUD dark / kept / back, the hint law both ways, the dock
+  standing at an empty rung with a held sigil).

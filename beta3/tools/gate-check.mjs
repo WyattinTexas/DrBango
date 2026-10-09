@@ -9,8 +9,13 @@
 // the board row, the profile sheet, the rating card).
 //
 // The game side: before EVERY endless level — level 1 included, a resume
-// re-showing LEVEL N — the board + word-line sink to a tenth (showMap's dress)
-// and the beast's own furniture goes dark; LEVEL N condenses in gold
+// re-showing LEVEL N — THE CLEAR GATE (v0.116.0, Skylar 10/9: "we don't need
+// the grayed-out blocked letters … the player's health … the Endless Sky at
+// the top … the Cast and Scribe button"): the board, the beast's own
+// furniture AND the HUD all go dark — only the score, the sigil dock and the
+// back arrow stay beside the card — and a gate left untapped for ~1s fades in
+// "tap to continue" (every gate; a tap before that never sees it); LEVEL N
+// condenses in gold
 // letterpress; the week's flags rise around it as two mirrored hands of five
 // (SS_GATE_SLOTS: ranks alternate right/left, inner tallest+highest, leans AS
 // MOCKED; left hand = the baked flagL-<colour> texture, name/roundel never
@@ -58,6 +63,16 @@ ok('the gate deals only in endless (create entry · afterSigil · demoStep)',
   /if \(this\.state === 'gate'\) \{/.test(src.game));
 ok('the removal seam is the ?gate=0 door (the ?ride=0 precedent)',
   /if \(QS\.get\('gate'\) === '0'\) \{ this\.startFight\(\); return; \}/.test(src.game));
+// THE CLEAR GATE (v0.116.0): the HUD sinks with the board, every piece handed back at startFight
+ok('the clear gate: gateHud rides gateSink to alpha 0 and startFight hands every piece back',
+  /gateHud\(\) \{/.test(src.game) && /\.concat\(this\.gateBeastFurniture\(\), this\.gateHud\(\)\)/.test(src.game) &&
+  /const hud = this\.gateHud\(\);/.test(src.game) && /hud\.forEach\(\(o\) => o\.setAlpha\(1\)\);/.test(src.game) &&
+  /this\.headT\.setAlpha\(0\.9\);/.test(src.game));
+ok('the hint is per-gate after SS_GATE_HINT_MS = 1000 (the first-of-session latch retired) and reads "tap to continue"',
+  /const SS_GATE_HINT_MS = 1000;/.test(src.game) && !/SS_GATE_HINTED/.test(src.game) &&
+  /this\.time\.delayedCall\(SS_GATE_HINT_MS,/.test(src.game) && /c\.__hint = hint;/.test(src.game) &&
+  /gateTap: 'tap to continue'/.test(src.strings) && /gateTap: 'toca para continuar'/.test(src.strings) &&
+  /gateTap: 'touche pour continuer'/.test(src.strings) && /gateTap: 'zum Fortfahren tippen'/.test(src.strings));
 ok('the fan reads the week: getWeekFlags over endless/<isoWeek>, own row kept',
   /async function getWeekFlags\(\)/.test(src.net) && /const wk = weekKey\(\);/.test(src.net) &&
   /dbGet\('endless\/' \+ wk\)/.test(src.net) && /mine: id === uid\(\)/.test(src.net) &&
@@ -206,18 +221,39 @@ ok('the entry gate deals before level 1 (verdict: level 1 included)', await unti
 ok('sky blocked (local net)', await ev(`SSNET.mode`) === 'local', await ev(`SSNET.mode`));
 let g = await evj(GATEBEA);
 ok("'gate' MEANS settled-and-tappable, the beacon shown once, level 1", g.level === 1 && g.shown === 1 && await ev(`${B}.state === 'gate'`), JSON.stringify(g));
-ok('the board + word-line sank to a tenth', await ev(`${B}.boardC.alpha < 0.2 && ${B}.lineC.alpha < 0.2`));
+// THE CLEAR GATE: nothing under the card but the score, the dock and the back arrow
+const HUD_DARK = `(() => { const b = ${B}; return [b.headT, ...b.pips, b.youT, b.hpTrough, b.hpBar, b.hpT, b.castB, b.castT, b.scryB, b.scryT, ...b.scryPips, b.hintB, b.hintT].every((o) => o && o.alpha === 0) })()`;
+const HUD_KEPT = `(() => { const b = ${B}; return b.scoreT.alpha === 1 && b.scoreT.visible && b.dockC.visible && b.dockC.alpha === 1 && b.homeB.alpha === 1 && b.homeB.visible })()`;
+const HUD_BACK = `(() => { const b = ${B}; return b.headT.alpha === 0.9 && b.pips.every((p) => p.alpha === 1) && [b.youT, b.hpTrough, b.hpBar, b.hpT, b.scryB, b.scryT, b.hintB, b.hintT].every((o) => o.alpha === 1) && b.castB.alpha > 0.4 && b.castT.alpha > 0.4 && b.scryPips.every((p) => p.alpha > 0) })()`;
+const HINT = `(() => { const c = ${B}.gateC; return c && c.__hint ? c.__hint.alpha : -1 })()`;
+ok('no letters under the card: the board + word-line went fully dark (was a tenth)', await ev(`${B}.boardC.alpha === 0 && ${B}.lineC.alpha === 0`));
 ok('the beast\'s own furniture went dark (bar, title, hint)', await ev(`${B}.ehpC.alpha === 0 && ${B}.beastTitle.alpha === 0 && ${B}.lineHint.alpha === 0`));
-ok('the header names the gate level, the HUD stays lit', await ev(`${B}.headT.text === SS_T('endlessTitle') + ' · ' + SS_T('endLvl', 1) && ${B}.headT.alpha > 0.5 && ${B}.hpBar.alpha === 1`));
+ok('the header line + its pips, the YOU row and the CAST/SCRY row hid with it', await ev(HUD_DARK));
+ok('the score, the sigil dock and the back arrow stay beside the card (the header still names the level for its return)',
+  await ev(HUD_KEPT) && await ev(`${B}.headT.text === SS_T('endlessTitle') + ' · ' + SS_T('endLvl', 1)`));
 ok('nothing in the whole card is interactive but the one sky zone', await ev(`(() => { let n = 0; const scan = (ls) => ls.forEach((o) => { if (o.input && o.input.enabled && o.type !== 'Zone') n++; if (o.list) scan(o.list); }); scan(${B}.gateC.list); return n })()`) === 0);
 ok('the sky zone fires on the UP (the mapZone contract), honoring the 8u drag', await ev(`!!${B}.gateZone && ${B}.gateZone.type === 'Zone'`));
 await shot('gate-entry-l1');
+// the hint law: a gate left standing fades "tap to continue" in after ~1s
+ok('a gate left untapped fades in "tap to continue" after ~1s (the beacon counts the hint)',
+  await until(`(window.__ssgate || {}).hints === 1 && ${HINT} > 0.85`, 6000, 100), JSON.stringify(await evj(GATEBEA)) + ' alpha ' + await ev(HINT));
+ok('…in the five-tongue string, the game\'s own dim italic hint type', await ev(`${B}.gateC.__hint.text === SS_T('gateTap') && SS_T('gateTap') === 'tap to continue' && ${B}.gateC.__hint.style.fontStyle === 'italic'`));
+await shot('gate-entry-l1-hint');
 // the tap — one gesture — enters, the fight rises back from under the gate
 await ev(`${B}.gateZone.emit('pointerdown'); 'ok'`);
 ok('a tap enters the fight (pick, board dealt)', await until(PICK, 20000));
 ok('the board rose back to full, the gate was swept', await ev(`${B}.boardC.alpha === 1 && !${B}.gateC`));
+ok('every hidden piece came back: header 0.9, pips, the YOU row, CAST on its own validity alpha, SCRY, the eye', await ev(HUD_BACK));
 let gt = await evj(GATEBEA);
 ok('the beacon counted the tap', (gt.taps | 0) >= 1, JSON.stringify(gt));
+// a gate tapped inside its first second never shows the hint: deal one and
+// enter mid-entrance (the synthetic emit snaps + continues at once)
+await ev(`(() => { const b = ${B}; b.run.fightIdx = 0; b.showGate(); return 'ok' })()`);
+await until(`${B}.state === 'anim' || ${B}.state === 'gate'`, 5000, 60);
+await ev(`${B}.gateZone.emit('pointerdown'); 'ok'`);
+await until(PICK, 20000);
+await sleep(1400);   // past where the hint would have landed
+ok('a gate tapped inside the first second never shows the hint (the timer finds the card gone)', (await evj(GATEBEA)).hints === 1 && await ev(HUD_BACK), JSON.stringify(await evj(GATEBEA)));
 
 /* ================= 3. the fan: slots, mirror, tier, sparse ================= */
 console.log('— THE FAN (two hands, mirrored, named by rule) —');
@@ -267,12 +303,18 @@ await shot('gate-overflow-l12');
 // a genuine empty rung — not a frontier (a no-rows rung ABOVE the max is gold,
 // not quiet); and it must not latch ffront before the frontier test below
 console.log('— THE EMPTY RUNG (the quiet card) —');
+// a held sigil so the dock stands at this gate (Skylar's own LEVEL 5 shot had
+// one) — COMET also prints scry pips, which the clear gate must hide too
+await ev(`(() => { const b = ${B}; b.run.sigils = ['comet']; b.refreshDock(); return 'ok' })()`);
 ok('level 5 stands the numeral alone', await gateAt(5));
 await sleep(700);
 g = await evj(GATEBEA);
 fan = await evj(FAN);
 ok('no flag stands, no ledger, no apology, no frontier — the quiet IS the message',
   g.drawn === 0 && fan.length === 0 && (g.more | 0) === 0 && g.front === false, JSON.stringify(g));
+ok('the sigil dock stands beside the clear card; the comet\'s scry pips hid with the SCRY button', await ev(HUD_KEPT) && await ev(HUD_DARK) && await ev(`${B}.scryPips.length > 0 && ${B}.dockC.list.length > 0`));
+await sleep(900);   // ≥1s in: the hint stands on this gate too
+ok('"tap to continue" stands on this gate too (every gate, not the first alone)', await until(`${HINT} > 0.85`, 4000, 100), 'alpha ' + await ev(HINT));
 await shot('gate-empty-l5');
 
 /* ================= 7. the frontier (≥1 rival, once per climb) ================= */

@@ -107,7 +107,7 @@ const SS_STR = {
     flagFront: '✦ THE FRONTIER IS YOURS ✦', flagFrontSub: 'your flag now flies above %1\'s · level %2',
     flagAt: 'their flag · level %1',
     // the level gate (v0.115.0)
-    gateLevel: 'LEVEL', gateTap: 'tap to face the sky',
+    gateLevel: 'LEVEL', gateTap: 'tap to continue',
     gateMore: '+%1 more ended here this week',
     lbAllTime: 'the endless ledger · every climb remembered', lbHardTime: 'the ember ledger · every hard clear remembered',
     mapTitle: 'THE CAMPAIGN SKY', mapHint: 'tap the glowing constellation to begin', mapDest: 'journey\'s end',
@@ -282,7 +282,7 @@ const SS_STR = {
     flagFront: '✦ LA FRONTERA ES TUYA ✦', flagFrontSub: 'tu bandera ondea sobre la de %1 · nivel %2',
     flagAt: 'su bandera · nivel %1',
     // the level gate (v0.115.0)
-    gateLevel: 'NIVEL', gateTap: 'toca para encarar el cielo',
+    gateLevel: 'NIVEL', gateTap: 'toca para continuar',
     gateMore: '+%1 más terminaron aquí esta semana',
     lbAllTime: 'el registro sin fin · cada ascenso queda guardado', lbHardTime: 'el registro de brasas · cada victoria difícil queda guardada',
     mapTitle: 'EL CIELO DE LA CAMPAÑA', mapHint: 'toca la constelación que brilla para comenzar', mapDest: 'fin del viaje',
@@ -525,7 +525,7 @@ const SS_STR = {
     flagFront: '✦ LA FRONTIÈRE EST À TOI ✦', flagFrontSub: 'ton drapeau flotte au-dessus de celui de %1 · niveau %2',
     flagAt: 'son drapeau · niveau %1',
     // the level gate (v0.115.0)
-    gateLevel: 'NIVEAU', gateTap: 'touche pour affronter le ciel',
+    gateLevel: 'NIVEAU', gateTap: 'touche pour continuer',
     gateMore: '+%1 de plus ont fini ici cette semaine',
     lbAllTime: 'le registre sans fin · chaque ascension retenue', lbHardTime: 'le registre de braise · chaque victoire difficile retenue',
     mapTitle: 'LE CIEL DE LA CAMPAGNE', mapHint: 'touchez la constellation qui brille pour commencer', mapDest: 'fin du voyage',
@@ -768,7 +768,7 @@ const SS_STR = {
     flagFront: '✦ A FRONTEIRA É SUA ✦', flagFrontSub: 'sua bandeira tremula acima da de %1 · nível %2',
     flagAt: 'a bandeira deles · nível %1',
     // the level gate (v0.115.0)
-    gateLevel: 'NÍVEL', gateTap: 'toque para encarar o céu',
+    gateLevel: 'NÍVEL', gateTap: 'toca para continuar',
     gateMore: '+%1 mais terminaram aqui esta semana',
     lbAllTime: 'o registro sem fim · cada subida guardada', lbHardTime: 'o registro de brasas · cada vitória difícil guardada',
     mapTitle: 'O CÉU DA CAMPANHA', mapHint: 'toque na constelação brilhante para começar', mapDest: 'fim da jornada',
@@ -1011,7 +1011,7 @@ const SS_STR = {
     flagFront: '✦ DIE GRENZE GEHÖRT DIR ✦', flagFrontSub: 'deine Flagge weht nun über der von %1 · Stufe %2',
     flagAt: 'ihre Flagge · Stufe %1',
     // the level gate (v0.115.0)
-    gateLevel: 'STUFE', gateTap: 'tippe und stell dich dem Himmel',
+    gateLevel: 'STUFE', gateTap: 'zum Fortfahren tippen',
     gateMore: '+%1 weitere endeten hier diese Woche',
     lbAllTime: 'das endlose Register · jeder Aufstieg bleibt', lbHardTime: 'das Glut-Register · jeder schwere Sieg bleibt',
     mapTitle: 'DER KAMPAGNENHIMMEL', mapHint: 'tippe auf das leuchtende Sternbild, um zu beginnen', mapDest: 'Ende der Reise',

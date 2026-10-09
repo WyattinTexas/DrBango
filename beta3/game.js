@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.115.0';
+const BUILD = 'STARSPELL v0.116.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -4037,7 +4037,10 @@ const SS_GATE_SLOTS = [
   { x: 140, y: 524, w: 66, rot: 9 },
   { x: -140, y: 528, w: 66, rot: -10, m: 1 },
 ];
-let SS_GATE_HINTED = false;   // "tap to face the sky" — the first gate of a session only
+// THE CLEAR GATE's hint (v0.116.0, Skylar 10/9: "if you don't tap in the
+// first second, have a 'Tap to continue' come up") — every gate, after this
+// long untapped; a tap before it never sees it
+const SS_GATE_HINT_MS = 1000;
 
 /* ---- sigil rarity dress ------------------------------------------------
    Three tiers, unmistakable at a glance: basic wears the house gold, rare a
@@ -9019,9 +9022,11 @@ class Battle extends Phaser.Scene {
       }
     }
 
-    txt(l.x(-190), l.y(68), 'YOU', 12, '#c9b676').setOrigin(0, 0.5);
+    // the row's four pieces are named so THE CLEAR GATE (v0.116.0) can hide
+    // the whole YOU row while the level card stands
+    this.youT = txt(l.x(-190), l.y(68), 'YOU', 12, '#c9b676').setOrigin(0, 0.5);
     // framed troughs + gradient fills; progress is a setCrop in the draw fns
-    this.add.image(l.x(-152), l.y(68), 'bartrough').setOrigin(0, 0.5).setDisplaySize(l.u(254), l.u(15));
+    this.hpTrough = this.add.image(l.x(-152), l.y(68), 'bartrough').setOrigin(0, 0.5).setDisplaySize(l.u(254), l.u(15));
     this.hpBar = this.add.image(l.x(-150), l.y(68), 'barfill-gold').setOrigin(0, 0.5).setDisplaySize(l.u(250), l.u(9));
     this.hpT = txt(l.x(190), l.y(68), '', 12).setOrigin(1, 0.5);
     // what the player bar SHOWS — trails run.hp while a strike's number is in
@@ -9080,7 +9085,7 @@ class Battle extends Phaser.Scene {
     // scry + hint wear the painted dark button (aspect-correct via ssBtn), same
     // as the home screen's LEADERBOARD/PROFILE — no more bare dev rectangles
     this.scryB = this.add.image(l.x(-150), l.y(766), ssBtn(this, true, 100, 50)).setDisplaySize(l.u(100), l.u(50)).setInteractive({ useHandCursor: true });
-    txt(l.x(-150), l.y(766), 'SCRY ↻', 14, '#9fb0e8').setOrigin(0.5);
+    this.scryT = txt(l.x(-150), l.y(766), 'SCRY ↻', 14, '#9fb0e8').setOrigin(0.5);
     this.scryPips = [];   // COMET TRAIL's charge pips, built by updateScryPips
     this.scryB.on('pointerdown', () => this.scry());
     this.hintB = this.add.image(l.x(-62), l.y(766), ssBtn(this, true, 50, 50)).setDisplaySize(l.u(50), l.u(50)).setInteractive({ useHandCursor: true }).setVisible(false);
@@ -10051,10 +10056,16 @@ class Battle extends Phaser.Scene {
     this.skyAshClear();
     // the fight rises back from under the gate (v0.115.0): the furniture the
     // gate sank is restored to full here (beastNameI was rebuilt fresh above;
-    // the deal hint keeps its own 0.9 rest alpha)
+    // the deal hint keeps its own 0.9 rest alpha). THE CLEAR GATE (v0.116.0)
+    // hands the HUD back the same way — the header to its 0.9 rest, the rest
+    // to full; layoutLine below re-judges the cast button's own alpha and
+    // the tome's eye is re-lit by its own law a few lines down
     const rise = [this.boardC, this.lineC, this.beastC, this.beastTitle, this.ehpC, this.strikeT];
-    this.tweens.killTweensOf(rise.concat(this.lineHint));
+    const hud = this.gateHud();
+    this.tweens.killTweensOf(rise.concat(this.lineHint, hud));
     rise.forEach((o) => o.setAlpha(1));
+    hud.forEach((o) => o.setAlpha(1));
+    this.headT.setAlpha(0.9);
     this.lineHint.setAlpha(0.9);
     this.layoutLine();
     if (this.hasSigil('gilded')) this.pending = [...this.sigVal('gilded', 'start')];
@@ -10722,14 +10733,20 @@ class Battle extends Phaser.Scene {
      on a hand … flip the flag [on the left side] … removed and reset
      Whenever the weekly reset happens."
      Before EVERY endless level — level 1 included, a resumed climb
-     re-showing LEVEL N (verdict 7) — the board sinks to a tenth (the star
-     chart's own dress), LEVEL N condenses in gold letterpress, and the
-     week's flags rise around it, two mirrored hands of five. One tap
-     anywhere continues; every flag dips a 6° salute on the way out (the
-     retired pass ceremony's wordless echo). No timer, no auto-advance —
-     the gate is the climb's breather and Skylar said click. Endless only
-     (verdict 8); on paying fights the sigil offer leads and the gate
-     follows (verdict 6 — afterSigil IS the gate's door).
+     re-showing LEVEL N (verdict 7) — the board goes dark, LEVEL N
+     condenses in gold letterpress, and the week's flags rise around it,
+     two mirrored hands of five. One tap anywhere continues; every flag
+     dips a 6° salute on the way out (the retired pass ceremony's wordless
+     echo). No timer, no auto-advance — the gate is the climb's breather
+     and Skylar said click. Endless only (verdict 8); on paying fights the
+     sigil offer leads and the gate follows (verdict 6 — afterSigil IS the
+     gate's door).
+     THE CLEAR GATE (v0.116.0, Skylar 10/9): while the card stands the
+     sky shows ONLY the score, the sigil dock and the back arrow beside
+     the card — the board's letters, the YOU row, the header line with
+     its pips and the CAST/SCRY row all hide (gateHud), and every one of
+     them returns at startFight. An untapped gate fades in "tap to
+     continue" after SS_GATE_HINT_MS; a tap before that never sees it.
      THE STATE LAW (the v0.80 'map' law): 'gate' MEANS settled-and-
      tappable; the entrance and exit run under 'anim'. After a 300ms
      residue guard a tap mid-entrance snaps every tween to the settled
@@ -10760,22 +10777,31 @@ class Battle extends Phaser.Scene {
     const rivalMax = rows.reduce((m, r) => (r.mine ? m : Math.max(m, r.level)), 0);
     return rivalMax > 0 && this.run.fightIdx + 1 > rivalMax;
   }
-  // the gate's dress: the board + word-line sink to a tenth (the star
-  // chart's own glimpse-able dress), while the beast's OWN furniture —
-  // its constellation, name, title, health bar, strike line, the deal
-  // hint — goes fully dark (the fell shattered it; the next fight is not
-  // yet born). The HUD is never touched. beastNameI rebuilds fresh per
-  // fight, so it is swept only while it stands.
+  // the gate's dress (THE CLEAR GATE, v0.116.0): the board + word-line and
+  // the beast's OWN furniture — its constellation, name, title, health bar,
+  // strike line, the deal hint — all go fully dark (the fell shattered it;
+  // the next fight is not yet born; Skylar 10/9: no grayed-out letters under
+  // the card), and so does the HUD but for the score, the sigil dock and
+  // the back arrow (gateHud). beastNameI rebuilds fresh per fight, so it is
+  // swept only while it stands.
   gateBeastFurniture() {
     const f = [this.beastC, this.beastTitle, this.ehpC, this.strikeT, this.lineHint];
     if (this.beastNameI) f.push(this.beastNameI);
     return f.filter(Boolean);
   }
+  // the HUD the gate hides: the header line with its level pips, the YOU
+  // row (label · trough · fill · counter), the CAST / SCRY row with the
+  // comet pips and the tome's eye. NOT here, by Skylar's word: scoreT (+ the
+  // birth sign beside it), dockC, homeB — the sky keeps those while the
+  // card stands. startFight hands every one of these back (the cast button
+  // through layoutLine's own validity alpha, the eye through its tome law).
+  gateHud() {
+    return [this.headT, ...this.pips, this.youT, this.hpTrough, this.hpBar, this.hpT,
+      this.castB, this.castT, this.scryB, this.scryT, ...(this.scryPips || []), this.hintB, this.hintT].filter(Boolean);
+  }
   gateSink(dur) {
-    const glimpse = [this.boardC, this.lineC];
-    const dark = this.gateBeastFurniture();
-    this.tweens.killTweensOf(glimpse.concat(dark));
-    this.tweens.add({ targets: glimpse, alpha: 0.1, duration: dur });
+    const dark = [this.boardC, this.lineC].concat(this.gateBeastFurniture(), this.gateHud());
+    this.tweens.killTweensOf(dark);
     this.tweens.add({ targets: dark, alpha: 0, duration: dur });
   }
   showGate() {
@@ -10789,10 +10815,10 @@ class Battle extends Phaser.Scene {
     // stale and refetches — the new, emptier sky at the NEXT gate, never
     // mid-gate (the late read rises into the standing card)
     if (this.flagWeek && this.flagWeek !== SSNET.weekKey()) { this.flagRows = null; this.fetchWeekFlags(); }
-    this.headT.setText(this.modeTitle());
-    // the board + word-line sink to a tenth; the beast's own furniture goes
-    // dark; the HUD stays lit (header, score, YOU bar, the back arrow still
-    // abandons mid-fight)
+    this.headT.setText(this.modeTitle());   // right for the moment it returns (startFight re-stamps it too)
+    // THE CLEAR GATE: the board, the beast's furniture and the HUD all go
+    // dark — only the score, the sigil dock and the back arrow (which still
+    // abandons mid-climb) stay beside the card
     this.gateSink(300);
     const front = this.gateFront();
     if (front) { this.run.ffront = true; this.saveCheckpoint(); }   // spent the moment it rings — a resume never re-rings
@@ -10847,15 +10873,21 @@ class Battle extends Phaser.Scene {
     this.time.delayedCall(red ? 150 : 420, () => {
       if (this.gateC === c && c.active) { if (c.__front) SFX.sigil(); else SFX.chime(5); }
     });
-    // the hint — the first gate of a session only; after that the gate
-    // trusts you (outside the fan so a late rebuild keeps it)
-    if (!SS_GATE_HINTED) {
-      SS_GATE_HINTED = true;
-      const h = ssTxt(this, l.x(0), l.y(645), SS_T('gateTap'), l.u(9.5), '#5a6390', 'italic').setOrigin(0.5).setAlpha(0);
-      c.add(h);
-      tw(h, { alpha: 0.9 }, { alpha: 0.9, duration: 500, delay: red ? 250 : 800 });
-      if (!red) this.tweens.add({ targets: h, alpha: 0.45, duration: 1400, delay: 2300, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-    }
+    // the hint (THE CLEAR GATE, v0.116.0): "tap to continue" fades in on
+    // EVERY gate left untapped for SS_GATE_HINT_MS — a tap before that never
+    // sees it (the timer checks the card still stands). Outside the fan so
+    // a late rebuild keeps it; outside the snap so a mid-entrance tap never
+    // flashes it on the way out. Breathes after it lands (motion-free under
+    // reduce-motion).
+    const hint = ssTxt(this, l.x(0), l.y(645), SS_T('gateTap'), l.u(9.5), '#5a6390', 'italic').setOrigin(0.5).setAlpha(0);
+    c.add(hint);
+    c.__hint = hint;
+    this.time.delayedCall(SS_GATE_HINT_MS, () => {
+      if (this.gateC !== c || !c.active || !hint.active) return;
+      window.__ssgate = Object.assign(window.__ssgate || {}, { hints: ((window.__ssgate || {}).hints | 0) + 1 });
+      this.tweens.add({ targets: hint, alpha: 0.9, duration: 500, ease: 'Sine.easeOut' });
+      if (!red) this.tweens.add({ targets: hint, alpha: 0.45, duration: 1400, delay: 2000, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    });
     // 'gate' MEANS settled-and-tappable — stamped here (or by the snap)
     const settle = () => {
       if (this.gateC !== c || !c.active || this.state !== 'anim') return;
