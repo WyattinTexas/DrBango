@@ -2008,31 +2008,49 @@ function ssF5TomorrowCue(scene) {
    (scry → fillBoard walks the queue first), so the board after the lesson
    is the same for every player (en: the night's own letters, dense by the
    suite's gate — 16 cells, index order; the other tongues' sixteen are
-   their curated deals' density-proven sets, drafts for native review). */
+   their curated deals' density-proven sets, drafts for native review).
+   F5-BLUE (card 04): THE BLUE LESSON's two refills ride the same queue —
+   after the forge word (en TONIGHT: cells 1·5·6·7·8·10·11) the BLUE's own
+   letter lands FIRST (the lowest emptied cell takes the pending tier), then
+   the six beside it; after the blue word (en HALO: cells 1·2·4·5) four more
+   (d·a·w·n) so the board the hand leaves is the same for every player
+   (density-gated by the suite; card 05 may re-author its own refill). */
 const SS_F5_RIG = {
   en: ['m', 'o', 'n', 's', 's', 'k', 'y', 'r', 'e', 'n', 'o', 's',
-    's', 't', 'a', 'r', 'l', 'i', 'g', 'h', 't', 'e', 'n', 'o', 'd', 'e', 'a', 'm'],
+    's', 't', 'a', 'r', 'l', 'i', 'g', 'h', 't', 'e', 'n', 'o', 'd', 'e', 'a', 'm',
+    'h', 'o', 'n', 'i', 'g', 't', 'e', 'd', 'a', 'w', 'n'],
   es: ['m', 'a', 'r', 'e', 's', 'l', 'o', 'n', 't', 'a', 'e', 'r',
-    'n', 'o', 'c', 't', 'e', 's', 'o', 'l', 'a', 'n', 'i', 'm', 'a', 'r', 'e', 'd'],
+    'n', 'o', 'c', 't', 'e', 's', 'o', 'l', 'a', 'n', 'i', 'm', 'a', 'r', 'e', 'd',
+    'h', 'e', 's', 't', 'i', 'n', 'o', 'l', 'u', 'n', 'a'],
   fr: ['l', 'u', 'n', 'e', 's', 'l', 'a', 'o', 't', 'e', 'n', 's',
-    'p', 'a', 'l', 'o', 'n', 'e', 's', 'i', 'u', 'r', 't', 'a', 'e', 'm', 'o', 'd'],
+    'p', 'a', 'l', 'o', 'n', 'e', 's', 'i', 'u', 'r', 't', 'a', 'e', 'm', 'o', 'd',
+    'h', 'l', 'e', 's', 'i', 't', 'e', 'l', 'u', 'n', 'e'],
   pt: ['c', 'a', 's', 'a', 's', 'l', 'e', 'o', 'r', 'a', 't', 'n',
-    'm', 'e', 'c', 'o', 'a', 'l', 'u', 'r', 's', 'i', 't', 'e', 'a', 'd', 'o', 'n'],
+    'm', 'e', 'c', 'o', 'a', 'l', 'u', 'r', 's', 'i', 't', 'e', 'a', 'd', 'o', 'n',
+    'l', 'a', 'e', 's', 't', 'r', 'e', 'm', 'a', 'r'],
   de: ['s', 't', 'e', 'r', 'n', 'e', 'a', 's', 't', 'r', 'n', 'i', 'e',
-    's', 'o', 'm', 'a', 'd', 'e', 'n', 'i', 'o', 'r', 't', 'u', 'n', 'e', 'l', 'h'],
+    's', 'o', 'm', 'a', 'd', 'e', 'n', 'i', 'o', 'r', 't', 'u', 'n', 'e', 'l', 'h',
+    'm', 'e', 'r', 't', 'a', 'e', 'l', 'l', 'i', 'e', 'd'],
 };
 /* F5-GUIDED: the script after the deal's own word — word 2 is 5 (de: 6)
    letters, so it FORGES the orange (the live rule: 5+ letters → tier 1, +6
    on its letter, landing with the next refill in the lowest emptied cell);
    word 3 STARTS on the orange tile (the pointed tile is the first tap) and
    is 3 letters, so at LEN_MULT 1.0 the hit's extra is EXACTLY the +6 the
-   lesson line promised. `orange` = which authored word uses it. */
+   lesson line promised. `orange` = which authored word uses it.
+   F5-BLUE (card 04): after THE SCRY GATE (which stands between word 3 and
+   word 4) the script goes on — word 4 is 7 letters, so the live forge rule
+   drops the BLUE (7+ letters → tier 2: the WHOLE word ×1.5, nothing on the
+   letter itself) with the next refill; word 5 STARTS on the blue tile and
+   is short, so the hit is EXACTLY plain × 1.5 (en HALO: 8 → 12; pt LUA:
+   4 → 6) — the showcase can say the number and the rule in one breath.
+   `blue` = which authored word uses it. */
 const SS_F5_GUIDE = {
-  en: { words: [['m', 'o', 'o', 'n', 's'], ['s', 'k', 'y']], orange: 1 },
-  es: { words: [['m', 'a', 'r', 'e', 's'], ['s', 'o', 'l']], orange: 1 },
-  fr: { words: [['l', 'u', 'n', 'e', 's'], ['s', 'o', 'l']], orange: 1 },
-  pt: { words: [['c', 'a', 'l', 'm', 'a'], ['s', 'o', 'l']], orange: 1 },
-  de: { words: [['s', 't', 'e', 'r', 'n', 'e'], ['n', 'e', 'u']], orange: 1 },
+  en: { words: [['m', 'o', 'o', 'n', 's'], ['s', 'k', 'y'], ['t', 'o', 'n', 'i', 'g', 'h', 't'], ['h', 'a', 'l', 'o']], orange: 1, blue: 3 },
+  es: { words: [['m', 'a', 'r', 'e', 's'], ['s', 'o', 'l'], ['d', 'e', 's', 't', 'i', 'n', 'o'], ['h', 'a', 'l', 'o']], orange: 1, blue: 3 },
+  fr: { words: [['l', 'u', 'n', 'e', 's'], ['s', 'o', 'l'], ['e', 't', 'o', 'i', 'l', 'e', 's'], ['h', 'a', 'l', 'o']], orange: 1, blue: 3 },
+  pt: { words: [['c', 'a', 'l', 'm', 'a'], ['s', 'o', 'l'], ['e', 's', 't', 'r', 'e', 'l', 'a'], ['l', 'u', 'a']], orange: 1, blue: 3 },
+  de: { words: [['s', 't', 'e', 'r', 'n', 'e'], ['n', 'e', 'u'], ['l', 'a', 't', 'e', 'r', 'n', 'e'], ['m', 'o', 'n', 'd']], orange: 1, blue: 3 },
 };
 const SS_F5_GUIDE_SETTLE_MS = 750;   // the refill's bounce (420 + ≤90ms) before the hand moves on
 const SS_F5_POINT_MS = 2600;         // the look at the orange tile before the hand asks for it
@@ -2049,6 +2067,14 @@ const SS_F5_SCRY_REVEAL_MS = 900;    // after the tap: the fresh board rains in,
 const SS_F5_SCRY_STEP_MS = 700;      // the reveal has stood this long when the count STEPS (the pill + the big line together)
 const SS_F5_SCRY_SHOW_MS = 4200;     // the reveal's dwell, from the step
 const SS_F5_SCRY_FLOOR_MS = 1400;    // a tap lets the reveal go only after this (from the step — the ceremony-floor grammar)
+/* F5-BLUE (card ss-2026-10-09-first5-script/04): THE BLUE LESSON's dials.
+   The blue showcase carries two lines (the hit, then the orange/blue
+   difference in one breath), so it dwells longer than the orange's; the
+   floor and the veil are the showcase's own. SS_F5_BLUE_MULT is wordDamage's
+   starMult written out for the showcase's "×1.5" — the suite's simulation
+   proves the authored blue word's hit is EXACTLY plain × this. */
+const SS_F5_BLUE_SHOW_MS = 4600;     // the blue showcase's dwell (two lines to read)
+const SS_F5_BLUE_MULT = 1.5;         // the blue tile's rule (wordDamage: `if (s.tier === 2) starMult = 1.5`)
 /* ---- F5-CARD-05: THE TEACHING SCRIPTS — Skylar's verdict-1 notes, with
    verdict 5 (WORDS ARE FINE) paying the copy. Ground truth held against the
    shipping code: the special tiles ARE orange (+6, tier 1), blue (×1.5,
@@ -2069,6 +2095,8 @@ const SS_F5_PROMPTS = {
     scry: 'Stuck? SCRY deals a fresh board',
     scryCost: 'Using SCRY makes the beast attack one turn earlier',
     orangeHit: 'That orange tile added +{x} — {d} damage, not {p}.',   /* F5-GUIDED: {x} the extra, {d} the hit, {p} the plain hit */
+    blueHit: 'That blue tile made the WHOLE word ×{m} — {d} damage, not {p}.',   /* F5-BLUE: {m} the rule's multiplier, {d} the hit, {p} the plain hit */
+    blueVsOrange: 'Orange adds +6 to one tile. Blue multiplies the whole word.',   /* F5-BLUE: the difference, said once under the number (one line per text) */
   },
 };
 /* the one prompt frame (F5-FIX1-03 pulled it out of ssF5Prompt so the scry
@@ -2102,7 +2130,16 @@ function ssF5Prompt(scene, key, x, y) {
   scene.time.delayedCall(500, () => scene.input.once('pointerdown', close));   // taps accelerate
 }
 const SS_F5_FLOOR = { en: ['m', 'o', 'o', 'n', 's'], es: ['l', 'u', 'n', 'a', 's'], fr: ['l', 'u', 'n', 'e', 's'], pt: ['c', 'a', 's', 'a', 's'], de: ['s', 't', 'e', 'r', 'n', 'e'] };
-const SS_F5_EMBER_MULT = 1.1;   // VULPES 30 → 33 hp: the ember minute always arrives (page §IV)
+/* F5-BLUE (card 04): VULPES 30 → 84 hp. The scripted night now lands FIVE
+   guided words on the first beast (en: STAR 5 · MOONS 9 · SKY 16 · TONIGHT
+   21 · HALO 12 = 63) and the blue showcase must hold with the beast still
+   standing (a felled beast skips the lesson — beastDeath takes the plain
+   road); 84 leaves 21 after the blue word in en (30–38 in the other
+   tongues), room for card 05's strike and green word before the ember
+   minute. Was 1.1 (33 hp, "strikes in 1 cast" at a sliver — the 10/7
+   page's §IV tuning, superseded by the script). The suite's simulation
+   reads this constant. */
+const SS_F5_EMBER_MULT = 2.8;
 function ssFtueDone() {
   if (SS.prof && SS.prof.ftue !== 1) { SS.prof.ftue = 1; SS.save(); DIAG('ftue: done'); }
 }
@@ -9160,13 +9197,16 @@ class Battle extends Phaser.Scene {
            race it or eat it, manufactured on day one at stakes of 8. */
         this.fights[0].mult = SS_F5_EMBER_MULT;
         this.fights[0].atkAdd = 0;
-        /* F5-SCRYGATE (card 03): the first night's VULPES runs a FIVE-cast
-           fuse (timer 4 → 5 through beastFor's tcut door), so after the
-           three guided casts the fuse stands at 2 and the scripted scry has
-           a step to SHOW (2 → 1, "strikes in 1 cast" — the one cast earlier,
-           literally). Cards 04/05: the next cast after the gate is the
-           strike. */
-        this.fights[0].tcut = -1;
+        /* F5-SCRYGATE (card 03): the first night's VULPES runs a longer
+           fuse through beastFor's tcut door, so after the three guided
+           casts the scripted scry has a step to SHOW (the one cast
+           earlier, literally). F5-BLUE (card 04): SIX casts now (timer
+           4 → 6): STAR·MOONS·SKY leave 3, the scry steps it 3 → 2 in the
+           light, the forge word 2 → 1 (the ember alarm wakes as the blue
+           lands), and the blue word's own tick 1 → 0 IS the strike — the
+           beat card 05 scripts, delivered by the mechanic right after the
+           blue showcase lets go. */
+        this.fights[0].tcut = -2;
       }
       planSeed = Math.floor(rng() * 1e9);       // daily: seeded stream → every hunter shares the schedule
     }
@@ -9885,10 +9925,13 @@ class Battle extends Phaser.Scene {
     /* F5-GUIDED: the script — the deal's own word, then the authored words
        (a tongue without an entry plays the old one-word hand) */
     const guide = SS_F5_GUIDE[PACK.lang] || null;
-    this.f5G = guide ? { words: [deal.word, ...guide.words], idx: 0, orange: guide.orange + 1, beat: 'word', pose: null, poseN: 0, show: null, cont: null, waits: 0 } : null;
+    /* F5-BLUE: `orange` / `blue` are WORD indices (the cell each tile lands
+       on is read at its point beat into `pointAt`); the scry gate stands
+       before word index `scryAt`, once (`scried`) */
+    this.f5G = guide ? { words: [deal.word, ...guide.words], idx: 0, orange: guide.orange + 1, blue: guide.blue != null ? guide.blue + 1 : -1, scryAt: guide.orange + 2, scried: false, pointAt: null, beat: 'word', pose: null, poseN: 0, show: null, cont: null, waits: 0 } : null;
     window.__f5guide = {
-      lang: PACK.lang, words: (this.f5G ? this.f5G.words : [deal.word]).map((w) => w.join('')), orange: this.f5G ? this.f5G.orange : null,
-      beat: this.f5G ? 'word' : 'none', idx: 0, refused: 0, castRefused: 0, scryRefused: 0, orangeCell: null, pointed: 0, show: null, shown: 0, released: 0, holdMs: 0, ended: 0,
+      lang: PACK.lang, words: (this.f5G ? this.f5G.words : [deal.word]).map((w) => w.join('')), orange: this.f5G ? this.f5G.orange : null, blue: this.f5G ? this.f5G.blue : null, scryAt: this.f5G ? this.f5G.scryAt : null, scried: 0,
+      beat: this.f5G ? 'word' : 'none', idx: 0, refused: 0, castRefused: 0, scryRefused: 0, orangeCell: null, blueCell: null, pointed: 0, show: null, shown: 0, released: 0, holdMs: 0, ended: 0,
     };
     window.__ssftue = Object.assign(window.__ssftue || {}, {
       state: 'board', word: deal.word.join(''), deal: this.board.map((s) => (s ? s.ch : '')).join(' '), point: null,
@@ -9945,7 +9988,7 @@ class Battle extends Phaser.Scene {
       if (g.beat === 'show' || g.beat === 'reveal') return g.pose ? 'pose' : 'wait';   /* F5-SCRYGATE: the reveal points like the showcase */
       if (g.beat === 'cast') return 'wait';
       if (g.beat === 'scry') return 'scry';   /* F5-SCRYGATE: the one lit door */
-      if (g.beat === 'point') return g.orange;
+      if (g.beat === 'point') return g.pointAt;   /* F5-BLUE: the pointed cell (the orange's, then the blue's) */
     }
     const tt = this.ftueWord;
     const onRoad = this.sel.length < tt.length
@@ -9953,10 +9996,13 @@ class Battle extends Phaser.Scene {
     if (onRoad) {
       const need = tt[this.sel.length];
       /* F5-GUIDED: the orange word asks for the ORANGE tile itself when its
-         letter matches — never a plain twin of it */
-      if (g && g.idx === g.orange) for (let i = 0; i < 16; i++) {
+         letter matches — never a plain twin of it. F5-BLUE: the blue word
+         asks for the BLUE the same way (de: MOND's m stands twice, plain at
+         2 and blue at 3 — the finger must name the blue). */
+      const pref = g ? (g.idx === g.orange ? 1 : g.idx === g.blue ? 2 : 0) : 0;
+      if (pref) for (let i = 0; i < 16; i++) {
         const s = this.board[i];
-        if (s && s.c.active && !s.blk && s.tier === 1 && s.ch === need && this.sel.indexOf(i) < 0) return i;
+        if (s && s.c.active && !s.blk && s.tier === pref && s.ch === need && this.sel.indexOf(i) < 0) return i;
       }
       for (let i = 0; i < 16; i++) {
         const s = this.board[i];
@@ -10058,8 +10104,14 @@ class Battle extends Phaser.Scene {
        3 letters, so the extra is exactly +6) → THE SHOWCASE (the hit lands
        and the bar drains as shipped, then the flow HOLDS: a light veil,
        the orange tile with its +6, "16 damage, not 10", the hand on the
-       number; the dwell or a tap after the floor lets go) → the hand
-       retires for good and the night is the player's.
+       number; the dwell or a tap after the floor lets go) → THE SCRY GATE
+       (card 03, f5GuideScry) → F5-BLUE (card 04): word 4 (TONIGHT: 7
+       letters, so the forge rule drops the BLUE with the refill) → THE
+       POINT on the blue (the ×1.5 line) → word 5 (HALO: STARTS on the
+       blue, pays exactly plain × 1.5) → THE SHOWCASE again (the blue tile,
+       "×1.5", "12 damage, not 8", the orange/blue difference in one line)
+       → the refill and the strike (card 05's beat) → the hand retires for
+       good and the night is the player's.
      Under the hand the board is NOT free: a tile off the road, CAST before
      the word stands, and SCRY are refused — a wiggle, no sound, nothing
      spent; un-weaving your own tiles stays allowed. The stall glint, the
@@ -10070,7 +10122,7 @@ class Battle extends Phaser.Scene {
   // orange word at once) or the very tile the finger is on
   f5GuideAllows(i) {
     const g = this.f5G;
-    if (g.beat === 'point') { if (i !== g.orange) return false; this.f5GuideBeat('word'); }
+    if (g.beat === 'point') { if (i !== g.pointAt) return false; this.f5GuideBeat('word'); }   /* F5-BLUE: the pointed cell */
     if (g.beat !== 'word') return false;
     return this.ftueGoal() === i;
   }
@@ -10092,7 +10144,7 @@ class Battle extends Phaser.Scene {
     const g = this.f5G; if (!g) return;
     g.beat = beat;
     const b = window.__f5guide; if (b) { b.beat = beat; b.idx = g.idx; }
-    if (window.__ssftue) window.__ssftue.state = beat === 'word' ? (g.idx ? 'guide' : 'board') : beat === 'point' ? 'orange' : beat;
+    if (window.__ssftue) window.__ssftue.state = beat === 'word' ? (g.idx ? 'guide' : 'board') : beat === 'point' ? (g.idx === g.blue ? 'blue' : 'orange') : beat;   /* F5-BLUE: the blue's own point */
     this.ftueAt = null;   // the hand re-reads its goal at once
     this.ftueRepoint();
   }
@@ -10101,16 +10153,22 @@ class Battle extends Phaser.Scene {
   // as plain glass, and the difference between them
   f5GuideCast(word, tiles, dmg) {
     const g = this.f5G;
-    if (g.idx >= g.words.length - 1) {
-      const ot = tiles.find((s) => s.tier === 1 && !s.blk);
+    /* F5-BLUE: a showcase for the ORANGE word (tier 1: +6 on its letter) and
+       for the BLUE word (tier 2: the whole word ×1.5) — the plain hit is the
+       same tiles with that tile read as plain glass. Every other guided word
+       flies plain (g.show stays null, so the cast path never parks). */
+    g.show = null;
+    const kind = g.idx === g.orange ? 1 : g.idx === g.blue ? 2 : 0;
+    if (kind) {
+      const ot = tiles.find((s) => s.tier === kind && !s.blk);
       if (ot) {
-        const plain = this.wordDamage(tiles.map((s) => (s.tier === 1 ? Object.assign({}, s, { tier: 0 }) : s)));
-        g.show = { word, dmg, plain, extra: dmg - plain, ch: ot.ch };
+        const plain = this.wordDamage(tiles.map((s) => (s.tier === kind ? Object.assign({}, s, { tier: 0 }) : s)));
+        g.show = { word, dmg, plain, extra: dmg - plain, ch: ot.ch, tier: kind };
         if (window.__f5guide) window.__f5guide.show = Object.assign({}, g.show);
       }
     }
     this.f5GuideBeat('cast');
-    DIAG('f5 guide: cast ' + word + ' for ' + dmg + (g.show ? ' (plain ' + g.show.plain + ', orange +' + g.show.extra + ')' : ''));
+    DIAG('f5 guide: cast ' + word + ' for ' + dmg + (g.show ? ' (plain ' + g.show.plain + ', ' + (kind === 2 ? 'blue ×' + SS_F5_BLUE_MULT : 'orange +' + g.show.extra) + ')' : ''));
   }
   // the refill of a guided cast has been dealt: once it has settled and the
   // board is the player's again, the next beat
@@ -10126,20 +10184,27 @@ class Battle extends Phaser.Scene {
   }
   f5GuideNext() {
     const g = this.f5G;
+    /* F5-SCRYGATE: THE SCRY GATE stands between the orange word and the
+       forge word — once (F5-BLUE: the lift resumes the script through
+       f5GuideScried, which marks it so the gate never rises twice) */
+    if (g.idx + 1 === g.scryAt && !g.scried) { this.f5GuideScry(); return; }
     g.idx++;
-    if (g.idx >= g.words.length) { this.f5GuideScry(); return; }   /* F5-SCRYGATE: the words are spent — THE SCRY GATE, then the hand lets go */
+    if (g.idx >= g.words.length) { this.f5GuideEnd(true); return; }   /* F5-BLUE: the script is spent — the hand lets go, happily */
     this.ftueWord = g.words[g.idx];
     if (window.__ssftue) window.__ssftue.word = this.ftueWord.join('');
-    if (g.idx === g.orange) {
-      // THE POINT: the orange that word 2 forged, found where it landed
+    /* THE POINT: the special tile the last word forged, found where it
+       landed — the orange (word 2's) or, F5-BLUE, the blue (word 4's): the
+       hand rests on it while its own lesson line speaks, then asks for it */
+    const kind = g.idx === g.orange ? 1 : g.idx === g.blue ? 2 : 0;
+    if (kind) {
       let oi = -1;
-      for (let i = 0; i < 16; i++) { const s = this.board[i]; if (s && s.tier === 1 && !s.blk && s.c.active && s.ch === this.ftueWord[0]) { oi = i; break; } }
-      if (oi < 0) { DIAG('f5 guide: no orange on the board — the hand lets go'); this.f5GuideEnd(false); return; }
-      g.orange = oi;
-      const b = window.__f5guide; if (b) { b.orangeCell = oi; b.pointed++; }
+      for (let i = 0; i < 16; i++) { const s = this.board[i]; if (s && s.tier === kind && !s.blk && s.c.active && s.ch === this.ftueWord[0]) { oi = i; break; } }
+      if (oi < 0) { DIAG('f5 guide: no ' + (kind === 2 ? 'blue' : 'orange') + ' on the board — the hand lets go'); this.f5GuideEnd(false); return; }
+      g.pointAt = oi;
+      const b = window.__f5guide; if (b) { b[kind === 2 ? 'blueCell' : 'orangeCell'] = oi; b.pointed++; }
       this.f5GuideBeat('point');
-      ssF5Prompt(this, 'tile1', this.L.x(0), this.L.y(374));   // spawnTile's own call already spoke — the dedupe keeps it one
-      DIAG('f5 guide: the orange at ' + oi);
+      ssF5Prompt(this, 'tile' + kind, this.L.x(0), this.L.y(374));   // spawnTile's own call already spoke — the dedupe keeps it one
+      DIAG('f5 guide: the ' + (kind === 2 ? 'blue' : 'orange') + ' at ' + oi);
       this.time.delayedCall(SS_F5_POINT_MS, () => { if (this.f5G === g && g.beat === 'point') this.f5GuideBeat('word'); });
       return;
     }
@@ -10152,25 +10217,38 @@ class Battle extends Phaser.Scene {
     const g = this.f5G;
     if (!g || !g.show || !g.cont || g.beat !== 'cast' || !this.sys.isActive()) return;
     const l = this.L, sh = g.show;
+    /* F5-BLUE: the showcase speaks for the orange (tier 1, "+6") and the blue
+       (tier 2, "×1.5") alike — the tile as it stood, the number in the tile's
+       own voice, the hit line; the blue adds the one line that keeps the two
+       apart (one line per text — the iOS bake law) and dwells longer. */
+    const tier = sh.tier || 1, blue = tier === 2;
     const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setDepth(900).setInteractive();
     this.tweens.add({ targets: veil, alpha: SS_F5_SHOW_VEIL, duration: 260 });
     const c = this.add.container(l.x(0), l.y(468)).setDepth(950).setAlpha(0).setScale(0.92);   // the hit number's own seat
-    c.setData('f5show', 1);
-    // the thing itself: the orange tile, its letter and its chip, as it stood on the board
+    c.setData('f5show', tier);
+    // the thing itself: the tile, its letter and its chip, as it stood on the board
     const ts = l.u(46), k = 46 / 78;
-    const glow = this.add.image(-l.u(62), 0, 'dot').setScale(ts / 9).setAlpha(0.3).setTint(SS_TIER_GLOW[1]).setBlendMode('ADD');
+    const glow = this.add.image(-l.u(62), 0, 'dot').setScale(ts / 9).setAlpha(0.3).setTint(SS_TIER_GLOW[tier]).setBlendMode('ADD');
     const tile = this.add.container(-l.u(62), 0, [
-      this.add.image(0, 0, 'tile1').setDisplaySize(ts, ts),
-      this.add.image(0, -l.u(2 * k), ssGlyph(this, sh.ch, SS_TILE_INK[1])).setDisplaySize(l.u(64 * k), l.u(48 * k)),
-      this.add.image(l.u(24 * k), l.u(21 * k), ssGlyphVal(this, this.tileChip(sh.ch, 1), SS_TILE_VINK[1])).setDisplaySize(l.u(30 * k), l.u(20 * k)),
+      this.add.image(0, 0, 'tile' + tier).setDisplaySize(ts, ts),
+      this.add.image(0, -l.u(2 * k), ssGlyph(this, sh.ch, SS_TILE_INK[tier])).setDisplaySize(l.u(64 * k), l.u(48 * k)),
+      this.add.image(l.u(24 * k), l.u(21 * k), ssGlyphVal(this, this.tileChip(sh.ch, tier), SS_TILE_VINK[tier])).setDisplaySize(l.u(30 * k), l.u(20 * k)),
     ]);
-    // the number, in the tile's own voice
-    const plus = ssTxt(this, -l.u(30), 0, '+' + sh.extra, l.u(38), '#ffb457').setOrigin(0, 0.5)
-      .setShadow(0, 0, '#7a3a08', l.u(10), true, true);
-    const str = ((SS_F5_PROMPTS[PACK.lang] || SS_F5_PROMPTS.en).orangeHit || SS_F5_PROMPTS.en.orangeHit)
-      .replace('{x}', sh.extra).replace('{d}', sh.dmg).replace('{p}', sh.plain);
+    // the number, in the tile's own voice: the orange's "+6", the blue's "×1.5"
+    const plus = ssTxt(this, -l.u(30), 0, blue ? '×' + SS_F5_BLUE_MULT : '+' + sh.extra, l.u(38), blue ? '#9fd8ff' : '#ffb457').setOrigin(0, 0.5)
+      .setShadow(0, 0, blue ? '#1d4a66' : '#7a3a08', l.u(10), true, true);
+    const P = SS_F5_PROMPTS[PACK.lang] || SS_F5_PROMPTS.en;
+    const str = (blue ? (P.blueHit || SS_F5_PROMPTS.en.blueHit) : (P.orangeHit || SS_F5_PROMPTS.en.orangeHit))
+      .replace('{m}', SS_F5_BLUE_MULT).replace('{x}', sh.extra).replace('{d}', sh.dmg).replace('{p}', sh.plain);
     const line = ssF5Frame(this, str).setPosition(0, l.u(52));
     c.add([glow, tile, plus, line]);
+    if (blue) {
+      // …and the difference, in one breath, right under the hit line
+      const vs = ssF5Frame(this, P.blueVsOrange || SS_F5_PROMPTS.en.blueVsOrange).setAlpha(0);
+      vs.setPosition(0, l.u(52) + line.f5H / 2 + l.u(8) + vs.f5H / 2);
+      c.add(vs);
+      this.tweens.add({ targets: vs, alpha: 1, duration: 260, delay: 700 });
+    }
     this.tweens.add({ targets: c, alpha: 1, scale: 1, duration: 220, ease: 'Back.easeOut' });
     this.tweens.add({ targets: glow, alpha: 0.55, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     // the hand points at the number (above the veil for the beat)
@@ -10179,11 +10257,11 @@ class Battle extends Phaser.Scene {
     const h = this.ftueHand; if (h && h.active) h.setDepth(960);
     g.showObjs = { veil, c }; g.shownAt = this.time.now;
     this.f5GuideBeat('show');
-    const b = window.__f5guide; if (b) { b.shown++; b.shownAt = Date.now(); }
+    const b = window.__f5guide; if (b) { b.shown++; b.shownAt = Date.now(); b.showTier = tier; }
     SFX.forge();
-    DIAG('f5 guide: showcase ' + sh.dmg + ' vs plain ' + sh.plain + ' (orange +' + sh.extra + ')');
+    DIAG('f5 guide: showcase ' + sh.dmg + ' vs plain ' + sh.plain + (blue ? ' (blue ×' + SS_F5_BLUE_MULT + ')' : ' (orange +' + sh.extra + ')'));
     const release = () => { if (g.tapFn) { this.input.off('pointerdown', g.tapFn); g.tapFn = null; } this.f5GuideRelease(); };
-    const dwell = this.time.delayedCall(SS_F5_SHOW_MS, release);
+    const dwell = this.time.delayedCall(blue ? SS_F5_BLUE_SHOW_MS : SS_F5_SHOW_MS, release);
     this.time.delayedCall(SS_F5_SHOW_FLOOR_MS, () => {
       if (this.f5G !== g || g.beat !== 'show') return;
       g.tapFn = () => { dwell.remove(false); release(); };   // taps accelerate, past the floor
@@ -10196,6 +10274,7 @@ class Battle extends Phaser.Scene {
     const { veil, c } = g.showObjs;
     this.tweens.add({ targets: c, alpha: 0, duration: 260, onComplete: () => { if (c.active) c.destroy(); } });
     this.tweens.add({ targets: veil, alpha: 0, duration: 300, onComplete: () => { if (veil.active) veil.destroy(); } });
+    g.show = null; g.showObjs = null; g.pose = null;   /* F5-BLUE: a spent showcase never parks the next cast */
     const cont = g.cont; g.cont = null;
     /* F5-SCRYGATE: the hand STAYS past the showcase — the parked continuation
        (n·o·s, the beast's count) runs under the 'cast' beat, so the refill's
@@ -10224,6 +10303,32 @@ class Battle extends Phaser.Scene {
     this.f5GuideBeat('scry');
     this.f5ScryGateUp(true);
     DIAG('f5 guide: the scry gate (count ' + this.beast.count + ')');
+  }
+  /* ---- F5-BLUE (card ss-2026-10-09-first5-script/04): THE BLUE LESSON.
+     Skylar (10/09): "We also wanted it to be scripted, so we show the player
+     what the blue tile does. We'll need the finger for that and whatever
+     prompts the blue tile to pop up. It should build a word using the blue
+     tile and really highlight the damage and what the blue tile does,
+     because the blue tile can be confusing from the orange tile."
+     The gate has lifted: the hand STAYS and the script goes on — word 4
+     (en TONIGHT) is 7 letters, so the live forge rule drops the BLUE with
+     its refill (the authored letter, the lowest emptied cell), the fuse
+     ticks 2 → 1 under it; THE POINT rests the hand on the blue while "A
+     blue tile makes the whole word ×1.5." speaks; word 5 (HALO) STARTS on
+     the blue and pays EXACTLY plain × 1.5 (8 → 12); the showcase HOLDS the
+     fight with the blue tile, "×1.5", "12 damage, not 8" and the one line
+     that keeps orange and blue apart; the release runs the parked refill
+     and the beast's count — 1 → 0, the strike (card 05's beat, by the
+     mechanic) — and the hand retires once that refill has settled. */
+  f5GuideScried() {
+    const g = this.f5G; if (!g) return;
+    g.scried = true; g.pose = null;
+    const b = window.__f5guide; if (b) b.scried = (b.scried | 0) + 1;
+    const h = this.ftueHand; if (h && h.active) h.setDepth(62);   // back under the lesson frames (the gate raised it)
+    if (g.idx + 1 >= g.words.length) { this.f5GuideEnd(true); return; }   // nothing more authored — the hand lets go as before
+    this.f5GuideBeat('cast');
+    this.f5GuideRefill();   // the settle, then f5GuideNext → the forge word
+    DIAG('f5 guide: the gate lifted — the blue lesson');
   }
   // the hand lets go: happily at the end of the script, quietly if the
   // beast fell early or the board ran out of road
@@ -12140,9 +12245,10 @@ class Battle extends Phaser.Scene {
     }
     const b = window.__f5scry = window.__f5scry || {};
     b.lifted = (b.lifted | 0) + 1;
-    /* F5-SCRYGATE: the script's hand retires here — the night is the player's;
-       without a script the stall clock starts fresh from the lesson */
-    if (this.f5G && this.f5G.beat === 'reveal') this.f5GuideEnd(true);
+    /* F5-SCRYGATE: the script's hand goes on from here — F5-BLUE: into the
+       blue lesson (or retires, when nothing more is authored); without a
+       script the stall clock starts fresh from the lesson */
+    if (this.f5G && this.f5G.beat === 'reveal') this.f5GuideScried();
     else { this.f5LastTap = this.time.now; this.f5Glinted = false; }
     DIAG('f5: scry gate lifted');
   }

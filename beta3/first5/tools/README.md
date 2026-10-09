@@ -3,13 +3,22 @@
 Harness for the FIRST5 sandbox (the first-night tutorial test build at
 drbango.com/beta3/first5/ — batch `ss-2026-10-07-first-night` + fix round
 `ss-2026-10-08-first5-fixes` + `ss-2026-10-09-night-sky-live` card 03 +
-`ss-2026-10-09-first5-script` cards 01–03).
+`ss-2026-10-09-first5-script` cards 01–04).
 
 **first5-check.mjs** — the whole-stage suite (cards 01-06 + fix 01 THE
 CLEAN REFRESH + fix 02 THE STRAY SIGNS + fix 03 THE SCRY LESSON + STRAIGHT
 INTO THE NIGHT + THE PAINTED FIRST FIVE + THE GUIDED HAND, ORANGE + THE SCRY
-GATE): static seams (including THE SCRY GATE's — sixteen F5-SCRYGATE sites,
-the first night's five-cast fuse (tcut −1 in the ember block), the gate on
+GATE + THE BLUE LESSON): static seams (including THE BLUE LESSON's —
+twenty-one F5-BLUE sites, the five-word script table for every tongue with
+the blue word named, the rig carrying both of the lesson's refills, the
+dials (the longer blue dwell, the rule's ×1.5 written out and agreeing with
+wordDamage), the two showcase lines, VULPES staged at ×2.8 (84 hp), the
+gate standing between word 3 and word 4 ONCE, the lift handing the script
+on (f5GuideScried), the one tier preference by word index, the point beat
+and the showcase generalized to both tiers, a spent showcase never parking
+the next cast; and THE SCRY GATE's — sixteen F5-SCRYGATE sites,
+the first night's SIX-cast fuse (tcut −2 in the ember block, F5-BLUE
+lengthened card 03's five), the gate on
 the script's own beat through the SAME door the stall raises, the lock that
 yields to SCRY at that beat alone, the shared slowed reveal (the hold
 released at the step, the two readings in the pill's own words, the
@@ -21,10 +30,14 @@ script table for all five tongues, the rig carrying every refill of the
 scripted fight, the lock on tile/CAST/SCRY, the held continuation, the
 showcase trigger, the reset-before-build — plus THE SIMULATION: every
 tongue's script dealt and cast exactly as the game does, against the REAL
-dictionaries in ../words*.js and the live damage math — word two must
-forge the orange, word three must start on it at exactly +6, VULPES must
-survive, the fuse must stand at 2 for the gate, the sweep must deal the
-rig's last sixteen (dense) and spend it; and including the
+dictionaries in ../words*.js and the live damage math — the WHOLE five-word
+script now: word two must forge the orange, word three must start on it at
+exactly +6, the gate's sweep must deal the rig's sixteen (dense) and step
+the fuse, word four (7+ letters) must forge the BLUE, which must land in the
+lowest emptied cell with the authored refill, word five must start on it
+and pay EXACTLY plain × 1.5, VULPES must survive every word, the fuse must
+walk 6 → 0 (the blue word's tick is the strike), the rig must be spent and
+the final board dense; and including the
 painted seams — thirteen F5-PAINTED sites, the live game's plate seat /
 zenith crown / fight frame (ssNightSkyTex · ssNightSkyCap · ssZenithSky)
 proven byte-for-byte against ../game.js, the painted wordmark branch, the
@@ -58,7 +71,7 @@ the painted word at playIntro's seat) captured as `live-zenith.png` +
 dependency-free PNG reader: the first fight's outer sky strips ≥95% within
 ±6, the title night's full frame ≥95% within ±8, the wordmark band ≥90%),
 the LURE (real CDP click at
-the TITLE launches the lean and arms the sound), THE SKY LEANS IN (ember 33hp, star-write,
+the TITLE launches the lean and arms the sound), THE SKY LEANS IN (VULPES 84 hp — ×2.8 for the five-word script, star-write,
 the density gate vs the full dictionary, curated trio, encore, the cue
 ladder), THE GUIDED HAND, ORANGE (§2c: REAL taps follow the finger through
 STAR, then — no free-typing gap — MOONS; the lock proven with real fingers:
@@ -66,27 +79,44 @@ a tile off the road, SCRY, and CAST with MOON standing all refused while
 un-weaving stays allowed; MOONS forges the orange, which lands on cell 0
 with the hand resting on it and the +6 line spoken; the pointed tile is
 the first tap of SKY; the showcase HOLDS the fight — state anim, the cast
-cells still empty, the fuse unticked, VULPES shown at 3 — with 16 damage /
+cells still empty, the fuse unticked, VULPES shown at 54 — with 16 damage /
 plain 10 / +6 on the beacon, the light veil at 900, the showcase at 950,
 the hand raised to 960 on the number; a real tap past the 900ms floor lets
-go: n·o·s lands, the fuse ticks 3 → 2 — and the hand STAYS; three DPR-3
+go: n·o·s lands, the fuse ticks 4 → 3 — and the hand STAYS; three DPR-3
 captures in `tools/shots-guided/` — finger-word2 · orange-intro ·
 orange-showcase — untracked, never committed), THE SCRY GATE (card 03 of
 ss-2026-10-09-first5-script, still §2c: on the refill's settle the gate
 rises on the script's OWN beat — the veil at 900 (0.66), SCRY alone above
-it under Skylar's line, the pill still saying 2, the finger above the veil
+it under Skylar's line, the pill still saying 3, the finger above the veil
 ON SCRY; REAL taps on a tile, CAST and the back door do nothing and the
 gate stands; the REAL SCRY tap scries as normal — the board redeals to the
-rig's authored sixteen, the pill raised into the light but HELD at 2 — then
-the slowed reveal: the count steps 2 → 1 in the light, the raised pill
-reads "strikes in 1 cast" with the ember alarm, the reveal at 950 (the old
+rig's authored sixteen, the pill raised into the light but HELD at 3 — then
+the slowed reveal: the count steps 3 → 2 in the light, the raised pill
+reads "strikes in 2 casts", the reveal at 950 (the old
 reading struck through, the new one hot, the cost line beneath — five
 parts), the finger on the pill; a tap before the floor does NOT let go;
 untapped, the beat holds its whole dwell (≥ 4.1 s) and lifts by itself —
-depths home, veil and reveal gone, the hand retired for good, the fuse at 1,
-the ribbon silent; two DPR-3 captures in `tools/shots-scry/` — scry-gate ·
-scry-reveal — untracked, never committed; then tiles answer freely and the
-scried board is density-gated), THE TEACHING SCRIPTS (real
+depths home, veil and reveal gone, the fuse at 2 — and the hand STAYS; two
+DPR-3 captures in `tools/shots-scry/` — scry-gate · scry-reveal —
+untracked, never committed), THE BLUE LESSON (card 04, still §2c: word four
+is TONIGHT, the finger on its T over the scry's sixteen with the hand back
+under the lesson frames; the lock with real fingers again — SCRY after the
+gate, a tile off the road, CAST with T·O·N standing — all refused; TONIGHT
+flies (7 letters, rung 7's gold rain) and forges the BLUE, which lands on
+cell 1 — the lowest emptied cell — with the hand resting on it, the beacon
+"blue", the ×1.5 line spoken once, the fuse ticked 2 → 1 with the ember
+alarm breathing; the pointed tile is HALO's first tap; the showcase HOLDS
+the fight with FIVE parts — the blue tile, "×1.5" in blue, "That blue tile
+made the WHOLE word ×1.5 — 12 damage, not 8." and "Orange adds +6 to one
+tile. Blue multiplies the whole word." (one text per frame), the hand on
+the number — with 12 / plain 8 / tier 2 on the beacon, the cast cells still
+empty, VULPES shown at 21; untapped it holds its whole LONGER dwell (≥ 4.5
+s); the release runs the night on: d·a·w·n refilled, the blue word's own
+tick 1 → 0 brings THE STRIKE (the player 50 → 42, the fuse re-armed at 6),
+the dew blooms, the hand retires for good; three DPR-3 captures in
+`tools/shots-blue/` — blue-finger · blue-intro · blue-showcase — untracked,
+never committed; then tiles answer freely and the board the hand leaves is
+density-gated), THE TEACHING SCRIPTS (real
 dewTile/blackTile prompts, once-per-run dedupe, the forge/plant chain),
 THE LIT SKY (a fell through the true chain writes the mark, the converge,
 the rite still SEATING its mark + the sweep clearing the zenith, the
