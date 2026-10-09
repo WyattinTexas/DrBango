@@ -64,24 +64,30 @@ ok('the flag is baked per colour — no setTint anywhere near it (Canvas law)', 
   const j = src.game.indexOf('/* ---- sigil rarity dress');
   return i > 0 && j > i && !/setTint/.test(src.game.slice(i, j));
 })());
-ok('the row carries the dress: submitEndless takes colour + veil, dressFlag redresses, getFlags reads',
+ok('the row carries the dress: submitEndless takes colour + veil, dressFlag redresses, getWeekFlags reads the week',
   /submitEndless\(level, score, finestWord, color, veiled\)/.test(src.net) &&
-  /async function dressFlag\(color, veiled\)/.test(src.net) && /async function getFlags\(\)/.test(src.net) &&
-  /dressFlag, getFlags,/.test(src.net));
-ok('getFlags is real players only (sg_ filtered at the source)', /!\/\^sg_\/\.test\(id\)/.test(src.net));
+  /async function dressFlag\(color, veiled\)/.test(src.net) && /async function getWeekFlags\(\)/.test(src.net) &&
+  /dressFlag, getWeekFlags,/.test(src.net));
+// the fan reads the WEEK (v0.115.0): the endless/<isoWeek> slice, never all-time
+ok('getWeekFlags reads endless/<isoWeek> (the weekly slice, not all-time)',
+  /const wk = weekKey\(\);/.test(src.net) && /dbGet\('endless\/' \+ wk\)/.test(src.net));
+ok('getWeekFlags is real players only (sg_ filtered at the source)', /!\/\^sg_\/\.test\(id\)/.test(src.net));
 ok('the jar ships with the profile (flagColor in the sync payload)', /flagColor: this\.prof\.flag/.test(src.game));
-ok('one read at climb start, never per level (getFlags absent from startFight)', (() => {
-  const i = src.game.indexOf('startFight() {');
-  const j = src.game.indexOf('modeTitle() {');
-  const one = (src.game.match(/SSNET\.getFlags\(\)/g) || []).length === 1;
-  return one && !(i > 0 && src.game.slice(i, j).includes('getFlags'));
-})());
-ok('the ceremonies ride the checkpoint (fpassLv + ffront saved and resumed)',
-  /fpassLv: this\.run\.fpassLv \| 0, ffront: this\.run\.ffront \? 1 : undefined/.test(src.game) &&
-  /fpassLv: this\.resume\.fpassLv \| 0, ffront: !!this\.resume\.ffront/.test(src.game));
-// strings ×5, every key, the right slots
-const KEYS = ['flagTitle', 'flagStands', 'flagJars', 'flagJarsHint', 'flagPass', 'flagPassMore', 'flagPassSub', 'flagFront', 'flagFrontSub', 'flagAt'];
-const SLOT = { flagStands: ['%1'], flagPass: ['%1'], flagPassMore: ['%1', '%2'], flagPassSub: ['%1'], flagFrontSub: ['%1', '%2'], flagAt: ['%1'] };
+// v0.115.0: in-climb plantFlags/flagBeats RETIRE — the gate owns the flags now
+ok('the in-climb flags are gone (plantFlags/flagBeats/__ssflags retired)',
+  !/plantFlags/.test(src.game) && !/flagBeats/.test(src.game) && !/__ssflags/.test(src.game));
+// the FRONTIER re-seats on the gate; its latch rides the checkpoint alone now
+// (the pass-beat family + run.fpassLv retired)
+ok('the frontier rides the checkpoint (ffront saved + resumed; fpassLv retired)',
+  /ffront: this\.run\.ffront \? 1 : undefined/.test(src.game) &&
+  /ffront: !!this\.resume\.ffront/.test(src.game) &&
+  !/fpassLv: this\.run\.fpassLv/.test(src.game) && !/fpassLv: this\.resume\.fpassLv/.test(src.game));
+ok('the retired pass strings are gone ×5 (flagPass/flagPassMore/flagPassSub)',
+  !/\bflagPass:/.test(src.strings) && !/\bflagPassMore:/.test(src.strings) && !/\bflagPassSub:/.test(src.strings));
+// the MONUMENT strings stay (the profile sheet + rating card keep their
+// all-time voice) — flagFront/flagFrontSub + the gate strings are gate-check's
+const KEYS = ['flagTitle', 'flagStands', 'flagJars', 'flagJarsHint', 'flagAt'];
+const SLOT = { flagStands: ['%1'], flagAt: ['%1'] };
 let strOk = true, strWhy = '';
 for (const lang of ['en', 'es', 'fr', 'pt', 'de']) {
   const m = src.strings.match(new RegExp("  " + lang + ": \\{([\\s\\S]*?)\\n  \\},"));
@@ -92,7 +98,7 @@ for (const lang of ['en', 'es', 'fr', 'pt', 'de']) {
     for (const s of SLOT[k] || []) if (!km[1].includes(s)) { strOk = false; strWhy = lang + '.' + k + ' misses ' + s; }
   }
 }
-ok('all ten flag strings ride in all five tongues, slots intact', strOk, strWhy);
+ok('the five monument flag strings ride in all five tongues, slots intact', strOk, strWhy);
 
 /* ---------- server + browser ---------- */
 const kids = [];
@@ -165,32 +171,10 @@ const H = `game.scene.getScene('home')`;
 const P = `game.scene.getScene('profile')`;
 const PICK = `!!window.game && ${B} && ${B}.scene.isActive() && ${B}.state === 'pick' && ${B}.board.filter(Boolean).length === 16`;
 const HOME = `!!window.game && ${H} && ${H}.sys.isActive() && !!${H}.menuRows`;
-const FLAGS = `JSON.stringify(window.__ssflags || {})`;
-// what stands in the climb's flag ground: per flag container, the baked
-// texture (the jar) and any name text on the cloth
-const STAND = `JSON.stringify((() => { const b = ${B}; const out = [];
-  for (const c of b.flagC.list) { if (!c.list) continue;
-    const img = c.list.find((o) => o.texture && /^flag-/.test(o.texture.key));
-    const txt = c.list.find((o) => o.style && o.text);
-    out.push({ tex: img ? img.texture.key : null, name: txt ? txt.text : '' }); }
-  return out })())`;
-const INTERACTIVE_FLAGS = `(() => { let n = 0; const scan = (ls) => ls.forEach((o) => {
-  if (o.input && o.input.enabled) n++; if (o.list) scan(o.list); }); scan(${B}.flagC.list); return n })()`;
-// the rival sky, seeded through the REAL channel (the local tree IS the
-// local sky — SSNET reads it through the same dbGet the live sky uses)
-const SKY = JSON.stringify({
-  endless: {
-    all: {
-      test_r1: { name: 'Velvet Fox', lvl: 2, score: 400, word: 'MOON', at: 1, c: 'blue' },
-      test_r2: { name: 'Astral Owl', lvl: 3, score: 300, word: 'STAR', at: 2, c: 'red' },
-      test_r3: { name: 'Quiet Hare', lvl: 3, score: 500, word: 'DUSK', at: 3, c: 'teal' },
-      test_veil: { name: 'Umbral Widow', lvl: 2, score: 900, word: 'VEIL', at: 4, c: 'purple', v: 1 },
-      sg_fake: { name: 'Seeded Ghost', lvl: 4, score: 200, word: 'FAKE', at: 5, c: 'gold' },
-      test_top: { name: 'Gilded Fox', lvl: 5, score: 9000, word: 'CROWN', at: 6, c: 'green' },
-    },
-  },
-});
-const PROF3 = JSON.stringify({ rating: 1000, endless: { bestLevel: 3, bestScore: 777, runs: 1 }, flag: 'orange' });
+// v0.115.0: the in-climb fan (plantFlags/flagBeats/__ssflags) + the rival-sky
+// seeding + climbTo RETIRED to gate-check — flag-check keeps the MONUMENTS
+// (the board row the reckoning writes, the profile flag sheet, the rating card,
+// the flag art), which this build leaves untouched.
 const boot = async (q, seed) => {
   await send('Page.navigate', { url: 'http://localhost:' + SRV + '/ascent.html' }); await sleep(500);
   await ev(`localStorage.clear(); sessionStorage.setItem('beta3.skipIntro', '1');
@@ -205,17 +189,12 @@ const reboot = async (q) => {
   await send('Page.navigate', { url: BASE + '?fps=0' + (q ? '&' + q : '') }); await sleep(2500);
   await until(`!!window.game && typeof SSNET !== 'undefined'`, 30000);
 };
-// enter level N (fights[N-1]) through the level's own beat, and wait for
-// the flag ground to speak for it
-const climbTo = async (lv) => {
-  await until(`!!${B} && ${B}.state === 'pick'`, 20000, 250);
-  await ev(`(() => { const b = ${B}; b.run.fightIdx = ${lv - 1}; b.startFight(); return 'ok' })()`);
-  return until(`(window.__ssflags || {}).level === ${lv}`, 15000, 250);
-};
 
 /* ================= 2. the ledger: a run plants ONE flag ================= */
+// the MONUMENT board row (endless/all) — untouched by the gate build; the
+// gate is skipped (?gate=0) so the reckoning is reached straight off pick
 console.log('— THE LEDGER (one flag, moved never multiplied) —');
-await boot('endless=1');
+await boot('endless=1&gate=0');
 ok('endless battle at pick (?endless=1 seam)', await until(PICK, 60000));
 ok('sky blocked (local net)', await ev(`SSNET.mode`) === 'local', await ev(`SSNET.mode`));
 // first completed run: fall on level 3
@@ -244,104 +223,27 @@ await sleep(800);
 row = await evj(`SSNET.dbGet('endless/all/' + SSNET.uid()).then((r) => JSON.stringify(r || {}))`);
 ok('a worse run never lowers it', row.lvl === 7 && (await evj(`JSON.stringify(SS.prof.endless)`)).bestLevel === 7);
 
-/* ================= 3. the climb: the iconic moment ================= */
-console.log('— THE CLIMB (their flag is THERE) —');
-await boot('endless=1', `localStorage.setItem('beta3.profile', '${PROF3.replace(/'/g, "\\'")}');
-  localStorage.setItem('starspellLocalDb', '${SKY.replace(/'/g, "\\'")}');`);
-ok('the rival sky stands and a fresh climb rises', await until(PICK, 60000));
-ok('the ledger was read once at climb start (4 real unveiled rivals)',
-  await until(`(window.__ssflags || {}).rows === 4`, 15000), await ev(FLAGS));
-let f = await evj(FLAGS);
-ok('level 1: no flag stands, nothing drawn', f.level === 1 && f.drawn === 0 && !f.mine);
-ok('the flag ground is pure presence — nothing interactive in it', await ev(INTERACTIVE_FLAGS) === 0);
-// level 2: Velvet Fox's blue flag is THERE — the veiled widow's is NOT
-ok('level 2 reached', await climbTo(2));
-await sleep(1200);
-let st = await evj(STAND);
-f = await evj(FLAGS);
-ok('level 2: Velvet Fox\'s flag is THERE — blue cloth, name across it',
-  f.drawn === 1 && st.some((x) => x.tex === 'flag-blue' && x.name === 'VELVET FOX'), JSON.stringify(st));
-ok('the veiled mage\'s flag stands NOWHERE (their stats are veiled)',
-  !st.some((x) => x.tex === 'flag-purple') && !JSON.stringify(f.names || []).includes('Umbral'), 'level-2 field clean');
-ok('no pass beat yet (nothing stood at level 1)', !(f.passes | 0), 'passes ' + (f.passes | 0));
-await shot('climb-l2-velvet-fox');
-// level 3: two rivals fan + the own flag at its standing best; the pass beat rings for level 2
-ok('level 3 reached', await climbTo(3));
-await sleep(1400);
-st = await evj(STAND);
-f = await evj(FLAGS);
-ok('level 3: both rival flags fan legibly beside the own (3 drawn)', f.drawn === 3 &&
-  st.some((x) => x.tex === 'flag-red') && st.some((x) => x.tex === 'flag-teal'), JSON.stringify(st.map((x) => x.tex)));
-const myNm = (await ev(`SSNET.myName()`)).toUpperCase();
-ok('the own flag stands at the standing best — orange, this mage\'s own name',
-  f.mine && st.some((x) => x.tex === 'flag-orange' && x.name === myNm));
-ok('the pass beat rang once, naming Velvet Fox', (f.passes | 0) === 1 && String(f.beat).includes('Velvet Fox') && f.passedLv === 2, f.beat);
-// the beat is once per climb per rung: re-entering the level never re-rings
-await ev(`(() => { const b = ${B}; b.startFight(); return 'ok' })()`);
-await sleep(1200);
-f = await evj(FLAGS);
-ok('re-entering the level never re-rings the beat (once per climb)', (f.passes | 0) === 1);
-// level 4: the seeded ghost's flag must NOT stand — the moment is real players only
-ok('level 4 reached', await climbTo(4));
-await sleep(1200);
-st = await evj(STAND);
-f = await evj(FLAGS);
-ok('level 4: the seeded ghost plants NO flag (real players only)',
-  !st.some((x) => x.tex === 'flag-gold') && f.drawn === 1, JSON.stringify(st.map((x) => x.tex)));
-ok('…passing the two level-3 flags rang ONE beat naming the finest + more', (f.passes | 0) === 2 &&
-  String(f.beat).includes('Quiet Hare') && /\+\s*1|\+1/.test(String(f.beat)), f.beat);
-// level 5: the frontier flag stands; level 6: THE FRONTIER IS YOURS
-ok('level 5 reached — the record flag stands highest', await climbTo(5));
-await sleep(1200);
-st = await evj(STAND);
-f = await evj(FLAGS);
-ok('level 5: Gilded Fox\'s green record flag is THERE', st.some((x) => x.tex === 'flag-green' && x.name === 'GILDED FOX'));
-ok('…and no beat rang for the ghost\'s rung below', (f.passes | 0) === 2);
-await shot('climb-l5-frontier-stands');
-ok('level 6 reached — past the record', await climbTo(6));
-await sleep(1400);
-f = await evj(FLAGS);
-ok('THE FRONTIER IS YOURS — the big beat rang', f.front === true && String(f.beat) === await ev(`SS_T('flagFront')`), f.beat);
-ok('…and the own flag rides above it (planted at level 6)', f.mine && f.level === 6);
-await shot('climb-l6-frontier-taken');
-const ck1 = await evj(`localStorage.getItem('beta3.endless')`);
-ok('the ceremonies rode the checkpoint (fpassLv 5, the frontier spent)', ck1.fpassLv === 5 && ck1.ffront === 1, JSON.stringify({ f: ck1.fpassLv, fr: ck1.ffront }));
-// a resumed climb re-reads, never duplicates, never re-rings
-await reboot('endless=1');
-ok('the climb resumes at level 6 by its checkpoint', await until(`(window.__ssflags || {}).level === 6`, 60000));
-await sleep(1500);
-f = await evj(FLAGS);
-st = await evj(STAND);
-ok('the resumed climb re-read the ledger (4 rivals again, flags re-planted)', f.rows === 4 && f.mine);
-ok('…and repeats NO ceremony (fpassLv/ffront resumed, zero fresh passes)', !(f.passes | 0) && await ev(`${B}.run.fpassLv === 5 && ${B}.run.ffront === true`));
-// the reckoning writes the new frontier for the next climber
-await ev(`(() => { const b = ${B}; b.endRun(false); return 'ok' })()`);
-await until(`${B}.state === 'end'`, 15000);
-await sleep(800);
-row = await evj(`SSNET.dbGet('endless/all/' + SSNET.uid()).then((r) => JSON.stringify(r || {}))`);
-ok('the fall plants the flag at level 6 for the next climber — above the old record', row.lvl === 6 && row.c === 'orange', JSON.stringify(row));
-const flagsNow = await evj(`SSNET.getFlags().then((r) => JSON.stringify(r))`);
-ok('getFlags ranks it the frontier now, ghost rows invisible',
-  flagsNow[0] && flagsNow[0].level === 6 && !flagsNow.some((r) => /^sg_/.test(r.id)), JSON.stringify(flagsNow.map((r) => r.level)));
-// ?ghosts=0 sweeps seeded flags too — trivially: none ever stand
-await reboot('endless=1&ghosts=0');
-await until(PICK, 60000);
-ok('?ghosts=0: the flag ledger reads identically (real names only, never sg_)',
-  await ev(`SSNET.getFlags().then((r) => r.length === 6 && !r.some((x) => /^sg_/.test(x.id)))`));
-
-/* ================= 4. the veil on the row ================= */
+/* ================= 3. the veil on the row (the MONUMENT) ================= */
+// The in-climb fan + the frontier ceremony moved to the gate — that whole
+// story is gate-check's now. What stays here is the board ROW the reckoning
+// writes: it still carries the veil, and getWeekFlags still reports it for the
+// fan's veil=vanish filter to honour. A fresh orange-flag climb, veiled, fell.
 console.log('— THE VEIL ON THE ROW —');
+await boot('endless=1&gate=0', `localStorage.setItem('beta3.profile', JSON.stringify({ rating: 1000, flag: 'orange' }));`);
+ok('a fresh orange-flag climb rises', await until(PICK, 60000));
+ok('sky blocked (local net)', await ev(`SSNET.mode`) === 'local', await ev(`SSNET.mode`));
 await ev(`(() => { SS.prof.rhide = true; SS.save(); return 'ok' })()`);
 await ev(`(() => { const b = ${B}; b.run.fightIdx = 8; b.endRun(false); return 'ok' })()`);
 await until(`${B}.state === 'end'`, 15000);
 await sleep(800);
 row = await evj(`SSNET.dbGet('endless/all/' + SSNET.uid()).then((r) => JSON.stringify(r || {}))`);
-ok('a veiled mage\'s reckoning stamps the veil on the row (v: 1, level moved)', row.v === 1 && row.lvl === 9, JSON.stringify(row));
-ok('…and getFlags reports the veil for the climb-side filter to honour',
-  await ev(`SSNET.getFlags().then((r) => ((r.find((x) => x.id === 'test_veil') || {}).veiled === true)
-    && ((r.find((x) => x.id === SSNET.uid()) || {}).veiled === true))`));
+ok('a veiled mage\'s reckoning stamps the veil on the all-time row (v:1, orange, level 9)',
+  row.v === 1 && row.lvl === 9 && row.c === 'orange', JSON.stringify(row));
+ok('…and getWeekFlags reports the veil for the gate fan\'s veil=vanish filter',
+  await ev(`SSNET.getWeekFlags().then((res) => ((res.rows.find((x) => x.id === SSNET.uid()) || {}).veiled === true)
+    && ((res.rows.find((x) => x.id === SSNET.uid()) || {}).mine === true))`));
 
-/* ================= 5. the profile: the flag and the ten jars ================= */
+/* ================= 4. the profile: the flag and the ten jars ================= */
 console.log('— THE PROFILE (the flag sheet, ten jars by real taps) —');
 await ev(`(() => { SS.prof.rhide = false; SS.save(); SS.sync(); SSNET.dressFlag(SS.prof.flag, false); return 'ok' })()`);
 await reboot('');
@@ -410,7 +312,7 @@ await reboot('');
 await until(HOME, 60000);
 ok('the jar persists across a reload', await ev(`SS.prof.flag`) === 'red');
 
-/* ================= 6. the rating card's flag, and the veil ================= */
+/* ================= 5. the rating card's flag, and the veil ================= */
 console.log('— THE RATING CARD (veiled to others, never to self) —');
 await ev(`(() => {
   const t = JSON.parse(localStorage.getItem('starspellLocalDb'));
@@ -443,17 +345,12 @@ cd = await card(`{ name: 'Some Ghost', rating: 990, rhide: false }`);
 ok('a board ghost\'s card carries no flag (nothing in the registry)', !cd.tex && !cd.flagTxt);
 await ev(`(() => { SS.prof.rhide = false; SS.save(); return 'ok' })()`);
 
-/* ================= 7. the spanish dress ================= */
+/* ================= 6. the spanish dress (the MONUMENT sheet words) ================= */
+// the gate's own es dress (flagFront/gateLevel/…) is gate-check's; here the
+// profile flag sheet's all-time words stay Spanish
 console.log('— THE SPANISH DRESS —');
-await boot('endless=1&lang=es', `localStorage.setItem('beta3.profile', '${PROF3.replace(/'/g, "\\'")}');
-  localStorage.setItem('starspellLocalDb', '${SKY.replace(/'/g, "\\'")}');`);
+await boot('endless=1&gate=0&lang=es');
 ok('the spanish climb rises', await until(PICK, 60000));
-await until(`(window.__ssflags || {}).rows === 4`, 15000);
-await climbTo(3);
-await sleep(1200);
-f = await evj(FLAGS);
-ok('the pass beat speaks Spanish', String(f.beat).includes('pasaste la bandera de Velvet Fox'), f.beat);
-ok('…and the sub-line too', String(f.beatSub).includes('nivel 2'), f.beatSub);
 const esT = await evj(`JSON.stringify({ t: SS_T('flagTitle'), j: SS_T('flagJars') })`);
 ok('the sheet\'s words are Spanish (TU BANDERA · EL COLOR DE TU BANDERA)', esT.t === 'TU BANDERA' && esT.j === 'EL COLOR DE TU BANDERA');
 ok('no page errors anywhere', errs.length === 0, errs.join(' | ').slice(0, 200));

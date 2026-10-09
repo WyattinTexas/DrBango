@@ -111,7 +111,7 @@ const boot = async (q, seed) => {
   await send('Page.navigate', { url: 'http://localhost:' + SRV + '/ascent.html' }); await sleep(500);
   await ev(`localStorage.clear(); sessionStorage.setItem('beta3.skipIntro', '1');
     localStorage.setItem('beta3.profile', JSON.stringify({ rating: 1000 })); ${seed || ''} 'ok'`);
-  await send('Page.navigate', { url: BASE + '?fps=0' + (q ? '&' + q : '') }); await sleep(2500);
+  await send('Page.navigate', { url: BASE + '?fps=0&gate=0' + (q ? '&' + q : '') }); await sleep(2500);
   await until(`!!window.game && typeof SSNET !== 'undefined'`, 30000);
 };
 // endless-check's proven fell + card helpers (the real death path)
@@ -763,7 +763,7 @@ for (const lang of ['es', 'de']) {
   await send('Page.navigate', { url: 'http://localhost:' + SRV + '/ascent.html' }); await sleep(400);
   await ev(`localStorage.clear(); sessionStorage.setItem('beta3.skipIntro', '1');
     localStorage.setItem('beta3.profile', JSON.stringify({ rating: 1000, signs: { aries: { best: 0, clears: 1, runs: 1, eBest: 0, xp: 990, ack: 10 } } })); 'ok'`);
-  await send('Page.navigate', { url: BASE + '?fps=0&lang=' + lang }); await sleep(2500);
+  await send('Page.navigate', { url: BASE + '?fps=0&gate=0&lang=' + lang }); await sleep(2500);
   ok(lang + ': home stands', await until(HOME, 90000));
   ok(lang + ': the picker card speaks the levelled desc with real numbers (no %1 residue)', await (async () => {
     if (!(await tapUntil(`${H}.rowBtns.newcamp`, SHEET, 8))) return false;

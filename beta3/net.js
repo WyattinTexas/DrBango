@@ -434,18 +434,28 @@ const SSNET = (() => {
       });
     } catch (e) { }
   }
-  /* THE FRONTIER FLAGS' ledger read (v0.77.0): every REAL planted flag, one
-     read at climb start/resume — never per level, never polled mid-battle.
-     Raw endless/all rows, no ghost merge (the seeded hunters are board
-     dressing; the flags in the sky are real players only — sg_ filtered as
-     the belt to that law's suspenders, since ghosts are client-side and
-     never written). Sorted the way endless ranks: level, then score. */
-  async function getFlags() {
-    const all = (await dbGet('endless/all').catch(() => null)) || {};
-    return Object.entries(all)
+  /* THE LEVEL GATE's weekly ledger read (v0.115.0, re-aiming v0.77's
+     all-time getFlags at Skylar's 10/8 verdicts): the gate's fan reads THE
+     WEEK — `endless/<isoWeek>`, the slice every reckoning has quietly
+     written since v0.68 (zero new writes; pruneBoards already ages old
+     weeks out). One read at climb start/resume — never per level, never
+     polled mid-battle. Same filters as the retired climb read (real
+     players only — sg_ filtered as the belt to the ghosts-never-write
+     law's suspenders; veiled REPORTED for the gate-side veil=vanish
+     filter), sorted the way endless ranks: level, then score, then the
+     earlier arrival. The OWN row rides along now — the gate seats it at
+     its earned place (the old read dropped it; the in-climb flags that
+     drew their own are retired). Returns { week, rows } so the caller
+     stamps the fetch's own weekKey and refetches at the first gate past
+     the Monday 00:00 UTC turnover. */
+  async function getWeekFlags() {
+    const wk = weekKey();
+    const all = (await dbGet('endless/' + wk).catch(() => null)) || {};
+    const rows = Object.entries(all)
       .filter(([id, r]) => r && (r.lvl | 0) > 0 && !/^sg_/.test(id))
-      .map(([id, r]) => ({ id, name: r.name || '???', level: r.lvl | 0, score: r.score | 0, color: r.c || null, veiled: !!r.v }))
-      .sort((a, b) => b.level - a.level || b.score - a.score);
+      .map(([id, r]) => ({ id, name: r.name || '???', level: r.lvl | 0, score: r.score | 0, at: r.at || 0, color: r.c || null, veiled: !!r.v, mine: id === uid() }))
+      .sort((a, b) => b.level - a.level || b.score - a.score || a.at - b.at);
+    return { week: wk, rows };
   }
   // housekeeping: old day/week boards would pile up forever — sweep them as we
   // pass by. Once/session.
@@ -657,5 +667,5 @@ const SSNET = (() => {
     async decline(fromUid) { try { await dbSet('invites/' + uid() + '/' + fromUid, null); } catch (e) { } },
   };
 
-  return { connect, uid, myName, setName, mintUid, mintName, nameKey, claimName, releaseName, findByName, mintClaimed, ensureName, renameNotice, side, submitScore, submitEndless, submitHard, dressFlag, getFlags, getBoard, syncProfile, dayKey, setDayKey, dayKeyISO, msToNextDay, msToNextWeek, weekKey, ref, dbGet, dbSet, dbUpdate, dbTxn, FR, get mode() { return mode; } };
+  return { connect, uid, myName, setName, mintUid, mintName, nameKey, claimName, releaseName, findByName, mintClaimed, ensureName, renameNotice, side, submitScore, submitEndless, submitHard, dressFlag, getWeekFlags, getBoard, syncProfile, dayKey, setDayKey, dayKeyISO, msToNextDay, msToNextWeek, weekKey, ref, dbGet, dbSet, dbUpdate, dbTxn, FR, get mode() { return mode; } };
 })();

@@ -155,7 +155,7 @@ console.log('\nENDLESS-CHECK · fight until you fall, see how far you climb\n');
 
 /* ================= 1. the curve and the ladder ================= */
 console.log('— THE CURVE (the card\'s balance sheet) —');
-await boot('endless=1');
+await boot('endless=1&gate=0');   // THE LEVEL GATE (v0.115.0): the climb walk rides pick-to-pick; the gate's own suite is gate-check
 ok('endless battle at pick (?endless=1 seam)', await until(PICK, 60000));
 ok('sky blocked (local net)', await ev(`SSNET.mode`) === 'local', await ev(`SSNET.mode`));
 const curve = await evj(`JSON.stringify({
@@ -245,9 +245,12 @@ ok('the defs never learn what one fight dressed them in', bf.clean);
 ok('no page errors (the curve)', errs.length === 0, errs.join(' | ').slice(0, 200));
 
 /* ================= 2. the door, the sign, the rise ================= */
+// THE LEVEL GATE (v0.115.0): the meadow door → picker → BEGIN now rises into
+// the gate (LEVEL 1), then the fight; &gate=0 skips it so the door/climb walk
+// here lands straight on pick (the gate's own suite is gate-check)
 console.log('\n— THE MEADOW DOOR —');
 errs.length = 0;
-await boot('');
+await boot('gate=0');
 ok('the meadow stands', await until(HOME, 30000));
 await sleep(1200);
 const menu = await evj(`JSON.stringify(${H}.menuRows.filter((m) => m.b.visible).map((m) => ({ k: m.key, y: Math.round(m.lab.rowY) })))`);
@@ -303,7 +306,7 @@ for (let i = 0; i < 12; i++) {
     // (an offer may have been an UPGRADE — compare held sigils, not offers)
     const heldBefore = await ev(`${B}.run.sigils.length`);
     await sleep(400);
-    await reboot('');
+    await reboot('gate=0');   // THE LEVEL GATE (v0.115.0): skip the resume's LEVEL-N card so the walk lands on pick
     if (!(await until(HOME, 30000))) { walkOk = false; break; }
     await sleep(1000);
     resumed = await ev(`${H}.rowSubs.endless.text === SS_T('endlessCont', ${RESUME_AT + 1})`);
@@ -362,7 +365,7 @@ ok('no page errors (the fall)', errs.length === 0, errs.join(' | ').slice(0, 200
 console.log('\n— NEW BEST, BOTH FLAGS —');
 errs.length = 0;
 const best1 = end1.prof;
-await reboot('endless=1');
+await reboot('endless=1&gate=0');
 ok('a second climb rises (profile kept)', await until(PICK, 60000) && await ev(`SS.prof.endless.runs === 1`));
 // climb past the standing bests the honest way: march the ladder high, then fall
 await ev(`(() => { const b = ${B}; b.run.fightIdx = 20; b.run.totalDmg = 2600; b.run.words = 34; b.run.letters = 150;
@@ -379,7 +382,7 @@ ok('a better level AND score pulse both NEW BEST flags', end2.newBest === 2, end
 ok('the books moved to the new marks', end2.prof.bestLevel === 21 && end2.prof.bestScore > best1.bestScore && end2.prof.runs === 2, JSON.stringify(end2.prof));
 await shot('endless-new-best');
 // …and a worse climb pulses nothing, the books standing
-await reboot('endless=1');
+await reboot('endless=1&gate=0');
 await until(PICK, 60000);
 ok('a worse climb ends quiet — the books stand', await die() && await evj(`(() => { const b = ${B}; const texts = [];
   const scan = (ls) => ls.forEach((o) => { if (o.text) texts.push(o.text); if (o.list) scan(o.list); });
@@ -395,7 +398,7 @@ errs.length = 0;
 // nothing; the eBest/campaign-ledger asserts below stand on this record
 await ev(`localStorage.setItem('beta3.endsign', 'aries');
   SS.prof.signs.aries = { best: 0, clears: 0, runs: 0, eBest: 0, xp: SS_SIGNLV.cum[22], ack: 22 }; SS.save(); 'ok'`);
-await reboot('endless=1');
+await reboot('endless=1&gate=0');
 await until(PICK, 60000);
 const ram = await evj(`JSON.stringify({ sign: ${B}.sign, rammed: ${B}.beast.hpNow === ${B}.beast.hp - 8 })`);
 ok('the ram opens an endless battle — zodiac powers apply', ram.sign === 'aries' && ram.rammed, JSON.stringify(ram));

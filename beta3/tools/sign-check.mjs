@@ -147,7 +147,7 @@ const open = async () => {
 const boot = async (dv, inset, extra) => {
   await send('Emulation.setDeviceMetricsOverride', { width: dv.w, height: dv.h, deviceScaleFactor: dv.dpr, mobile: true, screenWidth: dv.w, screenHeight: dv.h, screenOrientation: { type: 'portraitPrimary', angle: 0 } });
   await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
-  await send('Page.navigate', { url: BASE + `?rend=cv&fps=0&diag=1&mpuid=sign${Math.floor(Math.random() * 1e6)}&inset=${inset}` + (extra || '') });
+  await send('Page.navigate', { url: BASE + `?rend=cv&fps=0&diag=1&mpuid=sign${Math.floor(Math.random() * 1e6)}&inset=${inset}&gate=0` + (extra || '') });
   await sleep(1500);
   const up = await until(HOME_REST, 90000);
   if (!up) return false;
@@ -502,7 +502,9 @@ ok('the remembered deck is the same deck — ‹ steps to CANCER, › returns to
 const bpM2 = await css(`${H}.signC.list.find(o => o.texture && /^btn/.test(o.texture.key) && o.displayWidth > 200)`);
 ok('BEGIN on the remembered card re-pins leo', await touchUntil(bpM2, `!${H}.signC && !!${H}.mapC && localStorage.getItem('beta3.campsign') === 'leo'`, 6));
 // a cold reload: the memory lives in beta3.profile, so a fresh boot keeps it
-await send('Page.navigate', { url: BASE + `?rend=cv&fps=0&diag=1&mpuid=sign${Math.floor(Math.random() * 1e6)}&inset=59,34` });
+// (v0.115.0: &gate=0 skips the endless LEVEL gate so the deck-memory walk's
+// endless BEGIN lands straight on pick)
+await send('Page.navigate', { url: BASE + `?rend=cv&fps=0&diag=1&mpuid=sign${Math.floor(Math.random() * 1e6)}&inset=59,34&gate=0` });
 await sleep(1500);
 ok('home stands after a cold reload', await until(HOME_REST, 90000));
 ok('…and the reopened picker STILL stands on LEO (the memory rode the reboot)', await open() && (await peek()).id === 'leo' && await ev(`SS.prof.lastSign === 'leo'`), JSON.stringify(await peek()));

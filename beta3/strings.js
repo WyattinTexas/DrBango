@@ -104,10 +104,11 @@ const SS_STR = {
     // the frontier flags (v0.77.0)
     flagTitle: 'YOUR FLAG', flagStands: 'your flag stands at level %1',
     flagJars: 'YOUR FLAG\'S COLOR', flagJarsHint: 'tap a jar — your flag repaints for every sky',
-    flagPass: '✦ you passed %1\'s flag ✦', flagPassMore: '✦ you passed %1\'s flag · +%2 more ✦',
-    flagPassSub: 'their climb ended here · level %1',
     flagFront: '✦ THE FRONTIER IS YOURS ✦', flagFrontSub: 'your flag now flies above %1\'s · level %2',
     flagAt: 'their flag · level %1',
+    // the level gate (v0.115.0)
+    gateLevel: 'LEVEL', gateTap: 'tap to face the sky',
+    gateMore: '+%1 more ended here this week',
     lbAllTime: 'the endless ledger · every climb remembered', lbHardTime: 'the ember ledger · every hard clear remembered',
     mapTitle: 'THE CAMPAIGN SKY', mapHint: 'tap the glowing constellation to begin', mapDest: 'journey\'s end',
     restartTitle: 'RESTART YOUR GAME?', restartBody: 'This will restart your current game in progress.',
@@ -278,10 +279,11 @@ const SS_STR = {
     // las banderas de la frontera (v0.77.0)
     flagTitle: 'TU BANDERA', flagStands: 'tu bandera ondea en el nivel %1',
     flagJars: 'EL COLOR DE TU BANDERA', flagJarsHint: 'toca un tarro — tu bandera se repinta en todos los cielos',
-    flagPass: '✦ pasaste la bandera de %1 ✦', flagPassMore: '✦ pasaste la bandera de %1 · +%2 más ✦',
-    flagPassSub: 'su ascenso terminó aquí · nivel %1',
     flagFront: '✦ LA FRONTERA ES TUYA ✦', flagFrontSub: 'tu bandera ondea sobre la de %1 · nivel %2',
     flagAt: 'su bandera · nivel %1',
+    // the level gate (v0.115.0)
+    gateLevel: 'NIVEL', gateTap: 'toca para encarar el cielo',
+    gateMore: '+%1 más terminaron aquí esta semana',
     lbAllTime: 'el registro sin fin · cada ascenso queda guardado', lbHardTime: 'el registro de brasas · cada victoria difícil queda guardada',
     mapTitle: 'EL CIELO DE LA CAMPAÑA', mapHint: 'toca la constelación que brilla para comenzar', mapDest: 'fin del viaje',
     restartTitle: '¿REINICIAR TU PARTIDA?', restartBody: 'Esto reiniciará tu partida actual en curso.',
@@ -520,10 +522,11 @@ const SS_STR = {
     // les drapeaux de la frontière (v0.77.0)
     flagTitle: 'TON DRAPEAU', flagStands: 'ton drapeau flotte au niveau %1',
     flagJars: 'LA COULEUR DU DRAPEAU', flagJarsHint: 'touche un pot — ton drapeau se repeint dans tous les cieux',
-    flagPass: '✦ tu as dépassé le drapeau de %1 ✦', flagPassMore: '✦ tu as dépassé le drapeau de %1 · +%2 de plus ✦',
-    flagPassSub: 'son ascension s\'est arrêtée ici · niveau %1',
     flagFront: '✦ LA FRONTIÈRE EST À TOI ✦', flagFrontSub: 'ton drapeau flotte au-dessus de celui de %1 · niveau %2',
     flagAt: 'son drapeau · niveau %1',
+    // the level gate (v0.115.0)
+    gateLevel: 'NIVEAU', gateTap: 'touche pour affronter le ciel',
+    gateMore: '+%1 de plus ont fini ici cette semaine',
     lbAllTime: 'le registre sans fin · chaque ascension retenue', lbHardTime: 'le registre de braise · chaque victoire difficile retenue',
     mapTitle: 'LE CIEL DE LA CAMPAGNE', mapHint: 'touchez la constellation qui brille pour commencer', mapDest: 'fin du voyage',
     restartTitle: 'RECOMMENCER VOTRE PARTIE ?', restartBody: 'Votre partie en cours sera recommencée depuis le début.',
@@ -762,10 +765,11 @@ const SS_STR = {
     // as bandeiras da fronteira (v0.77.0)
     flagTitle: 'SUA BANDEIRA', flagStands: 'sua bandeira tremula no nível %1',
     flagJars: 'A COR DA SUA BANDEIRA', flagJarsHint: 'toque um pote — sua bandeira se repinta em todos os céus',
-    flagPass: '✦ você passou a bandeira de %1 ✦', flagPassMore: '✦ você passou a bandeira de %1 · +%2 mais ✦',
-    flagPassSub: 'a subida deles terminou aqui · nível %1',
     flagFront: '✦ A FRONTEIRA É SUA ✦', flagFrontSub: 'sua bandeira tremula acima da de %1 · nível %2',
     flagAt: 'a bandeira deles · nível %1',
+    // the level gate (v0.115.0)
+    gateLevel: 'NÍVEL', gateTap: 'toque para encarar o céu',
+    gateMore: '+%1 mais terminaram aqui esta semana',
     lbAllTime: 'o registro sem fim · cada subida guardada', lbHardTime: 'o registro de brasas · cada vitória difícil guardada',
     mapTitle: 'O CÉU DA CAMPANHA', mapHint: 'toque na constelação brilhante para começar', mapDest: 'fim da jornada',
     restartTitle: 'REINICIAR SEU JOGO?', restartBody: 'Isso reiniciará seu jogo atual em andamento.',
@@ -1004,10 +1008,11 @@ const SS_STR = {
     // die Grenzflaggen (v0.77.0)
     flagTitle: 'DEINE FLAGGE', flagStands: 'deine Flagge steht auf Stufe %1',
     flagJars: 'DIE FARBE DEINER FLAGGE', flagJarsHint: 'tippe ein Glas an — deine Flagge wird überall neu bemalt',
-    flagPass: '✦ du hast die Flagge von %1 passiert ✦', flagPassMore: '✦ du hast die Flagge von %1 passiert · +%2 weitere ✦',
-    flagPassSub: 'ihr Aufstieg endete hier · Stufe %1',
     flagFront: '✦ DIE GRENZE GEHÖRT DIR ✦', flagFrontSub: 'deine Flagge weht nun über der von %1 · Stufe %2',
     flagAt: 'ihre Flagge · Stufe %1',
+    // the level gate (v0.115.0)
+    gateLevel: 'STUFE', gateTap: 'tippe und stell dich dem Himmel',
+    gateMore: '+%1 weitere endeten hier diese Woche',
     lbAllTime: 'das endlose Register · jeder Aufstieg bleibt', lbHardTime: 'das Glut-Register · jeder schwere Sieg bleibt',
     mapTitle: 'DER KAMPAGNENHIMMEL', mapHint: 'tippe auf das leuchtende Sternbild, um zu beginnen', mapDest: 'Ende der Reise',
     restartTitle: 'SPIEL NEU STARTEN?', restartBody: 'Dein laufendes Spiel wird damit neu gestartet.',
