@@ -12,10 +12,15 @@
 // re-showing LEVEL N — THE CLEAR GATE (v0.116.0, Skylar 10/9: "we don't need
 // the grayed-out blocked letters … the player's health … the Endless Sky at
 // the top … the Cast and Scribe button"): the board, the beast's own
-// furniture AND the HUD all go dark — only the score, the sigil dock and the
-// back arrow stay beside the card — and a gate left untapped for ~1s fades in
-// "tap to continue" (every gate; a tap before that never sees it); LEVEL N
-// condenses in gold
+// furniture AND the HUD all go dark — only the score and the back arrow stay
+// beside the card (THE BARE GATE, v0.117.0, Skylar later that day: "we can
+// remove the sigil docket button on the top right, and there's a small sign
+// above that that should be removed. I think it should just be a clean
+// screen" — the dock and the birth-sign glyph sink with the rest, and the
+// score the card stands over is the LIVE run score, stamped at the deal: his
+// LEVEL 5 shot read the label's birth "0" over a resumed climb) — and a gate
+// left untapped for ~1s fades in "tap to continue" (every gate; a tap before
+// that never sees it); LEVEL N condenses in gold
 // letterpress; the week's flags rise around it as two mirrored hands of five
 // (SS_GATE_SLOTS: ranks alternate right/left, inner tallest+highest, leans AS
 // MOCKED; left hand = the baked flagL-<colour> texture, name/roundel never
@@ -65,9 +70,17 @@ ok('the removal seam is the ?gate=0 door (the ?ride=0 precedent)',
   /if \(QS\.get\('gate'\) === '0'\) \{ this\.startFight\(\); return; \}/.test(src.game));
 // THE CLEAR GATE (v0.116.0): the HUD sinks with the board, every piece handed back at startFight
 ok('the clear gate: gateHud rides gateSink to alpha 0 and startFight hands every piece back',
-  /gateHud\(\) \{/.test(src.game) && /\.concat\(this\.gateBeastFurniture\(\), this\.gateHud\(\)\)/.test(src.game) &&
+  /gateHud\(\) \{/.test(src.game) && /\.concat\(this\.gateBeastFurniture\(\), this\.gateHud\(\), this\.signGlow/.test(src.game) &&
   /const hud = this\.gateHud\(\);/.test(src.game) && /hud\.forEach\(\(o\) => o\.setAlpha\(1\)\);/.test(src.game) &&
   /this\.headT\.setAlpha\(0\.9\);/.test(src.game));
+// THE BARE GATE (v0.117.0): the dock + the sign glyph ride the same census, the
+// ember sinks beside them, the card's score is stamped live at the deal, and
+// the tally count never goes stale across runs (the stale-ref law)
+ok('the bare gate: dockC + signG ride gateHud, signGlow sinks with gateSink, showGate stamps runScore() at the deal, create zeroes scoreAnim',
+  /this\.hintB, this\.hintT,\s+this\.dockC, this\.signG\]\.filter\(Boolean\);/.test(src.game) &&
+  /this\.gateHud\(\), this\.signGlow \? \[this\.signGlow\] : \[\]\)/.test(src.game) &&
+  /this\.headT\.setText\(this\.modeTitle\(\)\);[^\n]*\n(?:\s*\/\/[^\n]*\n)+\s*if \(!this\.scoreAnim\) this\.scoreT\.setText\(String\(this\.runScore\(\)\)\);/.test(src.game) &&
+  /this\.scoreAnim = 0;/.test(src.game) && /this\.signG = null; this\.signGlow = null;/.test(src.game));
 ok('the hint is per-gate after SS_GATE_HINT_MS = 1000 (the first-of-session latch retired) and reads "tap to continue"',
   /const SS_GATE_HINT_MS = 1000;/.test(src.game) && !/SS_GATE_HINTED/.test(src.game) &&
   /this\.time\.delayedCall\(SS_GATE_HINT_MS,/.test(src.game) && /c\.__hint = hint;/.test(src.game) &&
@@ -222,15 +235,19 @@ ok('sky blocked (local net)', await ev(`SSNET.mode`) === 'local', await ev(`SSNE
 let g = await evj(GATEBEA);
 ok("'gate' MEANS settled-and-tappable, the beacon shown once, level 1", g.level === 1 && g.shown === 1 && await ev(`${B}.state === 'gate'`), JSON.stringify(g));
 // THE CLEAR GATE: nothing under the card but the score, the dock and the back arrow
-const HUD_DARK = `(() => { const b = ${B}; return [b.headT, ...b.pips, b.youT, b.hpTrough, b.hpBar, b.hpT, b.castB, b.castT, b.scryB, b.scryT, ...b.scryPips, b.hintB, b.hintT].every((o) => o && o.alpha === 0) })()`;
-const HUD_KEPT = `(() => { const b = ${B}; return b.scoreT.alpha === 1 && b.scoreT.visible && b.dockC.visible && b.dockC.alpha === 1 && b.homeB.alpha === 1 && b.homeB.visible })()`;
-const HUD_BACK = `(() => { const b = ${B}; return b.headT.alpha === 0.9 && b.pips.every((p) => p.alpha === 1) && [b.youT, b.hpTrough, b.hpBar, b.hpT, b.scryB, b.scryT, b.hintB, b.hintT].every((o) => o.alpha === 1) && b.castB.alpha > 0.4 && b.castT.alpha > 0.4 && b.scryPips.every((p) => p.alpha > 0) })()`;
+// THE BARE GATE (v0.117.0): the dock rides the dark census, the sign's glyph
+// + ember with it (both stand only under a sign); what stays is the score + ‹
+const HUD_DARK = `(() => { const b = ${B}; return [b.headT, ...b.pips, b.youT, b.hpTrough, b.hpBar, b.hpT, b.castB, b.castT, b.scryB, b.scryT, ...b.scryPips, b.hintB, b.hintT, b.dockC].every((o) => o && o.alpha === 0) && (!b.signG || b.signG.alpha === 0) && (!b.signGlow || b.signGlow.alpha === 0) })()`;
+const HUD_KEPT = `(() => { const b = ${B}; return b.scoreT.alpha === 1 && b.scoreT.visible && b.homeB.alpha === 1 && b.homeB.visible })()`;
+const HUD_BACK = `(() => { const b = ${B}; return b.headT.alpha === 0.9 && b.pips.every((p) => p.alpha === 1) && [b.youT, b.hpTrough, b.hpBar, b.hpT, b.scryB, b.scryT, b.hintB, b.hintT, b.dockC].every((o) => o.alpha === 1) && (!b.signG || b.signG.alpha === 1) && b.castB.alpha > 0.4 && b.castT.alpha > 0.4 && b.scryPips.every((p) => p.alpha > 0) })()`;
 const HINT = `(() => { const c = ${B}.gateC; return c && c.__hint ? c.__hint.alpha : -1 })()`;
 ok('no letters under the card: the board + word-line went fully dark (was a tenth)', await ev(`${B}.boardC.alpha === 0 && ${B}.lineC.alpha === 0`));
 ok('the beast\'s own furniture went dark (bar, title, hint)', await ev(`${B}.ehpC.alpha === 0 && ${B}.beastTitle.alpha === 0 && ${B}.lineHint.alpha === 0`));
-ok('the header line + its pips, the YOU row and the CAST/SCRY row hid with it', await ev(HUD_DARK));
-ok('the score, the sigil dock and the back arrow stay beside the card (the header still names the level for its return)',
+ok('the header line + its pips, the YOU row, the CAST/SCRY row AND the sigil dock hid with it (the bare gate)', await ev(HUD_DARK));
+ok('only the score and the back arrow stay beside the card (the header still names the level for its return)',
   await ev(HUD_KEPT) && await ev(`${B}.headT.text === SS_T('endlessTitle') + ' · ' + SS_T('endLvl', 1)`));
+ok('a FRESH climb\'s gate reads a truthful zero — the label equals runScore(), and nothing has scored yet',
+  await ev(`${B}.scoreT.text === String(${B}.runScore()) && ${B}.runScore() === 0`), await ev(`${B}.scoreT.text`));
 ok('nothing in the whole card is interactive but the one sky zone', await ev(`(() => { let n = 0; const scan = (ls) => ls.forEach((o) => { if (o.input && o.input.enabled && o.type !== 'Zone') n++; if (o.list) scan(o.list); }); scan(${B}.gateC.list); return n })()`) === 0);
 ok('the sky zone fires on the UP (the mapZone contract), honoring the 8u drag', await ev(`!!${B}.gateZone && ${B}.gateZone.type === 'Zone'`));
 await shot('gate-entry-l1');
@@ -243,7 +260,7 @@ await shot('gate-entry-l1-hint');
 await ev(`${B}.gateZone.emit('pointerdown'); 'ok'`);
 ok('a tap enters the fight (pick, board dealt)', await until(PICK, 20000));
 ok('the board rose back to full, the gate was swept', await ev(`${B}.boardC.alpha === 1 && !${B}.gateC`));
-ok('every hidden piece came back: header 0.9, pips, the YOU row, CAST on its own validity alpha, SCRY, the eye', await ev(HUD_BACK));
+ok('every hidden piece came back: header 0.9, pips, the YOU row, CAST on its own validity alpha, SCRY, the eye, the dock', await ev(HUD_BACK));
 let gt = await evj(GATEBEA);
 ok('the beacon counted the tap', (gt.taps | 0) >= 1, JSON.stringify(gt));
 // a gate tapped inside its first second never shows the hint: deal one and
@@ -303,8 +320,8 @@ await shot('gate-overflow-l12');
 // a genuine empty rung — not a frontier (a no-rows rung ABOVE the max is gold,
 // not quiet); and it must not latch ffront before the frontier test below
 console.log('— THE EMPTY RUNG (the quiet card) —');
-// a held sigil so the dock stands at this gate (Skylar's own LEVEL 5 shot had
-// one) — COMET also prints scry pips, which the clear gate must hide too
+// a held sigil so the dock has something to hide at this gate (Skylar's own
+// LEVEL 5 shot had one) — COMET also prints scry pips, which hide with SCRY
 await ev(`(() => { const b = ${B}; b.run.sigils = ['comet']; b.refreshDock(); return 'ok' })()`);
 ok('level 5 stands the numeral alone', await gateAt(5));
 await sleep(700);
@@ -312,7 +329,7 @@ g = await evj(GATEBEA);
 fan = await evj(FAN);
 ok('no flag stands, no ledger, no apology, no frontier — the quiet IS the message',
   g.drawn === 0 && fan.length === 0 && (g.more | 0) === 0 && g.front === false, JSON.stringify(g));
-ok('the sigil dock stands beside the clear card; the comet\'s scry pips hid with the SCRY button', await ev(HUD_KEPT) && await ev(HUD_DARK) && await ev(`${B}.scryPips.length > 0 && ${B}.dockC.list.length > 0`));
+ok('a HELD sigil\'s dock hides under the bare card; the comet\'s scry pips hid with the SCRY button', await ev(HUD_KEPT) && await ev(HUD_DARK) && await ev(`${B}.scryPips.length > 0 && ${B}.dockC.list.length > 0 && ${B}.dockC.alpha === 0`));
 await sleep(900);   // ≥1s in: the hint stands on this gate too
 ok('"tap to continue" stands on this gate too (every gate, not the first alone)', await until(`${HINT} > 0.85`, 4000, 100), 'alpha ' + await ev(HINT));
 await shot('gate-empty-l5');
@@ -379,6 +396,27 @@ await ev(`(() => { const b = ${B}; b.run.fightIdx = 1; b.showGate(); return 'ok'
 await until(GATE, 20000);
 await sleep(800);
 ok('a stale weekKey refetches at the next gate (back to the live week)', await ev(`${B}.flagWeek`) === wkNow, await ev(`${B}.flagWeek`));
+
+/* ================= 10b. the resumed climb (THE BARE GATE's truthful score) ================= */
+// Skylar's 10/9 LEVEL 5 shot read "0" over a live climb: the label is born
+// '0' in buildUi and only updateBars (first run from startFight) ever stamped
+// it — the gate stood before that. A checkpoint at level 5 with 300 damage, a
+// four-letter longest word and four fells carries 300 + 4·15 + 4·50 = 560,
+// under a sign (LEO) so the glyph stands to be hidden, with a held sigil so
+// the dock stands to be hidden.
+console.log('— THE RESUMED CLIMB (the bare gate: truthful score, no dock, no sign) —');
+await boot('endless=1', `localStorage.setItem('beta3.endless', JSON.stringify({ fightIdx: 4, eseed: 4242, hp: 40, hpMax: 50, sigils: ['comet'], tiers: {}, words: 9, longest: 'MOTH', totalDmg: 300, scried: false, featherUsed: false, letters: 30, bigHit: 60, playMs: 90000, clockV: 2 })); localStorage.setItem('beta3.endsign', 'leo');`);
+ok('the resumed climb re-shows its LEVEL 5 gate', await until(`${GATE} && (window.__ssgate||{}).level === 5`, 60000), await ev(`${B} ? ${B}.state + ' L' + (${B}.run.fightIdx + 1) : 'no battle'`));
+ok('the run carried its score: runScore() = 560 (300 dmg + MOTH·15 + 4 fells·50)', await ev(`${B}.runScore()`) === 560, await ev(`${B}.runScore()`));
+ok('THE SCORE ON THE GATE IS THE LIVE RUN SCORE — the label reads 560, not the birth 0', await ev(`${B}.scoreT.text === '560' && ${B}.scoreT.text === String(${B}.runScore())`), await ev(`${B}.scoreT.text`));
+ok('the sign\'s glyph (LEO) stands under the score — and hides under the bare gate, its ember with it', await ev(`${B}.sign === 'leo' && !!${B}.signG && ${B}.signG.alpha === 0 && ${B}.signGlow.alpha === 0`));
+ok('the held sigil\'s dock hides too; only the score and ‹ stay', await ev(`${B}.dockC.list.length > 0 && ${B}.dockC.alpha === 0`) && await ev(HUD_KEPT) && await ev(HUD_DARK));
+await sleep(1600);   // the hint lands — the shot shows the whole bare card
+await shot('gate-resume-l5');
+await ev(`${B}.gateZone.emit('pointerdown'); 'ok'`);
+ok('the tap enters level 5', await until(PICK, 20000));
+ok('the dock and the glyph came back with the rest (the ember by its own law: dark for a non-VIRGO sign)', await ev(HUD_BACK) && await ev(`${B}.dockC.alpha === 1 && ${B}.signG.alpha === 1 && ${B}.signGlow.alpha === 0`));
+ok('the score still tells the truth after the rise', await ev(`${B}.scoreT.text === String(${B}.runScore())`), await ev(`${B}.scoreT.text + ' vs ' + ${B}.runScore()`));
 
 /* ================= 11. the spanish dress ================= */
 console.log('— THE SPANISH DRESS —');

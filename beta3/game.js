@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.116.0';
+const BUILD = 'STARSPELL v0.117.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -8804,6 +8804,8 @@ class Battle extends Phaser.Scene {
     this.skyAsh = [];    // THE ASHEN BOARD's cooling cells (v0.110.0) — markers by slot, empty under every other sky
     this.pending = [];   // bonus tiles owed to the next empty slots (forge drops, GILDED DAWN's start)
     this.gateC = null; this.gateZone = null;   // the level gate's card (scene instances persist across restarts — stale-ref law)
+    this.signG = null; this.signGlow = null;   // the birth sign's glyph + ember — rebuilt below only under a sign (the gate's census reads them)
+    this.scoreAnim = 0;   // a tally still in flight when the last battle left died with its tween — its count must never mute this run's score
     SS.prof.runs++; SS.save();
 
     const tState = performance.now();
@@ -10058,8 +10060,10 @@ class Battle extends Phaser.Scene {
     // gate sank is restored to full here (beastNameI was rebuilt fresh above;
     // the deal hint keeps its own 0.9 rest alpha). THE CLEAR GATE (v0.116.0)
     // hands the HUD back the same way — the header to its 0.9 rest, the rest
-    // to full; layoutLine below re-judges the cast button's own alpha and
-    // the tome's eye is re-lit by its own law a few lines down
+    // to full (THE BARE GATE's dock + sign glyph among them, v0.117.0; the
+    // sign's ember came back by its own law at the wake above); layoutLine
+    // below re-judges the cast button's own alpha and the tome's eye is
+    // re-lit by its own law a few lines down
     const rise = [this.boardC, this.lineC, this.beastC, this.beastTitle, this.ehpC, this.strikeT];
     const hud = this.gateHud();
     this.tweens.killTweensOf(rise.concat(this.lineHint, hud));
@@ -10742,11 +10746,16 @@ class Battle extends Phaser.Scene {
      sigil offer leads and the gate follows (verdict 6 — afterSigil IS the
      gate's door).
      THE CLEAR GATE (v0.116.0, Skylar 10/9): while the card stands the
-     sky shows ONLY the score, the sigil dock and the back arrow beside
-     the card — the board's letters, the YOU row, the header line with
-     its pips and the CAST/SCRY row all hide (gateHud), and every one of
-     them returns at startFight. An untapped gate fades in "tap to
-     continue" after SS_GATE_HINT_MS; a tap before that never sees it.
+     sky shows ONLY the score and the back arrow beside the card — the
+     board's letters, the YOU row, the header line with its pips and the
+     CAST/SCRY row all hide (gateHud), and every one of them returns at
+     startFight. An untapped gate fades in "tap to continue" after
+     SS_GATE_HINT_MS; a tap before that never sees it. THE BARE GATE
+     (v0.117.0, Skylar later that day: "it should just be a clean
+     screen") sinks the sigil dock and the birth-sign glyph too, and the
+     score the card stands over is stamped from runScore() the moment the
+     gate deals — a resumed climb's card used to read the label's birth
+     '0' until the first fight's updateBars reached it.
      THE STATE LAW (the v0.80 'map' law): 'gate' MEANS settled-and-
      tappable; the entrance and exit run under 'anim'. After a 300ms
      residue guard a tap mid-entrance snaps every tween to the settled
@@ -10791,16 +10800,21 @@ class Battle extends Phaser.Scene {
   }
   // the HUD the gate hides: the header line with its level pips, the YOU
   // row (label · trough · fill · counter), the CAST / SCRY row with the
-  // comet pips and the tome's eye. NOT here, by Skylar's word: scoreT (+ the
-  // birth sign beside it), dockC, homeB — the sky keeps those while the
-  // card stands. startFight hands every one of these back (the cast button
-  // through layoutLine's own validity alpha, the eye through its tome law).
+  // comet pips and the tome's eye — and, since THE BARE GATE (v0.117.0,
+  // Skylar 10/9: "it should just be a clean screen"), the sigil dock and
+  // the birth-sign glyph that kept watch under the score. What stays, by
+  // his word: scoreT and homeB alone. startFight hands every one of these
+  // back to full (the cast button through layoutLine's own validity alpha,
+  // the eye through its tome law). The sign's ember (signGlow) is NOT
+  // listed: gateSink sinks it with the rest, but it returns by its own law
+  // (updateSignGlow at the fight's wake), never to a flat 1.
   gateHud() {
     return [this.headT, ...this.pips, this.youT, this.hpTrough, this.hpBar, this.hpT,
-      this.castB, this.castT, this.scryB, this.scryT, ...(this.scryPips || []), this.hintB, this.hintT].filter(Boolean);
+      this.castB, this.castT, this.scryB, this.scryT, ...(this.scryPips || []), this.hintB, this.hintT,
+      this.dockC, this.signG].filter(Boolean);
   }
   gateSink(dur) {
-    const dark = [this.boardC, this.lineC].concat(this.gateBeastFurniture(), this.gateHud());
+    const dark = [this.boardC, this.lineC].concat(this.gateBeastFurniture(), this.gateHud(), this.signGlow ? [this.signGlow] : []);
     this.tweens.killTweensOf(dark);
     this.tweens.add({ targets: dark, alpha: 0, duration: dur });
   }
@@ -10816,9 +10830,16 @@ class Battle extends Phaser.Scene {
     // mid-gate (the late read rises into the standing card)
     if (this.flagWeek && this.flagWeek !== SSNET.weekKey()) { this.flagRows = null; this.fetchWeekFlags(); }
     this.headT.setText(this.modeTitle());   // right for the moment it returns (startFight re-stamps it too)
+    // THE BARE GATE (v0.117.0): the score on the card is the LIVE cumulative
+    // run score. The label is born reading '0' in buildUi and only updateBars
+    // (first run from startFight) ever stamped it, so a RESUMED climb's gate
+    // stood with a zero over a level-5 run (Skylar's 10/9 shot) until the
+    // tap. A tally still in flight (scoreAnim) owns the counter and lands on
+    // runScore() itself, so it is left alone.
+    if (!this.scoreAnim) this.scoreT.setText(String(this.runScore()));
     // THE CLEAR GATE: the board, the beast's furniture and the HUD all go
-    // dark — only the score, the sigil dock and the back arrow (which still
-    // abandons mid-climb) stay beside the card
+    // dark — only the score and the back arrow (which still abandons
+    // mid-climb) stay beside the card
     this.gateSink(300);
     const front = this.gateFront();
     if (front) { this.run.ffront = true; this.saveCheckpoint(); }   // spent the moment it rings — a resume never re-rings

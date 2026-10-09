@@ -314,3 +314,39 @@ What changed on the shipped gate (§2's Dress + Hint lines are superseded):
 - Beacon `window.__ssgate.hints` counts hint landings; gate-check grew the
   clear-gate section (HUD dark / kept / back, the hint law both ways, the dock
   standing at an empty rung with a held sigil).
+
+## §12 · 2026-10-09 refinement — THE BARE GATE (v0.117.0, BUILT)
+
+**Skylar (Skylar's console), 2026-10-09 ~11:45 AM, verbatim (voice-dictated),
+off his own v0.116.0 LEVEL 5 phone shot:** "in the attached image, the number on
+the top right of the screen says 0. Shouldn't that be the cumulative amount of
+points that you scored in the endless run, or is that only the points for the
+current round? I'm just curious. Also, we can remove the sigil docket button on
+the top right, and there's a small sign above that that should be removed. I
+think it should just be a clean screen."
+
+What changed on the shipped gate (§11's "what stays" line is superseded — his
+newer word wins over the morning's "the Sidewall docket … can stay there"):
+- **Dress**: the sigil dock (`dockC`) and the birth-sign glyph that kept watch
+  under the score (`signG`, with its VIRGO ember `signGlow`) now ride the same
+  `gateHud` census and sink to alpha 0 with everything else. What stays beside
+  the card: the score and the back arrow alone. `startFight` hands the dock and
+  the glyph back to full with the rest; the ember comes back by its own law
+  (`updateSignGlow` at the fight's wake), never to a flat 1.
+- **The score tells the truth**: `runScore()` was always cumulative
+  (totalDmg + longest·15 + fightIdx·50). The "0" was the LABEL, not the run: the
+  score label is born reading '0' in buildUi and only `updateBars` (first run
+  from `startFight`) ever stamped it — and the gate stands BEFORE startFight, so
+  a RESUMED climb's card (create → buildUi → showGate) stood over the birth zero
+  until the tap. `showGate` now stamps the label from `runScore()` at the deal
+  (a tally still in flight owns the counter and lands on runScore() itself).
+  `create` also zeroes `scoreAnim` and nulls `signG`/`signGlow` under the
+  stale-ref law (scene instances persist across restarts). A FRESH climb's
+  level-1 gate reads a truthful 0 — nothing has scored yet.
+- The gate now shows ONLY: ‹, the score, THE ENDLESS SKY / LEVEL / N (+ the
+  week's flags when any stand), and "tap to continue".
+- gate-check: HUD_DARK/HUD_KEPT/HUD_BACK re-aimed (dock dark, glyph dark, both
+  back on dismiss), the fresh gate's truthful zero, a HELD sigil's dock hidden
+  at the empty rung, and a NEW resumed-climb section (checkpoint at level 5
+  carrying 560 under LEO with a held COMET: the card reads 560, dock + glyph
+  hidden, both back after the tap, label still equal to runScore()).
