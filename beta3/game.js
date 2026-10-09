@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.113.0';
+const BUILD = 'STARSPELL v0.114.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -4655,6 +4655,39 @@ function ssClearCampaign() {
   localStorage.removeItem('beta3.camphard');
 }
 
+/* ---- THE KEPT HUNT (v0.114.0, Skylar 10/8) -------------------------------
+   "If you begin the hunt in the daily and close out of the hunt you should be
+   able to continue where you left off … It'll only refresh to the first turn
+   if … the new sky refreshes to a new daily."
+   A Daily Hunt run that is left unfinished — back to the sheet, back to the
+   meadow, or the browser closed outright — is kept whole in its own store
+   (board, fuse, strikes, score, found words, every sign/sigil counter) and
+   resumes EXACTLY where it stood. The kept run is keyed to the daily's own
+   identity — the UTC day AND the tongue it was dealt in, which together ARE
+   the seed (dayKey ^ ssPackSeed) — so a run saved against one sky can never
+   resume into a new one: a rolled-over daily is read as stale and discarded
+   to a fresh first turn. endRun clears it (a finished daily stays finished),
+   and any malformed or version-stale save is discarded silently — never a
+   crash, never a wrong board. Daily only; the other modes keep their own
+   stores untouched. */
+const SS_DAILYRUN_V = 1;
+const SS_DAILYRUN_KEY = 'beta3.dailyrun';
+function ssDailyRun() {
+  try {
+    const raw = localStorage.getItem(SS_DAILYRUN_KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    if (!s || s.v !== SS_DAILYRUN_V) return null;          // a build moved the schema on
+    if (s.day !== SSNET.dayKey()) return null;             // a NEW sky — fresh first turn
+    if (s.lang !== ssGameLang()) return null;              // dealt in another tongue (its own seed)
+    if (!s.run || typeof s.run.fightIdx !== 'number' || !(s.run.fightIdx >= 0)) return null;
+    if (!s.beast || typeof s.beast.hpNow !== 'number') return null;
+    if (!Array.isArray(s.board) || s.board.length !== 16) return null;
+    return s;
+  } catch (e) { return null; }                             // malformed → fresh, never a crash
+}
+function ssClearDailyRun() { try { localStorage.removeItem(SS_DAILYRUN_KEY); } catch (e) { } }
+
 /* ---- the endless ladder (v0.68.0) ----------------------------------------
    Levels built as fights, n at a time, from ONE seeded stream consumed in
    level order — so ssEndlessFights(seed, 400) and (seed, 800) agree on their
@@ -7687,6 +7720,10 @@ class Home extends Phaser.Scene {
        so one line, two or none all read as composed. The lantern lines keep
        their own words and their tap into the lantern sheet. */
     const played = SS.prof.daily[String(SSNET.dayKey())] | 0;
+    // THE KEPT HUNT (v0.114.0): a hunt left unfinished tonight waits to be
+    // resumed — the door below says CONTINUE instead of BEGIN/HUNT AGAIN, and
+    // PLAY rides straight back into the standing position.
+    const kept = !!ssDailyRun();
     const sState = ssStreakState();
     const streak = sState.n;
     const stand = [];
@@ -7747,7 +7784,7 @@ class Home extends Phaser.Scene {
 
     // the big door: PLAY — closes the sheet and rides the ascent
     const pb = this.add.image(l.x(0), py(548), ssBtn(this, false, 260, 58)).setDisplaySize(l.u(260), l.u(58)).setInteractive({ useHandCursor: true });
-    const pbT = ssTxt(this, l.x(0), py(548), played ? SS_T('dpAgain') : SS_T('dpPlay'), l.u(17), BTN_INK()).setOrigin(0.5);
+    const pbT = ssTxt(this, l.x(0), py(548), SS_T(kept ? 'dpResume' : played ? 'dpAgain' : 'dpPlay'), l.u(17), BTN_INK()).setOrigin(0.5);
     items.push(pb, pbT);
     pb.on('pointerover', () => pb.setScale(pb.scaleX * 1.03, pb.scaleY * 1.03));
     pb.on('pointerout', () => pb.setDisplaySize(l.u(260), l.u(58)));
@@ -8335,9 +8372,13 @@ class Home extends Phaser.Scene {
     SFX.ui();
     const resume = mode === 'campaign' ? this.campaignCheckpoint()
       : mode === 'endless' ? this.endlessCheckpoint() : null;
+    // THE KEPT HUNT (v0.114.0): the daily carries its own resume — the whole
+    // mid-hunt position, or null for a fresh first turn (stale/new-sky saves
+    // read as null). It rides beside `resume` and never touches it.
+    const dailyResume = mode === 'daily' ? ssDailyRun() : null;
     // campaign's one door is the chart — the herald flag marks "a node was
     // clicked", and Battle heralds only when that node's beast is a boss
-    this.beginAscent({ mode, resume, ascended: true, herald: mode === 'campaign' ? 1 : 0 });
+    this.beginAscent({ mode, resume, dailyResume, ascended: true, herald: mode === 'campaign' ? 1 : 0 });
   }
 
   /* ---------- the rise (SKY-DESIGN §5) ---------- */
@@ -8520,6 +8561,11 @@ class Battle extends Phaser.Scene {
   constructor() { super('battle'); }
   init(data) {
     this.mode = data.mode || 'quick'; this.resume = data.resume || null; this.ascended = !!data.ascended; this.ftue = !!data.ftue;
+    // THE KEPT HUNT (v0.114.0): the daily's own resume — the whole position a
+    // closed hunt left standing. Null on a fresh run (and on every other
+    // mode). startFight consumes it ONCE, for the fight the hunt was left on;
+    // a resize-restart mid-create re-passes the same data and restores again.
+    this.dresume = data.dailyResume || null;
     // the boss herald rides the chart door's data and is CONSUMED here: a
     // resize-restart mid-herald (or mid-fight) re-inits on the same data
     // object and falls straight to the battle — the beat never replays and
@@ -8650,6 +8696,11 @@ class Battle extends Phaser.Scene {
       });
       this.skyCursed = new Set();
     }
+    // THE KEPT HUNT: the letters already walked dark ride the save (the ladder
+    // above is rebuilt deterministically; only the live dark-set is state)
+    if (this.dresume && this.skyCursed && Array.isArray(this.dresume.cursed)) {
+      for (const ch of this.dresume.cursed) this.skyCursed.add(ch);
+    }
     this.sigPlan = ssSigilPlan(this.mode, this.fights, planSeed, this.hard);
     this.sigTypes = ssOfferTypes(this.mode, this.sigPlan, planSeed);
 
@@ -8667,6 +8718,10 @@ class Battle extends Phaser.Scene {
       // re-reads the ledger but never repeats a ceremony
       fpassLv: this.resume.fpassLv | 0, ffront: !!this.resume.ffront,
     } : { fightIdx: 0, hpMax: 50, hp: 50, sigils: [], words: 0, longest: '', totalDmg: 0, scried: false, featherUsed: false, letters: 0, bigHit: 0, playMs: 0, overkill: 0, tiers: {}, fpassLv: 0, ffront: false };
+    // THE KEPT HUNT: a resumed daily lays its saved run OVER the fresh defaults
+    // (missing fields keep their default, so an older save never throws); the
+    // mid-fight position itself is restored in startFight below.
+    if (this.dresume && this.dresume.run) Object.assign(this.run, this.dresume.run);
     this.clockLast = 0;   // the active-play heartbeat's last stamp — 0 until the first update ticks
     this.run.firstUsed = false;
     // the birth sign — the campaign's and the endless climb's, each pinned
@@ -8687,7 +8742,9 @@ class Battle extends Phaser.Scene {
     // refreshed per battle at startFight; a borrowed sign holds the guest
     // level for the whole run (never the player's own ladder)
     this.signLv = this.signBorrowed ? SS_SKY_SIGN_LV : ssSignLv(this.sign);
-    if (this.sign && !this.resume) {
+    // a resumed daily (dresume) already baked the vessel into its saved hpMax —
+    // the fresh-start grant below is a fight-start-once gift, never re-paid
+    if (this.sign && !this.resume && !this.dresume) {
       // what lands once at a fresh climb's start and rides the checkpoint's
       // hpMax: the reward table's vessel rows (every sign) and TAURUS's own
       // endurance at its level — the bull takes both
@@ -8818,8 +8875,29 @@ class Battle extends Phaser.Scene {
      where it began — the minutes spent on the abandoned attempt were
      played, and they count. */
   clockPersist() {
+    if (this.state === 'end' || !this.run) return;
+    // THE KEPT HUNT (v0.114.0): a daily folds its honest minutes into the kept
+    // run the same way — only playMs moves, so the standing board/beast keep
+    // the last clean 'pick' they were saved at (a blur mid-animation never
+    // overwrites the position with a transient).
+    if (this.mode === 'daily') {
+      // a clean 'pick' at the moment of leaving is the truest keep — the whole
+      // position WITH the strike clock as it stands (Saturday's fuse part-run).
+      // dailySave self-guards a live beast; mid-animation we keep the last
+      // clean save and only fold the honest minutes onto it.
+      if (this.state === 'pick' && !this.dying && this.beast && (this.beast.hpNow | 0) > 0) { this.dailySave(); return; }
+      try {
+        const raw = localStorage.getItem(SS_DAILYRUN_KEY);
+        if (!raw) return;
+        const s = JSON.parse(raw);
+        if (!s || !s.run || s.day !== SSNET.dayKey()) return;
+        s.run.playMs = this.run.playMs | 0;
+        localStorage.setItem(SS_DAILYRUN_KEY, JSON.stringify(s));
+      } catch (e) { }
+      return;
+    }
     const key = this.mode === 'campaign' ? 'beta3.campaign' : this.mode === 'endless' ? 'beta3.endless' : null;
-    if (!key || this.state === 'end' || !this.run) return;
+    if (!key) return;
     try {
       const raw = localStorage.getItem(key);
       if (!raw) return;
@@ -9251,15 +9329,17 @@ class Battle extends Phaser.Scene {
       this.spawnTile(i, ch, tier, initial);
     }
   }
-  spawnTile(i, ch, tier, initial) {
+  spawnTile(i, ch, tier, initial, forceBlk) {
     const l = this.L, p = this.slotPos(i);
     /* THE DYING NAMES (v0.110.0): a cursed letter is BORN dark — the void
        face, the pale letter, the flat 0 — and keeps dealing: dead weight
        the hunt routes around. It rides the standing blk law whole, so
        wordDamage pays nothing, the dew refuses the cell, the boss's own
        volley passes over it, and the chip's 0 tells the truth at a
-       glance. Dark wins from birth: no tier, no leaf, no glow. */
-    const cursed = !!(this.skyCursed && this.skyCursed.has(ch));
+       glance. Dark wins from birth: no tier, no leaf, no glow.
+       `forceBlk` (v0.114.0) births a dark tile the dying-names set doesn't
+       own — THE KEPT HUNT re-laying a blackout-inked cell on resume. */
+    const cursed = !!forceBlk || !!(this.skyCursed && this.skyCursed.has(ch));
     if (cursed) tier = 0;
     const c = this.add.container(p.x, p.y - (initial ? l.u(500) + i * l.u(14) : l.u(420)));
     const img = this.add.image(0, 0, cursed ? 'tileblk' : 'tile' + tier).setDisplaySize(this.tileSize, this.tileSize);
@@ -9316,6 +9396,28 @@ class Battle extends Phaser.Scene {
       this.tweens.add({ targets: a, alpha: 0, duration: 260, onComplete: () => { if (a.active) a.destroy(); } });
     }
     this.skyAsh = [];
+  }
+  /* THE KEPT HUNT (v0.114.0): re-lay a resumed daily's exact board instead of
+     dealing fresh. Each saved slot is re-spawned at its own letter · tier ·
+     ink (a dark cell via forceBlk, which covers both the dying-names curse and
+     a boss's blackout); a slot the hunt had left EMPTY is re-dressed as ash
+     where the save marked one (the Ashen Board), else simply left open. No
+     rng() is drawn here — the letters are the saved ones — so the daily's
+     shared seeded stream is untouched for every refill, dew and offer still to
+     come, continuing exactly as uninterrupted play would. */
+  restoreBoard(R) {
+    const board = Array.isArray(R.board) ? R.board : [];
+    const ash = Array.isArray(R.ash) ? R.ash : [];
+    for (let i = 0; i < 16; i++) {
+      const t = board[i];
+      if (t && typeof t.ch === 'string') { this.spawnTile(i, t.ch, t.tier | 0, false, !!t.blk); }
+      else {
+        // an empty cell stays EXPLICITLY null — a dense board, exactly as live
+        // play keeps it (a hole would read differently to .map/.filter/.some)
+        this.board[i] = null;
+        if (ash[i]) this.skyAshSettle(i);
+      }
+    }
   }
   tileVal(ch, tier) { return (VALS[ch] || VALS[ch[0]] || 1) + (tier === 1 ? 6 : 0); }
   // what a held sigil adds to this letter (0 when none apply) — at the HELD
@@ -9382,6 +9484,11 @@ class Battle extends Phaser.Scene {
       s.val.setTexture(this.chipKey(s.ch, 3)).setDisplaySize(l.u(30), l.u(20));
     });
     window.__ssdew = { i, ch: s.ch, fight: this.run.fightIdx, t: Date.now() };   // verification beacon
+    // THE KEPT HUNT (v0.114.0): the dew gathers AFTER a strike settles — past
+    // the turn's own save — so re-keep the daily here, or a dew that bloomed
+    // since the last turn would be lost on resume. (The tile's worth is set
+    // synchronously above; the chip repaint 200ms on is cosmetic.)
+    if (this.mode === 'daily') this.dailySave();
     return i;
   }
 
@@ -9787,6 +9894,10 @@ class Battle extends Phaser.Scene {
   }
   startFight() {
     const l = this.L;
+    // THE KEPT HUNT (v0.114.0): a resumed daily restores THIS fight's exact
+    // standing position in place of a fresh deal. Consumed once — only the
+    // fight the hunt was left on; every fight after is dealt fresh.
+    const R = this.dresume; this.dresume = null;
     const f = this.fights[this.run.fightIdx];
     // the endless climb's rungs ring the moment they are REACHED (v0.68.0):
     // award() is idempotent, so a resumed climb settles up quietly
@@ -9800,7 +9911,9 @@ class Battle extends Phaser.Scene {
     // beast's fuse runs one cast longer under Wednesday's sky
     if (this.sky && this.sky.fuseAdd) this.beast.timer += this.sky.fuseAdd;
     this.beast.hpNow = this.beast.hp;
-    if ((this.run.overkill | 0) > 0) {                 // ECHO OF RUIN carries the surplus
+    // a restored fight's opening effects (ECHO's carve, the ram below) are
+    // already baked into the saved beast.hpNow — never re-paid on resume
+    if (!R && (this.run.overkill | 0) > 0) {           // ECHO OF RUIN carries the surplus
       const carve = Math.min(this.run.overkill | 0, this.beast.hp - 1);
       this.beast.hpNow -= carve;
       this.run.overkill = 0;
@@ -9820,7 +9933,7 @@ class Battle extends Phaser.Scene {
     this.purifyLeft = this.sign === 'virgo' ? this.signVal('charges') : 0;
     if (this.purifyArmed) this.setPurifyArmed(false);
     else this.updateSignGlow && this.updateSignGlow();
-    if (this.sign === 'aries') {                       // the opening ram
+    if (!R && this.sign === 'aries') {                 // the opening ram
       const ram = Math.min(this.signVal('ram'), this.beast.hpNow - 1);
       if (ram > 0) {
         this.beast.hpNow -= ram;
@@ -9849,6 +9962,26 @@ class Battle extends Phaser.Scene {
     // the strike clock re-arms with every battle (fight-start semantics,
     // derived never persisted — the cometLeft law); one truth, two flags
     if (this.strikeMs) { this.hardLeft = this.strikeMs; this.hardDraw(true); }
+    // THE KEPT HUNT: lay the saved mid-fight standing OVER the fresh setup —
+    // the wounded beast, the wound it has dealt you, the fuse mid-count, the
+    // strike clock part-drained, and every per-battle allowance spent so far.
+    // These replace the fight-start grants above, so the hunt resumes exactly
+    // as it stood rather than reopening the fight from the top.
+    if (R) {
+      this.beast.hpNow = R.beast.hpNow | 0;
+      this.beast.count = R.beast.count | 0;
+      this.ehpShown.v = this.beast.hpNow;
+      this.venom = R.venom | 0;
+      this.shellUsed = !!R.shellUsed;
+      this.watersLeft = R.watersLeft | 0;
+      this.purifyLeft = R.purifyLeft | 0;
+      this.shieldLeft = R.shieldLeft | 0;
+      this.hintsLeft = R.hintsLeft | 0;
+      this.cometLeft = R.cometLeft | 0;
+      this.struckThisBattle = !!R.struckThisBattle;
+      this.run.firstUsed = !!(R.run && R.run.firstUsed);
+      if (this.strikeMs) { this.hardLeft = R.hardLeft | 0; this.hardDraw(true); }
+    }
     this.clearHintFx();
     this.headT.setText(this.modeTitle());
     const pipBase = this.mode === 'campaign' || this.mode === 'endless' ? Math.floor(this.run.fightIdx / 5) * 5 : 0;
@@ -9892,12 +10025,20 @@ class Battle extends Phaser.Scene {
       const rg = ssSignRewards(this.sign, this.signLv).gilded | 0;
       for (let gi = 0; gi < rg; gi++) this.pending.push(1);
     }
-    this.fillBoard(true);
+    // THE KEPT HUNT: the saved owed-tiles ride over the fresh gifts (which a
+    // resumed fight already received), then the board is re-laid tile for tile
+    // — the exact stars, forges, dew, dark cells and ash the hunt left standing
+    if (R) { this.pending = Array.isArray(R.pending) ? R.pending.slice() : []; this.restoreBoard(R); }
+    else this.fillBoard(true);
     this.hintB.setVisible(this.hasSigil('tome')); this.hintT.setVisible(this.hasSigil('tome'));
     this.hintB.setAlpha(1); this.hintT.setAlpha(1);
     this.updateScryPips();
     this.updateBars();
     this.state = 'pick';
+    // THE KEPT HUNT: a fresh fight is a stable position worth keeping — so a
+    // hunt closed the instant a new beast assembles resumes on that beast, not
+    // the one just felled (the mid-fight saves ride every turn after)
+    if (this.mode === 'daily') this.dailySave();
   }
   updateBars() {
     const l = this.L;
@@ -10442,6 +10583,13 @@ class Battle extends Phaser.Scene {
      meadow can never repeat it — and a `pend` a resumed run carried in is
      said here too, at the first cast instead of the next meadow. */
   sigilMoment() {
+    // THE KEPT HUNT (v0.114.0): every turn settles back to the player through
+    // here (a cast resolved, a scry, a strike weathered) with state 'pick' and
+    // the board at rest — the one chokepoint every mid-fight beat shares, so
+    // it is where the daily keeps its standing position. dailySave guards a
+    // dead/dying beast itself, so a felled beast's settle writes nothing (the
+    // next startFight keeps the new fight instead).
+    if (this.mode === 'daily') this.dailySave();
     if (this.state !== 'pick' || this.dying || SS_RITE.busy) return;
     ssSigilCheck();
     const pend = ssSigilPending();
@@ -10478,6 +10626,41 @@ class Battle extends Phaser.Scene {
       // hard rides the checkpoint (v0.70.0): a climb begun hard resumes hard
       hard: this.hard ? 1 : undefined,
     }));
+  }
+  /* THE KEPT HUNT (v0.114.0): write the daily's standing position whole. Only
+     a live mid-fight 'pick' moment is kept — a dead/dying beast or an ended
+     run writes nothing (the felled fight is gone; the next fresh fight keeps
+     itself). Keyed to the daily's identity (day ^ tongue). The board is
+     flattened to letter · tier · ink; everything else is the run's own state
+     and the fight's own counters. One localStorage write; wrapped so a full
+     storage quota can never crash a hunt. */
+  dailySave() {
+    if (this.mode !== 'daily' || this.state === 'end') return;
+    if (this.dying || !this.beast || (this.beast.hpNow | 0) <= 0) return;
+    try {
+      const snap = {
+        v: SS_DAILYRUN_V, day: SSNET.dayKey(), lang: ssGameLang(), build: BUILD,
+        run: {
+          fightIdx: this.run.fightIdx, hpMax: this.run.hpMax, hp: this.run.hp,
+          sigils: this.run.sigils, tiers: this.run.tiers, words: this.run.words,
+          longest: this.run.longest, totalDmg: this.run.totalDmg, scried: this.run.scried,
+          featherUsed: this.run.featherUsed, letters: this.run.letters, bigHit: this.run.bigHit,
+          playMs: this.runElapsed(), overkill: this.run.overkill | 0,
+          firstUsed: !!this.run.firstUsed, fadeShown: !!this.run.fadeShown, inkShown: !!this.run.inkShown,
+        },
+        beast: { hpNow: this.beast.hpNow | 0, count: this.beast.count | 0 },
+        board: this.board.map((s) => (s ? { ch: s.ch, tier: s.tier | 0, blk: !!s.blk } : null)),
+        ash: this.skyAsh.map((a) => !!a),
+        pending: this.pending.slice(),
+        cursed: this.skyCursed ? [...this.skyCursed] : null,
+        venom: this.venom | 0, shellUsed: !!this.shellUsed,
+        watersLeft: this.watersLeft | 0, purifyLeft: this.purifyLeft | 0,
+        shieldLeft: this.shieldLeft | 0, hintsLeft: this.hintsLeft | 0, cometLeft: this.cometLeft | 0,
+        struckThisBattle: !!this.struckThisBattle, hardLeft: this.hardLeft | 0,
+      };
+      localStorage.setItem(SS_DAILYRUN_KEY, JSON.stringify(snap));
+      window.__ssdaily = { saved: true, fightIdx: snap.run.fightIdx, hpNow: snap.beast.hpNow, score: this.runScore(), day: snap.day, t: Date.now() };
+    } catch (e) { }
   }
   // deterministic growth: the same seed re-runs the same stream, so the new
   // stretch changes nothing already climbed; the sigil plan re-walks the
@@ -11204,6 +11387,12 @@ class Battle extends Phaser.Scene {
   endRun(won) {
     const l = this.L;
     this.state = 'end';
+    // THE KEPT HUNT (v0.114.0): a finished daily stays finished — a win or a
+    // strike-out ends the run and clears the kept position, so reopening the
+    // Daily Hunt shows the sheet (with today's score), never a resumed board.
+    // Only an UNFINISHED hunt is ever kept; PHOENIX FEATHER's revive never
+    // reaches here, so a survived blow keeps playing (and keeps saving).
+    if (this.mode === 'daily') ssClearDailyRun();
     // the first game COMPLETED — win or loss, the first-open flag is down
     // forever (the abandon door pays the same toll in goHome)
     if (this.ftue) { ssFtueDone(); if (!this.ftueGone) this.ftueRetire(false); }
