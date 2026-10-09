@@ -1398,7 +1398,7 @@ before your cast animation landed let the animation's tail write `state =
 
 THE HOME MENU's own harness (v0.46.0 flavour cull · v0.47.0 campaign doors ·
 v0.51.0 HOME RESHAPE · v0.52.0 leaderboard into the profile · v0.90.0 the
-tagline retired — 67 checks). The
+tagline retired · v0.120.0 the braid retired — 71 checks). The
 column since v0.52.0, top to bottom:
 `[CONTINUE GAME while a climb stands] · NEW GAME · VERSUS`.
 
@@ -1435,8 +1435,18 @@ column since v0.52.0, top to bottom:
   both skies and in de/es: the `tagline` key survives in NO language (the
   five old phrases are pinned in the harness so the check cannot rot),
   `SS_T('tagline')` falls through to the raw key, and no meadow Text
-  carries the old copy or a leaked raw `tagline`. The braid ornament stays
-  — it closes the wordmark on its own.
+  carries the old copy or a leaked raw `tagline`.
+- **The braid is GONE too** (v0.120.0, Skylar 10/9: "remove the line that
+  is underneath Starspell and above Continue Game" — the `— ✦ —` strip of
+  button braid that closed the wordmark; `ssBraidTex` retired with it, its
+  only caller was the home). NOTHING of the home's sits between the
+  wordmark's bottom edge and the first row's top edge now; `noTag` asserts
+  it on both skies and in de/es: no image wears `titlebraid`, the texture
+  is never minted, `ssBraidTex` is undefined, and no `uiItems` entry has
+  its centre in the band (the sky's own dots are not ui items and may
+  twinkle through it). The painted wordmark's own swirl tail closes the
+  title; the rows did not move (the band is ~31u with CONTINUE GAME, ~56u
+  without).
 - The v0.46.0 laws still hold: labels dead-centre in 58-tall buttons, only
   LIVE sub-lines (campaign progress, friends online) via
   `home.setRowSub(key, text, color, snap)`, the label gliding 9 for them;

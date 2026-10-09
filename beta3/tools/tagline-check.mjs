@@ -28,6 +28,11 @@
 //   disagreed — the honest fix was removing it for real). The v0.51.0 dress
 //   measurements left with it; this suite now asserts ABSENCE — no tagline
 //   key in any language, no tagline text on either sky, no raw-key leak.
+// - The braid ornament under the wordmark is GONE too (v0.120.0, Skylar
+//   10/9: "remove the line that is underneath Starspell and above Continue
+//   Game") — nothing of the home's sits in the band between the wordmark's
+//   bottom edge and the first row's top edge, on either sky; asserted here
+//   beside the tagline's absence.
 // - The v0.46.0 laws still hold: labels dead-centre, only LIVE sub-lines
 //   (campaign progress, friends online), labels glide 9 for them.
 //
@@ -121,8 +126,26 @@ const noTag = async (sky) => {
   const r = JSON.parse(await ev(`(() => { const h = ${H}; const old = ${JSON.stringify(OLD_TAGLINES)};
     return JSON.stringify({ keyIn: Object.keys(SS_STR).filter(L => 'tagline' in SS_STR[L]), fb: SS_T('tagline'),
       txt: h.children.list.filter(o => o.type === 'Text' && (old.includes(o.text) || o.text === 'tagline')).map(o => o.text) }) })()`));
-  ok(`${sky}: the tagline is gone — no key in any language, no line under the braid, no raw-key leak`,
+  ok(`${sky}: the tagline is gone — no key in any language, no line under the title, no raw-key leak`,
     r.keyIn.length === 0 && r.fb === 'tagline' && r.txt.length === 0, JSON.stringify(r));
+  /* v0.120.0: THE BRAID GOES (Skylar 10/9: "remove the line that is
+     underneath Starspell and above Continue Game"). Nothing the home builds
+     may sit in the band between the wordmark's bottom edge and the first
+     row's top edge: no image wears the retired 'titlebraid' texture, the
+     texture is never minted, ssBraidTex no longer exists, and no registered
+     ui item (the braid rode the ui() ledger) has its centre in the band — the
+     sky's own dots are not ui items and may twinkle through it. */
+  const b = JSON.parse(await ev(`(() => { const h = ${H}; const t = h.titleT; const U = t.displayWidth / 340;
+    const tb = t.y + t.displayHeight / 2;
+    const rows = Object.values(h.rowBtns || {}).filter(b => b && b.visible);
+    const top = rows.length ? Math.min(...rows.map(b => b.y - b.displayHeight / 2)) : tb + 60 * U;
+    const key = (o) => o.__ssBaseTex || (o.texture && o.texture.key) || '';
+    return JSON.stringify({ braidImgs: h.children.list.filter(o => key(o) === 'titlebraid').length, braidTex: h.textures.exists('titlebraid'),
+      braidFn: typeof ssBraidTex, gap: +((top - tb) / U).toFixed(1),
+      inBand: h.uiItems.filter(o => o.visible && typeof o.y === 'number' && o.y > tb && o.y < top)
+        .map(o => o.type + ':' + key(o) + '@' + ((o.y - t.y) / U + 300).toFixed(0)) }) })()`));
+  ok(`${sky}: the braid is gone — no titlebraid image or texture, ssBraidTex retired, nothing of the home's between the wordmark and the first row (gap ${b.gap}u)`,
+    b.braidImgs === 0 && !b.braidTex && b.braidFn === 'undefined' && b.inBand.length === 0 && b.gap > 0, JSON.stringify(b));
 };
 
 // ---------------------------------------------------------------- before

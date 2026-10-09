@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.119.0';
+const BUILD = 'STARSPELL v0.120.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -3941,57 +3941,6 @@ function ssTitleTex(scene) {
   return { key, w: W / R, h: H / R, anchors };
 }
 
-// The divider under the title. With the painted art on it is a strip of the
-// actual button braid — the title and the buttons literally share material —
-// with a ✦ set in the middle; the procedural build gets a plain gold hairline
-// so the layout doesn't jump between modes. Both ends fade out.
-function ssBraidTex(scene) {
-  const key = 'titlebraid';
-  const R = Math.max(2, ssTexRes(scene));
-  if (scene.textures.exists(key)) {
-    const f = scene.textures.get(key).getSourceImage();
-    return { key, w: f.width / R, h: f.height / R };
-  }
-  const W = Math.round(250 * R), H = Math.round(16 * R);
-  const t = scene.textures.createCanvas(key, W, H);
-  const c = t.context, mid = W / 2, gap = 13 * R;
-  if (ART && SSART.ready) {
-    const img = SSART.img.btn;
-    const bh = 7 * R, byy = (H - bh) / 2;
-    // the button's top braid run, between the corners
-    c.drawImage(img, 130, 10, img.width - 260, 30, 0, byy, mid - gap / 2, bh);
-    c.save(); c.translate(W, 0); c.scale(-1, 1);       // mirrored right half
-    c.drawImage(img, 130, 10, img.width - 260, 30, 0, byy, mid - gap / 2, bh);
-    c.restore();
-  } else {
-    const line = (x0, x1) => {
-      const g = c.createLinearGradient(x0, 0, x1, 0);
-      g.addColorStop(0, 'rgba(215,180,92,0)'); g.addColorStop(1, 'rgba(215,180,92,0.9)');
-      c.fillStyle = g; c.fillRect(Math.min(x0, x1), H / 2 - R * 0.6, Math.abs(x1 - x0), R * 1.2);
-    };
-    line(0, mid - gap / 2); line(W, mid + gap / 2);
-  }
-  // fade the outer ends
-  for (const [x0, x1] of [[0, 26 * R], [W, W - 26 * R]]) {
-    const g = c.createLinearGradient(x0, 0, x1, 0);
-    g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)');
-    c.globalCompositeOperation = 'destination-out';
-    c.fillStyle = g; c.fillRect(Math.min(x0, x1), 0, Math.abs(x1 - x0), H);
-    c.globalCompositeOperation = 'source-over';
-  }
-  // the ✦, in the same gold-on-navy dress as the letters
-  c.font = '900 ' + Math.round(11 * R) + 'px serif';
-  c.textAlign = 'center'; c.textBaseline = 'middle';
-  c.lineJoin = 'round'; c.lineWidth = 2.2 * R; c.strokeStyle = '#241c40';
-  c.strokeText('✦', mid, H / 2 + R * 0.5);
-  const g = c.createLinearGradient(0, H / 2 - 6 * R, 0, H / 2 + 6 * R);
-  g.addColorStop(0, '#fff7dc'); g.addColorStop(0.6, '#ffe08d'); g.addColorStop(1, '#c9a057');
-  c.fillStyle = g;
-  c.fillText('✦', mid, H / 2 + R * 0.5);
-  t.refresh();
-  return { key, w: W / R, h: H / R };
-}
-
 // Small gold-lettered texture in the wordmark's dress — single run, no arch:
 // beast nameplates, flying damage numbers. Cached by text+size; battle removes
 // its number textures on shutdown so a long session doesn't hoard canvases.
@@ -6753,7 +6702,7 @@ class Home extends Phaser.Scene {
     if (!bare) this.time.delayedCall(700, () => { if (this.sys.isActive() && SSNET.renameNotice()) ssRenameNotice(this); });
     // baseAlpha: the ascent fades all ui to 0 — the wake path (return from
     // battle without a re-create) restores each item to the alpha it was born
-    // with, which is not 1 for sparkles, braid, mute/lang buttons
+    // with, which is not 1 for sparkles, mute/lang buttons
     const ui = (o) => { o.baseAlpha = o.alpha; this.uiItems.push(o); return o; };
     const tUi = performance.now();
 
@@ -6848,12 +6797,12 @@ class Home extends Phaser.Scene {
       }
     };
     this.idleTweens();
-    // the braid closes the wordmark on its own — the tagline that hung under
-    // it ("weave words · fell the star-beasts") retired in v0.90.0 (Skylar,
-    // 9/8: phones showing different things; the honest fix was removal).
-    // tools/tagline-check.mjs now asserts its ABSENCE on both skies.
-    const bk = ssBraidTex(this);
-    ui(this.add.image(l.x(0), l.y(300 + tk.h * tScale * 0.5 + 6), bk.key).setDisplaySize(l.u(bk.w), l.u(bk.h)).setAlpha(0.9));
+    // NOTHING sits between the wordmark and the first row. The tagline that
+    // hung under the title ("weave words · fell the star-beasts") retired in
+    // v0.90.0 (Skylar, 9/8); the braid ornament that closed the wordmark
+    // retired in v0.120.0 (Skylar, 10/9: "remove the line that is underneath
+    // Starspell and above Continue Game"). tools/tagline-check.mjs asserts
+    // the band is empty on both skies.
 
     if (bare) {
       // nothing below is built; the refreshers other paths call become
