@@ -1,6 +1,16 @@
 // FIRST5-CHECK — the stage (batch ss-2026-10-07-first-night, card 01;
-// + fix round ss-2026-10-08-first5-fixes cards 01 THE CLEAN REFRESH and
-// 02 THE STRAY SIGNS).
+// + fix round ss-2026-10-08-first5-fixes cards 01 THE CLEAN REFRESH,
+// 02 THE STRAY SIGNS and 03 THE SCRY LESSON).
+//
+// Card 03 (F5-FIX1-03): the SCRY prompt is a forced two-beat lesson now —
+// at the stall the screen grays out and ONLY the scry button answers
+// (real-click proven: tiles, CAST and the back door are inert under the
+// veil); the tap scries as normal, then the strikes pill rises above the
+// veil and the count steps down in the light before the cost line speaks;
+// the gate lifts, play resumes, and the lesson never takes the hand twice
+// (SS.prof.f5scry). §2/§3b pre-seed that flag so the older sections keep
+// testing THEIR cards; §3b2 clears it and stalls honestly.
+// Run against the PUBLISHED page with F5BASE=https://drbango.com/beta3/first5/index.html
 // Proves the first5 sandbox is a true first night that cannot touch live
 // beta3: static seams (script order, no Firebase, repointed shared assets),
 // then live boots in headless Chrome at DPR 3 — fresh first open with the
@@ -26,7 +36,7 @@ const PORT = 9476, SRV = 8901;
 // the standing-marks census: every ssF5DrawMini item carries a 'f5mark'
 // data tag (F5-FIX1-02), so "the fight view is clean" is one honest count
 const CENSUS = (key) => "(()=>{try{const s=game.scene.getScene('" + key + "');if(!s||!s.scene.isActive())return 'inactive';return s.children.list.filter(o=>o.active&&o.getData&&o.getData('f5mark')).length}catch(e){return 'err:'+e.message}})()";
-const BASE = 'http://localhost:' + SRV + '/beta3/first5/index.html';
+const BASE = process.env.F5BASE || ('http://localhost:' + SRV + '/beta3/first5/index.html');
 const ROOT = '../..'; // repo root, relative to first5/ where this runs
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 let pass = 0, fail = 0;
@@ -73,6 +83,14 @@ ok('F5-CARD-06 seams: seats, the rite, the ledger, the kept sky', ['SS_F5_SEATS'
 ok('F5-CARD-05 seams: prompt table + five triggers', ['SS_F5_PROMPTS', 'ssF5Prompt(', 'f5InkTaught', 'THE PLANTED GLOW'].every((t) => gameSrc.includes(t)) && (gameSrc.match(/F5-CARD-05/g) || []).length >= 6);
 ok('the en prompt table carries all five lessons', ['tile1', 'tile2', 'tile3', 'ink', 'scry'].every((k) => new RegExp(k + ':').test(gameSrc.slice(gameSrc.indexOf('SS_F5_PROMPTS'), gameSrc.indexOf('SS_F5_PROMPTS') + 900))));
 ok('F5-CARD-04 seams: the rig, the kind bag, the beats, the ember tune', ['SS_F5_RIG', 'SS_F5_FLOOR', 'SS_F5_EMBER_MULT', 'f5Kind(', 'f5CastBeats(', 'f5StarWrite(', 'f5Encore('].every((t) => gameSrc.includes(t)));
+/* — F5-FIX1-03 THE SCRY LESSON seams — */
+ok("the gate line is Skylar's, verbatim — the footnote tail is gone", gameSrc.includes("scry: 'Stuck? SCRY deals a fresh board',") && !gameSrc.includes('the beast still counts it'));
+ok('…and the cost line, verbatim', gameSrc.includes("scryCost: 'Using SCRY makes the beast attack one turn earlier',"));
+ok('F5-FIX1-03 seams: seven tagged sites', (gameSrc.match(/F5-FIX1-03/g) || []).length === 7, String((gameSrc.match(/F5-FIX1-03/g) || []).length));
+ok('the three beats stand: gate up / tap / gate down, and the pill hold', ['f5ScryGateUp()', 'f5ScryTap()', 'f5ScryGateDown(', 'this.f5PillHold = 1'].every((t) => gameSrc.includes(t)) && gameSrc.includes('if (!this.f5PillHold) {'));
+ok('once a night: SS.prof.f5scry written at the tap', gameSrc.includes('SS.prof.f5scry = 1'));
+ok('the stall family yields while the gate stands', gameSrc.includes('&& !this.f5ScryGate'));
+ok('one prompt frame speaks for ribbon and gate alike', gameSrc.includes('function ssF5Frame(') && gameSrc.includes('ssF5Frame(scene, str).setDepth(950)'));
 const BUILD = (gameSrc.match(/const BUILD = '([^']+)'/) || [])[1];
 ok('game.js copy carries a BUILD', !!BUILD, BUILD);
 try {
@@ -108,6 +126,16 @@ await new Promise((r) => { ws.onopen = r; });
 await send('Runtime.enable', {});
 await send('Page.enable', {});
 const go = async (url) => { errs.length = 0; await send('Page.navigate', { url }); await sleep(1500); };
+// a REAL tap at viewport CSS coordinates (the verify-with-clicks law)
+const tap = async (p) => {
+  await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: p.x, y: p.y, button: 'left', clickCount: 1 });
+  await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: p.x, y: p.y, button: 'left', clickCount: 1 });
+};
+// card 03's pre-seed: sections that test the OLDER cards mark the scry
+// lesson already-taught (SS.prof.f5scry=1), so their organic stalls keep
+// the old voice (glint + ribbon) and never veil the chain; §3b2 clears the
+// seed and owns the gate.
+const seedScry = () => ev("(()=>{try{if(typeof SS!=='undefined'&&SS.prof){SS.prof.f5scry=1;SS.save();return 1}}catch(e){}return 0})()");
 
 /* ================= §2 the true first open ================= */
 console.log('— §2 the true first open —');
@@ -122,6 +150,7 @@ ok('every storage key wears the prefix — zero bare beta3.* keys', await ev("((
   await ev("(()=>{const ks=[];for(let i=0;i<localStorage.length;i++)ks.push(localStorage.key(i));return ks.filter(k=>!k.startsWith('first5.')).join()||'(all prefixed, '+ks.length+' keys)'})()"));
 ok('the FTUE gate is OPEN — this device reads virgin (ftue 0 = owed)', (await ev('typeof SS !== "undefined" && SS.prof ? SS.prof.ftue : "no SS.prof"')) === 0, String(await ev('typeof SS !== "undefined" && SS.prof ? SS.prof.ftue : "no SS.prof"')));
 ok('net rides local mode (no firebase global)', await ev("typeof firebase === 'undefined'"));
+await seedScry();   // the §2 chain tests cards 01–06 + fixes 01–02, not the gate
 // the first open rises BY ITSELF into the battle. The game's own headless
 // beacon (window.__ssftue) is the truth; swiftshader stretches the intro
 // well past its real ~10s, so the window is generous.
@@ -143,6 +172,7 @@ await go(BASE + '?reset=1');
 let lure = false;
 for (let i = 0; i < 180 && !lure; i++) { lure = (await ev("window.__ssftue ? window.__ssftue.state : null")) === 'lure'; if (!lure) await sleep(1000); }
 ok('one firefly asks — the lure stands after the settle', lure);
+await seedScry();   // the reset re-owed the lesson — re-seed before this ascent
 // a REAL tap, anywhere on screen (the verify-with-clicks law)
 await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: 195, y: 420, button: 'left', clickCount: 1 });
 await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: 195, y: 420, button: 'left', clickCount: 1 });
@@ -341,6 +371,7 @@ let resumed = false;
 for (let i = 0; i < 90 && !resumed; i++) { resumed = await ev("(()=>{try{const b=game.scene.getScene('battle');return !!(b&&b.scene.isActive()&&b.mode==='quick'&&b.state==='pick')}catch(e){return false}})()"); if (!resumed) await sleep(1000); }
 const rIdx = await ev("(()=>{try{return game.scene.getScene('battle').run.fightIdx}catch(e){return -1}})()");
 ok('a CARRIED reopen resumes the held fight (graft 4 rides the survive door)', resumed && qk && rIdx === qk.fightIdx, 'resumed at fight ' + rIdx + ' (held ' + (qk && qk.fightIdx) + ')');
+await seedScry();   // §3b tests the doors and the glint — §3b2 owns the gate
 ok('the intro was NOT replayed over the carried run (graft 4)', await ev("window.__ssftue && window.__ssftue.on === false"));
 // now the REAL door — the versus offline retry button fires the actual
 // versus.js F5-FIX1-01 line: a true scripted reload through real game code
@@ -372,6 +403,87 @@ if (pair) {
   ok('a word the sky never heard CRUMBLES TO DUST (graft 6)', (await ev('window.__f5refusal')) === 'dust' && await ev("game.scene.getScene('battle').sel.length === 0"));
 }
 ok('zero exceptions through the pocket round', errs.length === 0, errs.slice(0, 2).join(' | '));
+
+/* ======== §3b2 THE SCRY LESSON (fix 03) — the hand is taken, the cost shown ========
+   The resumed battle stands at 'pick' with a full fuse and no comet (the
+   held run's one sigil is from the curated trio). Clear the pre-seed so
+   the lesson is owed again, stall honestly (§3b's clock rewind), and the
+   gate must arm: veil up, SCRY alone lit, Skylar's line verbatim. Every
+   inert-screen proof is a REAL CDP tap — a letter tile, CAST, the back
+   door — then the REAL tap on SCRY runs the whole lesson: the redeal, the
+   raised pill, the count stepping down, the cost line, the lift. Then the
+   same real fingers that were refused answer again, and a later stall
+   only glints — the hand is never taken twice. */
+console.log('— §3b2 THE SCRY LESSON: the hand is taken, the cost is shown —');
+const pr0 = await ev('(window.__f5prompt||{}).scry | 0');
+await ev("(()=>{delete SS.prof.f5scry;SS.save();window.__f5refusal=null;const b=game.scene.getScene('battle');b.f5Glinted=false;b.f5LastTap=b.time.now-11000;return 1})()");
+let armed = false;
+for (let i = 0; i < 24 && !armed; i++) { armed = ((await ev('(window.__f5scry||{}).armed | 0')) >= 1); if (!armed) await sleep(500); }
+ok('THE GATE ARMS at the honest stall (the lesson owed, the fuse real)', armed);
+ok("…the prompt is Skylar's line, verbatim", (await ev('(window.__f5scry||{}).gate')) === 'Stuck? SCRY deals a fresh board', String(await ev('(window.__f5scry||{}).gate')));
+const gateUp = await ev("(()=>{const b=game.scene.getScene('battle');const g=b.f5ScryGate;return g?[g.veil.active,g.veil.depth,b.scryB.depth,b.scryT.depth,b.beast.count,b.run.words]:null})()");
+ok('…the veil stands and SCRY ALONE rises above it', !!gateUp && gateUp[0] === true && gateUp[1] === 900 && gateUp[2] === 905 && gateUp[3] === 906, String(gateUp));
+const cnt0 = gateUp ? gateUp[4] : 0, words0 = gateUp ? gateUp[5] : -1;
+ok('…over a fuse with room to step (count > 1)', cnt0 > 1, 'count ' + cnt0);
+// the inert screen — real taps at real coordinates
+const pts = await ev("(()=>{const b=game.scene.getScene('battle');const r=game.canvas.getBoundingClientRect();const kx=r.width/game.scale.width,ky=r.height/game.scale.height;const m=(x,y)=>({x:Math.round(r.left+x*kx),y:Math.round(r.top+y*ky)});let ti=-1;for(let i=0;i<16;i++)if(b.board[i]&&b.board[i].c.active){ti=i;break}const tp=b.slotPos(ti);return {tile:m(tp.x,tp.y),cast:m(b.castB.x,b.castB.y),scry:m(b.scryB.x,b.scryB.y),back:m(b.homeB.x+8,b.homeB.y),ti}})()");
+ok('real screen coordinates stand for tile / CAST / SCRY / back', !!(pts && pts.tile && pts.cast && pts.scry && pts.back), JSON.stringify(pts));
+const b0 = await ev("(()=>{const b=game.scene.getScene('battle');return b.board.map(s=>s?s.ch:'·').join('')})()");
+await tap(pts.tile); await sleep(900);
+const tIn = await ev("(()=>{const b=game.scene.getScene('battle');return [b.sel.length,b.state,b.board.map(s=>s?s.ch:'·').join('')].join('|')})()");
+ok('a REAL tap on a letter tile does NOTHING under the gate', tIn === '0|pick|' + b0, String(tIn).slice(0, 26));
+await tap(pts.cast); await sleep(900);
+ok('a REAL tap on CAST does NOTHING under the gate', (await ev("(()=>{const b=game.scene.getScene('battle');return [b.sel.length,b.state,b.run.words,String(window.__f5refusal)].join('|')})()")) === '0|pick|' + words0 + '|null');
+await tap(pts.back); await sleep(900);
+ok('a REAL tap on the back door does NOTHING under the gate', (await ev("game.scene.isActive('battle')")) === true && ((await ev('(window.__f5scry||{}).lifted | 0')) === 0));
+ok('…and the gate still stands through all three', await ev("(()=>{const b=game.scene.getScene('battle');return !!(b.f5ScryGate&&b.f5ScryGate.veil.active)})()"));
+// THE TAP — the one lit door answers. The lesson's 700ms + 1500ms beats
+// ride the GAME clock, and the headless clock IDLES when input quiets
+// (the settings-door law) — so every timed poll here NUDGES with a
+// harmless mouse-move to keep the loop ticking, as a held phone would.
+const nudge = (i) => send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 200 + (i % 5), y: 420 + (i % 7) });
+await tap(pts.scry);
+let tapped = false;
+for (let i = 0; i < 16 && !tapped; i++) { tapped = ((await ev('(window.__f5scry||{}).tapped | 0')) >= 1); if (!tapped) await sleep(400); }
+const b1s = await ev("(()=>{const b=game.scene.getScene('battle');return b.board.map(s=>s?s.ch:'·').join('')})()");
+ok('a REAL tap on SCRY fires the scry itself — the board redeals (beat 2)', tapped && b1s !== b0, tapped ? 'redealt' : 'no tap seen');
+let down = null;
+for (let i = 0; i < 20 && !down; i++) { await nudge(i); const d = await ev('(window.__f5scry||{}).down || null'); if (d) down = d; else await sleep(400); }
+ok('THE COST IS SHOWN: the count steps down before the raised pill (' + cnt0 + ' → ' + (cnt0 - 1) + ')', !!down && down[0] === cnt0 && down[1] === cnt0 - 1, String(down));
+let cost = false;
+for (let i = 0; i < 10 && !cost; i++) { await nudge(i + 30); cost = ((await ev('(window.__f5prompt||{}).scryCost | 0')) >= 1); if (!cost) await sleep(400); }
+ok('…then SAID: the cost line speaks (once, like every lesson)', cost && ((await ev('(window.__f5scry||{}).cost | 0')) === 1));
+let lifted = false;
+// the 1.5s linger needs real accumulated game time: BURST the nudges (a
+// woken headless clock pays ~one clamped frame per input event)
+for (let i = 0; i < 30 && !lifted; i++) {
+  for (let k = 0; k < 6; k++) await nudge(i * 6 + k);
+  lifted = ((await ev('(window.__f5scry||{}).lifted | 0')) >= 1);
+  if (!lifted) await sleep(250);
+}
+ok('THE GATE LIFTS (beat 4)', lifted);
+const after = await ev("(()=>{const b=game.scene.getScene('battle');return [b.f5ScryGate===null,b.scryB.depth,b.scryT.depth,b.strikeT.depth,b.strikeRib.depth,b.strikeGlow.depth,SS.prof.f5scry|0,b.strikeT.text.includes(' " + (cnt0 - 1) + " ')?1:0].join('|')})()");
+ok('every depth goes home; the pill tells the new truth; the lesson is written', after === 'true|0|0|0|0|0|1|1', after);
+await sleep(1200);   // the redeal's bounce settles before the resume taps
+// NORMAL PLAY RESUMES — the same real fingers that were refused now answer
+await tap(pts.tile);
+let selGrew = false;
+for (let i = 0; i < 10 && !selGrew; i++) { selGrew = ((await ev("game.scene.getScene('battle').sel.length")) === 1); if (!selGrew) await sleep(400); }
+ok('tiles ANSWER again after the lift (a real tap selects)', selGrew);
+await ev('window.__f5refusal=null');
+await tap(pts.cast);
+let bounced = false;
+for (let i = 0; i < 10 && !bounced; i++) { bounced = ((await ev('String(window.__f5refusal)')) === 'home'); if (!bounced) await sleep(400); }
+ok('CAST ANSWERS again after the lift (a real tap runs the one-letter bounce)', bounced && await ev("game.scene.getScene('battle').sel.length === 0"));
+// THE ONCE LAW — a later stall only glints; the hand is never taken twice
+await sleep(900);   // the bounce settles home
+const glint0 = await ev('window.__f5glint | 0');
+await ev("(()=>{const b=game.scene.getScene('battle');b.f5Glinted=false;b.f5LastTap=b.time.now-11000;return 1})()");
+let reglint = false;
+for (let i = 0; i < 16 && !reglint; i++) { await nudge(i + 90); reglint = ((await ev('window.__f5glint | 0')) > glint0); if (!reglint) await sleep(500); }
+ok('a later stall only GLINTS — the lesson never takes the hand twice', reglint && ((await ev('(window.__f5scry||{}).armed | 0')) === 1) && await ev("game.scene.getScene('battle').f5ScryGate === null"));
+ok('…and the ribbon never spoke OVER the lesson (the gate owned the voice)', (await ev('(window.__f5prompt||{}).scry | 0')) === pr0, 'ribbon count ' + await ev('(window.__f5prompt||{}).scry | 0') + ' (was ' + pr0 + ')');
+ok('zero exceptions through the whole lesson', errs.length === 0, errs.slice(0, 2).join(' | '));
 
 /* ======== §3c THE CLEAN REFRESH — the fix itself (F5-FIX1-01) ======== */
 console.log('— §3c THE CLEAN REFRESH: a player refresh is a true first open —');

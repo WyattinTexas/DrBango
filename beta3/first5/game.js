@@ -1980,16 +1980,34 @@ const SS_F5_RIG = { en: ['m', 'o', 'n', 's'], es: ['m', 'a', 'r', 'e', 's'], fr:
    remembered — and the gray/black tile is the bosses' BLACKOUT curse
    (tileblk, pays nothing). ONE declared table, shortest true sentence
    each, en-first; the ×5 translation at integration is mechanical. Every
-   prompt fires ONCE per run, waits ~8s or one tap, pauses nothing. */
+   prompt fires ONCE per run, waits ~8s or one tap, pauses nothing —
+   except SCRY: F5-FIX1-03 (Skylar's 10/08 verdict) turned that one from a
+   footnote into THE SCRY LESSON, a forced two-beat gate (f5ScryGateUp
+   below) — the gate line first, the cost line after the tap has shown it. */
 const SS_F5_PROMPTS = {
   en: {
     tile1: 'An orange tile pays +6 extra.',
     tile2: 'A blue tile makes the whole word ×1.5.',
     tile3: 'A green dew tile heals ♥6 when cast.',
     ink: 'An inked tile spells, but pays nothing.',
-    scry: 'Stuck? SCRY deals a fresh board — the beast still counts it.',
+    scry: 'Stuck? SCRY deals a fresh board',
+    scryCost: 'Using SCRY makes the beast attack one turn earlier',
   },
 };
+/* the one prompt frame (F5-FIX1-03 pulled it out of ssF5Prompt so the scry
+   gate speaks in the same voice): dark plate, gold rim, cream italic. The
+   caller owns position, depth and life. */
+function ssF5Frame(scene, str) {
+  const l = scene.L;
+  const t = ssTxt(scene, 0, 0, str, l.u(14.5), '#f3e5b4', 'italic').setOrigin(0.5);
+  const w = t.width + l.u(28), h = t.height + l.u(18);
+  const g = scene.add.graphics();
+  g.fillStyle(0x15131f, 0.93); g.fillRoundedRect(-w / 2, -h / 2, w, h, l.u(9));
+  g.lineStyle(l.u(1.3), 0xd9b96a, 0.55); g.strokeRoundedRect(-w / 2, -h / 2, w, h, l.u(9));
+  const c = scene.add.container(0, 0, [g, t]);
+  c.f5W = w; c.f5H = h;
+  return c;
+}
 function ssF5Prompt(scene, key, x, y) {
   const seen = scene.f5Prompted || (scene.f5Prompted = {});
   if (seen[key] || !scene.scene.isActive()) return;
@@ -1997,12 +2015,8 @@ function ssF5Prompt(scene, key, x, y) {
   window.__f5prompt = Object.assign(window.__f5prompt || {}, { [key]: ((window.__f5prompt || {})[key] | 0) + 1 });
   const l = scene.L;
   const str = (SS_F5_PROMPTS[PACK.lang] || SS_F5_PROMPTS.en)[key] || SS_F5_PROMPTS.en[key];
-  const t = ssTxt(scene, 0, 0, str, l.u(14.5), '#f3e5b4', 'italic').setOrigin(0.5);
-  const w = t.width + l.u(28), h = t.height + l.u(18);
-  const g = scene.add.graphics();
-  g.fillStyle(0x15131f, 0.93); g.fillRoundedRect(-w / 2, -h / 2, w, h, l.u(9));
-  g.lineStyle(l.u(1.3), 0xd9b96a, 0.55); g.strokeRoundedRect(-w / 2, -h / 2, w, h, l.u(9));
-  const c = scene.add.container(0, 0, [g, t]).setDepth(950).setAlpha(0).setScale(0.92);
+  const c = ssF5Frame(scene, str).setDepth(950).setAlpha(0).setScale(0.92);
+  const w = c.f5W, h = c.f5H;
   c.setPosition(Math.max(w / 2 + l.u(6), Math.min(l.W - w / 2 - l.u(6), x)),
     Math.max(h / 2 + l.u(6), Math.min(l.H - h / 2 - l.u(6), y)));
   scene.tweens.add({ targets: c, alpha: 1, scale: 1, duration: 220, ease: 'Back.easeOut' });
@@ -8904,6 +8918,11 @@ class Battle extends Phaser.Scene {
        (the morning-after proof), the fell's own rite, the second-fell
        tomorrow cue, the end screen's ledger. */
     this.f5SeatMarks = [];
+    /* F5-FIX1-03: THE SCRY LESSON's gate (null = down) and the pill hold —
+       while the hold is up, updateBars leaves the strikes pill saying the
+       OLD count so the lesson can show the step down on its own beat (the
+       hpShown/hpHold grammar, applied to the fuse). */
+    this.f5ScryGate = null; this.f5PillHold = 0;
     /* F5-GRAFT-5: feed the stalled speller — the stall clock. Any tap
        anywhere re-arms it; the glint itself fires from update(). */
     this.f5LastTap = 0; this.f5Glinted = false;
@@ -8936,15 +8955,29 @@ class Battle extends Phaser.Scene {
        lands ONE viable-tile glint. Wordless, once per stall, invisible to
        anyone who doesn't need it; the demo solver is nobody's student. */
     if (this.mode === 'quick' && !DEMO && this.state === 'pick' && !this.sel.length
-      && (!this.ftue || this.ftueGone)) {
+      && (!this.ftue || this.ftueGone) && !this.f5ScryGate) {
       if (!this.f5LastTap) this.f5LastTap = this.time.now;
       else if (!this.f5Glinted && this.time.now - this.f5LastTap > 10000) {
         this.f5Glinted = true;
-        const best = this.bestWord();
-        if (best && best.length) this.f5Glint(this.board[best[0]]);
-        /* F5-CARD-05: the stall is also SCRY's honest moment — the player
-           who is stuck is the one the button exists for. */
-        ssF5Prompt(this, 'scry', this.L.x(-150), this.L.y(706));
+        /* F5-FIX1-03: THE SCRY LESSON (Skylar's 10/08 verdict) — the first
+           honest stall of the night TAKES THE HAND: the screen grays out,
+           SCRY alone stays lit, and the player must use it; the cost is
+           shown on the pill after the tap, then said. Once a night
+           (SS.prof.f5scry; the stage's refresh-restart replays it on a
+           fresh open). Deferred — falling back to the old glint + ribbon,
+           the lesson still owed — while the fuse sits at 1 (the step down
+           would be a strike, not a lesson) or a comet charge would make
+           the scry free (a free scry can't teach the price). */
+        if (!(SS.prof && SS.prof.f5scry) && this.beast && this.beast.hpNow > 0 && this.beast.count > 1
+          && !(this.hasSigil('comet') && (this.cometLeft | 0) > 0)) {
+          this.f5ScryGateUp();
+        } else {
+          const best = this.bestWord();
+          if (best && best.length) this.f5Glint(this.board[best[0]]);
+          /* F5-CARD-05: the stall is also SCRY's honest moment — the player
+             who is stuck is the one the button exists for. */
+          ssF5Prompt(this, 'scry', this.L.x(-150), this.L.y(706));
+        }
       }
       /* F5-CARD-04: the rescue's second rung — 30s of stall brings the
          gesture back once (the best word's tiles glint in walking order). */
@@ -9362,9 +9395,11 @@ class Battle extends Phaser.Scene {
     // scry + hint wear the painted dark button (aspect-correct via ssBtn), same
     // as the home screen's LEADERBOARD/PROFILE — no more bare dev rectangles
     this.scryB = this.add.image(l.x(-150), l.y(766), ssBtn(this, true, 100, 50)).setDisplaySize(l.u(100), l.u(50)).setInteractive({ useHandCursor: true });
-    txt(l.x(-150), l.y(766), 'SCRY ↻', 14, '#9fb0e8').setOrigin(0.5);
+    // F5-FIX1-03: the label is kept (scryT) so the lesson can lift button
+    // and letters together above the gate's veil
+    this.scryT = txt(l.x(-150), l.y(766), 'SCRY ↻', 14, '#9fb0e8').setOrigin(0.5);
     this.scryPips = [];   // COMET TRAIL's charge pips, built by updateScryPips
-    this.scryB.on('pointerdown', () => this.scry());
+    this.scryB.on('pointerdown', () => this.f5ScryTap());
     this.hintB = this.add.image(l.x(-62), l.y(766), ssBtn(this, true, 50, 50)).setDisplaySize(l.u(50), l.u(50)).setInteractive({ useHandCursor: true }).setVisible(false);
     this.hintT = txt(l.x(-62), l.y(766), '◉', 18, '#d7b45c').setOrigin(0.5).setVisible(false);
     this.hintB.on('pointerdown', () => this.useHint());
@@ -10340,33 +10375,40 @@ class Battle extends Phaser.Scene {
     this.drawPhp();
     this.drawEhp();
     const alive = this.beast.hpNow > 0;
-    this.strikeT.setText(alive ? SS_T(this.beast.count === 1 ? 'strikeIn1' : 'strikeIn', this.beast.count) : '');
-    this.strikeT.setColor(this.beast.count === 1 && alive ? '#ff8a70' : '#e6a2a2');
-    this.strikeRib.setAlpha(this.strikeT.text ? 0.9 : 0);
-    if (this.strikeT.text) {
-      this.strikeRib.setDisplaySize(this.strikeT.width + l.u(30), l.u(22));
-      this.strikeGlow.setDisplaySize(this.strikeT.width + l.u(70), l.u(52));
+    /* F5-FIX1-03: while THE SCRY LESSON holds the pill (f5PillHold), the
+       whole fuse voice — text, color, alarm, pulse, telegraph — keeps the
+       OLD count; the lesson releases the hold on its own beat and calls
+       back in, so the player WATCHES the number step down under the raised
+       pill (the hpShown/hpHold grammar, applied to the fuse). */
+    if (!this.f5PillHold) {
+      this.strikeT.setText(alive ? SS_T(this.beast.count === 1 ? 'strikeIn1' : 'strikeIn', this.beast.count) : '');
+      this.strikeT.setColor(this.beast.count === 1 && alive ? '#ff8a70' : '#e6a2a2');
+      this.strikeRib.setAlpha(this.strikeT.text ? 0.9 : 0);
+      if (this.strikeT.text) {
+        this.strikeRib.setDisplaySize(this.strikeT.width + l.u(30), l.u(22));
+        this.strikeGlow.setDisplaySize(this.strikeT.width + l.u(70), l.u(52));
+      }
+      // the count-1 alarm: while the NEXT cast is the strike, an ember glow
+      // breathes behind the ribbon — killed on any other count so a fresh
+      // fight or a re-armed fuse never inherits it
+      const alarm = alive && this.beast.count === 1;
+      if (alarm && !this.strikeAlarm) {
+        this.strikeGlow.setAlpha(0.18);
+        this.strikeAlarm = this.tweens.add({ targets: this.strikeGlow, alpha: 0.6, duration: 520, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      } else if (!alarm && this.strikeAlarm) {
+        this.strikeAlarm.remove(); this.strikeAlarm = null;
+        this.strikeGlow.setAlpha(0);
+      }
+      // the fuse is FELT: any change of the counter pops the ribbon — hot when
+      // it burns down a step, cool when the beast re-arms after striking. The
+      // null sentinel keeps a fight's first paint (and a cleared line) quiet.
+      const cnt = alive ? this.beast.count : null;
+      if (cnt !== null && this._strikeCnt !== null && cnt !== this._strikeCnt) this.strikePulse(cnt < this._strikeCnt);
+      this._strikeCnt = cnt;
+      // telegraph: the constellation charges as the strike counter fills
+      if (this.beastFx) this.beastFx.setThreat(alive
+        ? (this.beast.timer - this.beast.count) / Math.max(1, this.beast.timer - 1) : 0);
     }
-    // the count-1 alarm: while the NEXT cast is the strike, an ember glow
-    // breathes behind the ribbon — killed on any other count so a fresh
-    // fight or a re-armed fuse never inherits it
-    const alarm = alive && this.beast.count === 1;
-    if (alarm && !this.strikeAlarm) {
-      this.strikeGlow.setAlpha(0.18);
-      this.strikeAlarm = this.tweens.add({ targets: this.strikeGlow, alpha: 0.6, duration: 520, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-    } else if (!alarm && this.strikeAlarm) {
-      this.strikeAlarm.remove(); this.strikeAlarm = null;
-      this.strikeGlow.setAlpha(0);
-    }
-    // the fuse is FELT: any change of the counter pops the ribbon — hot when
-    // it burns down a step, cool when the beast re-arms after striking. The
-    // null sentinel keeps a fight's first paint (and a cleared line) quiet.
-    const cnt = alive ? this.beast.count : null;
-    if (cnt !== null && this._strikeCnt !== null && cnt !== this._strikeCnt) this.strikePulse(cnt < this._strikeCnt);
-    this._strikeCnt = cnt;
-    // telegraph: the constellation charges as the strike counter fills
-    if (this.beastFx) this.beastFx.setThreat(alive
-      ? (this.beast.timer - this.beast.count) / Math.max(1, this.beast.timer - 1) : 0);
     // while a damage number is in flight the tally animation owns the counter
     if (!this.scoreAnim) this.scoreT.setText(String(this.runScore()));
   }
@@ -11329,6 +11371,95 @@ class Battle extends Phaser.Scene {
         });
       } else cool(p);
     });
+  }
+
+  /* ---- F5-FIX1-03: THE SCRY LESSON (Skylar, 10/08: "we need to make the
+     user use the scry button, when that happens the scry button should be
+     highlighted and the rest of the screen grayed out … then highlight the
+     'strikes in x casts' show the cast going down and then tell the
+     player"). Three beats:
+       1. the GATE (f5ScryGateUp): a veil grays the whole screen; under
+          topOnly input everything beneath it is inert — tiles, CAST, the
+          back door; SCRY alone rises above it, glowing, Skylar's line
+          standing over the one lit door.
+       2. the TAP (f5ScryTap): scry() fires AS NORMAL — the board redeals
+          and the beast counts it — but the pill is HELD at the old count.
+       3. the COST (the delayed release): the strikes pill rises above the
+          veil, the hold releases, the number steps down before the
+          player's eyes (strikePulse pops it hot), then the cost line
+          speaks. Then the gate lifts and the night goes on.
+     Once a night (SS.prof.f5scry, written at the tap); the stage's
+     refresh-restart (fix card 01) replays it on a fresh open. The beacon
+     window.__f5scry carries armed/gate/tapped/down/cost/lifted. */
+  f5ScryGateUp() {
+    const l = this.L;
+    const seen = this.f5Prompted || (this.f5Prompted = {});
+    seen.scry = 1;   // the gate IS the scry ribbon's moment — never both in one run
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setDepth(900).setInteractive();
+    this.tweens.add({ targets: veil, alpha: 0.66, duration: 320 });
+    // SCRY alone keeps the light: button and letters above the veil, a
+    // breathing glow in the button's own ink behind them
+    this.scryB.setDepth(905); this.scryT.setDepth(906);
+    const glow = this.add.image(this.scryB.x, this.scryB.y, 'glowbig').setDisplaySize(l.u(200), l.u(110))
+      .setTint(0x9fb0e8).setBlendMode('ADD').setAlpha(0.3).setDepth(904);
+    const breathe = this.tweens.add({ targets: glow, alpha: 0.75, duration: 620, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    // Skylar's line, verbatim, just above the lit door
+    const str = (SS_F5_PROMPTS[PACK.lang] || SS_F5_PROMPTS.en).scry || SS_F5_PROMPTS.en.scry;
+    const c = ssF5Frame(this, str).setDepth(950).setAlpha(0).setScale(0.92);
+    c.setPosition(Math.max(c.f5W / 2 + l.u(6), Math.min(l.W - c.f5W / 2 - l.u(6), l.x(-150))), l.y(706));
+    this.tweens.add({ targets: c, alpha: 1, scale: 1, duration: 220, ease: 'Back.easeOut' });
+    // a tap that lands anywhere else is guided to the one door: the button pops
+    const bx = this.scryB.scaleX, by = this.scryB.scaleY;
+    veil.on('pointerdown', () => {
+      this.tweens.killTweensOf(this.scryB);
+      this.scryB.setScale(bx, by);
+      this.tweens.add({ targets: this.scryB, scaleX: bx * 1.07, scaleY: by * 1.07, duration: 130, yoyo: true, ease: 'Sine.easeOut', onComplete: () => this.scryB.setScale(bx, by) });
+    });
+    this.f5ScryGate = { veil, glow, breathe, prompt: c, bx, by };
+    const b = window.__f5scry = window.__f5scry || {};
+    b.armed = (b.armed | 0) + 1; b.gate = str;
+    DIAG('f5: scry gate up');
+  }
+  f5ScryTap() {
+    const g = this.f5ScryGate;
+    if (!g) { this.scry(); return; }          // no lesson standing — the button is just itself
+    if (this.state !== 'pick') return;        // the same patience scry() keeps; the gate stands
+    this.f5ScryGate = null;                   // beat 2 — the hand is released into the tap
+    if (SS.prof) { SS.prof.f5scry = 1; SS.save(); }
+    g.breathe.remove(); g.glow.destroy();
+    this.tweens.killTweensOf(this.scryB);
+    this.scryB.setScale(g.bx, g.by);
+    this.scryB.setDepth(0); this.scryT.setDepth(0);
+    if (g.prompt.active) this.tweens.add({ targets: g.prompt, alpha: 0, duration: 180, onComplete: () => { if (g.prompt.active) g.prompt.destroy(); } });
+    const was = this.beast.count;
+    const b = window.__f5scry = window.__f5scry || {};
+    b.tapped = (b.tapped | 0) + 1;
+    this.f5PillHold = 1;                      // the pill waits for the lesson's beat
+    this.scry();                              // AS NORMAL: the board redeals, the beast counts it
+    // beat 3 — the cost, SHOWN: the pill rises above the veil…
+    this.strikeGlow.setDepth(901); this.strikeRib.setDepth(902); this.strikeT.setDepth(903);
+    this.time.delayedCall(700, () => {
+      this.f5PillHold = 0;
+      if (!this.scene.isActive()) return;
+      this.updateBars();                      // …and the number steps down in the light (hot pulse)
+      const now = this.beast ? this.beast.count : null;
+      b.down = [was, now];
+      // …then SAID, in Skylar's words, beneath the pill. (If a sign's own
+      // arrow felled the beast inside the scry, the price never ticked —
+      // the line would lie; the victory speaks for itself instead.)
+      if (now === was - 1) { ssF5Prompt(this, 'scryCost', this.L.x(0), this.L.y(398)); b.cost = (b.cost | 0) + 1; }
+      this.time.delayedCall(1500, () => this.f5ScryGateDown(g));
+    });
+  }
+  f5ScryGateDown(g) {
+    // beat 4 — the gate lifts: every depth goes home, the night goes on
+    this.strikeGlow.setDepth(0); this.strikeRib.setDepth(0); this.strikeT.setDepth(0);
+    if (g.veil.active) {
+      this.tweens.add({ targets: g.veil, alpha: 0, duration: 300, onComplete: () => { if (g.veil.active) g.veil.destroy(); } });
+    }
+    const b = window.__f5scry = window.__f5scry || {};
+    b.lifted = (b.lifted | 0) + 1;
+    DIAG('f5: scry gate lifted');
   }
 
   // The hint teaches the ORDER, not just the letters: tiles light one at a
