@@ -1,6 +1,76 @@
 # beta3 dev tools
 
-Thirty-three scripts, all dev-only — nothing here ships to the browser.
+Thirty-four scripts, all dev-only — nothing here ships to the browser.
+
+## worldwide-check.mjs — WORLDWIDE FINDS A RIVAL (v0.121.0)
+
+Skylar (10/9, off his phone on live beta3): "when you click challenge worldwide
+nothing happens it just says 'consulting the stars..' at the bottom. After 5-7
+seconds if no real players are in queue it should queue you against the
+computer (but the player won't know it's a computer) then the battle will
+start." REPRODUCED on the live v0.119.0 bytes with a phone-shaped CDP boot: with
+the sky reachable the path worked (theater at +0.3s, OPPONENT FOUND at +16s);
+with the socket cut AFTER boot — the page still in `firebase` mode, as a phone
+that slept or changed networks stands — the tap showed the note and
+`SSNET.dbGet('mp/rooms')` never settled (no error, no timeout: the RTDB SDK
+QUEUES reads until the socket returns). `VsMenu.match` awaited it without end,
+so the note was the last thing on screen. Three more hangs of the same class
+stood behind it: the quiet sky's last look (same read), goNear's door-shut
+transaction, and the mage's registry name claim over its own side door
+(`claimCircleName`) — any one of them held the theater on SEARCHING forever.
+
+The fix (versus.js + net.js + rival.js): `SSNET.connected` mirrors
+`.info/connected`; `vsSkyUp()` = firebase mode AND a socket the sky has not
+called dead. Every sky read on the worldwide path is bounded by `vsWithin`
+(`VS_FB.HUNT_MS` 2500 for the menu's hunt, `LOOK_MS` 1500 for the quiet sky's
+look and the rescans, `SHUT_MS` 1200 for the door-shut / join / re-seal
+transactions, rival.js `CLAIM_MS` 900 for the name claim); a dead socket is not
+asked at all. Past the bound the search is answered FROM THE DOOR —
+`vsNearSearch` seals the same near record goNear seals and the scene's own
+`SS_RIVAL.ensure` seats the mage — and anything the sky lands late is given
+back by `vsUnseat` (the late join/seal/shut: the host key passes on, an empty
+room closes). `vsQuickMatch(mode, deadline)` undoes its own late work. THE
+WINDOW: T rolls in [5s, 7s] (`T_MIN 5000 / T_SPREAD 2000`; was 8–15),
+`SETUP_MS` 3000 so the look starts 3s before the beat, `COMING_MS` 300 so two
+people tapping within a second still pair (the room record is the proof of
+life now). THE BEAT KEEPS WALL TIME: the quiet sky's alarm (`fbAlarm`) and the
+reveal (`revealTimer`) ride `wallAfter` (setTimeout + a per-visit token) —
+Phaser's clock clamps slow frames and ran seconds behind the clock the theater
+SHOWS on the harness box; the first look is armed from the FIRST room snapshot
+(`onRoom` → `quietSky`), not the 1s tick. THE HOST BELT (`hostBelt`,
+`HOST_BELT_MS` 8000): a queue room filled whose host never lights it is a dead
+host — the seat goes back and the near sky answers (`toNear`). The computer's
+reply pace is untouched (`BOT_PACE` 90–300s per reply, `thinkMs`).
+
+`node tools/worldwide-check.mjs [live dead silent slow deadhost]` — one
+phone-shaped Chrome on :9499 (/tmp/cdp-wwc, iPhone UA, DPR 3) per scenario, the
+folder on :8899 (started if nothing answers), the testroom sky for real; rooms
+it makes (`test_wwc*`) are deleted after. live: the theater at the tap, a LIVE
+queue room first, the mage on-device, FOUND on the beat, the room gone from the
+sky. dead: `Network.emulateNetworkConditions offline` after boot → the SDK
+says so → near from the door. silent: the same, with `SSNET.connected` pinned
+true → reads hang → HUNT_MS → near. slow: 2.5s latency. deadhost: a waiting
+public room with a fake host PUT by REST → the seat taken → the belt → near,
+and the dead room's record shows the seat given back. Each: the beat in [5,7],
+note never last, FOUND never early and inside the slack, 'pick' reached, the
+rival minted-named + rated, no bot/computer word anywhere on the scene, zero
+exceptions. ⚠ The beat's reveal is judged on the WALL clock; `secondTick`
+(the belt, the hold's re-looks) still rides Phaser's, so the deadhost slack is
+HOST_BELT_MS + 7s.
+
+Re-aimed: vspage-check §0 (the VS_FB pin → 5000/2000 + the bounded-hunt pin)
+and §7 ([5s, 7s]); rival-check queue ([5s, 7s], the stretch-tolerant late
+cap T+12 like vspage); vs-match (B's theater pin accepts SEARCHING or
+OPPONENT FOUND — under a 5–7s window B's own quiet sky may already have
+answered by the time A's room rose).
+
+⚠ Lessons: (1) an RTDB read over a dead socket never rejects — bound every
+awaited sky read on a player-facing path, and ask `.info/connected` first;
+(2) a timer the player can SEE (the theater's clock) must drive the beat on
+the same clock — Phaser's `delayedCall` is not it under slow frames; (3) a
+bounded transaction is not a cancelled one: whatever lands late must be undone
+by hand (vsUnseat), or a person waits on a seat nobody holds.
+
 
 ## sky-stays.mjs — THE SKY STAYS: the fight stands on the painted night (v0.119.0)
 
@@ -1378,7 +1448,7 @@ Elo runs off the seat's `rating` as for any stranger.
 ```
 node tools/rival-check.mjs          # everything, ~12 minutes
 node tools/rival-check.mjs brain    # sim + pacing pins (seconds)
-node tools/rival-check.mjs queue    # the quiet sky: reveal 11–17s, forced WIN then LOSS
+node tools/rival-check.mjs queue    # the quiet sky: reveal on the 5–7s roll (10/9; 11–17s before), forced WIN then LOSS
                                     # (rating + / −), rows, boards, presence, console
 ```
 

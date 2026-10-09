@@ -23,7 +23,7 @@
 //   PLAY   — the harness is the human: real taps on tiles and CAST, sigil cards
 //            by tap, to completion; the rival's transcript printed for a read
 //   QUEUE  — ?vsdemo=1 presses CHALLENGE WORLDWIDE alone: the searching
-//            theater's clock ticks up on screen, the roll T lands in [8,15]s,
+//            theater's clock ticks up on screen, the roll T lands in [5,7]s (10/9; was 8–15),
 //            the live room LEAVES the sky (the local swap) and one of the
 //            circle answers on this device with a seat cut like a person's,
 //            rated 40–90 off the player's; OPPONENT FOUND flips on the rolled
@@ -312,7 +312,7 @@ if (ONLY === 'all' || ONLY === 'queue') {
   ok('the search opened a queued room (seekAt stamped)', seated);
   const code = await ev(`${VS}.code`);
   const th = JSON.parse(await ev(`JSON.stringify(${VS}.theater || null)`));
-  ok('the searching theater stands with a rolled beat T in [8s, 15s]', !!th && th.T >= 8000 && th.T <= 15000, th && (th.T / 1000).toFixed(1) + 's');
+  ok('the searching theater stands with a rolled beat T in [5s, 7s]', !!th && th.T >= 5000 && th.T <= 7000, th && (th.T / 1000).toFixed(1) + 's');
   ok('under the searching line, no seal code and no roster on screen (every text walked, containers too)', await ev(`(() => {
     const walk = (list, out) => { for (const o of list) { if (o.text != null) out.push(o.text); if (o.list) walk(o.list, out); } return out; };
     const texts = walk(${VS}.children.list, []);
@@ -341,7 +341,9 @@ if (ONLY === 'all' || ONLY === 'queue') {
     return 0;
   })();
   const reveal = th && foundAt ? (foundAt - th.t0) / 1000 : -1;
-  ok('OPPONENT FOUND flips on the rolled beat — inside [8s, 16s], never early', foundAt > 0 && reveal >= 7.8 && reveal <= 16.5 && foundAt >= th.t0 + th.T - 500, reveal.toFixed(1) + 's of ' + (th.T / 1000).toFixed(1) + 's rolled');
+  // never early is the law; the late cap is stretch-tolerant (the reveal is a
+  // GAME-clock delayedCall — vspage §7's 10/7 lesson), T+12 at most
+  ok('OPPONENT FOUND flips on the rolled beat — never early, inside the stretch-tolerant cap', foundAt > 0 && reveal >= 4.8 && reveal <= th.T / 1000 + 12 && foundAt >= th.t0 + th.T - 500, reveal.toFixed(1) + 's of ' + (th.T / 1000).toFixed(1) + 's rolled');
   ok('…and the rival was seated BEFORE the reveal (the theater never lies)', !!seat && seat.joinedAt < foundAt);
   ok('uid cut like a device uid, no test_ prefix', /^u[a-z0-9]{8,}$/.test(other || ''), other);
   ok('name cut like a generated name', !!seat && /^[A-Z][a-z]+ [A-Z][a-z]+( \d+)?$/.test(seat.name), seat && seat.name);

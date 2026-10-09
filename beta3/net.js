@@ -41,6 +41,12 @@ const SSNET = (() => {
   };
   let mode = 'connecting'; // 'firebase' | 'local' | 'connecting'
   let fdb = null;
+  // the socket's own word (.info/connected): a page can stand in 'firebase'
+  // mode with its socket dead under it — a phone that slept, a network that
+  // changed hands — and every read then QUEUES until the sky is back (Skylar's
+  // 10/9 stall: "consulting the stars…" forever). null until the sky has
+  // spoken once; versus reads it to skip the sky it cannot reach.
+  let connected = null;
 
   // ---- identity (device uid + generated name, FAVOR-style) ----
   // ?mpuid=x is the same-machine test identity ('test_x' + a Wisp name), used
@@ -263,6 +269,7 @@ const SSNET = (() => {
       const app = firebase.apps && firebase.apps.length ? firebase.app() : firebase.initializeApp(FB_CONFIG);
       fdb = firebase.database(app);
       mode = 'firebase';
+      try { fdb.ref('.info/connected').on('value', (s) => { connected = !!s.val(); }); } catch (e) { }
       await Promise.race([
         dbGet('players/' + uid() + '/name'),
         new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 6000)),
@@ -667,5 +674,5 @@ const SSNET = (() => {
     async decline(fromUid) { try { await dbSet('invites/' + uid() + '/' + fromUid, null); } catch (e) { } },
   };
 
-  return { connect, uid, myName, setName, mintUid, mintName, nameKey, claimName, releaseName, findByName, mintClaimed, ensureName, renameNotice, side, submitScore, submitEndless, submitHard, dressFlag, getWeekFlags, getBoard, syncProfile, dayKey, setDayKey, dayKeyISO, msToNextDay, msToNextWeek, weekKey, ref, dbGet, dbSet, dbUpdate, dbTxn, FR, get mode() { return mode; } };
+  return { connect, uid, myName, setName, mintUid, mintName, nameKey, claimName, releaseName, findByName, mintClaimed, ensureName, renameNotice, side, submitScore, submitEndless, submitHard, dressFlag, getWeekFlags, getBoard, syncProfile, dayKey, setDayKey, dayKeyISO, msToNextDay, msToNextWeek, weekKey, ref, dbGet, dbSet, dbUpdate, dbTxn, FR, get mode() { return mode; }, get connected() { return connected; } };
 })();

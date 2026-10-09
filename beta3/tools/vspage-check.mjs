@@ -100,7 +100,14 @@ ok('no retired key survives in any language',
   OLD_KEYS.every((k) => !new RegExp('[^a-zA-Z]' + k + ':').test(strSrc)),
   OLD_KEYS.filter((k) => new RegExp('[^a-zA-Z]' + k + ':').test(strSrc)).join(','));
 ok('the searching theater is real: the rolled beat, the found gate, the ticking clock',
-  /T_MIN: 8000, T_SPREAD: 7000/.test(vsSrc) && /buildTheater/.test(vsSrc) && /foundBeat/.test(vsSrc) && /searchClockT/.test(vsSrc));
+  /T_MIN: 5000, T_SPREAD: 2000/.test(vsSrc) && /buildTheater/.test(vsSrc) && /foundBeat/.test(vsSrc) && /searchClockT/.test(vsSrc));
+// the 10/9 window + the bounded hunt (Skylar's stall): every sky read on the
+// worldwide path is bounded, a dead socket is not asked, the menu answers
+// from this device past HUNT_MS, and the beat is kept by its own alarm
+ok('the hunt is bounded and the near answer stands in from the door (10/9)',
+  /HUNT_MS: 2500/.test(vsSrc) && /LOOK_MS: 1500/.test(vsSrc) && /SHUT_MS: 1200/.test(vsSrc) && /function vsWithin/.test(vsSrc)
+  && /function vsSkyUp/.test(vsSrc) && /function vsNearSearch/.test(vsSrc) && /function vsUnseat/.test(vsSrc) && /fbAlarm/.test(vsSrc)
+  && /hostBelt\(\)/.test(vsSrc) && /get connected\(\)/.test(readFileSync('net.js', 'utf8')) && /CLAIM_MS/.test(readFileSync('rival.js', 'utf8')));
 ok('the harness seams stand: ?vsfind pins the roll, ?botpace shrinks the reply rhythm',
   /QS\.get\('vsfind'\)/.test(vsSrc) && /QS\.get\('botpace'\)/.test(readFileSync('rival.js', 'utf8')));
 ok('the near sky + the plaque rows are in the served set', /SS_NEAR/.test(vsSrc) && /VS_PEND/.test(vsSrc) && /pendRows/.test(vsSrc));
@@ -559,7 +566,7 @@ ok('the tap raises the searching theater over a queued TURNS room',
     && s.room.mode === 'turns' && !s.room.private && !!s.theater && !s.revealed })()`, 25000));
 const th = JSON.parse(await A.ev(`JSON.stringify((() => { const s = game.scene.getScene('vsbattle'); return { code: s.code, t0: s.theater.t0, T: s.theater.T } })())`));
 codes.add(th.code);
-ok('the beat is rolled inside [8s, 15s]', th.T >= 8000 && th.T <= 15000, (th.T / 1000).toFixed(1) + 's');
+ok('the beat is rolled inside [5s, 7s] (Skylar 10/9: "after 5-7 seconds")', th.T >= 5000 && th.T <= 7000, (th.T / 1000).toFixed(1) + 's');
 ok('no seal, no share, no roster under the theater — the summons-sealed screen never appears on this path',
   await A.ev(`(() => { const s = game.scene.getScene('vsbattle');
     const walk = (list, out) => { for (const o of list) { if (o.text != null) out.push(o.text); if (o.list) walk(o.list, out); } return out; };

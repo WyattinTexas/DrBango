@@ -332,6 +332,8 @@ const SS_RIVAL = (() => {
   function note(ev, x) { const e = Object.assign({ t: Date.now(), ev }, x || {}); log.push(e); if (log.length > 400) log.shift(); }
   try { window.__ssRivalLog = log; } catch (e) { }
 
+  // the registry claim's bound at the mage's arrival (ms) — see Duelist.attach
+  const CLAIM_MS = 900;
   class Duelist {
     constructor(o) {
       this.uid = o.uid || SSNET.mintUid();
@@ -388,8 +390,17 @@ const SS_RIVAL = (() => {
       this.room = null; this.board = null; this.state = 'join';
       this.pending = null; this.scryAt = 0; this.turnSince = 0; this.answered = false;
       // one of the circle answers under a name the registry knows is its own
-      // (offline, the standing claim from the duel's first evening holds)
-      if (this.persona && this.liveDb()) { await claimCircleName(this.liveDb(), this.persona); if (!this.alive) return; this.name = this.persona.name; }
+      // (offline, the standing claim from the duel's first evening holds).
+      // The claim is BOUNDED (10/9 — Skylar's stall): over a slow socket the
+      // registry answers late, over a dead one never, and the mage must
+      // still arrive on the theater's beat — past CLAIM_MS the standing name
+      // serves; a claim that lands later renames the circle's row for the
+      // NEXT duel. A socket the sky has called dead is not asked at all.
+      if (this.persona && this.liveDb() && SSNET.connected !== false) {
+        await Promise.race([claimCircleName(this.liveDb(), this.persona), new Promise((res) => setTimeout(res, CLAIM_MS))]);
+        if (!this.alive) return;
+        this.name = this.persona.name;
+      }
       if (!(await this.join(code))) { note('cold', Object.assign({ code }, this.lastJoin)); this.stop(); return; }
       if (!this.alive) return;
       this.duels++;

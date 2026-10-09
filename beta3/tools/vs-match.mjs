@@ -15,7 +15,7 @@
 // still meets anyone once the tolerance has opened (and a veiled rating
 // queues by its true number); three simultaneous searchers never
 // double-claim or orphan a room, over repeated runs; since v0.86.0 the one
-// left alone is answered INSIDE the searching theater's 8–15s roll: the live
+// left alone is answered INSIDE the searching theater's 5–7s roll (10/9; 8–15 before): the live
 // room leaves the sky (the local swap) and a circle mage duels them on their
 // own device — and two far-apart searchers who both outlast their tolerance
 // still pair with EACH OTHER (the last look + the younger-coming hold beat
@@ -140,8 +140,11 @@ ok('C (1050) takes the seat in A\'s room, not B\'s', await poll(async () => {
   const rs = await testRooms(); const b = seatsOf(rs, B.uid);
   ok('B is still alone in their own room', b.length === 1 && Object.keys(rs[b[0]].players).length === 1);
   ok('A\'s room rose into the duel', await poll(async () => { const rs = await testRooms(); const a = seatsOf(rs, A.uid); return a.length === 1 && rs[a[0]].status === 'active'; }, 30000));
+  // under the 5–7s window (10/9) B's own quiet sky may already have answered
+  // by the time A's room rose — the pin is the THEATER itself (its line is
+  // SEARCHING or OPPONENT FOUND), never the old lobby
   ok('the searching screen is the THEATER (9/3 card 03) — B\'s tab waits under it, no lobby', await B.ev(`(() => { const s = game.scene.getScene('vsbattle');
-    return game.scene.isActive('vsbattle') && s.room.status === 'waiting' && !!s.theater && !!s.searchT && s.searchT.text === SS_T('vsSearching') && !s.revealed })()`));
+    return game.scene.isActive('vsbattle') && !!s.theater && !!s.searchT && (s.searchT.text === SS_T('vsSearching') || s.searchT.text === SS_T('vsFound')) && !s.shareB && !s.waitT })()`));
 }
 await A.park(); await B.park(); await C.park(); await sweep();
 

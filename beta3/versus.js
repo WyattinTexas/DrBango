@@ -1018,16 +1018,38 @@ class VsMenu extends Phaser.Scene {
     this.busyC = true;
     this.note(SS_T('vsConsult'));
     // the searching theater's clock starts at the tap — the whole hunt
-    // (reads, joins, the quiet sky) plays out under one rolled 8–15s beat.
-    // ?vsfind=MS pins the roll for the harnesses (the ?ride=0 pattern).
+    // (reads, joins, the quiet sky) plays out under one rolled 5–7s beat
+    // (VS_FB; Skylar 10/9). ?vsfind=MS pins the roll for the harnesses (the
+    // ?ride=0 pattern).
     const pin = parseInt(QS.get('vsfind'), 10);
     const theater = { t0: Date.now(), T: Number.isFinite(pin) ? Math.max(1200, pin) : Math.round(VS_FB.T_MIN + Math.random() * VS_FB.T_SPREAD) };
-    const conn = await SSNET.connect();
-    if (conn !== 'firebase') { this.note(SS_T('vsNoSky')); this.busyC = false; return; }
-    const code = await vsQuickMatch(mode);
-    if (!this.sys.isActive()) return;
-    if (code) this.scene.start('vsbattle', { code, theater });
-    else { this.note(SS_T('vsRefused'), 3000); this.busyC = false; }
+    try {
+      const conn = await SSNET.connect();
+      if (conn !== 'firebase') { this.note(SS_T('vsNoSky')); this.busyC = false; return; }   // never online this boot: the honest door
+      // THE HUNT, BOUNDED (10/9 — Skylar's stall): a page in 'firebase' mode
+      // whose socket died under it (a phone that slept, a network that
+      // changed hands) QUEUES every read until the sky returns — the rooms
+      // read never settled, and "consulting the stars…" was the last thing
+      // he saw. The live hunt now has HUNT_MS; a socket the sky has called
+      // dead is not asked at all; past the bound (or a refused seal) the
+      // search is answered from this device — the very near duel the quiet
+      // sky seats — and the theater rises with its clock already running.
+      let code = null;
+      if (vsSkyUp()) {
+        const r = await vsWithin(vsQuickMatch(mode, Date.now() + VS_FB.HUNT_MS), VS_FB.HUNT_MS);
+        code = r === VS_LATE ? null : r;
+      }
+      if (!this.sys.isActive()) return;
+      if (!code) code = vsNearSearch(mode);
+      if (!code) { this.note(SS_T('vsRefused'), 3000); this.busyC = false; return; }
+      this.scene.start('vsbattle', { code, theater });
+    } catch (e) {
+      // even a hunt that THROWS resolves — the note is never the last word
+      if (!this.sys.isActive()) return;
+      const code = vsNearSearch(mode);
+      if (code) this.scene.start('vsbattle', { code, theater });
+      else { this.note(SS_T('vsRefused'), 3000); this.busyC = false; }
+    }
   }
   /* ---------- test recipes (?frdemo=) ----------
      host:   befriend test_b, wait for them online, CHALLENGE (their tab runs
@@ -1781,7 +1803,74 @@ const VS_MM = { TOL: 75, STEP: 75, STEP_MS: 3000, RESCAN_MS: 2500 };
 // waited a breath will reach their own last look inside the elder's hold —
 // gating the hold on a longer wait let an early-rolling elder swap local
 // while a person was mid-theater (both got the circle; Q1 says people first)
-const VS_FB = { T_MIN: 8000, T_SPREAD: 7000, SETUP_MS: 2400, HOLD_MS: 8000, COMING_MS: 1500, ARRIVE_MS: 500, ARRIVE_SPREAD: 800 };
+// THE WINDOW (10/9 — Skylar: "After 5-7 seconds if no real players are in
+// queue it should queue you against the computer"): T rolls in [5s, 7s] (was
+// 8–15); the quiet sky's look starts SETUP_MS before the beat so the mage is
+// seated when it lands; COMING_MS dropped to a breath — in a 5–7s window the
+// room record itself is the proof of life, and two people who tap within a
+// second of each other must still pair. HUNT_MS / LOOK_MS / SHUT_MS bound
+// every sky read on the path (vsWithin): a socket that died under a page
+// still in 'firebase' mode queues reads without end — Skylar's stall.
+// HOST_BELT_MS: a filled room whose host never lights it is a dead host.
+const VS_FB = { T_MIN: 5000, T_SPREAD: 2000, SETUP_MS: 3000, HOLD_MS: 8000, COMING_MS: 300, ARRIVE_MS: 500, ARRIVE_SPREAD: 800,
+  HUNT_MS: 2500, LOOK_MS: 1500, SHUT_MS: 1200, HOST_BELT_MS: 8000 };
+// a sky read that may never settle, bounded: resolves to the read's value, or
+// to VS_LATE past `ms` (a rejection counts as late — the caller treats both as
+// a quiet sky). The read itself runs on; late results are the caller's to undo.
+const VS_LATE = Symbol('late');
+function vsWithin(p, ms) {
+  return new Promise((res) => {
+    let done = false;
+    const t = setTimeout(() => { if (!done) { done = true; res(VS_LATE); } }, ms);
+    Promise.resolve(p).then((v) => { if (!done) { done = true; clearTimeout(t); res(v); } },
+      () => { if (!done) { done = true; clearTimeout(t); res(VS_LATE); } });
+  });
+}
+// the sky as it stands: 'firebase' mode AND a socket the sky has not called
+// dead (.info/connected; null = not yet spoken, taken as up). A dead socket
+// is not asked anything — the near answer stands in at once.
+function vsSkyUp() { return SSNET.mode === 'firebase' && SSNET.connected !== false; }
+// a seat the sky still holds for me after the search moved on (a late join,
+// a late seal, a room shut late): give it back — the host key passes to
+// whoever is left, an empty room closes, an active one wears my gone-mark —
+// the very transaction leaveRoom runs. Fire-and-forget: it lands when the
+// sky does.
+function vsUnseat(code) {
+  SSNET.dbTxn('mp/rooms/' + code, (cur) => {
+    if (!cur || !cur.players || !cur.players[vsUid()]) return cur;
+    if (cur.status !== 'waiting') { cur.players[vsUid()].gone = true; return cur; }
+    const players = { ...cur.players };
+    delete players[vsUid()];
+    const rest = Object.entries(players).sort((a, b) => a[1].seat - b[1].seat);
+    if (!rest.length) return null;
+    const next = { ...cur, players };
+    if (cur.hostUid === vsUid()) next.hostUid = rest[0][0];
+    return next;
+  }).catch(() => { });
+}
+// THE NEAR ANSWER FROM THE DOOR (10/9): a search that never reached the sky —
+// or reached it and heard nothing in time — is answered on this device
+// without a live room ever standing: the same near record goNear seals (a
+// worldwide room's shape, the correspondence dress), the same note; the mage
+// arrives through SS_RIVAL.ensure when the scene opens on the code (the
+// re-entered-duel path), and the theater's found gate lands OPPONENT FOUND
+// on the rolled second as ever. Returns the code, or null with no engine.
+function vsNearSearch(mode) {
+  if (typeof SS_RIVAL === 'undefined' || !SS_RIVAL.persona) return null;
+  const code = vsCode();
+  const who = SS_RIVAL.persona(SS.prof.rating);
+  const corr = mode === 'turns';
+  const now = Date.now();
+  const rec = {
+    mode, status: 'waiting', createdAt: now, hostUid: vsUid(),
+    seed: Math.floor(Math.random() * 1e9), lang: ssGameLang(),
+    private: false, seekAt: now,
+    players: { [vsUid()]: vsSeat(0, corr ? VS_CORR_HP : 0) },
+  };
+  if (corr) { rec.corr = 1; rec.hp = VS_CORR_HP; rec.turnCasts = 0; rec.movedAt = now; }
+  SS_NEAR.seal(code, rec, { uid: who.uid, myPlays: [], plays: [], seen: 0 });
+  return code;
+}
 // a younger public room of `mode`, host alone, that is about to migrate into mine
 function vsYoungerComing(rooms, mode, now, own, seekAt) {
   for (const [id, r] of Object.entries(rooms || {})) {
@@ -1833,7 +1922,13 @@ function vsPickRoom(rooms, mode, now, seekAt, own, skip) {
   }
   return best;
 }
-async function vsQuickMatch(mode) {
+// `deadline` (epoch ms, optional — the menu's HUNT_MS): a hunt the caller has
+// given up on must leave NOTHING behind it — no seat in a stranger's room
+// (they would wait on a duelist fighting elsewhere), no fresh room of its own
+// (a person could join a host who has moved on). Anything that lands late is
+// given back (vsUnseat) and null is returned.
+async function vsQuickMatch(mode, deadline) {
+  const late = () => !!deadline && Date.now() > deadline;
   try {
     const rooms = (await SSNET.dbGet('mp/rooms').catch(() => null)) || {};
     const now = Date.now();
@@ -1857,20 +1952,27 @@ async function vsQuickMatch(mode) {
     for (const [id, r] of Object.entries(rooms)) {
       if (r && r.status === 'waiting' && r.mode === mode && !r.private && (r.players || {})[vsUid()]) {
         if (!r.seekAt) await SSNET.dbUpdate('mp/rooms/' + id, { seekAt: now }).catch(() => { });
+        if (late()) { vsUnseat(id); return null; }
         return id;
       }
     }
     // the closest rival first; if their door shuts as I reach it, the next
     const skip = new Set();
     for (;;) {
+      if (late()) return null;
       const pick = vsPickRoom(rooms, mode, now, now, null, skip);
       if (!pick) break;
-      if (await vsJoinRoom(pick.id)) return pick.id;
+      if (await vsJoinRoom(pick.id)) {
+        if (late()) { vsUnseat(pick.id); return null; }
+        return pick.id;
+      }
       skip.add(pick.id);
     }
     // open a new room and wait in the queue
+    if (late()) return null;
     const code = vsCode();
     if (!(await vsSealRoom(code, mode, { seekAt: now }))) return null;
+    if (late()) { vsUnseat(code); return null; }
     return code;
   } catch (e) { return null; }
 }
@@ -1979,7 +2081,13 @@ class VsBattle extends Phaser.Scene {
     this.beginQueued = false; this.revealTimer = null; this.swapping = false;
     // the scene instance outlives a room: the quiet sky's clock must start
     // fresh with every seal, or the NEXT search would be answered at once
-    this.fbAt = 0; this.fbRival = null; this.fbSpawnAt = 0; this.fbBusy = false;
+    this.fbAt = 0; this.fbRival = null; this.fbSpawnAt = 0; this.fbBusy = false; this.fbAlarm = null;
+    // THE BEAT KEEPS WALL TIME (10/9): Phaser's clock clamps a slow frame to
+    // a target step, so on a struggling renderer it runs seconds behind the
+    // clock the theater SHOWS (Date.now). The alarm for the quiet sky's look
+    // and the reveal itself ride setTimeout, guarded by the scene's life and
+    // this visit's token (the scene instance outlives a room)
+    this.wallTimers = new Set(); this.wallToken = {};
     this.migrating = false; this.rescanning = false; this.lastScan = 0; this.left = false;
     // the rematch affair, reset every visit — the scene instance persists,
     // so a stale rematchBusy/pulse would dead-lock the NEXT end screen's door
@@ -2042,6 +2150,9 @@ class VsBattle extends Phaser.Scene {
     this.game.events.on('ss-ach', this.onAchCb);
     this.events.once('shutdown', () => {
       this.game.events.off('ss-ach', this.onAchCb);
+      this.wallToken = {};
+      for (const t of this.wallTimers) clearTimeout(t);
+      this.wallTimers.clear();
       if (this.roomRef) this.roomRef.off('value', this.onRoomCb);
       if (this.castsRef) this.castsRef.off('child_added', this.onCastCb);
       if (this.rmNoRef && this.rmNoCb) { this.rmNoRef.off('value', this.rmNoCb); this.rmNoCb = null; }
@@ -2185,7 +2296,7 @@ class VsBattle extends Phaser.Scene {
 
   /* ---------- the searching theater (worldwide, 9/3 card 03) ----------
      Skylar: tap CHALLENGE WORLDWIDE → "searching for an opponent" for a
-     rolled 8–15s → OPPONENT FOUND → straight into the duel. No seal code,
+     rolled 5–7s (8–15 until 10/9) → OPPONENT FOUND → straight into the duel. No seal code,
      no share, no roster. Under the veil the real hunt runs unchanged
      (humans first — Q1's stamp): the queue can seat a person at any beat;
      the quiet sky answers at the roll's end. The dress is the game's own —
@@ -2267,7 +2378,8 @@ class VsBattle extends Phaser.Scene {
     this.time.delayedCall(2600, () => { if (this.shareT.active) this.shareT.setText(SS_T('vsShareInvite')); });
   }
   killTheater() {
-    if (this.revealTimer) { this.revealTimer.remove(false); this.revealTimer = null; }
+    if (this.revealTimer != null) { this.wallClear(this.revealTimer); this.revealTimer = null; }
+    if (this.fbAlarm != null) { this.wallClear(this.fbAlarm); this.fbAlarm = null; }
     if (this.thClockEv) { this.thClockEv.remove(false); this.thClockEv = null; }
     this.revealed = true;
     if (this.thMotes) { for (const m of this.thMotes) m.destroy(); this.thMotes = null; }
@@ -2313,7 +2425,11 @@ class VsBattle extends Phaser.Scene {
     // start pulling the room's dictionary the moment its tongue is known, so
     // the beginBattle gate almost never actually has to wait
     if (first && room.lang && room.lang !== 'en') SS_DICT.load(room.lang);
-    if (room.status === 'waiting') { this.maybeAutoStart(); return; }
+    if (room.status === 'waiting') {
+      this.maybeAutoStart();
+      this.quietSky();   // the beat's alarm is set from the FIRST snapshot (10/9) — the 1s tick alone came late under slow frames
+      return;
+    }
     if (room.status === 'active' && this.state === 'wait') this.queueBegin();
     if (room.status === 'active') {
       this.updatePanels();
@@ -2332,12 +2448,24 @@ class VsBattle extends Phaser.Scene {
      Under the theater the duel may form early (a person!) — the reveal
      holds until the rolled beat lands, then OPPONENT FOUND, then the rise.
      Without a theater this is beginBattle, as ever. */
+  // a wall-clock timer bound to this visit of the scene (see init)
+  wallAfter(ms, fn) {
+    const token = this.wallToken;
+    const t = setTimeout(() => {
+      this.wallTimers.delete(t);
+      if (this.wallToken !== token || !this.sys || !this.sys.isActive()) return;
+      try { fn(); } catch (e) { }
+    }, Math.max(0, ms));
+    this.wallTimers.add(t);
+    return t;
+  }
+  wallClear(t) { if (t != null) { clearTimeout(t); this.wallTimers.delete(t); } }
   queueBegin() {
     if (this.state !== 'wait' || this.beginQueued) return;
     this.beginQueued = true;
     if (!this.theater) { this.beginBattle(); return; }
     const wait = Math.max(0, this.theater.t0 + this.theater.T - Date.now());
-    this.revealTimer = this.time.delayedCall(wait, () => this.foundBeat());
+    this.revealTimer = this.wallAfter(wait, () => this.foundBeat());
   }
   foundBeat() {
     this.revealTimer = null;
@@ -2454,11 +2582,17 @@ class VsBattle extends Phaser.Scene {
     if (r.private || !r.seekAt || r.hostUid !== vsUid() || this.challenged) return;
     if (Object.keys(r.players || {}).length !== 1) return;
     if (Date.now() - (this.lastScan || 0) < VS_MM.RESCAN_MS) return;
+    // the beat's own last look IS a rescan (10/9): none starts inside its
+    // last breath, so the quiet sky never waits its turn behind one
+    if (this.fbAt && Date.now() >= this.fbAt - 400) return;
     this.lastScan = Date.now();
     this.rescanning = true;
     (async () => {
       try {
-        const rooms = (await SSNET.dbGet('mp/rooms').catch(() => null)) || {};
+        // bounded like every sky read on this path — a dead socket must not
+        // hold the flag (and behind it the quiet sky) without end
+        const seen = vsSkyUp() ? await vsWithin(SSNET.dbGet('mp/rooms').catch(() => null), VS_FB.LOOK_MS) : null;
+        const rooms = (seen && seen !== VS_LATE) ? seen : {};
         if (!this.sys.isActive() || !this.room || this.room.status !== 'waiting' || Object.keys(this.room.players || {}).length !== 1) return;
         const pick = vsPickRoom(rooms, r.mode, Date.now(), r.seekAt, { code: this.code, createdAt: r.createdAt || 0 }, null);
         if (pick) await this.migrate(pick.id);
@@ -2469,13 +2603,23 @@ class VsBattle extends Phaser.Scene {
     const mode = this.room.mode, seekAt = this.room.seekAt;
     this.migrating = true;
     // 1. shut my own door — atomically, and only if I am still alone behind
-    //    it; a rival who took the seat meanwhile wins, and I stay
+    //    it; a rival who took the seat meanwhile wins, and I stay. BOUNDED
+    //    (10/9): a door that will not answer in SHUT_MS keeps me where I am —
+    //    the beat never waits behind a hung transaction; should its late word
+    //    turn out to have shut the room behind me, the near sky answers.
     try { if (this.meRef) this.meRef.child('gone').onDisconnect().cancel(); } catch (e) { }
-    const shut = await SSNET.dbTxn('mp/rooms/' + this.code, (cur) => {
+    const shutP = SSNET.dbTxn('mp/rooms/' + this.code, (cur) => {
       if (!cur) return cur;
       if (cur.status !== 'waiting' || !cur.players || !cur.players[vsUid()] || Object.keys(cur.players).length !== 1) return cur;
       return null;
     });
+    const shut = await vsWithin(shutP, VS_FB.SHUT_MS);
+    if (shut === VS_LATE) {
+      this.migrating = false;
+      try { if (this.meRef) this.meRef.child('gone').onDisconnect().set(true); } catch (e) { }
+      shutP.then((r) => { if (r && !r.value && this.sys.isActive() && !this.near && this.state === 'wait') this.toNear(); }).catch(() => { });
+      return;
+    }
     if (shut.value) {   // taken — the duel is here after all
       this.migrating = false;
       try { if (this.meRef) this.meRef.child('gone').onDisconnect().set(true); } catch (e) { }
@@ -2483,21 +2627,63 @@ class VsBattle extends Phaser.Scene {
     }
     // 2. the same seat-claim transaction a newcomer uses; the elder room may
     //    have filled in the meantime, and then my own door reopens under the
-    //    same code with the same wait (the queue never forgets how long)
-    if (await vsJoinRoom(target)) {
+    //    same code with the same wait (the queue never forgets how long).
+    //    Both bounded: a seat that lands late is given back (vsUnseat); a
+    //    sky that will not take my door back leaves the search to the near sky.
+    const joinP = vsJoinRoom(target);
+    const joined = await vsWithin(joinP, VS_FB.SHUT_MS);
+    if (joined === true) {
       this.left = true;   // nothing to mark gone — the old room is already gone
       if (this.sys.isActive()) this.scene.start('vsbattle', { code: target });
       return;
     }
-    await vsSealRoom(this.code, mode, { seekAt });
+    if (joined === VS_LATE) joinP.then((ok) => { if (ok) vsUnseat(target); }).catch(() => { });
+    const sealP = vsSealRoom(this.code, mode, { seekAt });
+    const sealed = await vsWithin(sealP, VS_FB.SHUT_MS);
+    if (sealed !== true) {
+      if (sealed === VS_LATE) sealP.then((ok) => { if (ok) vsUnseat(this.code); }).catch(() => { });
+      this.migrating = false;
+      this.toNear();
+      return;
+    }
     try { if (this.meRef) this.meRef.child('gone').onDisconnect().set(true); } catch (e) { }
     this.migrating = false;
+  }
+  // the search leaves a sky that stopped answering mid-step (10/9): whatever
+  // the sky still holds for me is given back when it speaks (vsUnseat), and
+  // the near sky answers under a fresh code — the theater's clock runs on,
+  // OPPONENT FOUND lands on its rolled second (or at once, if that has passed)
+  toNear() {
+    if (!this.sys.isActive() || this.near || this.left) return;
+    this.left = true;   // nothing of mine to gone-mark on the way out
+    if (this.roomRef) this.roomRef.off('value', this.onRoomCb);
+    if (this.castsRef) this.castsRef.off('child_added', this.onCastCb);
+    vsUnseat(this.code);
+    const code = vsNearSearch((this.room && this.room.mode) || 'turns');
+    if (!code) { this.scene.start('vsmenu'); return; }
+    this.scene.start('vsbattle', { code, theater: this.theater || null });
+  }
+  // THE HOST BELT (10/9): a seat taken in a stranger's room whose host never
+  // lights it — their app closed mid-search, their socket died before the
+  // server marked them gone — would wait under the theater forever (only a
+  // host starts a duel). A host silent HOST_BELT_MS past the room filling is
+  // a dead host: the seat goes back to the sky and the near sky answers the
+  // search this device began. Queue rooms only (seekAt) — a summons or a
+  // shared link keeps its own manners.
+  hostBelt() {
+    const r = this.room;
+    if (this.near || this.migrating || this.swapping || this.left || !r || r.status !== 'waiting') return;
+    if (r.private || !r.seekAt || r.hostUid === vsUid() || this.challenged || this.joining) return;
+    const me = this.me();
+    if (!me || Object.keys(r.players || {}).length < VS_MAX[r.mode]) return;
+    if (Date.now() - (Number(me.joinedAt) || (this.theater ? this.theater.t0 : Date.now())) < VS_FB.HOST_BELT_MS) return;
+    this.toNear();
   }
 
   /* ---------- the quiet sky, from the host's chair (VS_FB above) ---------- */
   quietSky() {
     const r = this.room;
-    if (this.fbBusy || this.migrating || this.rescanning || this.swapping || this.near || !r || r.status !== 'waiting') return;
+    if (this.fbBusy || this.migrating || this.swapping || this.near || !r || r.status !== 'waiting') return;
     if (r.private || !r.seekAt || r.hostUid !== vsUid() || this.challenged) return;
     if (VS_MAX[r.mode] !== 2) return;   // the battlegrounds fill by hand
     if (Object.keys(r.players || {}).length !== 1) return;
@@ -2509,11 +2695,23 @@ class VsBattle extends Phaser.Scene {
       this.fbAt = end - VS_FB.SETUP_MS;
     }
     const now = Date.now();
-    if (now < this.fbAt) return;
+    if (now < this.fbAt || this.rescanning) {
+      // the beat is kept to the millisecond, not the second tick (10/9): a
+      // 5–7s window has no room for the tick's slip — the quiet sky sets its
+      // own alarm for the moment the look is due (and re-arms behind a
+      // rescan still reading; that read is bounded too)
+      if (this.fbAlarm == null) this.fbAlarm = this.wallAfter(Math.max(200, this.fbAt - now + 20), () => { this.fbAlarm = null; this.quietSky(); });
+      return;
+    }
     this.fbBusy = true;
     (async () => {
       try {
-        const rooms = (await SSNET.dbGet('mp/rooms').catch(() => null)) || {};
+        // the last look, BOUNDED (10/9): a sky that cannot answer inside
+        // LOOK_MS is a quiet sky, and a socket the sky has called dead is not
+        // asked at all — the old look awaited the read without end, and a
+        // dead socket held the theater on SEARCHING forever
+        const seen = vsSkyUp() ? await vsWithin(SSNET.dbGet('mp/rooms').catch(() => null), VS_FB.LOOK_MS) : null;
+        const rooms = (seen && seen !== VS_LATE) ? seen : {};
         if (!this.sys.isActive() || this.migrating || !this.room || this.room.status !== 'waiting' || Object.keys(this.room.players || {}).length !== 1) return;
         const t = Date.now();
         const own = { code: this.code, createdAt: r.createdAt || 0 };
@@ -2539,12 +2737,22 @@ class VsBattle extends Phaser.Scene {
       if (this.roomRef) this.roomRef.off('value', this.onRoomCb);
       if (this.castsRef) this.castsRef.off('child_added', this.onCastCb);
       try { if (this.meRef) this.meRef.child('gone').onDisconnect().cancel(); } catch (e) { }
-      const shut = await SSNET.dbTxn('mp/rooms/' + this.code, (cur) => {
+      // the door shuts by transaction — BOUNDED (10/9): a sky that cannot
+      // answer inside SHUT_MS (or a socket it has called dead, not waited on
+      // at all) has lost custody of the room; the search leaves regardless.
+      // The transaction itself runs on and lands when the sky does: a room
+      // still mine alone closes then, and a seat a person took as the door
+      // was closing is handed back to them with the host key (vsUnseat) —
+      // nobody waits on a host who has moved on.
+      const shutP = SSNET.dbTxn('mp/rooms/' + this.code, (cur) => {
         if (!cur) return cur;
         if (cur.status !== 'waiting' || !cur.players || !cur.players[vsUid()] || Object.keys(cur.players).length !== 1) return cur;
         return null;
       });
-      if (shut.value) {
+      const shut = vsSkyUp() ? await vsWithin(shutP, VS_FB.SHUT_MS) : VS_LATE;
+      if (shut === VS_LATE) {
+        shutP.then((r) => { if (r && r.value) vsUnseat(this.code); }).catch(() => { });
+      } else if (shut.value) {
         // taken — a person got the seat as the door was closing; play THEM
         try { if (this.meRef) this.meRef.child('gone').onDisconnect().set(true); } catch (e) { }
         this.roomRef.on('value', this.onRoomCb);
@@ -2963,7 +3171,7 @@ class VsBattle extends Phaser.Scene {
   secondTick() {
     this.sweepHolds();   // a strike beat whose landing died frees its bar
     if (this.scryCooldown > 0) this.scryCooldown--;
-    if (this.room && this.room.status === 'waiting') { this.rescan(); this.quietSky(); }
+    if (this.room && this.room.status === 'waiting') { this.rescan(); this.quietSky(); this.hostBelt(); }
     if (!this.room || this.room.status !== 'active') return;
     if (this.room.mode === 'timed') {
       const left = Math.max(0, VS_TIME_MS - (Date.now() - this.room.startedAt));
