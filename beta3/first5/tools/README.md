@@ -3,12 +3,27 @@
 Harness for the FIRST5 sandbox (the first-night tutorial test build at
 drbango.com/beta3/first5/ — batch `ss-2026-10-07-first-night` + fix round
 `ss-2026-10-08-first5-fixes` + `ss-2026-10-09-night-sky-live` card 03 +
-`ss-2026-10-09-first5-script` cards 01–04).
+`ss-2026-10-09-first5-script` cards 01–05).
 
 **first5-check.mjs** — the whole-stage suite (cards 01-06 + fix 01 THE
 CLEAN REFRESH + fix 02 THE STRAY SIGNS + fix 03 THE SCRY LESSON + STRAIGHT
 INTO THE NIGHT + THE PAINTED FIRST FIVE + THE GUIDED HAND, ORANGE + THE SCRY
-GATE + THE BLUE LESSON): static seams (including THE BLUE LESSON's —
+GATE + THE BLUE LESSON + THE BEAST STRIKES, THE GREEN MENDS): static seams
+(including THE GREEN's — thirty F5-GREEN sites, the SIX-word script table
+for every tongue with the green word named (en DAWN · es LUNA · fr LUNE · pt
+AMOR · de TAU), the rig carrying the refill after the green word (en 43 · es
+43 · fr 43 · pt 42 · de 43), the seven dials, the four lines, the strike
+armed by the cast's continuation before the beast's tick (count 1, once,
+never behind a shield) with the pill held, the blow clamped never lethal,
+the fight held in place of done() with the crimson number lit above the
+veil and handed back, the YOU row kept on the scene and lifted, the landing
+bringing the second line and the hand onto the bar, the lift releasing the
+pill and blooming the dew on the AUTHORED cell (f5GreenCell → dewTile(at)),
+the refill tick yielding to the strike beat, the green word preferring the
+dew tile, the mend holding the player bar through hpHold while the truth is
+paid at the impact, the mend's own showcase and rise, the belts in
+f5GuideEnd, a lifted bar's ghost riding with it, the live dew rule untouched;
+and THE BLUE LESSON's —
 twenty-one F5-BLUE sites, the five-word script table for every tongue with
 the blue word named, the rig carrying both of the lesson's refills, the
 dials (the longer blue dwell, the rule's ×1.5 written out and agreeing with
@@ -31,13 +46,16 @@ scripted fight, the lock on tile/CAST/SCRY, the held continuation, the
 showcase trigger, the reset-before-build — plus THE SIMULATION: every
 tongue's script dealt and cast exactly as the game does, against the REAL
 dictionaries in ../words*.js and the live damage math — the WHOLE five-word
-script now: word two must forge the orange, word three must start on it at
-exactly +6, the gate's sweep must deal the rig's sixteen (dense) and step
-the fuse, word four (7+ letters) must forge the BLUE, which must land in the
-lowest emptied cell with the authored refill, word five must start on it
-and pay EXACTLY plain × 1.5, VULPES must survive every word, the fuse must
-walk 6 → 0 (the blue word's tick is the strike), the rig must be spent and
-the final board dense; and including the
+SIX-word script now: word two must forge the orange, word three must start
+on it at exactly +6, the gate's sweep must deal the rig's sixteen (dense)
+and step the fuse, word four (7+ letters) must forge the BLUE, which must
+land in the lowest emptied cell with the authored refill, word five must
+start on it and pay EXACTLY plain × 1.5, its tick must BE the strike
+(VULPES's 8 on the player, the fuse re-armed, the dew pinned onto the lowest
+plain cell holding the green word's first letter), word six must start on
+the dew and heal EXACTLY DEW_HEAL, VULPES must survive every word, the fuse
+must walk 6 → 0 → 5, the rig must be spent and the final board dense; and
+including the
 painted seams — thirteen F5-PAINTED sites, the live game's plate seat /
 zenith crown / fight frame (ssNightSkyTex · ssNightSkyCap · ssZenithSky)
 proven byte-for-byte against ../game.js, the painted wordmark branch, the
@@ -115,8 +133,27 @@ s); the release runs the night on: d·a·w·n refilled, the blue word's own
 tick 1 → 0 brings THE STRIKE (the player 50 → 42, the fuse re-armed at 6),
 the dew blooms, the hand retires for good; three DPR-3 captures in
 `tools/shots-blue/` — blue-finger · blue-intro · blue-showcase — untracked,
-never committed; then tiles answer freely and the board the hand leaves is
-density-gated), THE TEACHING SCRIPTS (real
+never committed), THE BEAST STRIKES, THE GREEN MENDS (card 05, still §2c:
+the blue word's own tick 1 → 0 is a HELD beat — the strike armed once, the
+pill kept at "strikes in 1 cast" with its alarm through the pounce, VULPES's
+8 landed in truth (50 → 42, never lethal) while the player bar HOLDS at 50,
+the crimson −8 LIT above the veil at 952 with "The beast struck YOU — 8
+damage." beneath, the YOU row lifted into the light, the hand on the number;
+the number flies, the bar DRAINS to 42, "Your health fell 50 → 42." under
+the row, the hand onto the numeral; untapped the beat holds its whole dwell
+(≥ 3.1 s from the drain) and lifts by itself — depths home, the pill
+re-armed at 6 with no alarm, state pick; the dew blooms on the D at cell 1
+(the AUTHORED cell, tier 3) with the hand resting on it, the beacon "green",
+its line spoken once; the pointed tile is DAWN's first tap; a tile off the
+road is refused; DAWN flies (9, VULPES 12) and the dew heals ♥6 IN TRUTH
+(42 → 48) while the bar HOLDS at 42; the mend HOLDS the fight — the green
+tile, both lines, "♥ +6" LIT at the seat, the hand on it — then the number
+flies up and the bar RISES to 48 in the light with the hand onto its
+numeral; untapped the mend holds its whole dwell (≥ 7.2 s from the
+showcase); the release refills o·p·a·l, ticks the fuse 6 → 5 and the hand
+retires for good; three DPR-3 captures in `tools/shots-green/` — strike-hit
+· green-intro · green-heal — untracked, never committed; then tiles answer
+freely and the board the hand leaves is density-gated), THE TEACHING SCRIPTS (real
 dewTile/blackTile prompts, once-per-run dedupe, the forge/plant chain),
 THE LIT SKY (a fell through the true chain writes the mark, the converge,
 the rite still SEATING its mark + the sweep clearing the zenith, the

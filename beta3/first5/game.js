@@ -2014,23 +2014,35 @@ function ssF5TomorrowCue(scene) {
    letter lands FIRST (the lowest emptied cell takes the pending tier), then
    the six beside it; after the blue word (en HALO: cells 1·2·4·5) four more
    (d·a·w·n) so the board the hand leaves is the same for every player
-   (density-gated by the suite; card 05 may re-author its own refill). */
+   (density-gated by the suite; card 05 may re-author its own refill).
+   F5-GREEN (card 05): the blue word's refill is now THE GREEN WORD's own
+   letters (en d·a·w·n → DAWN, es LUNA, fr LUNE, pt AMOR, de TAU — "Tau" IS
+   dew): the beast's strike lands right after the blue showcase, the dew is
+   pinned onto the lowest plain cell holding the green word's first letter
+   (f5GreenCell), and the word starts on it; the LAST line of each rig is
+   the refill after the green word, so the free board the hand finally
+   leaves is the same for every player (density-gated by the suite). */
 const SS_F5_RIG = {
   en: ['m', 'o', 'n', 's', 's', 'k', 'y', 'r', 'e', 'n', 'o', 's',
     's', 't', 'a', 'r', 'l', 'i', 'g', 'h', 't', 'e', 'n', 'o', 'd', 'e', 'a', 'm',
-    'h', 'o', 'n', 'i', 'g', 't', 'e', 'd', 'a', 'w', 'n'],
+    'h', 'o', 'n', 'i', 'g', 't', 'e', 'd', 'a', 'w', 'n',
+    'o', 'p', 'a', 'l'],
   es: ['m', 'a', 'r', 'e', 's', 'l', 'o', 'n', 't', 'a', 'e', 'r',
     'n', 'o', 'c', 't', 'e', 's', 'o', 'l', 'a', 'n', 'i', 'm', 'a', 'r', 'e', 'd',
-    'h', 'e', 's', 't', 'i', 'n', 'o', 'l', 'u', 'n', 'a'],
+    'h', 'e', 's', 't', 'i', 'n', 'o', 'l', 'u', 'n', 'a',
+    'o', 'r', 'a', 's'],
   fr: ['l', 'u', 'n', 'e', 's', 'l', 'a', 'o', 't', 'e', 'n', 's',
     'p', 'a', 'l', 'o', 'n', 'e', 's', 'i', 'u', 'r', 't', 'a', 'e', 'm', 'o', 'd',
-    'h', 'l', 'e', 's', 'i', 't', 'e', 'l', 'u', 'n', 'e'],
+    'h', 'l', 'e', 's', 'i', 't', 'e', 'l', 'u', 'n', 'e',
+    'a', 'c', 'e', 's'],
   pt: ['c', 'a', 's', 'a', 's', 'l', 'e', 'o', 'r', 'a', 't', 'n',
     'm', 'e', 'c', 'o', 'a', 'l', 'u', 'r', 's', 'i', 't', 'e', 'a', 'd', 'o', 'n',
-    'l', 'a', 'e', 's', 't', 'r', 'e', 'm', 'a', 'r'],
+    'l', 'a', 'e', 's', 't', 'r', 'e', 'm', 'a', 'r',
+    's', 'u', 'l', 'e'],
   de: ['s', 't', 'e', 'r', 'n', 'e', 'a', 's', 't', 'r', 'n', 'i', 'e',
     's', 'o', 'm', 'a', 'd', 'e', 'n', 'i', 'o', 'r', 't', 'u', 'n', 'e', 'l', 'h',
-    'm', 'e', 'r', 't', 'a', 'e', 'l', 'l', 'i', 'e', 'd'],
+    'm', 'e', 'r', 't', 'a', 'e', 'l', 'l', 'i', 'e', 'd',
+    'a', 'u', 'l'],
 };
 /* F5-GUIDED: the script after the deal's own word — word 2 is 5 (de: 6)
    letters, so it FORGES the orange (the live rule: 5+ letters → tier 1, +6
@@ -2044,13 +2056,21 @@ const SS_F5_RIG = {
    letter itself) with the next refill; word 5 STARTS on the blue tile and
    is short, so the hit is EXACTLY plain × 1.5 (en HALO: 8 → 12; pt LUA:
    4 → 6) — the showcase can say the number and the rule in one breath.
-   `blue` = which authored word uses it. */
+   `blue` = which authored word uses it.
+   F5-GREEN (card 05): the blue word's own tick is THE STRIKE (the fuse
+   6 → 0): the beast's blow lands slowly, the dew blooms on the green
+   word's first letter (the live rule: a landed strike leaves one plain
+   tile green — pinned here, so every player gets the same cell), and word
+   6 STARTS on the green: its heal is EXACTLY ♥DEW_HEAL (the dew pays its
+   heal per green tile, not by word length), shown coming BACK on the
+   player's own bar. `green` = which authored word uses it. en DAWN (the
+   night's answer), es LUNA, fr LUNE, pt AMOR, de TAU ("Tau" = dew). */
 const SS_F5_GUIDE = {
-  en: { words: [['m', 'o', 'o', 'n', 's'], ['s', 'k', 'y'], ['t', 'o', 'n', 'i', 'g', 'h', 't'], ['h', 'a', 'l', 'o']], orange: 1, blue: 3 },
-  es: { words: [['m', 'a', 'r', 'e', 's'], ['s', 'o', 'l'], ['d', 'e', 's', 't', 'i', 'n', 'o'], ['h', 'a', 'l', 'o']], orange: 1, blue: 3 },
-  fr: { words: [['l', 'u', 'n', 'e', 's'], ['s', 'o', 'l'], ['e', 't', 'o', 'i', 'l', 'e', 's'], ['h', 'a', 'l', 'o']], orange: 1, blue: 3 },
-  pt: { words: [['c', 'a', 'l', 'm', 'a'], ['s', 'o', 'l'], ['e', 's', 't', 'r', 'e', 'l', 'a'], ['l', 'u', 'a']], orange: 1, blue: 3 },
-  de: { words: [['s', 't', 'e', 'r', 'n', 'e'], ['n', 'e', 'u'], ['l', 'a', 't', 'e', 'r', 'n', 'e'], ['m', 'o', 'n', 'd']], orange: 1, blue: 3 },
+  en: { words: [['m', 'o', 'o', 'n', 's'], ['s', 'k', 'y'], ['t', 'o', 'n', 'i', 'g', 'h', 't'], ['h', 'a', 'l', 'o'], ['d', 'a', 'w', 'n']], orange: 1, blue: 3, green: 4 },
+  es: { words: [['m', 'a', 'r', 'e', 's'], ['s', 'o', 'l'], ['d', 'e', 's', 't', 'i', 'n', 'o'], ['h', 'a', 'l', 'o'], ['l', 'u', 'n', 'a']], orange: 1, blue: 3, green: 4 },
+  fr: { words: [['l', 'u', 'n', 'e', 's'], ['s', 'o', 'l'], ['e', 't', 'o', 'i', 'l', 'e', 's'], ['h', 'a', 'l', 'o'], ['l', 'u', 'n', 'e']], orange: 1, blue: 3, green: 4 },
+  pt: { words: [['c', 'a', 'l', 'm', 'a'], ['s', 'o', 'l'], ['e', 's', 't', 'r', 'e', 'l', 'a'], ['l', 'u', 'a'], ['a', 'm', 'o', 'r']], orange: 1, blue: 3, green: 4 },
+  de: { words: [['s', 't', 'e', 'r', 'n', 'e'], ['n', 'e', 'u'], ['l', 'a', 't', 'e', 'r', 'n', 'e'], ['m', 'o', 'n', 'd'], ['t', 'a', 'u']], orange: 1, blue: 3, green: 4 },
 };
 const SS_F5_GUIDE_SETTLE_MS = 750;   // the refill's bounce (420 + ≤90ms) before the hand moves on
 const SS_F5_POINT_MS = 2600;         // the look at the orange tile before the hand asks for it
@@ -2075,6 +2095,24 @@ const SS_F5_SCRY_FLOOR_MS = 1400;    // a tap lets the reveal go only after this
    proves the authored blue word's hit is EXACTLY plain × this. */
 const SS_F5_BLUE_SHOW_MS = 4600;     // the blue showcase's dwell (two lines to read)
 const SS_F5_BLUE_MULT = 1.5;         // the blue tile's rule (wordDamage: `if (s.tier === 2) starMult = 1.5`)
+/* F5-GREEN (card ss-2026-10-09-first5-script/05): THE STRIKE's and THE
+   MEND's dials. Skylar (10/09): "the beast attacks the player. It needs to
+   slow down and show the damage it does to the player. Then it should give
+   us a green tile … explain how that gives you health back. Really slow it
+   down and show the player that using the green tile heals you." The strike
+   itself is the live beat (the crimson number lingers ≥ 2 s, flies 780 ms,
+   the bar drains 560 ms — v0.107.0) HELD under a veil with the hit line, the
+   YOU row lifted into the light, the pill kept at its alarm until the lift;
+   the second line and the hand on the bar come when the bar has drained;
+   the dwell counts from there. The mend mirrors it upward in green: the
+   "♥ +6" lingers, flies to the bar, the bar RISES, then the dwell. */
+const SS_F5_STRIKE_SHOW_MS = 3200;   // the strike beat's dwell, from the bar's drain
+const SS_F5_STRIKE_FLOOR_MS = 900;   // a tap lets the strike beat go only after this (from the drain — the ceremony-floor grammar)
+const SS_F5_STRIKE_DEW_MS = 260;     // the dew's own beat after the lift (the live 260 after a landed blow)
+const SS_F5_MEND_LINGER_MS = 1800;   // the "♥ +6" stands readable before it flies to the bar
+const SS_F5_MEND_FLY_MS = 780;       // its flight to the bar (the strike's own)
+const SS_F5_MEND_RISE_MS = 640;      // the player bar's rise
+const SS_F5_MEND_SHOW_MS = 4200;     // the mend's dwell, from the rise (two lines to read)
 /* ---- F5-CARD-05: THE TEACHING SCRIPTS — Skylar's verdict-1 notes, with
    verdict 5 (WORDS ARE FINE) paying the copy. Ground truth held against the
    shipping code: the special tiles ARE orange (+6, tier 1), blue (×1.5,
@@ -2097,6 +2135,10 @@ const SS_F5_PROMPTS = {
     orangeHit: 'That orange tile added +{x} — {d} damage, not {p}.',   /* F5-GUIDED: {x} the extra, {d} the hit, {p} the plain hit */
     blueHit: 'That blue tile made the WHOLE word ×{m} — {d} damage, not {p}.',   /* F5-BLUE: {m} the rule's multiplier, {d} the hit, {p} the plain hit */
     blueVsOrange: 'Orange adds +6 to one tile. Blue multiplies the whole word.',   /* F5-BLUE: the difference, said once under the number (one line per text) */
+    strikeHit: 'The beast struck YOU — {a} damage.',   /* F5-GREEN: under the crimson number, {a} the blow */
+    strikeBar: 'Your health fell {b} → {c}.',   /* F5-GREEN: under the YOU row once the bar has drained */
+    greenHeal: 'That green tile healed you ♥{h} — {b} → {c}.',   /* F5-GREEN: {h} the heal, {b} → {c} the bar */
+    greenVsRest: 'Orange and blue hurt the beast. Green heals YOU.',   /* F5-GREEN: the family told apart, one line */
   },
 };
 /* the one prompt frame (F5-FIX1-03 pulled it out of ssF5Prompt so the scry
@@ -9731,9 +9773,9 @@ class Battle extends Phaser.Scene {
       }
     }
 
-    txt(l.x(-190), l.y(68), 'YOU', 12, '#c9b676').setOrigin(0, 0.5);
+    this.youT = txt(l.x(-190), l.y(68), 'YOU', 12, '#c9b676').setOrigin(0, 0.5);   /* F5-GREEN: kept — the row rises into the light for the strike and the mend (f5BarLift) */
     // framed troughs + gradient fills; progress is a setCrop in the draw fns
-    this.add.image(l.x(-152), l.y(68), 'bartrough').setOrigin(0, 0.5).setDisplaySize(l.u(254), l.u(15));
+    this.hpTrough = this.add.image(l.x(-152), l.y(68), 'bartrough').setOrigin(0, 0.5).setDisplaySize(l.u(254), l.u(15));   /* F5-GREEN: kept, as above */
     this.hpBar = this.add.image(l.x(-150), l.y(68), 'barfill-gold').setOrigin(0, 0.5).setDisplaySize(l.u(250), l.u(9));
     this.hpT = txt(l.x(190), l.y(68), '', 12).setOrigin(1, 0.5);
     // what the player bar SHOWS — trails run.hp while a strike's number is in
@@ -9928,10 +9970,10 @@ class Battle extends Phaser.Scene {
     /* F5-BLUE: `orange` / `blue` are WORD indices (the cell each tile lands
        on is read at its point beat into `pointAt`); the scry gate stands
        before word index `scryAt`, once (`scried`) */
-    this.f5G = guide ? { words: [deal.word, ...guide.words], idx: 0, orange: guide.orange + 1, blue: guide.blue != null ? guide.blue + 1 : -1, scryAt: guide.orange + 2, scried: false, pointAt: null, beat: 'word', pose: null, poseN: 0, show: null, cont: null, waits: 0 } : null;
+    this.f5G = guide ? { words: [deal.word, ...guide.words], idx: 0, orange: guide.orange + 1, blue: guide.blue != null ? guide.blue + 1 : -1, scryAt: guide.orange + 2, scried: false, pointAt: null, green: guide.green != null ? guide.green + 1 : -1, strike: null, beat: 'word', pose: null, poseN: 0, show: null, cont: null, waits: 0 } : null;   /* F5-GREEN: `green` the word index, `strike` the held beat */
     window.__f5guide = {
-      lang: PACK.lang, words: (this.f5G ? this.f5G.words : [deal.word]).map((w) => w.join('')), orange: this.f5G ? this.f5G.orange : null, blue: this.f5G ? this.f5G.blue : null, scryAt: this.f5G ? this.f5G.scryAt : null, scried: 0,
-      beat: this.f5G ? 'word' : 'none', idx: 0, refused: 0, castRefused: 0, scryRefused: 0, orangeCell: null, blueCell: null, pointed: 0, show: null, shown: 0, released: 0, holdMs: 0, ended: 0,
+      lang: PACK.lang, words: (this.f5G ? this.f5G.words : [deal.word]).map((w) => w.join('')), orange: this.f5G ? this.f5G.orange : null, blue: this.f5G ? this.f5G.blue : null, green: this.f5G ? this.f5G.green : null, scryAt: this.f5G ? this.f5G.scryAt : null, scried: 0,
+      beat: this.f5G ? 'word' : 'none', idx: 0, refused: 0, castRefused: 0, scryRefused: 0, orangeCell: null, blueCell: null, greenCell: null, pointed: 0, show: null, shown: 0, released: 0, holdMs: 0, ended: 0,
     };
     window.__ssftue = Object.assign(window.__ssftue || {}, {
       state: 'board', word: deal.word.join(''), deal: this.board.map((s) => (s ? s.ch : '')).join(' '), point: null,
@@ -9985,7 +10027,7 @@ class Battle extends Phaser.Scene {
     if (this.ftueGone || this.state === 'end') return null;
     const g = this.f5G;   /* F5-GUIDED: the script's own seats come first */
     if (g) {
-      if (g.beat === 'show' || g.beat === 'reveal') return g.pose ? 'pose' : 'wait';   /* F5-SCRYGATE: the reveal points like the showcase */
+      if (g.beat === 'show' || g.beat === 'reveal' || g.beat === 'strike') return g.pose ? 'pose' : 'wait';   /* F5-SCRYGATE: the reveal points like the showcase — F5-GREEN: the strike too */
       if (g.beat === 'cast') return 'wait';
       if (g.beat === 'scry') return 'scry';   /* F5-SCRYGATE: the one lit door */
       if (g.beat === 'point') return g.pointAt;   /* F5-BLUE: the pointed cell (the orange's, then the blue's) */
@@ -9999,7 +10041,7 @@ class Battle extends Phaser.Scene {
          letter matches — never a plain twin of it. F5-BLUE: the blue word
          asks for the BLUE the same way (de: MOND's m stands twice, plain at
          2 and blue at 3 — the finger must name the blue). */
-      const pref = g ? (g.idx === g.orange ? 1 : g.idx === g.blue ? 2 : 0) : 0;
+      const pref = g ? (g.idx === g.orange ? 1 : g.idx === g.blue ? 2 : g.idx === g.green ? 3 : 0) : 0;   /* F5-GREEN: the green word asks for the dew tile itself */
       if (pref) for (let i = 0; i < 16; i++) {
         const s = this.board[i];
         if (s && s.c.active && !s.blk && s.tier === pref && s.ch === need && this.sel.indexOf(i) < 0) return i;
@@ -10144,7 +10186,7 @@ class Battle extends Phaser.Scene {
     const g = this.f5G; if (!g) return;
     g.beat = beat;
     const b = window.__f5guide; if (b) { b.beat = beat; b.idx = g.idx; }
-    if (window.__ssftue) window.__ssftue.state = beat === 'word' ? (g.idx ? 'guide' : 'board') : beat === 'point' ? (g.idx === g.blue ? 'blue' : 'orange') : beat;   /* F5-BLUE: the blue's own point */
+    if (window.__ssftue) window.__ssftue.state = beat === 'word' ? (g.idx ? 'guide' : 'board') : beat === 'point' ? (g.idx === g.green ? 'green' : g.idx === g.blue ? 'blue' : 'orange') : beat;   /* F5-BLUE: the blue's own point — F5-GREEN: the green's */
     this.ftueAt = null;   // the hand re-reads its goal at once
     this.ftueRepoint();
   }
@@ -10158,17 +10200,18 @@ class Battle extends Phaser.Scene {
        same tiles with that tile read as plain glass. Every other guided word
        flies plain (g.show stays null, so the cast path never parks). */
     g.show = null;
-    const kind = g.idx === g.orange ? 1 : g.idx === g.blue ? 2 : 0;
+    const kind = g.idx === g.orange ? 1 : g.idx === g.blue ? 2 : g.idx === g.green ? 3 : 0;   /* F5-GREEN: the green word (tier 3: the dew heals ♥DEW_HEAL) arms THE MEND */
     if (kind) {
       const ot = tiles.find((s) => s.tier === kind && !s.blk);
       if (ot) {
         const plain = this.wordDamage(tiles.map((s) => (s.tier === kind ? Object.assign({}, s, { tier: 0 }) : s)));
         g.show = { word, dmg, plain, extra: dmg - plain, ch: ot.ch, tier: kind };
+        if (kind === 3) Object.assign(g.show, { heal: DEW_HEAL * tiles.filter((s) => s.tier === 3 && !s.blk).length, healed: 0, before: this.run.hp, after: this.run.hp, hold: 0 });   /* F5-GREEN: the heal the impact will pay (shown on the showcase's beat) */
         if (window.__f5guide) window.__f5guide.show = Object.assign({}, g.show);
       }
     }
     this.f5GuideBeat('cast');
-    DIAG('f5 guide: cast ' + word + ' for ' + dmg + (g.show ? ' (plain ' + g.show.plain + ', ' + (kind === 2 ? 'blue ×' + SS_F5_BLUE_MULT : 'orange +' + g.show.extra) + ')' : ''));
+    DIAG('f5 guide: cast ' + word + ' for ' + dmg + (g.show ? ' (plain ' + g.show.plain + ', ' + (kind === 3 ? 'green ♥' + g.show.heal : kind === 2 ? 'blue ×' + SS_F5_BLUE_MULT : 'orange +' + g.show.extra) + ')' : ''));
   }
   // the refill of a guided cast has been dealt: once it has settled and the
   // board is the player's again, the next beat
@@ -10177,6 +10220,7 @@ class Battle extends Phaser.Scene {
     g.waits = 0;
     const tick = () => {
       if (this.f5G !== g || this.ftueGone || !this.sys.isActive()) return;
+      if (g.beat !== 'cast') return;   /* F5-GREEN: the strike beat took the baton (it re-arms the settle at its lift) */
       if (this.state !== 'pick') { if (++g.waits < 60) this.time.delayedCall(250, tick); else this.f5GuideEnd(false); return; }
       this.f5GuideNext();
     };
@@ -10195,16 +10239,16 @@ class Battle extends Phaser.Scene {
     /* THE POINT: the special tile the last word forged, found where it
        landed — the orange (word 2's) or, F5-BLUE, the blue (word 4's): the
        hand rests on it while its own lesson line speaks, then asks for it */
-    const kind = g.idx === g.orange ? 1 : g.idx === g.blue ? 2 : 0;
+    const kind = g.idx === g.orange ? 1 : g.idx === g.blue ? 2 : g.idx === g.green ? 3 : 0;   /* F5-GREEN: the dew (word 6's), where the strike left it */
     if (kind) {
       let oi = -1;
       for (let i = 0; i < 16; i++) { const s = this.board[i]; if (s && s.tier === kind && !s.blk && s.c.active && s.ch === this.ftueWord[0]) { oi = i; break; } }
-      if (oi < 0) { DIAG('f5 guide: no ' + (kind === 2 ? 'blue' : 'orange') + ' on the board — the hand lets go'); this.f5GuideEnd(false); return; }
+      if (oi < 0) { DIAG('f5 guide: no ' + (kind === 3 ? 'green' : kind === 2 ? 'blue' : 'orange') + ' on the board — the hand lets go'); this.f5GuideEnd(false); return; }
       g.pointAt = oi;
-      const b = window.__f5guide; if (b) { b[kind === 2 ? 'blueCell' : 'orangeCell'] = oi; b.pointed++; }
+      const b = window.__f5guide; if (b) { b[kind === 3 ? 'greenCell' : kind === 2 ? 'blueCell' : 'orangeCell'] = oi; b.pointed++; }
       this.f5GuideBeat('point');
-      ssF5Prompt(this, 'tile' + kind, this.L.x(0), this.L.y(374));   // spawnTile's own call already spoke — the dedupe keeps it one
-      DIAG('f5 guide: the ' + (kind === 2 ? 'blue' : 'orange') + ' at ' + oi);
+      ssF5Prompt(this, 'tile' + kind, this.L.x(0), this.L.y(374));   // spawnTile's own call already spoke — the dedupe keeps it one (F5-GREEN: dewTile's, for the green)
+      DIAG('f5 guide: the ' + (kind === 3 ? 'green' : kind === 2 ? 'blue' : 'orange') + ' at ' + oi);
       this.time.delayedCall(SS_F5_POINT_MS, () => { if (this.f5G === g && g.beat === 'point') this.f5GuideBeat('word'); });
       return;
     }
@@ -10217,6 +10261,7 @@ class Battle extends Phaser.Scene {
     const g = this.f5G;
     if (!g || !g.show || !g.cont || g.beat !== 'cast' || !this.sys.isActive()) return;
     const l = this.L, sh = g.show;
+    if (sh.tier === 3) { this.f5MendShow(g); return; }   /* F5-GREEN: THE MEND — the heal shown coming back on the player's bar */
     /* F5-BLUE: the showcase speaks for the orange (tier 1, "+6") and the blue
        (tier 2, "×1.5") alike — the tile as it stood, the number in the tile's
        own voice, the hit line; the blue adds the one line that keeps the two
@@ -10274,6 +10319,9 @@ class Battle extends Phaser.Scene {
     const { veil, c } = g.showObjs;
     this.tweens.add({ targets: c, alpha: 0, duration: 260, onComplete: () => { if (c.active) c.destroy(); } });
     this.tweens.add({ targets: veil, alpha: 0, duration: 300, onComplete: () => { if (veil.active) veil.destroy(); } });
+    /* F5-GREEN: the mend's own objects fade with it and the YOU row goes home */
+    for (const o of g.showObjs.extra || []) if (o && o.active) this.tweens.add({ targets: o, alpha: 0, duration: 260, onComplete: () => { if (o.active) o.destroy(); } });
+    if (g.showObjs.bar) this.f5BarLift(false);
     g.show = null; g.showObjs = null; g.pose = null;   /* F5-BLUE: a spent showcase never parks the next cast */
     const cont = g.cont; g.cont = null;
     /* F5-SCRYGATE: the hand STAYS past the showcase — the parked continuation
@@ -10336,10 +10384,252 @@ class Battle extends Phaser.Scene {
     const g = this.f5G; if (!g) return;
     g.beat = 'free';
     if (g.tapFn) { this.input.off('pointerdown', g.tapFn); g.tapFn = null; }
+    /* F5-GREEN: belts — a hand that lets go mid-beat (the beast felled, the
+       road run out) never leaves the pill held, the player bar held, the
+       row lifted or a veil standing */
+    if (g.strike && g.strike.armed && !g.strike.lifted) { this.f5PillHold = 0; if (g.strike.objs) this.f5StrikeLift(g.strike, 'end'); else this.updateBars(); }
+    if (g.show && g.show.hold) { g.show.hold = 0; this.hpHold = Math.max(0, (this.hpHold | 0) - 1); this.updateBars(); }
+    if (g.showObjs) { for (const o of [g.showObjs.veil, g.showObjs.c, ...(g.showObjs.extra || [])]) if (o && o.active) o.destroy(); if (g.showObjs.bar) this.f5BarLift(false); g.showObjs = null; }
     const b = window.__f5guide; if (b) { b.beat = 'free'; b.ended++; }
     this.f5G = null;
     if (!this.ftueGone) this.ftueRetire(happy);
     this.f5LastTap = this.time.now; this.f5Glinted = false;   // the stall clock starts fresh from the release
+  }
+
+  /* ---- F5-GREEN (card ss-2026-10-09-first5-script/05): THE BEAST STRIKES,
+     THE GREEN MENDS. Skylar (10/09): "at some point, the beast attacks the
+     player. It needs to slow down and show the damage it does to the
+     player. Then it should give us a green tile, which will also need to
+     be scripted so the player has a word that uses the green tile, and
+     then explain how that gives you health back. Really slow it down and
+     show the player that using the green tile heals you."
+     The blue word's own tick (1 → 0) is the strike, by the mechanic. The
+     cast's continuation arms THE STRIKE beat before tickEnemy: the pill is
+     HELD at its alarm ("strikes in 1 cast") through the pounce, the blow
+     lands as live (never lethal under the script), and the fight HOLDS: a
+     veil, the crimson number LIT above it lingering its full two seconds,
+     "The beast struck YOU — 8 damage." beneath, the YOU row lifted into
+     the light, the hand on the number; the number flies, the bar DRAINS,
+     then "Your health fell 50 → 42." and the hand onto the bar; the dwell
+     or a tap past the floor lifts the veil, the pill re-arms in the clear
+     (the cool pulse), and the dew blooms on the authored cell — the green
+     word's first letter. THE POINT rests the hand on the green while "A
+     green dew tile heals ♥6 when cast." speaks; the green word STARTS on
+     it; at impact the heal is paid in truth while the bar HOLDS; when the
+     beast's bar has drained the fight HOLDS again on THE MEND: the green
+     tile with its ♥6 chip, "♥ +6" LIT at the number's seat lingering, then
+     flying up to the bar — which RISES 42 → 48 in the light — "That green
+     tile healed you ♥6 — 42 → 48." and "Orange and blue hurt the beast.
+     Green heals YOU.", the hand onto the bar; the dwell lets go, the
+     refill and the fuse run as live, and the hand retires for good. */
+  f5StrikeArm() {
+    const g = this.f5G;
+    if (!g || g.beat !== 'cast' || g.strike || !this.beast || this.beast.hpNow <= 0 || this.beast.count !== 1) return;
+    if (this.hasSigil('shield') && (this.shieldLeft | 0) > 0) return;   // a blocked strike has nothing to show
+    g.strike = { armed: 1 };
+    this.f5PillHold = 1;   // the alarm stands through the pounce — the pill steps to its re-arm at the lift
+    this.f5GuideBeat('strike');
+    const b = window.__f5strike = window.__f5strike || {};
+    b.armed = (b.armed | 0) + 1; b.pillHeld = 1;
+    DIAG('f5 strike: armed (the blue word\'s own tick)');
+  }
+  // the green word's first letter, on the lowest plain cell — where the dew is pinned
+  f5GreenCell() {
+    const g = this.f5G, w = g && g.green >= 0 ? g.words[g.green] : null;
+    if (!w) return undefined;
+    for (let i = 0; i < 16; i++) { const s = this.board[i]; if (s && s.tier === 0 && !s.blk && s.c.active && s.ch === w[0]) return i; }
+    return undefined;
+  }
+  // the YOU row rises above the veil for the beats that are about it (home at 0 — the scry reveal's grammar)
+  f5BarLift(up) {
+    [this.youT, this.hpTrough, this.hpBar, this.hpT].forEach((o, k) => { if (o && o.active) o.setDepth(up ? 905 + k : 0); });
+  }
+  f5StrikeShow(s, nT, done) {
+    const g = this.f5G, l = this.L;
+    if (!g || g.strike !== s || !this.sys.isActive()) { done(); return; }
+    s.done = done; s.after = this.run.hp; s.shownAt = this.time.now;
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setDepth(900).setInteractive();
+    this.tweens.add({ targets: veil, alpha: SS_F5_SHOW_VEIL, duration: 260 });
+    this.f5BarLift(true);
+    // the hit, said — under the crimson number at its own seat
+    const P = SS_F5_PROMPTS[PACK.lang] || SS_F5_PROMPTS.en;
+    const c = this.add.container(l.x(0), l.y(468)).setDepth(950).setAlpha(0).setScale(0.92);
+    c.setData('f5strike', 1);
+    c.add(ssF5Frame(this, (P.strikeHit || SS_F5_PROMPTS.en.strikeHit).replace('{a}', s.hit)).setPosition(0, l.u(52)));
+    this.tweens.add({ targets: c, alpha: 1, scale: 1, duration: 220, delay: 300, ease: 'Back.easeOut' });
+    // the hand on the number (above the veil for the beat)
+    g.pose = { x: l.x(0) + (nT && nT.active ? nT.width / 2 : l.u(26)) + l.u(8), y: l.y(468) + l.u(8), flip: false, dip: 7 };
+    g.poseN = (g.poseN | 0) + 1;
+    const h = this.ftueHand; if (h && h.active) h.setDepth(960);
+    this.ftueAt = null; this.ftueRepoint();
+    s.objs = { veil, c };
+    const b = window.__f5strike = window.__f5strike || {};
+    b.shown = (b.shown | 0) + 1; b.hit = s.hit; b.before = s.before; b.after = s.after; b.shownAt = Date.now();
+    DIAG('f5 strike: held — ' + s.hit + ' (' + s.before + ' → ' + s.after + ')');
+  }
+  f5StrikeLanded(s) {
+    const g = this.f5G, l = this.L;
+    if (!g || g.strike !== s || !s.objs || s.lifted || !this.sys.isActive()) return;
+    s.landedAt = this.time.now;
+    // the bar has drained: the health, said — under the YOU row, in the light
+    const P = SS_F5_PROMPTS[PACK.lang] || SS_F5_PROMPTS.en;
+    const f = ssF5Frame(this, (P.strikeBar || SS_F5_PROMPTS.en.strikeBar).replace('{b}', s.before).replace('{c}', s.after)).setDepth(950).setAlpha(0);
+    f.setData('f5strike', 2);
+    f.setPosition(Math.max(f.f5W / 2 + l.u(6), Math.min(l.W - f.f5W / 2 - l.u(6), l.x(0))), l.y(68) + l.u(34));
+    this.tweens.add({ targets: f, alpha: 1, duration: 260, ease: 'Sine.easeOut' });
+    s.objs.bar = f;
+    SFX.tick();
+    // the hand onto the bar's number
+    g.pose = { x: l.x(190) - this.hpT.width - l.u(2), y: l.y(68) - l.u(6), flip: true, dip: 7 };
+    g.poseN = (g.poseN | 0) + 1;
+    this.ftueAt = null; this.ftueRepoint();
+    const b = window.__f5strike = window.__f5strike || {};
+    b.landed = (b.landed | 0) + 1; b.landedAt = Date.now();
+    const release = (how) => { if (s.tapFn) { this.input.off('pointerdown', s.tapFn); s.tapFn = null; } this.f5StrikeLift(s, how); };
+    const dwell = this.time.delayedCall(SS_F5_STRIKE_SHOW_MS, () => release('dwell'));
+    this.time.delayedCall(SS_F5_STRIKE_FLOOR_MS, () => {
+      if (s.lifted || this.f5G !== g || !this.sys.isActive()) return;
+      s.tapFn = () => { dwell.remove(false); release('tap'); };   // taps accelerate, past the floor
+      this.input.once('pointerdown', s.tapFn);
+    });
+    DIAG('f5 strike: the bar drained — ' + s.before + ' → ' + s.after);
+  }
+  f5StrikeLift(s, how) {
+    if (s.lifted) return;
+    s.lifted = true;
+    const g = this.f5G;
+    if (s.tapFn) { this.input.off('pointerdown', s.tapFn); s.tapFn = null; }
+    const b = window.__f5strike = window.__f5strike || {};
+    b.released = how; b.holdMs = Math.round(this.time.now - (s.landedAt || s.shownAt || this.time.now)); b.lifted = (b.lifted | 0) + 1;
+    const o = s.objs || {};
+    for (const it of [o.c, o.bar, o.veil]) if (it && it.active) this.tweens.add({ targets: it, alpha: 0, duration: 260, onComplete: () => { if (it.active) it.destroy(); } });
+    this.f5BarLift(false);
+    this.f5PillHold = 0; b.pillHeld = 0;
+    this.updateBars();   // the pill re-arms in the clear — the cool pulse, the alarm gone
+    if (g && g.strike === s) { g.pose = null; this.f5GuideBeat('cast'); }
+    const done = s.done; s.done = null;
+    if (done) done();   // the fight is the player's again (state pick)
+    if (how === 'end') return;
+    // the dew, on the authored cell — then the script goes on to THE POINT
+    this.time.delayedCall(SS_F5_STRIKE_DEW_MS, () => {
+      if (this.state === 'end' || !this.sys.isActive()) return;
+      const at = this.f5G === g ? this.f5GreenCell() : undefined;
+      const i = this.dewTile(at);
+      b.dewAt = i;
+      if (this.f5G === g && g.beat === 'cast') this.f5GuideRefill();   // the settle → f5GuideNext → the green's point
+      DIAG('f5 strike: lifted (' + how + '), the dew at ' + i);
+    });
+  }
+  // THE MEND — from f5GuideShow, when the beast's bar has drained: the heal
+  // (already paid in truth at the impact, the bar held) shown coming BACK
+  f5MendShow(g) {
+    const l = this.L, sh = g.show;
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setDepth(900).setInteractive();
+    this.tweens.add({ targets: veil, alpha: SS_F5_SHOW_VEIL, duration: 260 });
+    this.f5BarLift(true);
+    const c = this.add.container(l.x(0), l.y(468)).setDepth(950).setAlpha(0).setScale(0.92);   // the hit number's own seat
+    c.setData('f5show', 3);
+    // the thing itself: the green tile, its letter and its ♥ chip, as it stood on the board
+    const ts = l.u(46), k = 46 / 78;
+    const glow = this.add.image(-l.u(62), 0, 'dot').setScale(ts / 9).setAlpha(0.3).setTint(SS_TIER_GLOW[3]).setBlendMode('ADD');
+    const tile = this.add.container(-l.u(62), 0, [
+      this.add.image(0, 0, 'tile3').setDisplaySize(ts, ts),
+      this.add.image(0, -l.u(2 * k), ssGlyph(this, sh.ch, SS_TILE_INK[3])).setDisplaySize(l.u(64 * k), l.u(48 * k)),
+      this.add.image(l.u(24 * k), l.u(21 * k), ssGlyphVal(this, this.tileChip(sh.ch, 3), SS_TILE_VINK[3])).setDisplaySize(l.u(30 * k), l.u(20 * k)),
+    ]);
+    const P = SS_F5_PROMPTS[PACK.lang] || SS_F5_PROMPTS.en;
+    const line = ssF5Frame(this, (P.greenHeal || SS_F5_PROMPTS.en.greenHeal).replace('{h}', sh.healed).replace('{b}', sh.before).replace('{c}', sh.after)).setPosition(0, l.u(52));
+    const vs = ssF5Frame(this, P.greenVsRest || SS_F5_PROMPTS.en.greenVsRest).setAlpha(0);
+    vs.setPosition(0, l.u(52) + line.f5H / 2 + l.u(8) + vs.f5H / 2);
+    c.add([glow, tile, line, vs]);
+    this.tweens.add({ targets: c, alpha: 1, scale: 1, duration: 220, ease: 'Back.easeOut' });
+    this.tweens.add({ targets: glow, alpha: 0.55, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    this.tweens.add({ targets: vs, alpha: 1, duration: 260, delay: 700 });
+    // the number, in green, LIT at the seat the orange's "+6" and the blue's
+    // "×1.5" stood — it lingers, then flies to the bar (the strike's road, upward)
+    const nT = ssTxt(this, l.x(0) - l.u(30), l.y(468), '♥ +' + sh.healed, l.u(44), '#9fe87a').setOrigin(0, 0.5).setDepth(952)
+      .setShadow(0, 0, '#1f5a2a', l.u(12), true, true);
+    nT.setScale(0.2).setAlpha(0);
+    this.tweens.add({ targets: nT, scale: 1.15, alpha: 1, duration: 120, ease: 'Back.easeOut' });
+    this.tweens.add({ targets: nT, scale: 1, delay: 120, duration: 110 });
+    const breath = ssReduceMotion() ? null
+      : this.tweens.add({ targets: nT, scale: 1.05, delay: 260, duration: 620, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    // the hand points at the number (above the veil for the beat)
+    g.pose = { x: nT.x + nT.width + l.u(8), y: l.y(468) + l.u(8), flip: false, dip: 7 };
+    g.poseN = (g.poseN | 0) + 1;
+    const h = this.ftueHand; if (h && h.active) h.setDepth(960);
+    g.showObjs = { veil, c, extra: [nT], bar: true }; g.shownAt = this.time.now;
+    this.f5GuideBeat('show');
+    const b = window.__f5guide; if (b) { b.shown++; b.shownAt = Date.now(); b.showTier = 3; }
+    const m = window.__f5mend = window.__f5mend || {};
+    m.shown = (m.shown | 0) + 1; m.heal = sh.healed; m.before = sh.before; m.after = sh.after; m.shownAt = Date.now();
+    SFX.dew();
+    DIAG('f5 mend: showcase ♥' + sh.healed + ' (' + sh.before + ' → ' + sh.after + ')');
+    const start = { x: nT.x, y: nT.y }, dst = { x: l.x(-25), y: l.y(68) }, pt = { t: 0 };
+    this.tweens.add({
+      targets: pt, t: 1, delay: SS_F5_MEND_LINGER_MS, duration: SS_F5_MEND_FLY_MS, ease: 'Cubic.easeIn',
+      onStart: () => { if (breath) breath.stop(); nT.setScale(1); if (this.f5G === g) { g.pose = null; this.ftueAt = null; this.ftueRepoint(); } },
+      onUpdate: () => {
+        nT.x = start.x + (dst.x - start.x) * pt.t;
+        nT.y = start.y + (dst.y - start.y) * pt.t;
+        nT.setScale(1 - pt.t * 0.45);
+      },
+      onComplete: () => {
+        if (g.showObjs && g.showObjs.extra) g.showObjs.extra = g.showObjs.extra.filter((o) => o !== nT);
+        nT.destroy();
+        this.f5MendRise(g);
+      },
+    });
+  }
+  // the number has landed on the bar: the health comes BACK in the light — a
+  // green slice over the gain, the bar rising, the numeral counting up, the
+  // live "♥ +6 ♥" drifting off the bar's end, the hand onto the number
+  f5MendRise(g) {
+    const l = this.L, sh = g.show;
+    if (!sh || this.f5G !== g || g.beat !== 'show' || !this.sys.isActive()) return;
+    this.starBurst.emitParticleAt(l.x(-25), l.y(68), 4);
+    SFX.dew();
+    const from = this.hpShown.v, to = Math.max(0, this.run.hp);
+    const f0 = clamp(from / this.run.hpMax, 0, 1), f1 = clamp(to / this.run.hpMax, 0, 1);
+    if (f1 - f0 > 0.004) {
+      const slice = this.add.rectangle(this.hpBar.x + this.hpBar.displayWidth * f0, this.hpBar.y, this.hpBar.displayWidth * (f1 - f0), this.hpBar.displayHeight, 0xa8e88a, 0.6)
+        .setOrigin(0, 0.5).setDepth(909);
+      this.tweens.add({ targets: slice, alpha: 0, delay: 500, duration: 900, ease: 'Sine.easeIn', onComplete: () => slice.destroy() });
+    }
+    this.tweens.killTweensOf(this.hpBar);
+    this.hpBar.setAlpha(1);
+    this.tweens.add({ targets: this.hpBar, alpha: 0.55, duration: 90, yoyo: true });
+    const ht = ssTxt(this, l.x(-150), l.y(94), '♥ +' + sh.healed + ' ♥', l.u(16), '#9fe87a').setOrigin(0.5).setDepth(909)
+      .setShadow(0, 0, '#2a7a3a', l.u(8), true, true);
+    this.tweens.add({ targets: ht, alpha: 0, y: l.y(74), delay: 1600, duration: 450, onComplete: () => ht.destroy() });
+    this.tweens.killTweensOf(this.hpShown);
+    this.tweens.add({
+      targets: this.hpShown, v: to, duration: SS_F5_MEND_RISE_MS, ease: 'Sine.easeOut',
+      onUpdate: () => this.drawPhp(),
+      onComplete: () => {
+        if (sh.hold) { sh.hold = 0; this.hpHold = Math.max(0, (this.hpHold | 0) - 1); }
+        const free = !(this.hpHold | 0) && !this.hitPend.length;
+        this.hpShown.v = free ? Math.max(0, this.run.hp) : to;
+        this.drawPhp();
+        if (this.f5G !== g || g.beat !== 'show') return;
+        sh.risenAt = this.time.now;
+        const m = window.__f5mend = window.__f5mend || {};
+        m.risen = (m.risen | 0) + 1; m.risenAt = Date.now(); m.shown2 = Math.round(this.hpShown.v);
+        // the hand onto the bar's number
+        g.pose = { x: l.x(190) - this.hpT.width - l.u(2), y: l.y(68) - l.u(6), flip: true, dip: 7 };
+        g.poseN = (g.poseN | 0) + 1;
+        this.ftueAt = null; this.ftueRepoint();
+        // the dwell from the rise; a tap past the floor lets go
+        const release = () => { if (g.tapFn) { this.input.off('pointerdown', g.tapFn); g.tapFn = null; } this.f5GuideRelease(); };
+        const dwell = this.time.delayedCall(SS_F5_MEND_SHOW_MS, release);
+        this.time.delayedCall(SS_F5_SHOW_FLOOR_MS, () => {
+          if (this.f5G !== g || g.beat !== 'show') return;
+          g.tapFn = () => { dwell.remove(false); release(); };   // taps accelerate, past the floor
+          this.input.once('pointerdown', g.tapFn);
+        });
+        DIAG('f5 mend: the bar rose — ' + sh.before + ' → ' + sh.after);
+      },
+    });
   }
 
   // ---------- board ----------
@@ -11140,7 +11430,7 @@ class Battle extends Phaser.Scene {
     f0 = clamp(f0, 0, 1); f1 = clamp(f1, 0, 1);
     if (f0 - f1 < 0.004) return;
     const g = this.add.rectangle(bar.x + bar.displayWidth * f1, bar.y, bar.displayWidth * (f0 - f1), bar.displayHeight, tint, 0.5)
-      .setOrigin(0, 0.5).setDepth(30);
+      .setOrigin(0, 0.5).setDepth(bar.depth > 30 ? bar.depth + 1 : 30);   /* F5-GREEN: a bar lifted into the light keeps its ghost with it */
     this.tweens.add({ targets: g, alpha: 0, duration: 700, ease: 'Sine.easeIn', onComplete: () => g.destroy() });
     this.tweens.killTweensOf(bar);
     bar.setAlpha(1);
@@ -11321,11 +11611,20 @@ class Battle extends Phaser.Scene {
       const dews = this.sel.filter((i) => this.board[i] && this.board[i].tier === 3 && !this.board[i].blk).length;
       if (dews > 0) {
         const before = this.run.hp;
+        /* F5-GREEN: THE MEND — under the green word the player bar HOLDS
+           (hpHold, the strike's own grammar) so the heal is SHOWN coming back
+           on the showcase's beat (f5MendShow → f5MendRise), never snapped;
+           the truth (run.hp) is paid right here, as live */
+        const mend = this.f5G && this.f5G.show && this.f5G.show.tier === 3 && this.f5G.beat === 'cast' ? this.f5G.show : null;
+        if (mend) { mend.hold = 1; this.hpHold = (this.hpHold | 0) + 1; }
         this.heal(DEW_HEAL * dews);
         SFX.dew();
-        const ht = ssTxt(this, l.x(-150), l.y(94), '♥ +' + (this.run.hp - before) + ' ♥', l.u(16), '#9fe87a').setOrigin(0.5).setDepth(70)
-          .setShadow(0, 0, '#2a7a3a', l.u(8), true, true);
-        this.tweens.add({ targets: ht, alpha: 0, y: l.y(74), delay: 700, duration: 450, onComplete: () => ht.destroy() });
+        if (mend) { mend.before = before; mend.after = this.run.hp; mend.healed = this.run.hp - before; if (window.__f5guide) window.__f5guide.show = Object.assign({}, mend); }
+        else {
+          const ht = ssTxt(this, l.x(-150), l.y(94), '♥ +' + (this.run.hp - before) + ' ♥', l.u(16), '#9fe87a').setOrigin(0.5).setDepth(70)
+            .setShadow(0, 0, '#2a7a3a', l.u(8), true, true);
+          this.tweens.add({ targets: ht, alpha: 0, y: l.y(74), delay: 700, duration: 450, onComplete: () => ht.destroy() });
+        }
         window.__ssdewHeal = { n: dews, healed: this.run.hp - before, hp: this.run.hp, t: Date.now() };
       }
       if (this.sign === 'scorpio') this.venom = (this.venom | 0) + this.signVal('venomAdd');   // the sting settles in (twofold at level 40)
@@ -11352,6 +11651,7 @@ class Battle extends Phaser.Scene {
         this.expireSpecials();               // unspent bonuses fade BEFORE the new reward drops
         this.fillBoard(false);
         if (this.f5G && !this.ftueGone) this.f5GuideRefill();   /* F5-GUIDED: the hand moves on once this refill settles */
+        if (this.f5G && !this.ftueGone) this.f5StrikeArm();   /* F5-GREEN: a tick that IS the strike becomes THE STRIKE beat (the pill held through the pounce) */
         this.tickEnemy(() => { this.state = 'pick'; this.sigilMoment(); });
       };
       /* F5-GUIDED: the showcase holds the flow — the refill and the beast's
@@ -11448,7 +11748,7 @@ class Battle extends Phaser.Scene {
     const big = boss || atk >= 15;
     const others = Math.max(0, (this.hitPend ? this.hitPend.length : 1) - 1);
     const nT = ssTxt(this, l.x(0), l.y(468) - l.u(44) * Math.min(others, 2), '−' + atk, l.u(big ? 54 : 46), '#ff9a8a')
-      .setOrigin(0.5).setDepth(70).setShadow(0, 0, '#7a1420', l.u(12), true, true);
+      .setOrigin(0.5).setDepth(this.f5G && this.f5G.beat === 'strike' ? 952 : 70).setShadow(0, 0, '#7a1420', l.u(12), true, true);   /* F5-GREEN: lit above the strike beat's veil */
     nT.setScale(0.2).setAlpha(0);
     this.tweens.add({ targets: nT, scale: big ? 1.3 : 1.15, alpha: 1, duration: 120, ease: 'Back.easeOut' });
     this.tweens.add({ targets: nT, scale: 1, delay: 120, duration: 110 });
@@ -11491,6 +11791,7 @@ class Battle extends Phaser.Scene {
         });
       },
     });
+    return nT;   /* F5-GREEN: the number, for the strike beat's hand to rest on */
   }
 
   // the tally beat (v0.9.0), re-anchored: a smaller +N lifts off the enemy bar
@@ -11934,6 +12235,10 @@ class Battle extends Phaser.Scene {
         this.tweens.add({ targets: st, alpha: 0, y: l.y(220), delay: 700, duration: 400, onComplete: () => st.destroy() });
       }
       if (this.hasSigil('ward')) atk = Math.max(1, atk - this.sigVal('ward', 'cut'));
+      /* F5-GREEN: THE STRIKE under the script — never lethal, whatever the
+         beats before it left (the player must FEEL the blow and stand) */
+      const f5s = this.f5G && this.f5G.strike && this.f5G.strike.armed && !this.f5G.strike.hit ? this.f5G.strike : null;
+      if (f5s) { atk = Math.max(1, Math.min(atk, this.run.hp - 1)); f5s.hit = atk; f5s.before = this.run.hp; }
       // the bar HOLDS its value while the blow's number flies to it — the
       // beast side's grammar mirrored (playerHit releases the hold). The
       // long linger lets blows overlap: count the hold, book the damage.
@@ -11966,12 +12271,16 @@ class Battle extends Phaser.Scene {
       // the blow LANDS on the player (v0.104.0, Skylar 9/22): its number
       // pops at the point of contact, flies to the player's bar at the top,
       // and only then does that bar drain — slow enough to watch
-      this.playerHit(atk, mult, boss, () => {
+      const nT = this.playerHit(atk, mult, boss, () => {
         // ride the landing that EMPTIES the bar — a still-flying later blow
         // keeps the death waiting for its own number to land
         if (this.run.hp <= 0 && this.state !== 'end' && !this.hitPend.length) this.endRun(false);
+        if (f5s) this.f5StrikeLanded(f5s);   /* F5-GREEN: the bar has drained — the second line, the hand onto the bar */
       });
       if (this.run.hp <= 0) return;   // the beat carries the death — endRun fires when the bar lands empty
+      /* F5-GREEN: THE STRIKE holds the fight on its lesson; the dew waits for
+         the lift and blooms on the authored cell (f5StrikeLift) */
+      if (f5s) { this.f5StrikeShow(f5s, nT, done); return; }
       // dew gathers where the blow fell — one plain tile greens, a beat
       // after the hit reads (never in versus: VsBattle has its own strike)
       this.time.delayedCall(260, () => { if (this.state !== 'end' && this.scene.isActive()) this.dewTile(); });
