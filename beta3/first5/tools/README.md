@@ -2,24 +2,35 @@
 
 Harness for the FIRST5 sandbox (the first-night tutorial test build at
 drbango.com/beta3/first5/ — batch `ss-2026-10-07-first-night` + fix round
-`ss-2026-10-08-first5-fixes`).
+`ss-2026-10-08-first5-fixes` + `ss-2026-10-09-night-sky-live` card 03).
 
 **first5-check.mjs** — the whole-stage suite (cards 01-06 + fix 01 THE
-CLEAN REFRESH + fix 02 THE STRAY SIGNS + fix 03 THE SCRY LESSON): static
-seams (including the
+CLEAN REFRESH + fix 02 THE STRAY SIGNS + fix 03 THE SCRY LESSON + STRAIGHT
+INTO THE NIGHT): static seams (including the straight seams — seventeen
+F5-STRAIGHT sites, the landing that STANDS instead of settling, the lean
+that RESUMES the shipped rise from the title's own frame, the riser sized
+to it, the stale-ref reset — and the
 ground-truth scan proving every `location.reload/replace` in the copies
 announces itself through `__f5survive` first, and the stray-sign seams —
 no battle boot draw, six F5-FIX1-02 sites, the census tag), then live at
 DPR 3 — the virgin first open (ftue owed, prefix isolation,
-`window.__ssftue`), the LURE (real CDP click launches the rise and arms
-the sound), THE SKY LEANS IN (ember 33hp, real-tap STAR cast, star-write,
+`window.__ssftue`), STRAIGHT INTO THE NIGHT (a page-side trace installed
+at document start proves the camera never left the zenith between the title
+and the fight — min p ≥ 0.9 — the meadow chrome never showed, the grass
+grain never lit, the intro beacon read "stands" never "done"; proven on the
+untapped 5s fallback, under emulated reduce-motion, and on the REAL lure
+tap; the DPR-3 capture pair `tools/shots-straight/` title-night.png +
+first-fight.png — untracked, never committed), the LURE (real CDP click at
+the TITLE launches the lean and arms the sound), THE SKY LEANS IN (ember 33hp, real-tap STAR cast, star-write,
 the density gate vs the full dictionary, curated trio, encore, a real
 5-letter cast firing the cue ladder), THE TEACHING SCRIPTS (real
 dewTile/blackTile prompts, once-per-run dedupe, the forge/plant chain),
 THE LIT SKY (a fell through the true chain writes the mark, the converge,
 the rite still SEATING its mark + the sweep clearing the zenith, the
 ledger, the kept sky surviving a CARRIED reopen, the resumed battle
-booting CLEAN, the meadow still wearing the morning-after sky), the demo
+booting CLEAN, a carried reopen with the night still OWED standing at the
+title with ZERO kept marks, the meadow still wearing the morning-after sky
+once the night is DONE), the demo
 solver, THE SKYLAR SCENE (solver paused atomically at 'pick' mid-run:
 zero standing marks by census, a DPR-3 screenshot kept in
 `tools/shots-stray/` — untracked, never committed — and a pixel probe
@@ -35,7 +46,7 @@ under the raised pill, the cost line speaks once, the gate lifts with
 every depth home; real taps select and bounce again; a later stall only
 glints — the hand is never taken twice), THE CLEAN REFRESH itself
 (Page.reload with no flag wipes sentinel/quickck/stat, re-opens the FTUE
-gate, and the lure asks again), and the reset door (still honored,
+gate, and the lure asks again, at the title), and the reset door (still honored,
 out-ranking even a survive flag). Run from first5/ — ~10-15 min.
 
 Sandbox-only law: the wipe-on-refresh is THE STAGE'S law, never the live

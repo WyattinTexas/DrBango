@@ -1,6 +1,19 @@
 // FIRST5-CHECK — the stage (batch ss-2026-10-07-first-night, card 01;
 // + fix round ss-2026-10-08-first5-fixes cards 01 THE CLEAN REFRESH,
-// 02 THE STRAY SIGNS and 03 THE SCRY LESSON).
+// 02 THE STRAY SIGNS and 03 THE SCRY LESSON; + ss-2026-10-09-night-sky-live
+// card 03 STRAIGHT INTO THE NIGHT).
+//
+// STRAIGHT INTO THE NIGHT (10/9, F5-STRAIGHT seams): the first open never
+// comes down to the grass — the title STANDS at the zenith, the lure asks
+// there, and the tap resumes the shipped rise from the frame the title is
+// already on (one transition: title → fight 1). Proven by a page-side TRACE
+// installed at document start (min camera p over the open, the meadow
+// chrome's max alpha, the grass grain, the beacon walk), on the fallback
+// auto-rise (§2), under reduce-motion (§2a2) and on the REAL lure tap (§2b,
+// with the DPR-3 capture pair in tools/shots-straight/ — untracked, never
+// committed). With the night still OWED a carried reopen stands at the
+// title and draws no kept marks; the morning-after meadow (night DONE)
+// still wears them.
 //
 // Card 03 (F5-FIX1-03): the SCRY prompt is a forced two-beat lesson now —
 // at the stall the screen grays out and ONLY the scry button answers
@@ -28,7 +41,7 @@
 // :8901 if nothing does — NOT the standing :8899 beta3 server, which roots
 // at beta3/ and cannot serve ../. Chrome on :9476, /tmp/cdp-first5 wiped.
 //
-//   cd beta3/first5 && perl -e 'alarm 840; exec @ARGV' node tools/first5-check.mjs
+//   cd beta3/first5 && perl -e 'alarm 1500; exec @ARGV' node tools/first5-check.mjs
 //
 import { spawn, execSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
@@ -91,6 +104,15 @@ ok('the three beats stand: gate up / tap / gate down, and the pill hold', ['f5Sc
 ok('once a night: SS.prof.f5scry written at the tap', gameSrc.includes('SS.prof.f5scry = 1'));
 ok('the stall family yields while the gate stands', gameSrc.includes('&& !this.f5ScryGate'));
 ok('one prompt frame speaks for ribbon and gate alike', gameSrc.includes('function ssF5Frame(') && gameSrc.includes('ssF5Frame(scene, str).setDepth(950)'));
+/* — STRAIGHT INTO THE NIGHT (10/9) seams — */
+const audioSrc = readFileSync('audio.js', 'utf8');
+ok('straight seams: seventeen tagged sites in game.js, the riser takes a length in audio.js', (gameSrc.match(/F5-STRAIGHT/g) || []).length === 17 && audioSrc.includes('riser(dur)') && audioSrc.includes('const d = dur || 2.3'), String((gameSrc.match(/F5-STRAIGHT/g) || []).length));
+ok('the first open STANDS at its landing; every other boot still settles (the descent kept for them)', gameSrc.includes('this.f5Straight ? stand(false) : settle(1000, false)') && gameSrc.includes('if (this.f5Straight) { stand(true); return; }') && gameSrc.includes("window.__ssintro = 'stands'"));
+ok('the lean RESUMES the shipped rise from the standing frame (no second curve)', gameSrc.includes('function ssF5LeanFrom(') && gameSrc.includes('this.ascentStart -= this.f5Lean.from; this.lastP = this.introP;') && gameSrc.includes('this.f5Lean = { from: ssF5LeanFrom(this.introP) }; this.f5LeanTitle();'));
+ok('the riser is sized to the lean; the word comes apart where it stands', gameSrc.includes('SFX.riser(this.f5Lean ? SS_F5_LEAN_RISER_S : undefined)') && gameSrc.includes('function ssF5Stardust(') && gameSrc.includes('ssF5Stardust(this, t.getBounds(), 46)'));
+ok('the title night draws no kept marks; the morning-after meadow keeps its draw; no crickets at the zenith', gameSrc.includes('if (!this.f5Straight) ssF5DrawLitSky(this);') && gameSrc.includes('if (!this.introPlaying && !this.f5Straight'));
+ok('the straight state dies with the open (stale-ref law)', gameSrc.includes('this.f5Straight = false; this.f5TitleFx = null; this.f5Lean = null;'));
+ok('the lure stands at the title: scroll-fixed firefly + rings, the f5lure census tag; reduce-motion and the restart stand there too', gameSrc.includes("setData('f5lure', 1)") && gameSrc.includes('if (zen) fly.setScrollFactor(0);') && gameSrc.includes('if (zen) ring.setScrollFactor(0);') && gameSrc.includes('if (this.f5Straight) this.f5StandTitle(l);') && gameSrc.includes('else { this.buildMeadowUi(l); this.f5StandTitle(l); }'));
 const BUILD = (gameSrc.match(/const BUILD = '([^']+)'/) || [])[1];
 ok('game.js copy carries a BUILD', !!BUILD, BUILD);
 try {
@@ -125,6 +147,30 @@ const evp = async (expr) => { const r = await send('Runtime.evaluate', { express
 await new Promise((r) => { ws.onopen = r; });
 await send('Runtime.enable', {});
 await send('Page.enable', {});
+/* STRAIGHT INTO THE NIGHT: a page-side trace, installed at document start so
+   it sees the whole open — the lowest camera p the home scene ever showed
+   (0 = meadow, 1 = zenith; the title stands at 0.92), the meadow chrome's
+   highest alpha, how often the grass grain was visible, and the beacon walk.
+   The home scene sleeps under the battle, so the trace stops at the fight. */
+await send('Page.addScriptToEvaluateOnNewDocument', { source: `window.__f5trace = { minP: 9, maxUi: 0, grain: 0, n: 0, states: [], intro: [] };
+setInterval(() => { try {
+  const t = window.__f5trace, g = window.game; if (!g || !g.scene) return;
+  const h = g.scene.getScene('home');
+  if (h && h.sky && h.sky.T && h.scene.isActive() && h.cameras && h.cameras.main) {
+    t.n++;
+    const p = -h.cameras.main.scrollY / h.sky.T; if (p < t.minP) t.minP = p;
+    if (h.uiItems) for (const o of h.uiItems) if (o && o.active && o.alpha > t.maxUi) t.maxUi = o.alpha;
+    if (h.sky.grain && h.sky.grain.visible) t.grain++;
+  }
+  const s = window.__ssftue && window.__ssftue.state; if (s && t.states[t.states.length - 1] !== s) t.states.push(s);
+  const i = window.__ssintro; if (i && t.intro[t.intro.length - 1] !== i) t.intro.push(i);
+} catch (e) { } }, 100);` });
+const trace = async () => JSON.parse((await ev('JSON.stringify(window.__f5trace || null)')) || 'null');
+const fmtTrace = (t) => t ? ('min p ' + (t.minP === 9 ? '—' : t.minP.toFixed(3)) + ' · ui ' + t.maxUi + ' · grain ' + t.grain + ' · ' + t.n + ' samples · ' + t.states.join('>') + ' · intro ' + t.intro.join('>')) : 'no trace';
+// the idle-clock law: a woken headless clock pays ~one frame per input event —
+// poke the page while polling a RIDE (the lean is 0.8s of game-loop time)
+const poke = (i) => send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 30 + (i % 5), y: 30 + (i % 7) });
+const pickStands = () => ev("(()=>{try{const b=game.scene.getScene('battle');return !!(b&&b.scene.isActive()&&b.state==='pick')}catch(e){return false}})()");
 const go = async (url) => { errs.length = 0; await send('Page.navigate', { url }); await sleep(1500); };
 // a REAL tap at viewport CSS coordinates (the verify-with-clicks law)
 const tap = async (p) => {
@@ -164,14 +210,41 @@ ok('the ascent rises by itself into the first fight', !!rose, 'ftue state ' + ro
 let f1 = null; // graft 1: the battle scene stands moments after the rise
 for (let i = 0; i < 30 && !f1; i++) { f1 = await ev("(()=>{try{const b=game.scene.getScene('battle');return b&&b.fights&&b.fights[0]?b.fights[0].id:null}catch(e){return null}})()"); if (!f1) await sleep(1000); }
 ok('fight one is pinned VULPES, every day of the week (graft 1)', f1 === 'vulpes', String(f1));
+// STRAIGHT INTO THE NIGHT: the untapped open (the 5s fallback) rode the same
+// road — the title stood, the sky never came down, the fight was dealt
+let pk0 = false;
+for (let i = 0; i < 80 && !pk0; i++) { await poke(i); pk0 = await pickStands(); if (!pk0) await sleep(500); }
+const t0 = await trace();
+ok('STRAIGHT INTO THE NIGHT — the camera never left the zenith between title and fight (min p ≥ 0.9)', pk0 && !!t0 && t0.n > 0 && t0.minP >= 0.9, fmtTrace(t0));
+ok('…the title STOOD at its landing (intro beacon "stands" — never "done"/"skipped", no settle)', !!t0 && t0.intro.includes('stands') && !t0.intro.includes('done') && !t0.intro.includes('skipped'), t0 && t0.intro.join('>'));
+ok('…the meadow chrome never showed (ui alpha 0 throughout) and the grass grain never lit', !!t0 && t0.maxUi === 0 && t0.grain === 0);
+ok('…the beacon walked lure → rise → board, in order (the silent fallback rose on its own)', !!t0 && ['lure', 'rise', 'board'].every((s) => t0.states.includes(s)) && t0.states.indexOf('lure') < t0.states.indexOf('rise') && t0.states.indexOf('rise') < t0.states.indexOf('board'), t0 && t0.states.join('>'));
 ok('zero page exceptions through the open', errs.length === 0, errs.slice(0, 2).join(' | '));
 
+/* ======== §2a2 reduce-motion: the same straight road, under a veil ======== */
+console.log('— §2a2 reduce-motion: the title stands under the veil, never the grass —');
+await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
+await go(BASE + '?reset=1');
+let rmb = false;
+for (let i = 0; i < 150 && !rmb; i++) { await poke(i); rmb = await pickStands(); if (!rmb) await sleep(500); }
+const t1 = await trace();
+ok('reduce-motion: the open stands at the zenith and crossfades into fight 1 — the grass is never visited', rmb && !!t1 && t1.n > 0 && t1.minP >= 0.9, fmtTrace(t1));
+ok('…the intro beacon read "reduced" (the veil path), the meadow chrome stayed dark', !!t1 && t1.intro.includes('reduced') && t1.maxUi === 0, t1 && t1.intro.join('>'));
+ok('zero exceptions on the reduce-motion open', errs.length === 0, errs.slice(0, 2).join(' | '));
+await send('Emulation.setEmulatedMedia', { features: [] });
+
 /* ======== §2b the lure — the rise, heard (card 03) ======== */
-console.log('— §2b the lure: the rise is heard —');
+console.log('— §2b the lure: the rise is heard, straight from the title —');
 await go(BASE + '?reset=1');
 let lure = false;
 for (let i = 0; i < 180 && !lure; i++) { lure = (await ev("window.__ssftue ? window.__ssftue.state : null")) === 'lure'; if (!lure) await sleep(1000); }
-ok('one firefly asks — the lure stands after the settle', lure);
+ok('one firefly asks — the lure stands at the TITLE (no settle, no meadow)', lure);
+const atTitle = await ev("(()=>{try{const h=game.scene.getScene('home');const p=-h.cameras.main.scrollY/h.sky.T;const fx=h.f5TitleFx;const fly=h.children.list.find(o=>o.active&&o.getData&&o.getData('f5lure'));return [!!(fx&&fx.t&&fx.t.active&&fx.t.alpha>0.99&&fx.t.scrollFactorX===0),!!(fly&&fly.scrollFactorX===0&&fx&&fly.y>fx.t.y),p.toFixed(3),h.introPlaying,h.uiItems.every(o=>!o.active||o.alpha===0)]}catch(e){return ['err:'+e.message]}})()");
+ok('…under the standing wordmark: the word at full voice and scroll-fixed, the firefly scroll-fixed below it, the sky at the zenith, the chrome dark', Array.isArray(atTitle) && atTitle[0] === true && atTitle[1] === true && Number(atTitle[2]) >= 0.9 && atTitle[3] === false && atTitle[4] === true, String(atTitle));
+try { mkdirSync('tools/shots-straight', { recursive: true }); } catch (e) { }
+const shotT = await send('Page.captureScreenshot', { format: 'png' });
+if (shotT && shotT.data) writeFileSync('tools/shots-straight/title-night.png', Buffer.from(shotT.data, 'base64'));
+ok('DPR-3 capture 1/2 on file: the title night with the lure standing (tools/shots-straight/title-night.png)', !!(shotT && shotT.data), shotT && shotT.data ? Math.round(shotT.data.length / 1024) + 'kb' : 'no data');
 await seedScry();   // the reset re-owed the lesson — re-seed before this ascent
 // a REAL tap, anywhere on screen (the verify-with-clicks law)
 await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: 195, y: 420, button: 'left', clickCount: 1 });
@@ -180,6 +253,21 @@ let lured = null;
 for (let i = 0; i < 20 && !lured; i++) { const st = await ev("window.__ssftue ? window.__ssftue.state : null"); if (st === 'lured' || st === 'rise' || st === 'board') lured = st; if (!lured) await sleep(400); }
 ok('the tap launches the ascent (lure → rise)', !!lured, String(lured));
 ok('…and the same gesture ARMED THE SOUND (riser audible)', await ev("typeof SFX !== 'undefined' && SFX.ok === true && SFX.ctx && SFX.ctx.state === 'running'"), String(await ev("typeof SFX !== 'undefined' && SFX.ctx ? SFX.ctx.state : 'no ctx'")));
+// ONE TRANSITION: the lean (the shipped rise resumed from the title's frame,
+// ~0.8s) then the crossfade — fight 1 stands, and the sky never came down
+let pk2 = false;
+for (let i = 0; i < 90 && !pk2; i++) { await poke(i); pk2 = await pickStands(); if (!pk2) await sleep(500); }
+const t2 = await trace();
+const f1b = await ev("(()=>{try{const b=game.scene.getScene('battle');return b&&b.fights&&b.fights[0]?b.fights[0].id:null}catch(e){return null}})()");
+ok('ONE TRANSITION: title → fight 1 (pinned VULPES) off the real tap — the camera never below the zenith shade', pk2 && f1b === 'vulpes' && !!t2 && t2.minP >= 0.9, fmtTrace(t2) + ' · fight ' + f1b);
+// the home sleeps when the 450ms crossfade ENDS — under load the deal's
+// 'pick' can land first, so the sleep is polled, never read once
+let hSleep = false;
+for (let i = 0; i < 60 && !hSleep; i++) { await poke(i); hSleep = (await ev("game.scene.isSleeping('home') === true")) === true; if (!hSleep) await sleep(250); }
+ok('…the lean rode the shipped curve: beta3.ascent stamped, the home scene asleep under the battle (the crossfade done), the standing word taken apart', await ev("localStorage.getItem('beta3.ascent') !== null") && hSleep && await ev("(()=>{const h=game.scene.getScene('home');return h.f5TitleFx===null&&h.f5Lean===null})()"), 'asleep ' + hSleep);
+const shotF = await send('Page.captureScreenshot', { format: 'png' });
+if (shotF && shotF.data) writeFileSync('tools/shots-straight/first-fight.png', Buffer.from(shotF.data, 'base64'));
+ok('DPR-3 capture 2/2 on file: the first fight frame (tools/shots-straight/first-fight.png)', !!(shotF && shotF.data), shotF && shotF.data ? Math.round(shotF.data.length / 1024) + 'kb' : 'no data');
 ok('zero exceptions through the lure', errs.length === 0, errs.slice(0, 2).join(' | '));
 
 /* ======== §2c THE SKY LEANS IN (card 04) ======== */
@@ -296,8 +384,21 @@ ok('zero exceptions on the kept-sky boot', errs.length === 0, errs.slice(0, 2).j
 let rb1 = false;
 for (let i = 0; i < 90 && !rb1; i++) { rb1 = await ev("(()=>{try{const b=game.scene.getScene('battle');return !!(b&&b.scene.isActive()&&b.state==='pick')}catch(e){return false}})()"); if (!rb1) await sleep(1000); }
 ok('THE RESUMED BATTLE BOOTS CLEAN — kept list stands, zero marks drawn', rb1 && (await ev(CENSUS('battle'))) === 0 && (await ev('ssF5LitList().length')) >= 1, 'census ' + (await ev(CENSUS('battle'))) + ' · lit ' + (await ev('ssF5LitList().length')));
-/* — fix 02: the mark's true home still lights. Drop the held fight, carry
-   a reopen — the boot lands on the MEADOW and the morning-after sky stands — */
+/* — STRAIGHT INTO THE NIGHT (10/9): with the first night still OWED (no
+   endRun yet), a carried reopen with no held fight stands at the TITLE —
+   and draws no kept marks there (the stray-signs law, extended to the
+   night sky): the marks' home is the meadow, which comes AFTER the fight — */
+await ev("localStorage.removeItem('beta3.quickck')");
+await ev('window.__f5survive()');
+await go(BASE);
+let tStand = null;
+for (let i = 0; i < 60 && !tStand; i++) { const st = await ev("window.__ssftue ? window.__ssftue.state : null"); if (st === 'lure' || st === 'rise' || st === 'board') tStand = st; if (!tStand) await sleep(1000); }
+const tCensus = await ev(CENSUS('home')), tLit = await ev("typeof ssF5LitList === 'function' ? ssF5LitList().length : -1"), tOwed = await ev('SS.prof ? SS.prof.ftue : null');
+ok('THE TITLE NIGHT DRAWS NO KEPT MARKS — night still owed, the open stands at the zenith with census 0 while the kept list stands', tStand === 'lure' && tCensus === 0 && tLit >= 2 && tOwed === 0, 'state ' + tStand + ' · census ' + tCensus + ' · lit ' + tLit + ' · ftue ' + tOwed);
+/* — fix 02: the mark's true home still lights. The first night DONE (the
+   ftue flag down, as endRun leaves it), a carried reopen with no held fight
+   lands on the MEADOW and the morning-after sky stands — */
+await ev("(()=>{SS.prof.ftue = 1; SS.save(); return 1})()");
 await ev("localStorage.removeItem('beta3.quickck')");
 await ev('window.__f5survive()');
 await go(BASE);
@@ -503,7 +604,7 @@ ok('the FTUE gate is OPEN again — the refresh made a stranger (ftue 0 = owed)'
 ok('the lit sky is empty again', (await ev("typeof ssF5LitList === 'function' ? ssF5LitList().length : null")) === 0);
 let start = null; // the tutorial at its VERY start: the lure asks, and waits
 for (let i = 0; i < 180 && !start; i++) { const st = await ev("window.__ssftue ? window.__ssftue.state : null"); if (st === 'lure') start = st; if (!start) await sleep(1000); }
-ok('the tutorial stands at its very start — the lure asks again', start === 'lure');
+ok('the tutorial stands at its very start — the lure asks again, at the title', start === 'lure' && await ev("(()=>{try{const h=game.scene.getScene('home');return !!(h.f5TitleFx&&h.f5TitleFx.t.active)&&(-h.cameras.main.scrollY/h.sky.T)>=0.9}catch(e){return false}})()"));
 ok('zero exceptions through the clean refresh', errs.length === 0, errs.slice(0, 2).join(' | '));
 
 /* ================= §4 the reset door ================= */

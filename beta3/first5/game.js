@@ -2146,6 +2146,26 @@ function ssVeilStars(scene, items, count, depth) {
    Spec: SKY-DESIGN.md · demo: ascent.html (curve ported 1:1).
    ============================================================ */
 const ASC = { DIP_MS: 260, TOTAL_MS: 2600, DESCEND_MS: 1150 };
+/* F5-STRAIGHT (Skylar 10/9, straight into the night): the ms into the shipped
+   rise at which the camera first reaches p — the first open's lean resumes
+   the ride from there (the title stands at the intro's 0.92: ~1790ms in,
+   ~810ms of climb, overshoot and settle left), so every frame after the tap
+   is the rise the game always made. The riser is sized to that tail plus
+   the crossfade so its swell lands just before the arrival chime. */
+function ssF5LeanFrom(p) { for (let ms = 0; ms <= ASC.TOTAL_MS; ms += 2) if (ssAscentP(ms) >= p) return ms; return ASC.TOTAL_MS; }
+const SS_F5_LEAN_RISER_S = 1.3;
+/* the stardust a word comes apart into (dissolveTitle's recipe), fixed to
+   the frame so it can rise off the zenith wordmark */
+function ssF5Stardust(scene, b, n) {
+  const em = scene.add.particles(0, 0, 'dot', {
+    speed: { min: 8, max: 60 }, lifespan: { min: 700, max: 1500 }, gravityY: -30,
+    scale: { start: 0.55, end: 0 }, alpha: { start: 0.9, end: 0 },
+    blendMode: 'ADD', tint: [0xf3e5b4, 0xffe9c9, 0xcfd8ff], emitting: false,
+  }).setScrollFactor(0).setDepth(612);
+  for (let k = 0; k < n; k++) em.emitParticleAt(b.x + Math.random() * b.width, b.y + b.height * 0.15 + Math.random() * b.height * 0.7);
+  scene.time.delayedCall(1700, () => { if (em.active) em.destroy(); });
+  return em;
+}
 const ssReduceMotion = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
 // dip → rise → settle with overshoot; p: 0 = meadow, 1 = zenith
 function ssAscentP(ms) {
@@ -6541,6 +6561,10 @@ class Home extends Phaser.Scene {
     this.streakC = null; this.riteC = null; this.riteTimer = null; this.sigTimer = null; this.signLvTimer = null;
     this.showZone = null; this.showFx = null;   // last run's showcase died with its scene
     this.ftueBare = false;   // the wordless first open re-arms it below if owed
+    /* F5-STRAIGHT (Skylar 10/9, straight into the night): the first open's
+       own state — the standing title, the pending lean — dies with the open;
+       the post-fight restart (entry 'battle') must boot the meadow clean */
+    this.f5Straight = false; this.f5TitleFx = null; this.f5Lean = null;
 
     // Everything at the meadow (showcase, title, buttons, chip, footer) is a
     // full frame's work on a slow phone, and a descent-by-create (the dawn
@@ -6590,12 +6614,15 @@ class Home extends Phaser.Scene {
        ride), but the answer is never silence: every tap sparks where the
        finger landed. */
     this.input.on('pointerdown', (p) => { if (this.introPlaying || this.ascending) ssF5TapSpark(this, p.x, p.y); });
-    ssF5DrawLitSky(this);   /* F5-CARD-06: the meadow wears the kept sky — the morning-after proof */
+    /* F5-STRAIGHT: the first open never rests on the grass, so the title night
+       draws no marks (the stray-signs law, extended) — the meadow after the
+       first game is a fresh create and wears them as before */
+    if (!this.f5Straight) ssF5DrawLitSky(this);   /* F5-CARD-06: the meadow wears the kept sky — the morning-after proof */
     this.events.on('ss-achproxy', (def) => ssAchToast(this, def));
 
     // crickets sing while we stand in the grass — at dawn, the birds do.
     // During the intro we're still up at the zenith; they start on landing.
-    if (!this.introPlaying) { SFX.crickets(!this.isDawn); SFX.birds(this.isDawn); }
+    if (!this.introPlaying && !this.f5Straight /* F5-STRAIGHT: no crickets at the zenith */) { SFX.crickets(!this.isDawn); SFX.birds(this.isDawn); }
     this.events.once('shutdown', () => { SFX.crickets(false); SFX.birds(false); });
 
     // the ascent puts this scene to SLEEP, not to rest — returning from battle
@@ -7122,6 +7149,7 @@ class Home extends Phaser.Scene {
     if (ssReduceMotion()) {
       // gentle: open on the grass under a lifting veil. introPlaying never
       // sticks on this path, so create() starts the crickets as usual.
+      if (this.f5Straight) this.f5StandTitle(l);   /* F5-STRAIGHT: the first open stands at the zenith under the veil, not on the grass */
       DIAG('intro: reduce-motion → veil fade');
       const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setScrollFactor(0).setDepth(650);
       this.tweens.add({ targets: veil, alpha: 0, duration: 700, onComplete: () => veil.destroy() });
@@ -7197,6 +7225,26 @@ class Home extends Phaser.Scene {
           onComplete: () => finish(skipped),
         });
       };
+      /* F5-STRAIGHT (Skylar 10/9): on the first open the camera never comes
+         down. The landed word STANDS at the zenith and the night waits for
+         the hand (f5Lure); the tap leans the sky the rest of the way into
+         the fight (ftueRise). A tap mid-condense snaps the landing — the
+         runway rule: the first tap counts wherever it lands. */
+      const stand = (skipped) => {
+        if (!this.introPlaying) return;
+        this.introPlaying = false;
+        for (const tm of timers) tm.remove(false);
+        if (this.introSkipFn) { this.input.off('pointerdown', this.introSkipFn); this.introSkipFn = null; }
+        if (skipped) {   // mid-condense: snap the word landed, sweep a half-bloomed flourish
+          this.tweens.killTweensOf([t, glow]);
+          t.setAlpha(1).setScale(bs.sx, bs.sy); glow.setAlpha(0.18);
+          for (const fx of this.introFx) if (fx && fx.active) { this.tweens.killTweensOf(fx); fx.destroy(); }
+          this.introFx = [];
+        }
+        this.f5TitleFx = { t, glow, em };   // the lean takes them apart (f5LeanTitle)
+        window.__ssintro = 'stands';
+        DIAG('intro stands at the zenith' + (skipped ? ' (SKIPPED)' : '') + ' — straight into the night');
+      };
       // the show, beats overlapping like weather: a star streaks while the boot
       // veil is still lifting, the word condenses and LANDS (scale settles with
       // a Back overshoot into a swell of light and kicked stardust), a second
@@ -7230,12 +7278,13 @@ class Home extends Phaser.Scene {
         for (let k = 0; k < 42; k++) em.emitParticleAt(b.x + Math.random() * b.width, b.y + b.height * 0.2 + Math.random() * b.height * 0.6);
       });
       at(1000, () => ssShootingStar(this));
-      at(1350, () => settle(1000, false));
+      at(1350, () => (this.f5Straight ? stand(false) : settle(1000, false)));   /* F5-STRAIGHT: the descent begins here on every other boot */
       at(300, () => {
         if (!this.introPlaying) return;
         this.input.on('pointerdown', this.introSkipFn = () => {
           if (!this.introPlaying) return;
           for (const tm of timers) tm.remove(false);
+          if (this.f5Straight) { stand(true); return; }
           settle(Math.max(240, 340 * this.introP), true);
         });
       });
@@ -7263,10 +7312,15 @@ class Home extends Phaser.Scene {
      meadow's own doors offer tomorrow. */
   ftueOpen(l, intro) {
     this.ftueBare = true;                 // buildMeadowUi builds bare; onWake restarts on it
-    DIAG('ftue: first open');
+    /* F5-STRAIGHT (Skylar 10/9): "it shouldn't transition to the meadow. It
+       should just transition right into the tutorial game from that night
+       screen" — the first open never comes down: the title stands at the
+       zenith, the lure asks there, the tap leans the sky into the fight. */
+    this.f5Straight = true;
+    DIAG('ftue: first open (straight into the night)');
     window.__ssftue.state = 'open';
-    if (intro) this.playIntro(l);         // the default cinematic, over the bare meadow
-    else this.buildMeadowUi(l);           // a mid-open restart: no second cinematic
+    if (intro) this.playIntro(l);         // the default cinematic, standing at its landing (F5-STRAIGHT)
+    else { this.buildMeadowUi(l); this.f5StandTitle(l); }   // a mid-open restart: no second cinematic — the title simply stands
     /* the rise follows the open by itself — nobody is asked to tap. A poll,
        not a hook: one waiter covers the settle, a tap-skip, the
        reduce-motion veil AND the intro's own catch-fallback. */
@@ -7274,8 +7328,9 @@ class Home extends Phaser.Scene {
       delay: 350, loop: true, callback: () => {
         if (this.introPlaying || this.ascending || this.descending || this.arrived) return;
         if (this.ftueWait) { this.ftueWait.remove(false); this.ftueWait = null; }
-        /* F5-CARD-03 (verdict 8: LURE TAP — HEAR THE RISE): the settled
-           meadow asks with ONE FIREFLY instead of rising unasked. The
+        /* F5-CARD-03 (verdict 8: LURE TAP — HEAR THE RISE): the standing
+           title (F5-STRAIGHT; the settled meadow, before 10/9) asks with
+           ONE FIREFLY instead of rising unasked. The
            player's tap — anywhere — launches the ascent and arms the audio
            in the same gesture, so the riser and the arrival chime are heard
            on a true first open for the first time in the game's history.
@@ -7294,9 +7349,13 @@ class Home extends Phaser.Scene {
     this.f5LureOn = true;
     window.__ssftue.state = 'lure';
     DIAG('ftue: lure');
-    const cx = l.x(0), cy = l.y(470);
+    /* F5-STRAIGHT: at the zenith the firefly asks UNDER the standing wordmark,
+       fixed to the frame (the meadow seat is a world away below it) */
+    const zen = !!this.f5TitleFx;
+    const cx = zen ? l.W / 2 : l.x(0), cy = zen ? Math.round(l.H * 0.6) : l.y(470);
     const items = [];
-    const fly = this.add.image(cx, cy, 'spark4').setScale(0.9).setAlpha(0).setDepth(560).setBlendMode('ADD').setTint(0xffe9a8);
+    const fly = this.add.image(cx, cy, 'spark4').setScale(0.9).setAlpha(0).setDepth(560).setBlendMode('ADD').setTint(0xffe9a8).setData('f5lure', 1);
+    if (zen) fly.setScrollFactor(0);
     items.push(fly);
     this.tweens.add({ targets: fly, alpha: 0.95, duration: 500 });
     this.tweens.add({ targets: fly, scale: 1.3, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
@@ -7305,6 +7364,7 @@ class Home extends Phaser.Scene {
     const breathe = (big) => {
       if (!this.f5LureOn || !this.scene.isActive()) return;
       const ring = this.add.image(cx, fly.y, ringK).setDisplaySize(l.u(30), l.u(30)).setAlpha(big ? 0.9 : 0.7).setDepth(559).setBlendMode('ADD');
+      if (zen) ring.setScrollFactor(0);
       this.tweens.add({ targets: ring, displayWidth: l.u(big ? 124 : 88), displayHeight: l.u(big ? 124 : 88), alpha: 0, duration: big ? 1000 : 850, ease: 'Sine.easeOut', onComplete: () => ring.destroy() });
     };
     breathe(false);
@@ -7329,7 +7389,50 @@ class Home extends Phaser.Scene {
     if (this.busy()) { this.time.delayedCall(400, () => this.ftueRise()); return; }
     DIAG('ftue: rise');
     window.__ssftue.state = 'rise';
+    /* F5-STRAIGHT: from the standing title the sky has only the last of the
+       climb left. The shipped rise RESUMES from the frame it is already on
+       (ssF5LeanFrom), the word coming apart into stardust as the night leans
+       in — every frame after the tap is the rise the game always made. */
+    if (this.f5TitleFx) { this.f5Lean = { from: ssF5LeanFrom(this.introP) }; this.f5LeanTitle(); }
     this.beginAscent({ mode: 'quick', resume: null, ascended: true, ftue: 1 });
+  }
+  /* F5-STRAIGHT: the title standing at the zenith with no cinematic — the
+     reduce-motion open and a mid-open restart (rotation) stand here instead
+     of on the grass; playIntro's own landing hands off through stand(). */
+  f5StandTitle(l) {
+    if (this.f5TitleFx) return;
+    this.introP = 0.92;                   // the intro's own zenith shade
+    this.sky.setP(this.introP, 0);
+    this.sky.grain.setVisible(false);
+    for (const o of this.uiItems) { this.tweens.killTweensOf(o); o.setAlpha(0); }
+    const tk = ssTitleTex(this);
+    const tScale = Math.min(1, 384 / tk.w);
+    const t = this.add.image(l.W / 2, l.H * 0.4, tk.key)
+      .setDisplaySize(l.u(tk.w * tScale), l.u(tk.h * tScale)).setScrollFactor(0).setDepth(610);
+    const glow = this.add.image(t.x, t.y, 'glowbig').setScale(l.u(2.1)).setTint(0xf3e5b4)
+      .setBlendMode('ADD').setScrollFactor(0).setDepth(605).setAlpha(0.18);
+    this.f5TitleFx = { t, glow, em: null };
+    window.__ssintro = 'stands';
+    DIAG('ftue: the title stands at the zenith (no cinematic)');
+  }
+  /* F5-STRAIGHT: the wordmark comes apart where it stands — the shipped
+     dissolve's own recipe (dissolveTitle), played on the ZENITH word, since
+     the meadow's title is a world away below the frame. Reduced motion
+     fades it under the veil instead. */
+  f5LeanTitle() {
+    const fx = this.f5TitleFx; this.f5TitleFx = null;
+    if (!fx) return;
+    const { t, glow, em } = fx;
+    const quick = ssReduceMotion();
+    if (!quick && t.active) {
+      ssF5Stardust(this, t.getBounds(), 46);
+      this.tweens.add({ targets: t, scaleX: t.scaleX * 1.05, scaleY: t.scaleY * 1.05, duration: 420, ease: 'Sine.easeOut' });
+    }
+    for (const o of [t, glow]) if (o && o.active) {
+      this.tweens.killTweensOf(o);
+      this.tweens.add({ targets: o, alpha: 0, duration: quick ? 200 : 420, ease: 'Sine.easeIn', onComplete: () => { if (o.active) o.destroy(); } });
+    }
+    if (em && em.active) this.time.delayedCall(1200, () => { if (em.active) em.destroy(); });
   }
 
   // Subtitle under DAILY HUNT. Unplayed, it invites and shows how long the sky
@@ -8509,7 +8612,7 @@ class Home extends Phaser.Scene {
     DIAG('ascent begin (' + data.mode + ')');
     try {
       const l = ssLayout(this);
-      SFX.crickets(false); SFX.birds(false); SFX.riser();
+      SFX.crickets(false); SFX.birds(false); SFX.riser(this.f5Lean ? SS_F5_LEAN_RISER_S : undefined);   /* F5-STRAIGHT: the sweep sized to the lean */
       this.sky.scatterFlies();
       for (const o of this.uiItems) this.tweens.killTweensOf(o);
       // BUGFIX: this tweened `scale`, whose setter writes BOTH axes — a setDisplaySize'd
@@ -8538,6 +8641,8 @@ class Home extends Phaser.Scene {
       PERF.start('ascent', this);
       this.ascentStart = this.time.now;
       this.skipAt = null; this.lastP = 0; this.lastT = this.time.now;
+      /* F5-STRAIGHT: resume the ride at the frame the standing title is on */
+      if (this.f5Lean) { this.ascentStart -= this.f5Lean.from; this.lastP = this.introP; this.f5Lean = null; }
       // arm the tap-to-skip only after the launching tap has fully cleared —
       // Phaser delivers the button's own pointerdown to scene listeners added
       // during dispatch, so arming immediately made every real tap self-skip
@@ -8555,7 +8660,7 @@ class Home extends Phaser.Scene {
   dissolveTitle() {
     if (ssReduceMotion()) return;
     this.time.delayedCall(340, () => {
-      if (!this.ascending || this.arrived || !this.titleT) return;
+      if (!this.ascending || this.arrived || !this.titleT || this.f5Straight /* F5-STRAIGHT: the lean dissolves the zenith word instead */) return;
       const b = this.titleT.getBounds();
       const em = this.add.particles(0, 0, 'dot', {
         speed: { min: 8, max: 60 }, lifespan: { min: 700, max: 1500 }, gravityY: -30,

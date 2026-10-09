@@ -100,7 +100,8 @@ class SynthAudio {
     };
     voice(2100); setTimeout(() => voice(2600), 1600);
   }
-  riser() { this.sweep(300, 2600, 2.3, 0.10); this.sweep(190, 520, 2.3, 0.05, true); }
+  // F5-STRAIGHT: an optional length — the first open's lean is a shorter ride than the full rise
+  riser(dur) { const d = dur || 2.3; this.sweep(300, 2600, d, 0.10); this.sweep(190, 520, d, 0.05, true); }
   arriveChime() { this.tone(880, 0.35, 'sine', 0.08, 0.12); this.tone(1318.5, 0.5, 'sine', 0.07, 0.22); }
   descendSweep() { this.sweep(1900, 320, 1.1, 0.07); }
   noise(dur, freq, q, gain, sweepTo) {
