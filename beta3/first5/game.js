@@ -2002,13 +2002,24 @@ function ssF5TomorrowCue(scene) {
      after MOONS (cells 0·3·4·7·9)    s k y r e      → the forged ORANGE lands first, on the S at cell 0
      after SKY   (cells 0·3·4)        n o s          → the free board (density-gated by the suite)
    Other tongues are drafts in the same shape (validated against their
-   dictionaries by the suite's simulation; native review at integration). */
+   dictionaries by the suite's simulation; native review at integration).
+   F5-SCRYGATE (card 03): the rig carries the SCRIPTED SCRY's redeal too —
+   the sixteen letters that rain in when the gate's tap sweeps the board
+   (scry → fillBoard walks the queue first), so the board after the lesson
+   is the same for every player (en: the night's own letters, dense by the
+   suite's gate — 16 cells, index order; the other tongues' sixteen are
+   their curated deals' density-proven sets, drafts for native review). */
 const SS_F5_RIG = {
-  en: ['m', 'o', 'n', 's', 's', 'k', 'y', 'r', 'e', 'n', 'o', 's'],
-  es: ['m', 'a', 'r', 'e', 's', 'l', 'o', 'n', 't', 'a', 'e', 'r'],
-  fr: ['l', 'u', 'n', 'e', 's', 'l', 'a', 'o', 't', 'e', 'n', 's'],
-  pt: ['c', 'a', 's', 'a', 's', 'l', 'e', 'o', 'r', 'a', 't', 'n'],
-  de: ['s', 't', 'e', 'r', 'n', 'e', 'a', 's', 't', 'r', 'n', 'i', 'e'],
+  en: ['m', 'o', 'n', 's', 's', 'k', 'y', 'r', 'e', 'n', 'o', 's',
+    's', 't', 'a', 'r', 'l', 'i', 'g', 'h', 't', 'e', 'n', 'o', 'd', 'e', 'a', 'm'],
+  es: ['m', 'a', 'r', 'e', 's', 'l', 'o', 'n', 't', 'a', 'e', 'r',
+    'n', 'o', 'c', 't', 'e', 's', 'o', 'l', 'a', 'n', 'i', 'm', 'a', 'r', 'e', 'd'],
+  fr: ['l', 'u', 'n', 'e', 's', 'l', 'a', 'o', 't', 'e', 'n', 's',
+    'p', 'a', 'l', 'o', 'n', 'e', 's', 'i', 'u', 'r', 't', 'a', 'e', 'm', 'o', 'd'],
+  pt: ['c', 'a', 's', 'a', 's', 'l', 'e', 'o', 'r', 'a', 't', 'n',
+    'm', 'e', 'c', 'o', 'a', 'l', 'u', 'r', 's', 'i', 't', 'e', 'a', 'd', 'o', 'n'],
+  de: ['s', 't', 'e', 'r', 'n', 'e', 'a', 's', 't', 'r', 'n', 'i', 'e',
+    's', 'o', 'm', 'a', 'd', 'e', 'n', 'i', 'o', 'r', 't', 'u', 'n', 'e', 'l', 'h'],
 };
 /* F5-GUIDED: the script after the deal's own word — word 2 is 5 (de: 6)
    letters, so it FORGES the orange (the live rule: 5+ letters → tier 1, +6
@@ -2028,6 +2039,16 @@ const SS_F5_POINT_MS = 2600;         // the look at the orange tile before the h
 const SS_F5_SHOW_MS = 3600;          // the damage showcase's dwell
 const SS_F5_SHOW_FLOOR_MS = 900;     // a tap lets the showcase go only after this (the ceremony-floor grammar)
 const SS_F5_SHOW_VEIL = 0.42;        // the light veil under the showcase (the scry gate's is 0.66)
+/* F5-SCRYGATE (card ss-2026-10-09-first5-script/03): THE SCRY GATE's dials.
+   The gate rises on the script's own beat (the orange showcase let go, n·o·s
+   settled — the fuse at 2 on the first night's five-cast timer), so no first
+   night ever skips it; the reveal after the tap is HELD: the fuse's step
+   2 → 1 shown big in the pill's own words, Skylar's cost line beneath, the
+   finger on the pill, until the dwell or a tap past the floor lets go. */
+const SS_F5_SCRY_REVEAL_MS = 900;    // after the tap: the fresh board rains in, then the reveal rises (the OLD reading, big)
+const SS_F5_SCRY_STEP_MS = 700;      // the reveal has stood this long when the count STEPS (the pill + the big line together)
+const SS_F5_SCRY_SHOW_MS = 4200;     // the reveal's dwell, from the step
+const SS_F5_SCRY_FLOOR_MS = 1400;    // a tap lets the reveal go only after this (from the step — the ceremony-floor grammar)
 /* ---- F5-CARD-05: THE TEACHING SCRIPTS — Skylar's verdict-1 notes, with
    verdict 5 (WORDS ARE FINE) paying the copy. Ground truth held against the
    shipping code: the special tiles ARE orange (+6, tier 1), blue (×1.5,
@@ -9139,6 +9160,13 @@ class Battle extends Phaser.Scene {
            race it or eat it, manufactured on day one at stakes of 8. */
         this.fights[0].mult = SS_F5_EMBER_MULT;
         this.fights[0].atkAdd = 0;
+        /* F5-SCRYGATE (card 03): the first night's VULPES runs a FIVE-cast
+           fuse (timer 4 → 5 through beastFor's tcut door), so after the
+           three guided casts the fuse stands at 2 and the scripted scry has
+           a step to SHOW (2 → 1, "strikes in 1 cast" — the one cast earlier,
+           literally). Cards 04/05: the next cast after the gate is the
+           strike. */
+        this.fights[0].tcut = -1;
       }
       planSeed = Math.floor(rng() * 1e9);       // daily: seeded stream → every hunter shares the schedule
     }
@@ -9914,8 +9942,9 @@ class Battle extends Phaser.Scene {
     if (this.ftueGone || this.state === 'end') return null;
     const g = this.f5G;   /* F5-GUIDED: the script's own seats come first */
     if (g) {
-      if (g.beat === 'show') return g.pose ? 'pose' : 'wait';
+      if (g.beat === 'show' || g.beat === 'reveal') return g.pose ? 'pose' : 'wait';   /* F5-SCRYGATE: the reveal points like the showcase */
       if (g.beat === 'cast') return 'wait';
+      if (g.beat === 'scry') return 'scry';   /* F5-SCRYGATE: the one lit door */
       if (g.beat === 'point') return g.orange;
     }
     const tt = this.ftueWord;
@@ -9953,6 +9982,7 @@ class Battle extends Phaser.Scene {
     // CAST is approached MIRRORED, from the label's left, so the glove
     // never covers the damage preview it is pointing the player at
     if (goal === 'cast') pose = { x: this.castB.x - l.u(58), y: this.castB.y - l.u(10), flip: true, dip: 9 };
+    else if (goal === 'scry') pose = { x: this.scryB.x + l.u(30), y: this.scryB.y - l.u(8), flip: false, dip: 8 };   /* F5-SCRYGATE: the tip on SCRY, the glove to its right */
     else if (goal === 'pose') pose = Object.assign({}, this.f5G.pose);   /* F5-GUIDED: the showcase's number */
     else if (goal === 'wait') pose = { x: h.x, y: Math.min(h.y, l.y(700)) - l.u(44), flip: h.flipX, faded: true };
     else {
@@ -10097,7 +10127,7 @@ class Battle extends Phaser.Scene {
   f5GuideNext() {
     const g = this.f5G;
     g.idx++;
-    if (g.idx >= g.words.length) { this.f5GuideEnd(true); return; }
+    if (g.idx >= g.words.length) { this.f5GuideScry(); return; }   /* F5-SCRYGATE: the words are spent — THE SCRY GATE, then the hand lets go */
     this.ftueWord = g.words[g.idx];
     if (window.__ssftue) window.__ssftue.word = this.ftueWord.join('');
     if (g.idx === g.orange) {
@@ -10167,9 +10197,33 @@ class Battle extends Phaser.Scene {
     this.tweens.add({ targets: c, alpha: 0, duration: 260, onComplete: () => { if (c.active) c.destroy(); } });
     this.tweens.add({ targets: veil, alpha: 0, duration: 300, onComplete: () => { if (veil.active) veil.destroy(); } });
     const cont = g.cont; g.cont = null;
-    this.f5GuideEnd(true);
-    if (cont) cont();   // the refill + the beast's count, exactly as the shipped cast path runs them
-    DIAG('f5 guide: released — the night is the player\'s');
+    /* F5-SCRYGATE: the hand STAYS past the showcase — the parked continuation
+       (n·o·s, the beast's count) runs under the 'cast' beat, so the refill's
+       settle brings f5GuideNext → the words are spent → THE SCRY GATE */
+    this.f5GuideBeat('cast');
+    if (cont) cont(); else this.f5GuideEnd(true);   // the refill + the beast's count, exactly as the shipped cast path runs them
+    DIAG('f5 guide: released — the scry gate waits on the refill');
+  }
+  /* F5-SCRYGATE (card ss-2026-10-09-first5-script/03): THE SCRY GATE on the
+     script's own beat. Skylar (10/09): "when the player clicks Scry, That
+     they have to click it. It should gray out the rest of the screen and
+     pretty much just highlight Scry, because we don't want them to ever
+     bypass clicking Scry (or else they won't know what the mechanic does
+     and how it makes the beast attack one turn earlier)." The three guided
+     words are spent, n·o·s has settled, VULPES stands at a sliver with the
+     fuse at 2 (the first night's five-cast timer): the gate rises with the
+     finger on SCRY. The stall-born gate (f5ScryGateUp from update()) is the
+     SAME door, so a tongue without a script still meets it at its first
+     honest stall. No room for the step (the beast felled, the fuse at 1, a
+     free scry, a gate already up) → the hand lets go as before. */
+  f5GuideScry() {
+    const g = this.f5G; if (!g) return;
+    const room = this.beast && this.beast.hpNow > 0 && this.beast.count > 1 && this.state === 'pick'
+      && !this.f5ScryGate && !(this.hasSigil('comet') && (this.cometLeft | 0) > 0);
+    if (!room) { DIAG('f5 guide: no room for the scry gate — the hand lets go'); this.f5GuideEnd(true); return; }
+    this.f5GuideBeat('scry');
+    this.f5ScryGateUp(true);
+    DIAG('f5 guide: the scry gate (count ' + this.beast.count + ')');
   }
   // the hand lets go: happily at the end of the script, quietly if the
   // beast fell early or the board ran out of road
@@ -11933,7 +11987,7 @@ class Battle extends Phaser.Scene {
      Once a night (SS.prof.f5scry, written at the tap); the stage's
      refresh-restart (fix card 01) replays it on a fresh open. The beacon
      window.__f5scry carries armed/gate/tapped/down/cost/lifted. */
-  f5ScryGateUp() {
+  f5ScryGateUp(scripted) {
     const l = this.L;
     const seen = this.f5Prompted || (this.f5Prompted = {});
     seen.scry = 1;   // the gate IS the scry ribbon's moment — never both in one run
@@ -11952,24 +12006,31 @@ class Battle extends Phaser.Scene {
     this.tweens.add({ targets: c, alpha: 1, scale: 1, duration: 220, ease: 'Back.easeOut' });
     // a tap that lands anywhere else is guided to the one door: the button pops
     const bx = this.scryB.scaleX, by = this.scryB.scaleY;
-    veil.on('pointerdown', () => {
+    const pop = () => {
       this.tweens.killTweensOf(this.scryB);
       this.scryB.setScale(bx, by);
       this.tweens.add({ targets: this.scryB, scaleX: bx * 1.07, scaleY: by * 1.07, duration: 130, yoyo: true, ease: 'Sine.easeOut', onComplete: () => this.scryB.setScale(bx, by) });
-    });
-    this.f5ScryGate = { veil, glow, breathe, prompt: c, bx, by };
+    };
+    veil.on('pointerdown', pop);
+    this.f5ScryGate = { veil, glow, breathe, prompt: c, bx, by, pop, scripted: !!scripted };
+    /* F5-SCRYGATE: the script's finger rises above the veil and rests on SCRY
+       (ftueGoal 'scry') — the one lit door, pointed at */
+    const h = this.ftueHand; if (scripted && h && h.active) h.setDepth(960);
     const b = window.__f5scry = window.__f5scry || {};
-    b.armed = (b.armed | 0) + 1; b.gate = str;
-    DIAG('f5: scry gate up');
+    b.armed = (b.armed | 0) + 1; b.gate = str; b.scripted = (b.scripted | 0) + (scripted ? 1 : 0);
+    DIAG('f5: scry gate up' + (scripted ? ' (scripted)' : ''));
   }
   f5ScryTap() {
-    if (this.f5GuideLocked()) { this.f5GuideRefuse('scry'); return; }   /* F5-GUIDED: no fresh board while the hand is teaching */
     const g = this.f5ScryGate;
+    /* F5-GUIDED: no fresh board while the hand is teaching — F5-SCRYGATE: except
+       at the gate's own beat, where SCRY is the one door the hand points at */
+    if (this.f5GuideLocked() && !(g && g.scripted && this.f5G.beat === 'scry')) { this.f5GuideRefuse('scry'); return; }
     if (!g) { this.scry(); return; }          // no lesson standing — the button is just itself
     if (this.state !== 'pick') return;        // the same patience scry() keeps; the gate stands
     this.f5ScryGate = null;                   // beat 2 — the hand is released into the tap
     if (SS.prof) { SS.prof.f5scry = 1; SS.save(); }
     g.breathe.remove(); g.glow.destroy();
+    if (g.pop) g.veil.off('pointerdown', g.pop);   /* F5-SCRYGATE: the reveal's taps are its own */
     this.tweens.killTweensOf(this.scryB);
     this.scryB.setScale(g.bx, g.by);
     this.scryB.setDepth(0); this.scryT.setDepth(0);
@@ -11977,31 +12038,112 @@ class Battle extends Phaser.Scene {
     const was = this.beast.count;
     const b = window.__f5scry = window.__f5scry || {};
     b.tapped = (b.tapped | 0) + 1;
+    /* F5-SCRYGATE: the finger lets go of the door and waits (faded) for the pill */
+    if (this.f5G && this.f5G.beat === 'scry') { this.f5G.pose = null; this.f5GuideBeat('reveal'); }
     this.f5PillHold = 1;                      // the pill waits for the lesson's beat
     this.scry();                              // AS NORMAL: the board redeals, the beast counts it
-    // beat 3 — the cost, SHOWN: the pill rises above the veil…
+    this.f5ScryReveal(g, was);                // beat 3 — the cost, SHOWN SLOWLY (F5-SCRYGATE)
+  }
+  /* F5-SCRYGATE: THE REVEAL. Skylar (10/09): "we really need to highlight
+     that the beast is striking in one cast earlier. Maybe it pops up for a
+     second, but it needs to be slowed down so the player has a moment to
+     realize what Scry really does." The fresh board rains in under the
+     veil while the pill (raised into the light) still says the OLD count;
+     then, big at the hit number's own seat, the old reading stands in the
+     pill's own words — and STEPS: the pill ticks down with its hot pulse
+     (the ember alarm, at 1) while the old line is struck through and the
+     new one pops hot, the finger moves onto the pill, Skylar's cost line
+     rises beneath. The beat HOLDS — SS_F5_SCRY_SHOW_MS from the step, a tap
+     past SS_F5_SCRY_FLOOR_MS lets go — then the gate lifts and the script's
+     hand retires. Shared by the scripted gate and the stall-born one. */
+  f5ScryReveal(g, was) {
+    const l = this.L, b = window.__f5scry = window.__f5scry || {};
     this.strikeGlow.setDepth(901); this.strikeRib.setDepth(902); this.strikeT.setDepth(903);
-    this.time.delayedCall(700, () => {
-      this.f5PillHold = 0;
-      if (!this.scene.isActive()) return;
-      this.updateBars();                      // …and the number steps down in the light (hot pulse)
-      const now = this.beast ? this.beast.count : null;
-      b.down = [was, now];
-      // …then SAID, in Skylar's words, beneath the pill. (If a sign's own
-      // arrow felled the beast inside the scry, the price never ticked —
-      // the line would lie; the victory speaks for itself instead.)
-      if (now === was - 1) { ssF5Prompt(this, 'scryCost', this.L.x(0), this.L.y(398)); b.cost = (b.cost | 0) + 1; }
-      this.time.delayedCall(1500, () => this.f5ScryGateDown(g));
+    const c = this.add.container(l.x(0), l.y(468)).setDepth(950).setAlpha(0).setScale(0.92);   // the hit number's own seat
+    c.setData('f5scryshow', 1);
+    const old = ssTxt(this, 0, -l.u(30), SS_T(was === 1 ? 'strikeIn1' : 'strikeIn', was), l.u(18), '#e6a2a2').setOrigin(0.5);
+    const cross = this.add.graphics();        // the strike-through, drawn at the step
+    c.add([old, cross]);
+    g.reveal = c; g.old = old; g.cross = cross;
+    this.time.delayedCall(SS_F5_SCRY_REVEAL_MS, () => {
+      if (!this.sys.isActive() || !c.active) return;
+      this.tweens.add({ targets: c, alpha: 1, scale: 1, duration: 260, ease: 'Back.easeOut' });
+      b.reveal = (b.reveal | 0) + 1; b.revealAt = Date.now();
+      this.time.delayedCall(SS_F5_SCRY_STEP_MS, () => this.f5ScryStep(g, was));
     });
   }
+  f5ScryStep(g, was) {
+    const l = this.L, b = window.__f5scry = window.__f5scry || {}, c = g.reveal;
+    this.f5PillHold = 0;
+    if (!this.sys.isActive() || !c || !c.active) return;
+    this.updateBars();                        // the number steps down in the light (the hot pulse; the ember alarm at 1)
+    const now = this.beast ? this.beast.count : null;
+    b.down = [was, now];
+    // the price ticked? (A sign's own arrow felling the beast inside the scry
+    // never ticks it — the line would lie; the victory speaks for itself.)
+    const told = now === was - 1;
+    let dwellMs = SS_F5_SCRY_SHOW_MS;
+    if (told) {
+      SFX.tick(); SFX.noise(0.3, 220, 0.8, 0.14, 70);
+      const old = g.old, cross = g.cross, w = old.width + l.u(10), seg = { t: 0 };
+      this.tweens.add({
+        targets: seg, t: 1, duration: 260, ease: 'Sine.easeOut',
+        onUpdate: () => { if (!cross.active) return; cross.clear(); cross.lineStyle(l.u(2.2), 0xff8a70, 0.9); cross.beginPath(); cross.moveTo(-w / 2, old.y); cross.lineTo(-w / 2 + w * seg.t, old.y); cross.strokePath(); },
+      });
+      this.tweens.add({ targets: old, alpha: 0.45, duration: 400 });
+      // the new reading pops hot, an ember breathing behind it
+      const ember = this.add.image(0, l.u(10), 'glowbig').setDisplaySize(l.u(300), l.u(70)).setTint(0xff5a48).setBlendMode('ADD').setAlpha(0);
+      const nowT = ssTxt(this, 0, l.u(10), SS_T(now === 1 ? 'strikeIn1' : 'strikeIn', now), l.u(25), '#ff8a70').setOrigin(0.5)
+        .setShadow(0, 0, '#ff5a48', l.u(10), true, true).setScale(0.6).setAlpha(0);
+      c.addAt(ember, 0); c.add(nowT);
+      this.tweens.add({ targets: nowT, alpha: 1, scale: 1, duration: 300, ease: 'Back.easeOut' });
+      this.tweens.add({ targets: ember, alpha: 0.5, duration: 320, onComplete: () => { if (ember.active) this.tweens.add({ targets: ember, alpha: 0.22, duration: 640, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' }); } });
+      // …then SAID, in Skylar's words (the one prompt frame; the once law on the table's own key)
+      const seen = this.f5Prompted || (this.f5Prompted = {}); seen.scryCost = 1;
+      window.__f5prompt = Object.assign(window.__f5prompt || {}, { scryCost: ((window.__f5prompt || {}).scryCost | 0) + 1 });
+      b.cost = (b.cost | 0) + 1;
+      const str = (SS_F5_PROMPTS[PACK.lang] || SS_F5_PROMPTS.en).scryCost || SS_F5_PROMPTS.en.scryCost;
+      const line = ssF5Frame(this, str).setPosition(0, l.u(62)).setAlpha(0);
+      c.add(line);
+      this.tweens.add({ targets: line, alpha: 1, duration: 260, delay: 500 });
+      // the script's finger moves onto the pill — the counter the player watches from now on
+      const sg = this.f5G;
+      if (sg && sg.beat === 'reveal') {
+        sg.pose = { x: l.x(0) + this.strikeT.width / 2 + l.u(10), y: l.y(343) + l.u(6), flip: false, dip: 7 };
+        sg.poseN = (sg.poseN | 0) + 1;
+        this.ftueAt = null; this.ftueRepoint();
+      }
+    } else dwellMs = 900;                     // nothing to teach — a short beat, then the night goes on
+    g.steppedAt = this.time.now; b.stepAt = Date.now();
+    const release = (how) => {
+      if (g.tapFn) { this.input.off('pointerdown', g.tapFn); g.tapFn = null; }
+      b.released = how; b.holdMs = Math.round(this.time.now - g.steppedAt);
+      this.f5ScryGateDown(g);
+    };
+    const dwell = this.time.delayedCall(dwellMs, () => release('dwell'));
+    this.time.delayedCall(Math.min(SS_F5_SCRY_FLOOR_MS, dwellMs), () => {
+      if (g.lifted || !this.sys.isActive() || !c.active) return;
+      g.tapFn = () => { dwell.remove(false); release('tap'); };   // taps accelerate, past the floor
+      this.input.once('pointerdown', g.tapFn);
+    });
+    DIAG('f5: scry reveal ' + was + ' → ' + now + (told ? '' : ' (no step to teach)'));
+  }
   f5ScryGateDown(g) {
-    // beat 4 — the gate lifts: every depth goes home, the night goes on
+    if (g.lifted) return;
+    g.lifted = true;
+    // beat 4 — the gate lifts: the reveal fades, every depth goes home, the night goes on
+    const c = g.reveal;
+    if (c && c.active) this.tweens.add({ targets: c, alpha: 0, duration: 260, onComplete: () => { if (c.active) c.destroy(); } });
     this.strikeGlow.setDepth(0); this.strikeRib.setDepth(0); this.strikeT.setDepth(0);
     if (g.veil.active) {
       this.tweens.add({ targets: g.veil, alpha: 0, duration: 300, onComplete: () => { if (g.veil.active) g.veil.destroy(); } });
     }
     const b = window.__f5scry = window.__f5scry || {};
     b.lifted = (b.lifted | 0) + 1;
+    /* F5-SCRYGATE: the script's hand retires here — the night is the player's;
+       without a script the stall clock starts fresh from the lesson */
+    if (this.f5G && this.f5G.beat === 'reveal') this.f5GuideEnd(true);
+    else { this.f5LastTap = this.time.now; this.f5Glinted = false; }
     DIAG('f5: scry gate lifted');
   }
 

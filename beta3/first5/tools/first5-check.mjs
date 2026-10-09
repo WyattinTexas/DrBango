@@ -22,7 +22,12 @@
 // veil and the count steps down in the light before the cost line speaks;
 // the gate lifts, play resumes, and the lesson never takes the hand twice
 // (SS.prof.f5scry). §2/§3b pre-seed that flag so the older sections keep
-// testing THEIR cards; §3b2 clears it and stalls honestly.
+// testing THEIR cards; §3b2 clears it and stalls honestly. THE SCRY GATE
+// (10/9, card ss-2026-10-09-first5-script/03): the gate now ALSO rises on
+// the script's own beat after the orange showcase (ignoring the flag by
+// design — no path through the first night skips it) and the reveal is a
+// HELD, slowed beat shared with the stall-born gate; §2c un-seeds before
+// the showcase lets go so the tap is seen writing the flag.
 // THE PAINTED FIRST FIVE (10/9, card ss-2026-10-09-first5-script/01, F5-PAINTED
 // seams): the tutorial stands on the live game's painted night — the crisp
 // plate (../art/nightsky.webp) under the title night AND the fight (ssZenithSky,
@@ -145,12 +150,22 @@ ok('painted seams: thirteen F5-PAINTED sites in game.js', (gameSrc.match(/F5-PAI
 ok('guided seams: twenty-four F5-GUIDED sites in game.js', (gameSrc.match(/F5-GUIDED/g) || []).length === 24, String((gameSrc.match(/F5-GUIDED/g) || []).length));
 ok('the script table stands for all five tongues, the rig carries every refill, the dials are declared', ['const SS_F5_GUIDE = {', 'const SS_F5_GUIDE_SETTLE_MS', 'const SS_F5_POINT_MS', 'const SS_F5_SHOW_MS', 'const SS_F5_SHOW_FLOOR_MS', 'const SS_F5_SHOW_VEIL'].every((t) => gameSrc.includes(t)) && /SS_F5_GUIDE = \{[\s\S]*?en:[\s\S]*?es:[\s\S]*?fr:[\s\S]*?pt:[\s\S]*?de:[\s\S]*?\n\};/.test(gameSrc));
 ok('the hand STAYS past the first cast (the old retire gated on no script; the cast hook after the damage is known)', gameSrc.includes('if (this.ftue && !this.ftueGone && !this.f5G) this.ftueRetire(true);') && gameSrc.includes('if (this.ftue && !this.ftueGone && this.f5G) this.f5GuideCast(word, tiles, dmg);'));
-ok('THE LOCK: a tile off the road, CAST before the word stands, SCRY — all refused under the hand; the button waits for the whole word', gameSrc.includes("if (this.f5GuideLocked() && !this.f5GuideAllows(i)) { this.f5GuideRefuse(i); return; }") && gameSrc.includes("if (this.f5GuideLocked() && word !== this.ftueWord.join('')) { this.f5GuideRefuse('cast'); return; }") && gameSrc.includes("if (this.f5GuideLocked()) { this.f5GuideRefuse('scry'); return; }") && gameSrc.includes('&& WORDSET.has(word) && !guided;'));
+ok('THE LOCK: a tile off the road, CAST before the word stands, SCRY — all refused under the hand; the button waits for the whole word', gameSrc.includes("if (this.f5GuideLocked() && !this.f5GuideAllows(i)) { this.f5GuideRefuse(i); return; }") && gameSrc.includes("if (this.f5GuideLocked() && word !== this.ftueWord.join('')) { this.f5GuideRefuse('cast'); return; }") && gameSrc.includes("if (this.f5GuideLocked() && !(g && g.scripted && this.f5G.beat === 'scry')) { this.f5GuideRefuse('scry'); return; }") && gameSrc.includes('&& WORDSET.has(word) && !guided;'));
 ok('THE SHOWCASE holds the flow: the continuation parked in g.cont, started by beastHit when the drain settles, released by the lesson', gameSrc.includes("if (this.f5G && this.f5G.show && this.f5G.beat === 'cast' && this.beast.hpNow > 0) this.f5G.cont = cont;") && gameSrc.includes('else if (this.f5G && this.f5G.cont) this.f5GuideShow();') && gameSrc.includes('const cont = g.cont; g.cont = null;') && gameSrc.includes('if (cont) cont();'));
 ok('the orange word asks for the ORANGE tile itself; CAST lights only for the whole guided word', gameSrc.includes('if (g && g.idx === g.orange) for (let i = 0; i < 16; i++) {') && gameSrc.includes("WORDSET.has(word) && (!g || word === tt.join(''))) return 'cast';"));
 ok('the script state is reset BEFORE the hand builds it (stale-ref law), and dies quietly if the beast falls mid-script', /this\.f5G = null;[^\n]*\n\s*if \(this\.ftue\) this\.ftueStart\(\);/.test(gameSrc) && gameSrc.includes('if (this.ftue && !this.ftueGone && this.f5G) this.f5GuideEnd(false);'));
 ok('the showcase line stands in the en table (every other tongue falls back to en)', gameSrc.includes("orangeHit: 'That orange tile added +{x} — {d} damage, not {p}.'"));
 ok('the tile/dew/ink lessons share ONE seat under the strikes pill now (374 — none over it at 352)', gameSrc.includes("ssF5Prompt(this, 'tile' + tier, this.L.x(0), this.L.y(374))") && gameSrc.includes("ssF5Prompt(this, 'tile3', this.L.x(0), this.L.y(374))") && gameSrc.includes("ssF5Prompt(this, 'ink', l.x(0), l.y(374))") && !/ssF5Prompt\([^\n]*\(352\)/.test(gameSrc));
+/* — THE SCRY GATE (card ss-2026-10-09-first5-script/03) seams — */
+ok('scry-gate seams: sixteen F5-SCRYGATE sites in game.js', (gameSrc.match(/F5-SCRYGATE/g) || []).length === 16, String((gameSrc.match(/F5-SCRYGATE/g) || []).length));
+ok("the first night's VULPES runs a FIVE-cast fuse (tcut −1 in the ember block, through beastFor's tcut door) — the gate has a step to show", /this\.fights\[0\]\.atkAdd = 0;[\s\S]{0,700}this\.fights\[0\]\.tcut = -1;/.test(gameSrc) && gameSrc.includes('if (f.tcut) b.timer = Math.max(2, b.timer - f.tcut);'));
+ok('the dials are declared: reveal 900 · step 700 · show 4200 · floor 1400', ['const SS_F5_SCRY_REVEAL_MS = 900;', 'const SS_F5_SCRY_STEP_MS = 700;', 'const SS_F5_SCRY_SHOW_MS = 4200;', 'const SS_F5_SCRY_FLOOR_MS = 1400;'].every((t) => gameSrc.includes(t)));
+ok("THE GATE ON ITS OWN BEAT: the words spent → f5GuideScry → the SAME door the stall raises, scripted; the hand STAYS past the showcase (the continuation runs under 'cast', the settle brings the gate)", gameSrc.includes('if (g.idx >= g.words.length) { this.f5GuideScry(); return; }') && gameSrc.includes("this.f5GuideBeat('cast');\n    if (cont) cont(); else this.f5GuideEnd(true);") && gameSrc.includes("this.f5GuideBeat('scry');\n    this.f5ScryGateUp(true);") && gameSrc.includes('f5ScryGateUp(scripted) {'));
+ok('…the finger rests on SCRY above the veil (goal scry, depth 960); no room for the step → the hand lets go as before', gameSrc.includes("if (g.beat === 'scry') return 'scry';") && gameSrc.includes("else if (goal === 'scry') pose = { x: this.scryB.x + l.u(30), y: this.scryB.y - l.u(8), flip: false, dip: 8 };") && gameSrc.includes('if (scripted && h && h.active) h.setDepth(960);') && gameSrc.includes("if (!room) { DIAG('f5 guide: no room for the scry gate — the hand lets go'); this.f5GuideEnd(true); return; }"));
+ok('ONLY SCRY answers at the gate: the lock yields to SCRY at the scripted beat alone (tiles and CAST stay refused under the hand; the veil swallows the rest)', gameSrc.includes("if (this.f5GuideLocked() && !(g && g.scripted && this.f5G.beat === 'scry')) { this.f5GuideRefuse('scry'); return; }") && gameSrc.includes("return !!(this.ftue && !this.ftueGone && this.f5G && this.f5G.beat !== 'free');"));
+ok("THE REVEAL is shared and SLOW: the tap holds the pill and scries as normal, f5ScryReveal rises after the fresh board, the step releases the hold — the two readings in the pill's own words, the cross-out, the ember, Skylar's cost line in the one frame, the finger on the pill", gameSrc.includes('this.f5PillHold = 1;') && gameSrc.includes('this.f5ScryReveal(g, was);') && gameSrc.includes('this.time.delayedCall(SS_F5_SCRY_STEP_MS, () => this.f5ScryStep(g, was));') && gameSrc.includes("const old = ssTxt(this, 0, -l.u(30), SS_T(was === 1 ? 'strikeIn1' : 'strikeIn', was), l.u(18), '#e6a2a2').setOrigin(0.5);") && gameSrc.includes("SS_T(now === 1 ? 'strikeIn1' : 'strikeIn', now), l.u(25), '#ff8a70')") && gameSrc.includes('const line = ssF5Frame(this, str).setPosition(0, l.u(62)).setAlpha(0);') && gameSrc.includes('sg.pose = { x: l.x(0) + this.strikeT.width / 2 + l.u(10), y: l.y(343) + l.u(6), flip: false, dip: 7 };') && /f5ScryStep\(g, was\) \{\n[^\n]*\n    this\.f5PillHold = 0;/.test(gameSrc));
+ok("…the beat HOLDS: the dwell from the step, a tap past the floor; the lift retires the script's hand (or restarts the stall clock), never twice", gameSrc.includes("const dwell = this.time.delayedCall(dwellMs, () => release('dwell'));") && gameSrc.includes('this.time.delayedCall(Math.min(SS_F5_SCRY_FLOOR_MS, dwellMs), () => {') && gameSrc.includes("if (this.f5G && this.f5G.beat === 'reveal') this.f5GuideEnd(true);") && gameSrc.includes('if (g.lifted) return;\n    g.lifted = true;'));
+ok('the old quick reveal is GONE (no 700 ms pop + 1.5 s linger, no ribbon-prompt cost line)', !gameSrc.includes('this.time.delayedCall(1500, () => this.f5ScryGateDown(g));') && !gameSrc.includes("ssF5Prompt(this, 'scryCost'"));
 /* THE SIMULATION: every tongue's script, dealt and cast exactly as the game
    does (the curated deal, the finger's first-match walk with the orange
    preference, the rig consumed in cell order, the pending forge landing in
@@ -164,6 +179,15 @@ const FTUE = lit(dataSrc.match(/const SS_FTUE = (\{[\s\S]*?\n\});/)[1]);
 const LENM = lit(gameSrc.match(/const LEN_MULT = (\[[^\]]*\]);/)[1]);
 const VALS = {}; for (const m of packSrc.matchAll(/lang: '(\w+)'[\s\S]*?vals: (\{[^}]*\})/g)) VALS[m[1]] = lit(m[2]);
 const EMBER = Math.round(30 * lit(gameSrc.match(/const SS_F5_EMBER_MULT = ([\d.]+);/)[1]));
+// THE SCRY GATE: the first night's fuse (VULPES's own timer through the ember block's tcut) and the sweep's sixteen
+const TCUT = +(gameSrc.match(/this\.fights\[0\]\.tcut = (-?\d+);/) || [0, 0])[1];
+const VTIMER = +(dataSrc.match(/vulpes: \{[^}]*?timer: (\d+)/) || [0, 0])[1];
+const densOf = (W, chs) => {
+  const counts = {}; for (const ch of chs) if (ch && ch !== '?') counts[ch] = (counts[ch] | 0) + 1;
+  const fits = (w) => { if (w.includes('q')) return false; const c = { ...counts }; for (const ch of w) { if (!c[ch]) return false; c[ch]--; } return true; };
+  let n4 = 0, n5 = 0, n6 = 0; for (const w of W) { const L = w.length; if (L === 4 && n4 < 9 && fits(w)) n4++; else if (L === 5 && n5 < 9 && fits(w)) n5++; else if (L === 6 && n6 < 9 && fits(w)) n6++; if (n4 > 8 && n5 > 8 && n6 > 8) break; }
+  return [n4, n5, n6];
+};
 const dictOf = (lang) => { const s = readFileSync(lang === 'en' ? '../words.js' : '../words-' + lang + '.js', 'utf8'); const m = lang === 'en' ? s.match(/=\s*"([^"]+)"/) : s.match(/feed\('\w+',\s*"([^"]*)"/); return new Set(m[1].split(' ')); };
 const simGuide = (lang) => {
   const W = dictOf(lang), vals = VALS[lang], board = FTUE[lang].board.map((ch) => ({ ch, tier: 0 })), queue = RIG[lang].slice(), pending = [];
@@ -191,16 +215,19 @@ const simGuide = (lang) => {
     for (const s of board) if (s && s.tier) s.tier = 0;
     for (let i = 0; i < 16; i++) { if (board[i]) continue; if (!queue.length) { board[i] = { ch: '?', tier: pending.length ? pending.shift() : 0 }; continue; } board[i] = { ch: queue.shift(), tier: pending.length ? pending.shift() : 0 }; }
   }
-  const counts = {}; for (const s of board) if (s && s.ch !== '?') counts[s.ch] = (counts[s.ch] | 0) + 1;
-  const fits = (w) => { if (w.includes('q')) return false; const c = { ...counts }; for (const ch of w) { if (!c[ch]) return false; c[ch]--; } return true; };
-  let n4 = 0, n5 = 0, n6 = 0; for (const w of W) { const L = w.length; if (L === 4 && n4 < 9 && fits(w)) n4++; else if (L === 5 && n5 < 9 && fits(w)) n5++; else if (L === 6 && n6 < 9 && fits(w)) n6++; if (n4 > 8 && n5 > 8 && n6 > 8) break; }
-  return { log, final: board.map((s) => s.ch + (s.tier ? '*' : '')).join(' '), density: [n4, n5, n6], queueLeft: queue.length, orange };
+  // THE SCRY GATE (card 03): the words spent, the gate's tap sweeps the board and
+  // the rig's next sixteen rain in — the board the player's own night begins on
+  const queueAfterWords = queue.length;
+  const scried = []; for (let i = 0; i < 16; i++) scried.push(queue.length ? queue.shift() : '?');
+  const timer = Math.max(2, VTIMER - TCUT);
+  return { log, final: board.map((s) => s.ch + (s.tier ? '*' : '')).join(' '), density: densOf(W, board.map((s) => s.ch)), scried: scried.join(' '), scryDensity: densOf(W, scried), queueAfterWords, queueLeft: queue.length, orange, fuse: { timer, afterWords: timer - words.length, afterScry: timer - words.length - 1 } };
 };
-const simOk = (r) => !r.err && r.log.length === 3 && r.log[1].forges === 1 && !r.log[1].orange && r.log[2].orange && r.log[2].startsOnOrange && r.log[2].extra === 6 && r.queueLeft === 0 && r.density.every((n) => n >= 3);
-const fmtSim = (r) => r.err ? r.err : r.log.map((e) => e.word + ' ' + e.dmg + (e.orange ? '(plain ' + e.plain + ', +' + e.extra + ')' : '') + (e.forges ? ' forges' + e.forges : '') + ' hp→' + e.hp).join(' · ') + ' · free board ' + r.density.join('/');
+const simOk = (r) => !r.err && r.log.length === 3 && r.log[1].forges === 1 && !r.log[1].orange && r.log[2].orange && r.log[2].startsOnOrange && r.log[2].extra === 6 && r.queueAfterWords === 16 && r.queueLeft === 0 && r.scryDensity.every((n) => n >= 3) && r.fuse.afterWords >= 2;
+const fmtSim = (r) => r.err ? r.err : r.log.map((e) => e.word + ' ' + e.dmg + (e.orange ? '(plain ' + e.plain + ', +' + e.extra + ')' : '') + (e.forges ? ' forges' + e.forges : '') + ' hp→' + e.hp).join(' · ') + ' · board ' + r.density.join('/') + ' · scried ' + r.scried.replace(/ /g, '') + ' ' + r.scryDensity.join('/') + ' · fuse ' + r.fuse.timer + '→' + r.fuse.afterWords + '→' + r.fuse.afterScry;
 const simEn = simGuide('en');
-ok('THE SIMULATION (en): STAR → MOONS forges the orange → SKY starts on it, +6 exactly (16, not 10), VULPES left alive at 3, the queue spent, the free board dense', simOk(simEn) && simEn.log[0].word === 'star' && simEn.log[1].word === 'moons' && simEn.log[2].word === 'sky' && simEn.log[2].dmg === 16 && simEn.log[2].plain === 10 && simEn.log[2].hp === 3 && simEn.final === 'n e m o s l i r n e d e o t a u', fmtSim(simEn));
-for (const lang of ['es', 'fr', 'pt', 'de']) { const r = simGuide(lang); ok('THE SIMULATION (' + lang + ', a draft for native review): three dictionary words, the orange forged by word two, word three starting on it at +6, VULPES alive, the rig spent, the free board dense', simOk(r), fmtSim(r)); }
+ok('THE SIMULATION (en): STAR → MOONS forges the orange → SKY starts on it, +6 exactly (16, not 10), VULPES left alive at 3 — then THE SCRY GATE: the five-cast fuse stands at 2, the sweep deals the authored sixteen (s·t·a·r·l·i·g·h·t·e·n·o·d·e·a·m, dense), the queue spent, the scry steps the fuse to 1', simOk(simEn) && simEn.log[0].word === 'star' && simEn.log[1].word === 'moons' && simEn.log[2].word === 'sky' && simEn.log[2].dmg === 16 && simEn.log[2].plain === 10 && simEn.log[2].hp === 3 && simEn.fuse.timer === 5 && simEn.fuse.afterWords === 2 && simEn.fuse.afterScry === 1 && simEn.scried === 's t a r l i g h t e n o d e a m', fmtSim(simEn));
+for (const lang of ['es', 'fr', 'pt', 'de']) { const r = simGuide(lang); ok('THE SIMULATION (' + lang + ', a draft for native review): three dictionary words, the orange forged by word two, word three starting on it at +6, VULPES alive, the fuse at 2 for the gate, the scry\'s sixteen dealt dense and the rig spent', simOk(r), fmtSim(r)); }
+ok("the rig carries the scry's sixteen for every tongue (en 28 · es 28 · fr 28 · pt 28 · de 29) — the rest of the first fight rolls the kind bag", RIG.en.length === 28 && RIG.es.length === 28 && RIG.fr.length === 28 && RIG.pt.length === 28 && RIG.de.length === 29 && RIG.en.slice(12).join('') === 'starlightenodeam');
 ok("the boot waits (bounded 2.5s) for the opening's own two — the painted night + the painted wordmark — through ../art", gameSrc.includes('const SS_ART_GRACE_MS = 2500;') && gameSrc.includes("const soft = ['nightsky', 'title'];") && gameSrc.includes('Promise.race([softP, new Promise((res) => setTimeout(res, SS_ART_GRACE_MS))])') && gameSrc.includes("DIAG('art absent ' + n)"));
 ok('the live sky plumbing stands: ssNightSkyTex (one seat) · ssNightSkyCap (SS_SKY_CAP_U 180) · ssZenithSky', ['function ssNightSkyTex(', 'function ssNightSkyCap(', 'function ssZenithSky(', 'const SS_SKY_CAP_U = 180;'].every((t) => gameSrc.includes(t)));
 ok('the ride seats the plate under every sky, the crown over its top, the dawn under its veil', gameSrc.includes('const artSky = !!ssNightSkyTex(scene);') && gameSrc.includes("scene.add.image(l.W / 2, wy(0), 'nightskyart').setOrigin(0.5, 0).setDisplaySize(l.W, 2400 * l.s);") && gameSrc.includes('ssNightSkyCap(scene, l, wy(0));') && gameSrc.includes("if (artSky && opts.dawn) scene.add.image(l.W / 2, wy(0), 'skygrad-dawn-veil')") && gameSrc.includes("gradTex('skygrad-dawn-veil'"));
@@ -519,7 +546,7 @@ let s3 = await gs();
 ok('a REAL tap on a tile off the road is REFUSED (the U at 15): nothing selected, the refusal counted, the hand still on the M', s3.sel === '' && s3.refused === 1 && s3.pt === 'slot:0', JSON.stringify({ sel: s3.sel, refused: s3.refused, pt: s3.pt }));
 await tap(await btnCss('scryB')); await sleep(600);
 s3 = await gs();
-ok('a REAL tap on SCRY is REFUSED under the hand: the board stands, the fuse untouched', s3.scryRefused === 1 && s3.board === 'm e m o o l i n n s d e o t a u' && s3.cnt === 3, JSON.stringify({ scryRefused: s3.scryRefused, cnt: s3.cnt }));
+ok('a REAL tap on SCRY is REFUSED under the hand: the board stands, the fuse untouched (4 of the first night\'s five)', s3.scryRefused === 1 && s3.board === 'm e m o o l i n n s d e o t a u' && s3.cnt === 4, JSON.stringify({ scryRefused: s3.scryRefused, cnt: s3.cnt }));
 for (let k = 0; k < 4; k++) { const pt = await ev("window.__ssftue.point"); if (pt && pt.startsWith('slot:')) { await tap(await slotCss(+pt.slice(5))); await sleep(420); } }
 s3 = await gs();
 ok('M·O·O·N woven by the finger: a real word, but the button WAITS for the whole lesson (dim, no preview), the finger on the S', s3.sel === '0,3,4,7' && s3.castT === 'CAST' && s3.castA <= 0.5 && s3.pt === 'slot:9', JSON.stringify({ sel: s3.sel, castT: s3.castT, castA: s3.castA, pt: s3.pt }));
@@ -556,23 +583,65 @@ const shown = await until(async () => { const s = await gs(); return (s.shown | 
 await sleep(700);
 const s5 = await gs();
 const showObjs = await ev("(()=>{" + B + "const veil=b.children.list.find(o=>o.type==='Image'&&o.depth===900&&o.texture&&o.texture.key==='veil');const show=b.children.list.filter(o=>o.active&&o.getData&&o.getData('f5show'));return {veil:!!veil,veilA:veil?+veil.alpha.toFixed(2):null,show:show.length,showDepth:show[0]?show[0].depth:null}})()");
-ok('THE SHOWCASE HOLDS THE MOMENT: SKY hit 16, the same word plain 10, the orange +6 — state anim, the cast cells STILL EMPTY (the refill waits), the fuse not yet ticked, VULPES shown at 3', w3 === 'cast' && shown && s5.state === 'anim' && !!s5.show && s5.show.dmg === 16 && s5.show.plain === 10 && s5.show.extra === 6 && s5.show.ch === 's' && s5.board === '_ e m _ _ l i r n e d e o t a u' && s5.cnt === 2 && s5.hp === 3 && s5.ehpShown === 3 && s5.words === 3, JSON.stringify({ show: s5.show, state: s5.state, board: s5.board, cnt: s5.cnt, hp: s5.hp, ehpShown: s5.ehpShown }));
+ok('THE SHOWCASE HOLDS THE MOMENT: SKY hit 16, the same word plain 10, the orange +6 — state anim, the cast cells STILL EMPTY (the refill waits), the fuse not yet ticked (3), VULPES shown at 3', w3 === 'cast' && shown && s5.state === 'anim' && !!s5.show && s5.show.dmg === 16 && s5.show.plain === 10 && s5.show.extra === 6 && s5.show.ch === 's' && s5.board === '_ e m _ _ l i r n e d e o t a u' && s5.cnt === 3 && s5.hp === 3 && s5.ehpShown === 3 && s5.words === 3, JSON.stringify({ show: s5.show, state: s5.state, board: s5.board, cnt: s5.cnt, hp: s5.hp, ehpShown: s5.ehpShown }));
 ok('…the lesson is DRAWN: the light veil at 900, the showcase at 950 (one f5show container), the hand raised above the veil and on the number (pose:1), the beacon "show"', !!showObjs && showObjs.veil && showObjs.veilA >= 0.3 && showObjs.show === 1 && showObjs.showDepth === 950 && s5.handDepth === 960 && s5.pt === 'pose:1' && s5.ft === 'show' && s5.hand, JSON.stringify(Object.assign({}, showObjs, { handDepth: s5.handDepth, pt: s5.pt, ft: s5.ft })));
 const shotG3 = await send('Page.captureScreenshot', { format: 'png' });
 if (shotG3 && shotG3.data) writeFileSync('tools/shots-guided/orange-showcase.png', Buffer.from(shotG3.data, 'base64'));
 ok('DPR-3 capture 3/3 on file: the damage showcase (tools/shots-guided/orange-showcase.png)', !!(shotG3 && shotG3.data), shotG3 && shotG3.data ? Math.round(shotG3.data.length / 1024) + 'kb' : 'no data');
-// the floor holds, then a real tap lets go
+// the floor holds, then a real tap lets go — first un-seed the night's scry
+// flag (§2's own pre-seed, for the older chains): the SCRIPTED gate ignores
+// it by design (no flag may bypass the lesson), and the tap must WRITE it
 await sleep(1000);
+await ev("(()=>{delete SS.prof.f5scry;SS.save();return 1})()");
 await tap({ x: 195, y: 500 });
-const ended = await until(async () => { const s = await gs(); return (s.ended | 0) >= 1 && s.state === 'pick'; }, 60, 250, 4);
-await sleep(1200);
-const s6 = await gs();
-ok("…a tap past the floor LETS GO: the hand retires for good (beacon done, no script), the refill lands (n·o·s), the fuse ticks to 1, VULPES at 3 — the night is the player's", ended && s6.released === 1 && s6.holdMs >= 900 && s6.gone && !s6.hand && s6.ft === 'done' && !s6.f5G && s6.board === 'n e m o s l i r n e d e o t a u' && s6.cnt === 1 && s6.hp === 3 && s6.state === 'pick', JSON.stringify({ released: s6.released, holdMs: s6.holdMs, gone: s6.gone, ft: s6.ft, board: s6.board, cnt: s6.cnt, hp: s6.hp }));
+/* — THE SCRY GATE (card 03): the showcase let go, but the hand STAYS — n·o·s
+   lands, the fuse ticks 3 → 2 (the first night's five-cast timer), and on the
+   refill's settle the gate rises on the script's OWN beat: the veil, SCRY alone
+   lit, the finger on it. REAL taps prove only SCRY answers; the real SCRY tap
+   runs the slowed reveal (the pill held, then the step 2 → 1 big, held its
+   whole dwell), and the lift retires the hand. — */
+const sc = async () => ev("(()=>{try{" + B + "const s=window.__f5scry||{};const g=b.f5ScryGate;const veil=b.children.list.find(o=>o.active&&o.type==='Image'&&o.depth===900&&o.texture&&o.texture.key==='veil');const show=b.children.list.filter(o=>o.active&&o.getData&&o.getData('f5scryshow'));return {armed:s.armed|0,scripted:s.scripted|0,tapped:s.tapped|0,reveal:s.reveal|0,down:s.down||null,cost:s.cost|0,lifted:s.lifted|0,released:s.released||null,holdMs:s.holdMs|0,gate:!!g,gateText:s.gate||null,veil:!!veil,veilA:veil?+veil.alpha.toFixed(2):null,scryD:b.scryB.depth,scryTD:b.scryT.depth,pillD:[b.strikeGlow.depth,b.strikeRib.depth,b.strikeT.depth].join('/'),pill:b.strikeT.text,hold:b.f5PillHold|0,alarm:!!b.strikeAlarm,show:show.length,showD:show[0]?show[0].depth:null,showA:show[0]?+show[0].alpha.toFixed(2):null,showN:show[0]?show[0].list.length:0,prof:SS.prof.f5scry|0,glinted:b.f5Glinted,prompt:(window.__f5prompt||{}).scry|0,costP:(window.__f5prompt||{}).scryCost|0}}catch(e){return {err:e.message}}})()");
+const gateRose = await until(async () => { const c = await sc(); return c.armed >= 1 && c.gate; }, 60, 300, 2);
+await sleep(800);   // the veil's 320 ms rise, the finger's 430 ms glide onto SCRY
+const s6 = await gs(), c6 = await sc();
+ok("THE SCRY GATE RISES ON THE SCRIPT'S OWN BEAT: the showcase let go, n·o·s landed, the fuse ticked 3 → 2 — and the hand STAYED: the gate stands (scripted), VULPES at 3, state pick, the night's lesson not yet written", gateRose && c6.scripted === 1 && c6.armed === 1 && s6.released === 1 && s6.ended === 0 && s6.f5G && s6.beat === 'scry' && s6.ft === 'scry' && s6.board === 'n e m o s l i r n e d e o t a u' && s6.cnt === 2 && s6.hp === 3 && s6.state === 'pick' && c6.prof === 0, JSON.stringify({ gateRose, scripted: c6.scripted, released: s6.released, ended: s6.ended, beat: s6.beat, ft: s6.ft, board: s6.board, cnt: s6.cnt, hp: s6.hp, state: s6.state, prof: c6.prof }));
+ok("…the screen is GRAYED: the veil at 900 (0.66), SCRY alone above it (905/906) under Skylar's line, the pill still saying 2, the finger above the veil and ON SCRY", c6.veil && c6.veilA >= 0.6 && c6.scryD === 905 && c6.scryTD === 906 && c6.gateText === 'Stuck? SCRY deals a fresh board' && / 2 /.test(c6.pill) && s6.hand && s6.handDepth === 960 && s6.pt === 'scry', JSON.stringify({ veil: c6.veil, veilA: c6.veilA, scryD: c6.scryD, scryTD: c6.scryTD, gateText: c6.gateText, pill: c6.pill, hand: s6.hand, handDepth: s6.handDepth, pt: s6.pt }));
+try { mkdirSync('tools/shots-scry', { recursive: true }); } catch (e) { }
+const shotS1 = await send('Page.captureScreenshot', { format: 'png' });
+if (shotS1 && shotS1.data) writeFileSync('tools/shots-scry/scry-gate.png', Buffer.from(shotS1.data, 'base64'));
+ok('DPR-3 capture 1/2 on file: the grayed screen with SCRY spotlit (tools/shots-scry/scry-gate.png)', !!(shotS1 && shotS1.data), shotS1 && shotS1.data ? Math.round(shotS1.data.length / 1024) + 'kb' : 'no data');
+// ONLY SCRY ANSWERS — real taps at real coordinates: a tile, CAST, the back door
+await tap(await slotCss(15)); await sleep(450);
+await tap(await btnCss('castB')); await sleep(450);
+const backP = await ev("(()=>{" + B + "return [b.homeB.x+8,b.homeB.y]})()");
+await tap(await gcss(backP[0], backP[1])); await sleep(700);
+const s7 = await gs(), c7 = await sc();
+ok('ONLY SCRY ANSWERS: a REAL tap on a tile, on CAST and on the back door do NOTHING under the gate — nothing selected, no cast flew, the battle stands, the gate still up, the finger still on SCRY', s7.sel === '' && s7.words === 3 && s7.state === 'pick' && c7.gate && c7.lifted === 0 && c7.tapped === 0 && s7.pt === 'scry' && (await ev("game.scene.isActive('battle')")) === true, JSON.stringify({ sel: s7.sel, words: s7.words, state: s7.state, gate: c7.gate, tapped: c7.tapped, pt: s7.pt }));
+// THE TAP — the one lit door
+await tap(await btnCss('scryB'));
+await sleep(350);
+const s8 = await gs(), c8 = await sc();
+ok("the REAL SCRY tap scries AS NORMAL — the board redeals to the rig's authored sixteen (s·t·a·r·l·i·g·h·t·e·n·o·d·e·a·m), the pill raised into the light but HELD at 2 while the fresh board rains in, the finger let go of the door (beat reveal), the lesson written once a night", c8.tapped === 1 && s8.board === 's t a r l i g h t e n o d e a m' && c8.hold === 1 && / 2 /.test(c8.pill) && c8.pillD === '901/902/903' && s8.beat === 'reveal' && s8.ft === 'reveal' && c8.prof === 1 && c8.scryD === 0 && c8.gate === false && c8.down === null, JSON.stringify({ tapped: c8.tapped, board: s8.board, hold: c8.hold, pill: c8.pill, pillD: c8.pillD, beat: s8.beat, prof: c8.prof, scryD: c8.scryD }));
+// THE STEP — after the reveal's own slow rise (900 + 700 ms)
+const stepped = await until(async () => { const c = await sc(); return !!c.down; }, 30, 250, 2);
+await tap({ x: 195, y: 500 });   // a tap BEFORE the floor — the reveal must hold
+await sleep(400);
+const s9 = await gs(), c9 = await sc();
+ok('THE REVEAL, HELD: the count STEPS 2 → 1 in the light — the raised pill says "strikes in 1 cast" with the ember alarm breathing, the reveal stands at 950 (the old reading struck through, the new one hot, Skylar\'s cost line beneath — five parts), the finger on the pill (pose:2) above the veil, the cost said once; a tap before the floor did NOT let go', stepped && !!c9.down && c9.down[0] === 2 && c9.down[1] === 1 && / 1 /.test(c9.pill) && c9.alarm && c9.pillD === '901/902/903' && c9.show === 1 && c9.showD === 950 && c9.showA >= 0.99 && c9.showN === 5 && c9.cost === 1 && c9.costP === 1 && s9.pt === 'pose:2' && s9.handDepth === 960 && s9.hand && c9.veil && c9.lifted === 0 && c9.released === null && s9.cnt === 1 && s9.ft === 'reveal', JSON.stringify({ down: c9.down, pill: c9.pill, alarm: c9.alarm, pillD: c9.pillD, show: c9.show, showD: c9.showD, showA: c9.showA, showN: c9.showN, cost: c9.cost, costP: c9.costP, pt: s9.pt, handDepth: s9.handDepth, veil: c9.veil, lifted: c9.lifted, released: c9.released, cnt: s9.cnt }));
+await sleep(500);   // the cost line's own delayed rise, for the record
+const shotS2 = await send('Page.captureScreenshot', { format: 'png' });
+if (shotS2 && shotS2.data) writeFileSync('tools/shots-scry/scry-reveal.png', Buffer.from(shotS2.data, 'base64'));
+ok('DPR-3 capture 2/2 on file: the slowed strikes-earlier reveal (tools/shots-scry/scry-reveal.png)', !!(shotS2 && shotS2.data), shotS2 && shotS2.data ? Math.round(shotS2.data.length / 1024) + 'kb' : 'no data');
+// THE DWELL — untapped, the reveal holds its whole slowed duration, then lets go by itself
+const liftedS = await until(async () => { const c = await sc(); return c.lifted >= 1; }, 40, 300, 2);
+await sleep(900);   // the veil's fade, the reveal's fade, the hand's farewell
+const s10 = await gs(), c10 = await sc();
+ok('THE GATE LIFTS BY ITS OWN DWELL — the reveal held its slowed duration (≥ 4.1 s from the step), every depth home, the veil and the reveal gone, the hand retired for good (beacon done, no script), the fuse says 1, the stall clock fresh, the ribbon never spoke over the lesson', liftedS && c10.lifted === 1 && c10.released === 'dwell' && c10.holdMs >= 4080 && c10.pillD === '0/0/0' && c10.scryD === 0 && !c10.veil && c10.show === 0 && s10.gone && !s10.hand && s10.ft === 'done' && !s10.f5G && s10.ended === 1 && s10.state === 'pick' && s10.cnt === 1 && / 1 /.test(c10.pill) && c10.glinted === false && c10.prompt === 0 && s10.hp === 3, JSON.stringify({ lifted: c10.lifted, released: c10.released, holdMs: c10.holdMs, pillD: c10.pillD, veil: c10.veil, show: c10.show, gone: s10.gone, hand: s10.hand, ft: s10.ft, f5G: s10.f5G, ended: s10.ended, state: s10.state, cnt: s10.cnt, glinted: c10.glinted, prompt: c10.prompt }));
 const dens2 = await ev("(()=>{const b=game.scene.getScene('battle');const counts={};for(const s of b.board)if(s&&!s.blk)counts[s.ch]=(counts[s.ch]|0)+1;const fits=(w)=>{if(w.includes('q'))return false;const c=Object.assign({},counts);for(const ch of w){if(!c[ch])return false;c[ch]--}return true};let n4=0,n5=0,n6=0;for(const w of WORDSET){const L=w.length;if(L===4&&n4<9&&fits(w))n4++;else if(L===5&&n5<9&&fits(w))n5++;else if(L===6&&n6<9&&fits(w))n6++;if(n4>8&&n5>8&&n6>8)break}return [n4,n5,n6]})()");
-ok('THE FREE BOARD after the script: >=3 findable words at 4/5/6 (en) — the player\'s own night begins dense', dens2 && dens2[0] >= 3 && dens2[1] >= 3 && dens2[2] >= 3, String(dens2));
+ok('THE FREE BOARD after the script — the scry\'s authored sixteen: >=3 findable words at 4/5/6 (en) — the player\'s own night begins dense', dens2 && dens2[0] >= 3 && dens2[1] >= 3 && dens2[2] >= 3, String(dens2));
 // a free tap answers again (the lock is gone with the hand)
 await tap(await slotCss(15)); await sleep(500);
-ok('tiles ANSWER freely once the hand has gone (a real tap selects the U)', (await ev("game.scene.getScene('battle').sel.join()")) === '15');
+ok('tiles ANSWER freely once the hand has gone (a real tap selects the M at 15)', (await ev("game.scene.getScene('battle').sel.join()")) === '15');
 await ev("(()=>{const b=game.scene.getScene('battle');b.unselectFrom(0);return 1})()");
 await ev("(()=>{const b=game.scene.getScene('battle');b.f5LastTap=b.time.now-31000;b.f5Glinted=true;b.f5Encored=false;return 1})()");
 let enc = false;
@@ -598,8 +667,9 @@ await ev("(()=>{const b=game.scene.getScene('battle');let pi=-1;for(let i=0;i<16
 let pink = false;
 for (let i = 0; i < 8 && !pink; i++) { pink = ((await ev("(window.__f5prompt||{}).ink | 0")) >= 1); if (!pink) await sleep(400); }
 ok('an inked tile teaches the beast special (real blackTile call)', pink);
-await ev("(()=>{const b=game.scene.getScene('battle');ssF5Prompt(b,'scry',100,600);ssF5Prompt(b,'scry',100,600);return 1})()");
-ok('every prompt fires ONCE per run (scry asked twice, spoke once)', (await ev("(window.__f5prompt||{}).scry | 0")) === 1);
+await ev("(()=>{const b=game.scene.getScene('battle');ssF5Prompt(b,'tile2',100,600);ssF5Prompt(b,'tile2',100,600);return 1})()");
+ok('every prompt fires ONCE per run (tile2 asked twice, spoke once)', (await ev("(window.__f5prompt||{}).tile2 | 0")) === 1);
+ok("…and the scry ribbon stays SILENT for the night — the gate owned that voice (asked, deduped; the gate's seen mark stands)", await ev("(()=>{const b=game.scene.getScene('battle');ssF5Prompt(b,'scry',100,600);return ((window.__f5prompt||{}).scry|0)===0&&b.f5Prompted.scry===1})()"));
 // the ORANGE lesson rides the real forge chain: the 5-letter cast already
 // paid pending; march to the next refill (or through the sigil pick into
 // fight 2, where the PLANTED GLOW lands) and the prompt speaks
@@ -837,20 +907,26 @@ for (let i = 0; i < 16 && !tapped; i++) { tapped = ((await ev('(window.__f5scry|
 const b1s = await ev("(()=>{const b=game.scene.getScene('battle');return b.board.map(s=>s?s.ch:'·').join('')})()");
 ok('a REAL tap on SCRY fires the scry itself — the board redeals (beat 2)', tapped && b1s !== b0, tapped ? 'redealt' : 'no tap seen');
 let down = null;
-for (let i = 0; i < 20 && !down; i++) { await nudge(i); const d = await ev('(window.__f5scry||{}).down || null'); if (d) down = d; else await sleep(400); }
-ok('THE COST IS SHOWN: the count steps down before the raised pill (' + cnt0 + ' → ' + (cnt0 - 1) + ')', !!down && down[0] === cnt0 && down[1] === cnt0 - 1, String(down));
-let cost = false;
-for (let i = 0; i < 10 && !cost; i++) { await nudge(i + 30); cost = ((await ev('(window.__f5prompt||{}).scryCost | 0')) >= 1); if (!cost) await sleep(400); }
-ok('…then SAID: the cost line speaks (once, like every lesson)', cost && ((await ev('(window.__f5scry||{}).cost | 0')) === 1));
+for (let i = 0; i < 24 && !down; i++) { await nudge(i); const d = await ev('(window.__f5scry||{}).down || null'); if (d) down = d; else await sleep(400); }
+ok('THE COST IS SHOWN: the count steps down before the raised pill (' + cnt0 + ' → ' + (cnt0 - 1) + ') — after the reveal\'s own slow rise (900 + 700 ms)', !!down && down[0] === cnt0 && down[1] === cnt0 - 1, String(down));
+await tap(pts.cast);   // a tap BEFORE the floor — the reveal must hold
+await sleep(500);
+const rv = await ev("(()=>{const b=game.scene.getScene('battle');const s=window.__f5scry||{};const show=b.children.list.filter(o=>o.active&&o.getData&&o.getData('f5scryshow'));return {show:show.length,d:show[0]?show[0].depth:null,n:show[0]?show[0].list.length:0,pill:[b.strikeGlow.depth,b.strikeRib.depth,b.strikeT.depth].join('/'),text:b.strikeT.text,lifted:s.lifted|0,released:s.released||null,cost:s.cost|0,costP:(window.__f5prompt||{}).scryCost|0}})()");
+ok('THE REVEAL HOLDS (the slowed beat, card 03): the old reading struck through, the new one hot, the cost line beneath — five parts at 950 over the raised pill reading ' + (cnt0 - 1) + '; a tap before the floor did NOT lift it', rv.show === 1 && rv.d === 950 && rv.n === 5 && rv.pill === '901/902/903' && rv.text.includes(' ' + (cnt0 - 1) + ' ') && rv.lifted === 0 && !rv.released, JSON.stringify(rv));
+ok('…then SAID: the cost line speaks (once, like every lesson)', rv.cost === 1 && rv.costP === 1);
+// past the floor (1.4 s from the step), a REAL tap lets go — the 1.4s needs real
+// accumulated game time: BURST the nudges (a woken headless clock pays ~one
+// clamped frame per input event)
+for (let i = 0; i < 4; i++) { for (let k = 0; k < 6; k++) await nudge(i * 6 + k); await sleep(250); }
+await tap(pts.cast);
 let lifted = false;
-// the 1.5s linger needs real accumulated game time: BURST the nudges (a
-// woken headless clock pays ~one clamped frame per input event)
 for (let i = 0; i < 30 && !lifted; i++) {
   for (let k = 0; k < 6; k++) await nudge(i * 6 + k);
   lifted = ((await ev('(window.__f5scry||{}).lifted | 0')) >= 1);
   if (!lifted) await sleep(250);
 }
-ok('THE GATE LIFTS (beat 4)', lifted);
+const rel = JSON.parse(await ev("JSON.stringify([(window.__f5scry||{}).released||null,(window.__f5scry||{}).holdMs|0])"));
+ok('THE GATE LIFTS (beat 4) — a REAL tap past the floor let go (held ≥ 1.4 s from the step)', lifted && rel[0] === 'tap' && rel[1] >= 1400, JSON.stringify(rel));
 const after = await ev("(()=>{const b=game.scene.getScene('battle');return [b.f5ScryGate===null,b.scryB.depth,b.scryT.depth,b.strikeT.depth,b.strikeRib.depth,b.strikeGlow.depth,SS.prof.f5scry|0,b.strikeT.text.includes(' " + (cnt0 - 1) + " ')?1:0].join('|')})()");
 ok('every depth goes home; the pill tells the new truth; the lesson is written', after === 'true|0|0|0|0|0|1|1', after);
 await sleep(1200);   // the redeal's bounce settles before the resume taps

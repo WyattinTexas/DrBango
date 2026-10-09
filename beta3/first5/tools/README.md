@@ -3,19 +3,28 @@
 Harness for the FIRST5 sandbox (the first-night tutorial test build at
 drbango.com/beta3/first5/ — batch `ss-2026-10-07-first-night` + fix round
 `ss-2026-10-08-first5-fixes` + `ss-2026-10-09-night-sky-live` card 03 +
-`ss-2026-10-09-first5-script` cards 01–02).
+`ss-2026-10-09-first5-script` cards 01–03).
 
 **first5-check.mjs** — the whole-stage suite (cards 01-06 + fix 01 THE
 CLEAN REFRESH + fix 02 THE STRAY SIGNS + fix 03 THE SCRY LESSON + STRAIGHT
-INTO THE NIGHT + THE PAINTED FIRST FIVE + THE GUIDED HAND, ORANGE): static
-seams (including THE GUIDED HAND's — twenty-four F5-GUIDED sites, the
+INTO THE NIGHT + THE PAINTED FIRST FIVE + THE GUIDED HAND, ORANGE + THE SCRY
+GATE): static seams (including THE SCRY GATE's — sixteen F5-SCRYGATE sites,
+the first night's five-cast fuse (tcut −1 in the ember block), the gate on
+the script's own beat through the SAME door the stall raises, the lock that
+yields to SCRY at that beat alone, the shared slowed reveal (the hold
+released at the step, the two readings in the pill's own words, the
+cross-out, the ember, Skylar's cost line in the one frame, the finger on
+the pill), the dwell + the tap past the floor, the old quick reveal gone,
+the rig carrying the scry's sixteen for every tongue; and THE GUIDED HAND's
+— twenty-four F5-GUIDED sites, the
 script table for all five tongues, the rig carrying every refill of the
 scripted fight, the lock on tile/CAST/SCRY, the held continuation, the
 showcase trigger, the reset-before-build — plus THE SIMULATION: every
 tongue's script dealt and cast exactly as the game does, against the REAL
 dictionaries in ../words*.js and the live damage math — word two must
 forge the orange, word three must start on it at exactly +6, VULPES must
-survive, the rig must be spent, the free board dense; and including the
+survive, the fuse must stand at 2 for the gate, the sweep must deal the
+rig's last sixteen (dense) and spend it; and including the
 painted seams — thirteen F5-PAINTED sites, the live game's plate seat /
 zenith crown / fight frame (ssNightSkyTex · ssNightSkyCap · ssZenithSky)
 proven byte-for-byte against ../game.js, the painted wordmark branch, the
@@ -60,10 +69,24 @@ the first tap of SKY; the showcase HOLDS the fight — state anim, the cast
 cells still empty, the fuse unticked, VULPES shown at 3 — with 16 damage /
 plain 10 / +6 on the beacon, the light veil at 900, the showcase at 950,
 the hand raised to 960 on the number; a real tap past the 900ms floor lets
-go: the hand retires, n·o·s lands, the fuse ticks to 1, tiles answer
-freely, the free board is density-gated; three DPR-3 captures in
-`tools/shots-guided/` — finger-word2 · orange-intro · orange-showcase —
-untracked, never committed), THE TEACHING SCRIPTS (real
+go: n·o·s lands, the fuse ticks 3 → 2 — and the hand STAYS; three DPR-3
+captures in `tools/shots-guided/` — finger-word2 · orange-intro ·
+orange-showcase — untracked, never committed), THE SCRY GATE (card 03 of
+ss-2026-10-09-first5-script, still §2c: on the refill's settle the gate
+rises on the script's OWN beat — the veil at 900 (0.66), SCRY alone above
+it under Skylar's line, the pill still saying 2, the finger above the veil
+ON SCRY; REAL taps on a tile, CAST and the back door do nothing and the
+gate stands; the REAL SCRY tap scries as normal — the board redeals to the
+rig's authored sixteen, the pill raised into the light but HELD at 2 — then
+the slowed reveal: the count steps 2 → 1 in the light, the raised pill
+reads "strikes in 1 cast" with the ember alarm, the reveal at 950 (the old
+reading struck through, the new one hot, the cost line beneath — five
+parts), the finger on the pill; a tap before the floor does NOT let go;
+untapped, the beat holds its whole dwell (≥ 4.1 s) and lifts by itself —
+depths home, veil and reveal gone, the hand retired for good, the fuse at 1,
+the ribbon silent; two DPR-3 captures in `tools/shots-scry/` — scry-gate ·
+scry-reveal — untracked, never committed; then tiles answer freely and the
+scried board is density-gated), THE TEACHING SCRIPTS (real
 dewTile/blackTile prompts, once-per-run dedupe, the forge/plant chain),
 THE LIT SKY (a fell through the true chain writes the mark, the converge,
 the rite still SEATING its mark + the sweep clearing the zenith, the
@@ -83,11 +106,13 @@ an honest stall arms the gate — Skylar's line verbatim, veil at 900 with
 SCRY alone above it; REAL CDP taps prove tile/CAST/back inert and the
 gate standing; the real SCRY tap redeals, the count steps down [N, N−1]
 under the raised pill, the cost line speaks once, the gate lifts with
-every depth home; real taps select and bounce again; a later stall only
-glints — the hand is never taken twice), THE CLEAN REFRESH itself
+every depth home; the reveal HOLDS over the raised pill (five parts at 950; a tap before the
+floor does not lift it), the cost line speaks once, a REAL tap past the
+floor lets go, the gate lifts with every depth home; real taps select and
+bounce again; a later stall only glints — the hand is never taken twice), THE CLEAN REFRESH itself
 (Page.reload with no flag wipes sentinel/quickck/stat, re-opens the FTUE
 gate, and the lure asks again, at the title), and the reset door (still honored,
-out-ranking even a survive flag). Run from first5/ — ~13-18 min.
+out-ranking even a survive flag). Run from first5/ — ~14-19 min.
 
 Sandbox-only law: the wipe-on-refresh is THE STAGE'S law, never the live
 game's — see the SANDBOX-ONLY block atop first5.js before any integration.
