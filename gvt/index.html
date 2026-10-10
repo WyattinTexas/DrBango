@@ -47075,7 +47075,7 @@ const GMY_WRAP_IMG={};
 function gmyWrapCanvas(u,on){ const X=u.x, Y=u.y;   // the carpet man (drawSargeOutfit's 0.45 figure: canvas = X-27+0.45·sx, Y-58+0.45·sy) wears the same SVG pieces, painted once to an image each
   for(const id of GMY_WRAPS_ALL){ if(!on(id)) continue; let im=GMY_WRAP_IMG[id]; if(!im){ const frag=(id==='headwraps')? '<g transform="translate(57,50)">'+OF_HEADWRAP+'</g>' : (id==='bodywraps')? OF_BODYWRAP : (id==='legwraps')? hl6dLegArt(0) /* CARD-HL6D */ : OF_FOOTWRAP_A;
       im=GMY_WRAP_IMG[id]=new Image(); im.src='data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 140">'+frag+'</svg>'); }
-    if(im.complete && im.naturalWidth) cx.drawImage(im, X-27, Y-58, 54, 63); } }
+    if(im.complete && im.naturalWidth){ const c9=(id==='bodywraps') && chlCv(on,X,Y,['bodywraps']); cx.drawImage(im, X-27, Y-58, 54, 63); if(c9) cx.restore(); } } }   /* CARD-CHL: the body wraps at the chest's fitted seat */
 //   // the FACE rail (ONE AT A TIME)
 function outfitSlot(id){ const g=OUTFIT_SLOTS.find(g=>g.ids.indexOf(id)>=0); return g? g.key : ''; }
 // ═══ CARD-NP THE CHAMPIONS SET (jumpr 1216; Wyatt 9/23/2026 22:40, verbatim: "Add a Champions set for players who win the gauntlet a few times. 5 wins = Legs & Helmet, 10 wins Feet & Chest, 20 Grand. Champion
@@ -71159,6 +71159,18 @@ const OF_GLOVE_TILE=(ace)=>{ const ink=ace? '#4E2A12' : '#3E2716', lea=ace? '#A8
     +'<rect x="11.4" y="20.6" width="18.4" height="3" rx="0.8" fill="'+ink+'"/><rect x="18.2" y="20" width="4.6" height="4.2" rx="0.8" fill="#E8C25A" stroke="#8a6a24" stroke-width="0.5"/><rect x="19.6" y="21.3" width="1.8" height="1.6" rx="0.3" fill="#8a6a24"/>'; };
 // the Sky Fortress menu's line (renderRaidScene): the gloves' picture, their name, how they are earned (owned: ALREADY YOURS)
 function ggbSkyChipHTML(){ const own=outfitOwns('pilotgloves'); return '<div class="rd-ggb'+(own? ' own' : '')+'" id="rdGgb" data-notr><span class="rd-ggb-pic">'+outfitPartSVG('pilotgloves')+'</span><span class="rd-ggb-tx"><b>'+escH(t(OUTFIT_INFO.pilotgloves.name))+'</b><i>'+escH(t(own? 'ALREADY YOURS' : 'FIGHT ONCE, WIN OR LOSE'))+'</i></span></div>'; }
+// ═══ CARD-CHL THE CHEST PIECES SIT HIGH (board J13, lane gvt-p5; Wyatt 10/10/2026 21:13 EDT from his phone, verbatim: "Visual bug: All the chess pieces on Sarge are showing up too low, leaving the top of his chest unarmored and exposed. This is not visually correct. We must correct this.") ═══
+// THE READ: every chest piece rode the torso's line 3 units LOWER than the torso itself (the torso M56 96 L58 68 at 16 wide, its round top at 60 under the chin at 58; the coats M58 71 L56.4 92 at 18 wide, their round top at 62), so a tan crescent of chest and
+// both shoulder roots stood bare above every coat; the two flat-shouldered tunics (the gnome's, the squad leader's) began at 68.6, a third of the chest bare. The carpet man carried the same digits at 0.45.
+// THE FIT: the chest seam rides UP CHL.lift (the portrait's units; the carpet man the same x0.45): the collar tucks under the chin, the hem still under the belt. The flat-shouldered tunics and the six narrow plates (16 wide, their own
+// hem at 98.5) are STRETCHED up from their hem by CHL.tall[id] instead (a lift alone would open the waist above the belt, or widen the plates' side seams). Every piece's own art bytes untouched (the rack's tiles are the same pictures). BODY ARMOR (the slim carrier worn over the chest piece) and the pieces pinned over the chest (the badge, the pads, the sash, the corsage,
+// the patch) keep their seats. WHO: every Sarge dressed through outfitDress (the Quarters' stand, the mirror, the door sargeWepURI, a partner's poster) and the carpet man (drawSargeOutfit, the wraps' image door). Zero words, zero rows, zero server bytes.
+const CHL={ lift:4, tall:{ gnometunic:[1.32,95], sqtunic:[1.32,95], scout:[1.16,98.5], efarmor:[1.16,98.5], iceplate:[1.16,98.5], kingchest:[1.16,98.5], infilset:[1.16,98.5], champplate:[1.16,98.5] } };   // tall = [the stretch, the hem it holds]
+function chlK(id){ return CHL.tall[id]||null; }
+function chlG(id,s){ const t=chlK(id); return '<g transform="'+(t? 'matrix(1 0 0 '+t[0]+' 0 '+(+((1-t[0])*t[1]).toFixed(3))+')' : 'translate(0,'+(-CHL.lift)+')')+'">'+s+'</g>'; }   // the portrait: one chest piece at its fitted seat (a lift, or a tunic's stretch from its hem)
+function chlCv(on,X,Y,ids){ const id=ids.find(i=>on(i)); if(!id) return false; const t=chlK(id); cx.save();   // the carpet man: the same fit at the figure's 0.45 (canvas = X-27+0.45 sx, Y-58+0.45 sy); true = a save the caller restores
+  if(t){ const hy=Y-58+0.45*t[1]; cx.translate(0,hy); cx.scale(1,t[0]); cx.translate(0,-hy); } else cx.translate(0,-CHL.lift*0.45); return true; }
+// ═══ CARD-CHL ends ═══
 // dress ONE portrait: the platform splices in right after BASE (it re-floors
 // the molded base UNDER the man), the body pieces right after the limbs group
 // (so the molded weapon stays IN FRONT of the vest — a gun is held before the
@@ -71193,20 +71205,20 @@ function outfitDress(art, wk, wear){
   if(on('sqpants')) body+=(st[2]==='B'? sqgArt().pantB : sqgArt().pantA);   // CARD-SQG THE SQUAD PANTS on the legs seam (the LEGS set)
   if(on('luckysocks') && lskShow(on)) body+=(st[2]==='B'? OF_LSK_B : OF_LSK_A);   // CARD-LSK LUCKY SOCKS: after the legs, before every boot (a boot paints over the foot; the cuff and the gold band show above it)
   if(on('boots')) body+=(st[2]==='B'? OF_BOOTS_B : OF_BOOTS_A);
-  if(on('vest')) body+=OF_VEST;
-  if(on('scout')) body+=OF_SCOUT;   // v3.27: the recon plate rides the vest's own seam (they can't co-occur — OUTFIT_EXCL)
-  if(on('snowjacket')) body+=OF_SNOWJKT;   // v3.33: the puffer rides the same seam (chest set)
-  if(on('explorervest')) body+=OF_EXPVEST;   // v3.35: the khaki vest on the chest seam (they can't co-occur — the SET)
-  if(on('efarmor')) body+=OF_EFARMOR;   // 0539: the camo plate on the chest seam (the chest SET keeps it exclusive)
-  if(on('muskarmor')) body+=OF_MARMOR;   // 0556: the Guard coat on the chest seam (the chest SET)
-  if(on('tuxjacket')) body+=OF_TUXJKT;   // 0723 THE TUXEDO JACKET on the chest seam (the CHEST set)
-  if(on('gnometunic')) body+=OF_GTUNIC;   // 1025 CARD-ML-B THE GNOME SET THE GNOME TUNIC on the chest seam (the CHEST set)
-  if(on('iceplate')) body+=OF_ICEPLATE;
-  if(on('kingchest')) body+=OF_KCHEST;
-  if(on('bodywraps')) body+=OF_BODYWRAP;   // CARD-HL4 THE BODY WRAPS on the chest seam (the CHEST set)   // CARD-CHS6 THE KING'S CHEST on the chest seam (the CHEST set)
-  if(on('infilset')) body+=OF_INFSET;   // CARD-CHS13 THE INFILTRATION SET on the chest seam (the CHEST set)
-  if(on('sqtunic')) body+=sqgArt().tunic;   // CARD-SQG THE SQUAD LEADER TUNIC on the chest seam (the CHEST set)
-  if(on('champplate')) body+=OF_CHPLATE;   // CARD-NP THE CHAMPION'S PLATE on the chest seam (the CHEST set)
+  if(on('vest')) body+=chlG('vest',OF_VEST);
+  if(on('scout')) body+=chlG('scout',OF_SCOUT);   // v3.27: the recon plate rides the vest's own seam (they can't co-occur — OUTFIT_EXCL)
+  if(on('snowjacket')) body+=chlG('snowjacket',OF_SNOWJKT);   // v3.33: the puffer rides the same seam (chest set)
+  if(on('explorervest')) body+=chlG('explorervest',OF_EXPVEST);   // v3.35: the khaki vest on the chest seam (they can't co-occur — the SET)
+  if(on('efarmor')) body+=chlG('efarmor',OF_EFARMOR);   // 0539: the camo plate on the chest seam (the chest SET keeps it exclusive)
+  if(on('muskarmor')) body+=chlG('muskarmor',OF_MARMOR);   // 0556: the Guard coat on the chest seam (the chest SET)
+  if(on('tuxjacket')) body+=chlG('tuxjacket',OF_TUXJKT);   // 0723 THE TUXEDO JACKET on the chest seam (the CHEST set)
+  if(on('gnometunic')) body+=chlG('gnometunic',OF_GTUNIC);   // 1025 CARD-ML-B THE GNOME SET THE GNOME TUNIC on the chest seam (the CHEST set)
+  if(on('iceplate')) body+=chlG('iceplate',OF_ICEPLATE);
+  if(on('kingchest')) body+=chlG('kingchest',OF_KCHEST);
+  if(on('bodywraps')) body+=chlG('bodywraps',OF_BODYWRAP);   // CARD-HL4 THE BODY WRAPS on the chest seam (the CHEST set)   // CARD-CHS6 THE KING'S CHEST on the chest seam (the CHEST set)
+  if(on('infilset')) body+=chlG('infilset',OF_INFSET);   // CARD-CHS13 THE INFILTRATION SET on the chest seam (the CHEST set)
+  if(on('sqtunic')) body+=chlG('sqtunic',sqgArt().tunic);   // CARD-SQG THE SQUAD LEADER TUNIC on the chest seam (the CHEST set)
+  if(on('champplate')) body+=chlG('champplate',OF_CHPLATE);   // CARD-NP THE CHAMPION'S PLATE on the chest seam (the CHEST set)
   if(on('champpatch')) body+=OF_CHPATCH;   // CARD-NP THE GRAND CHAMPION'S PATCH over the armor (stacks-free)   // 1153 THE ICE CAVES: THE ICE PLATE on the chest seam (the CHEST set)
   if(on('snowboots')) body+=(st[2]==='B'? OF_SNOWBOOT_B : OF_SNOWBOOT_A);   // v3.33: the feet set's own pose pair
   if(on('explorerboots')) body+=(st[2]==='B'? OF_EXPBOOT_B : OF_EXPBOOT_A);   // v3.35: the trail boots' own pose pair
@@ -71221,7 +71233,7 @@ function outfitDress(art, wk, wear){
   if(on('larsonboots')) body+=(st[2]==='B'? OF_LBB_B : OF_LBB_A);   // CARD-OCR-B5 LARSON'S BOOTS on the boots' seat (the FEET set; over the cuffs)
   if(on('hoverboots')) body+=(st[2]==='B'? OF_HVB_B : OF_HVB_A);   // CARD-GGB HOVER BOOTS on the boots' seat (the FEET set; over the cuffs)
   if(on('sqboots')) body+=(st[2]==='B'? sqgArt().bootB : sqgArt().bootA);   // CARD-SQG THE SQUAD BOOTS on the boots' seat (the FEET set; over the cuffs)
-  if(on('poncho')) body+=OF_PONCHO;   // 0340: the serape on the chest seam
+  if(on('poncho')) body+=chlG('poncho',OF_PONCHO);   // 0340: the serape on the chest seam
   if(on('bodyarmor')) body+=OF_BARMOR;   // IG BODY ARMOR: the slim plate carrier over the chest piece — the poncho's seat (the two are exclusive), under the belts, the badge, the pads, the sash and the corsage
   if(on('spurs')) body+=(st[2]==='B'? OF_SPURS_B : OF_SPURS_A);   // 0340: rowels at whichever heels he stands on
   if(on('belt')) body+=OF_BELT;
@@ -78088,7 +78100,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='19.94';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='19.95';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -115751,6 +115763,7 @@ function drawSargeOutfit(u){
       cx.strokeStyle=dg9? '#7A5A1C' : ace9? '#4E2A12' : '#6B4425'; cx.lineWidth=1.1; cx.beginPath(); cx.moveTo(gx9-vx9*2.6-qx9*2.2,gy9-vy9*2.6-qy9*2.2); cx.lineTo(gx9-vx9*2.6+qx9*2.2,gy9-vy9*2.6+qy9*2.2); cx.stroke();
       if(ace9){ cx.fillStyle=dg9? '#C0473A' : '#E8C25A'; cx.beginPath(); cx.arc(gx9-vx9*2.6+qx9*0.6,gy9-vy9*2.6+qy9*0.6,0.6,0,7); cx.fill(); } }
   }
+  const chl1=chlCv(on,X,Y,['vest','scout','efarmor','muskarmor','explorervest','snowjacket','tuxjacket','gnometunic','sqtunic']);   // CARD-CHL: the chest pieces at their fitted seat (the run ends after the squad tunic)
   if(on('vest')){                                  // the flak vest over the torso, pouches and zip
     cx.strokeStyle='#6b4f2e'; cx.lineWidth=8.1;
     cx.beginPath(); cx.moveTo(X-0.9,Y-26); cx.lineTo(X-1.6,Y-16.6); cx.stroke();
@@ -115853,6 +115866,7 @@ function drawSargeOutfit(u){
     cx.fillStyle='#D9A544'; cx.strokeStyle='#8a6a24'; cx.lineWidth=0.18; cx.beginPath(); cx.arc(X-0.495,Y-18.31,0.45,0,7); cx.fill(); cx.stroke();
   }
   sqgCanvas(on,X,Y,'chest');   // CARD-SQG THE SQUAD LEADER TUNIC on the carpet man (the chest pieces' seat, under the belt)
+  if(chl1) cx.restore();   // CARD-CHL: run 1 ends
   if(on('belt')){                                  // the duty belt with the brass buckle
     cx.strokeStyle='#26261f'; cx.lineWidth=2.4;
     cx.beginPath(); cx.moveTo(X-5.4,Y-15.8); cx.lineTo(X+2.1,Y-16.3); cx.stroke();
@@ -115871,6 +115885,7 @@ function drawSargeOutfit(u){
     cx.fillStyle='#D9A544'; cx.strokeStyle='#8a6a24'; cx.lineWidth=0.405; rr(X-3.06,Y-17.545,2.88,2.61,0.45); cx.fill(); cx.stroke();
     cx.fillStyle='#8a6a24'; rr(X-1.98,Y-16.735,0.72,0.99,0.18); cx.fill();
   }
+  const chl2=chlCv(on,X,Y,['iceplate','kingchest','infilset','champplate']);   // CARD-CHL: run 2
   if(on('iceplate')){                                    // IG THE ICE GEAR (Wyatt 9/21: "unable to see the gear on Sarge" in game — the set had no seat on the carpet man; artIG.py emits the block from the portrait's own digits through the 0579 mapping) — THE ICE PLATE on the chest seam (OF_ICEPLATE's digits): the ice plate, four camo patches, the crossed straps, the badge, the buckle
     cx.strokeStyle='#8FB2C8'; cx.lineWidth=7.2; cx.lineCap='round'; cx.beginPath(); cx.moveTo(X-0.9,Y-25.825); cx.lineTo(X-1.53,Y-17.275); cx.stroke(); cx.lineCap='butt';
     cx.strokeStyle='#DCEBF7'; cx.lineWidth=4.95; cx.lineCap='round'; cx.beginPath(); cx.moveTo(X-0.9,Y-25.6); cx.lineTo(X-1.485,Y-17.5); cx.stroke(); cx.lineCap='butt';
@@ -115908,6 +115923,7 @@ function drawSargeOutfit(u){
     cx.fillStyle='#E74C3C'; cx.strokeStyle='#6B4A12'; cx.lineWidth=0.405; cx.beginPath(); cx.arc(X-1.26,Y-21.91,1.08,0,7); cx.fill(); cx.stroke();
     cx.fillStyle='#B8860B'; cx.strokeStyle='#6B4A12'; cx.lineWidth=0.36; rr(X-3.42,Y-18.76,3.96,1.98,0.585); cx.fill(); cx.stroke();
   }
+  if(chl2) cx.restore();   // CARD-CHL: run 2 ends
   if(on('eyepatch')){                              // 1005 THE EYE PATCH — THE STRAP on the carpet man (OF_EPSTRAP at the figure's 0.45, the same geometry to the digit — strapES.py emits both paths): the far run to the far temple with its arc end on the dome, the near run down behind the near ear, the light/dark edges, the brass buckle — BEFORE the first hat run (0948's order: under every hat like a cord)
     cx.fillStyle='#2B2118';
     cx.beginPath(); cx.moveTo(hx+2.249,hy+0.5018); cx.lineTo(hx-4.671,hy-1.637); cx.arc(hx,hy,4.95,-2.804,-2.488,false); cx.lineTo(hx+2.701,hy-0.96); cx.closePath(); cx.fill();   // the far run: under the patch up across the brow, its end an arc on the dome (r 11 × 0.45)
@@ -116377,6 +116393,7 @@ function drawSargeOutfit(u){
     cx.beginPath(); cx.moveTo(hx-6.6,hy+0.2); cx.quadraticCurveTo(hx,hy+2.5,hx+6.6,hy+0.2); cx.stroke();
   }
   if(pkh9 && on('banditmask')) cx.restore();   // CARD-PKH: the bandana's ride ends
+  const chl3=chlCv(on,X,Y,['poncho']);   // CARD-CHL: the serape
   if(on('poncho')){                                // 0340: the striped serape over the torso
     cx.strokeStyle='#8A5A30'; cx.lineWidth=8.1;
     cx.beginPath(); cx.moveTo(X-0.9,Y-26); cx.lineTo(X-1.6,Y-16.6); cx.stroke();
@@ -116390,6 +116407,7 @@ function drawSargeOutfit(u){
     cx.strokeStyle='#8A5A30'; cx.lineWidth=1;
     cx.beginPath(); cx.moveTo(X-4,Y-17.6); cx.lineTo(X-3.4,Y-16); cx.moveTo(X-1.8,Y-17.3); cx.lineTo(X-1.3,Y-15.7); cx.moveTo(X+0.4,Y-17.4); cx.lineTo(X+0.9,Y-15.8); cx.stroke();
   }
+  if(chl3) cx.restore();   // CARD-CHL: the serape ends
   if(on('bodyarmor')){                                   // IG BODY ARMOR on the carpet man (OF_BARMOR through the 0579 body mapping — artIG.py emits both paths): the two straps, the small graphite plate, its panel, the MOLLE rows, the light edge — after the poncho's seat (the two are exclusive), under the badge, the pads, the sash and the corsage
     cx.strokeStyle='#2C3036'; cx.lineWidth=0.765; cx.lineCap='round'; cx.beginPath(); cx.moveTo(X-2.43,Y-23.98); cx.lineTo(X-3.33,Y-26.41); cx.stroke(); cx.lineCap='butt';
     cx.strokeStyle='#2C3036'; cx.lineWidth=0.765; cx.lineCap='round'; cx.beginPath(); cx.moveTo(X+0.18,Y-24.07); cx.lineTo(X+0.9,Y-26.5); cx.stroke(); cx.lineCap='butt';
