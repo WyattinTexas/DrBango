@@ -80260,7 +80260,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='20.23';        
+let GVT_CV='20.24';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -155916,6 +155916,15 @@ function labParkSpan(id){ const P=(META.lab && META.lab.park)||[], q=P.find(r=>r
 function labParkDigits(id){ return evDur(Math.round(labParkSpan(id)*3600*(1-labParkPct(id)/100))); }   
 
 
+const LRS_MAX=32;   
+function labResume(t0){ const L=META.lab, P=L && L.park; if(!L || L.job || !P || !P.length || labBoomArmed()) return null; const id=P[P.length-1][0]; labSeat(id); const now=Date.now(), k=Math.min(now, +t0>0? +t0 : now); L.due-=now-k; return id; }   
+function lrsSync(L){ let ch=false;   
+  for(let n=0; n<LRS_MAX; n++){ let t0=Date.now();
+    if(L.job){ if(Date.now()<L.due) break; const b0=L.boom; t0=L.due; labDueTake(); if(!L.job || L.boom!==b0) ch=true; if(L.job) break; }   
+    if(!labResume(t0)) break; ch=true; }
+  return ch; }
+
+
 
 
 
@@ -155985,7 +155994,7 @@ function labSync(){ const L=META.lab; if(!L) return false; let ch=false;
   const d9=L.done.filter(id=>!enhOwns(id)); if(d9.length!==L.done.length){ L.done=d9; ch=true; }
   if(L.park){ const p9=L.park.filter(q=>labSold(q[0]) && !enhOwns(q[0]) && L.done.indexOf(q[0])<0 && q[0]!==L.job); if(p9.length!==L.park.length){ if(p9.length) L.park=p9; else delete L.park; ch=true; } }   
   if(L.job && (!labSold(L.job) || enhOwns(L.job))){ L.job=null; L.due=0; L.span=0; ch=true; }
-  if(L.job && Date.now()>=L.due){ const b0=L.boom; labDueTake(); if(!L.job || L.boom!==b0) ch=true; }   
+  if(lrsSync(L)) ch=true;   
   if(ch) saveMeta(); return ch; }
 function labPct(){ const L=META.lab; if(!L.job) return 0; const t=(L.span>0? L.span : labHours(L.job))*3600000; return Math.max(0, Math.min(100, Math.round(100*(1-(L.due-Date.now())/t)))); }
 function labClockDigits(){ const L=META.lab; return L.job? evDur(Math.ceil((L.due-Date.now())/1000)) : ''; }   
