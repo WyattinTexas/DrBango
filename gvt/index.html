@@ -2049,6 +2049,11 @@
   .fh-stage.eq-stage > .fh-wcap.eq-cap:has(.fh-philbtn) b { font-size:13px; letter-spacing:.04em; }
   .fh-stage.eq-stage > .fh-wcap.eq-cap .acinfo { flex:0 0 auto; width:38px; height:38px; margin:-7px -8px; transform:scale(.86); }   /**/
   .fh-stage.eq-stage > .fh-wcap.eq-cap .mbtn.fh-philbtn { position:relative; display:block; flex:0 0 auto; width:auto; min-width:0; min-height:0; margin:0; padding:3px 9px 4px; font-size:11.5px; line-height:1.15; letter-spacing:.05em; white-space:nowrap; border-radius:8px; box-shadow:0 2px 0 rgba(0,0,0,.4); }
+  .fh-stage.eq-stage > .dsf-sp { position:absolute; left:50%; bottom:var(--eq-fb); height:var(--eq-fh); aspect-ratio:120 / 140; transform:translateX(-50%); pointer-events:none; z-index:2; }   /**/
+  .dsf-sp > i { position:absolute; width:calc(var(--eq-fh) * .075 * var(--dsf-s,1)); aspect-ratio:1; translate:-50% -50%; filter:drop-shadow(0 0 3px var(--dsf-c,#FFE24F)) drop-shadow(0 0 1px #fff); opacity:0; animation:dsfTw 1.9s ease-in-out var(--dsf-d,0s) infinite; }
+  .dsf-sp > i::before { content:''; position:absolute; inset:0; background:#fff; clip-path:polygon(50% 0,58% 42%,100% 50%,58% 58%,50% 100%,42% 58%,0 50%,42% 42%); }
+  @keyframes dsfTw { 0%,100% { opacity:0; transform:scale(.2) rotate(0deg); } 40% { opacity:1; transform:scale(1) rotate(40deg); } 70% { opacity:.5; transform:scale(.55) rotate(70deg); } }
+  @media (prefers-reduced-motion: reduce) { .dsf-sp > i { animation:none; opacity:.85; } }
   .fh-stage.eq-stage > .fh-wcap.eq-cap .mbtn.fh-philbtn::after { content:''; position:absolute; left:-6px; right:-6px; top:-9px; bottom:-9px; }   /**/
   /**/
   .fh-stage.eq-stage > .gst-row { position:absolute; left:50%; top:44px; transform:translateX(-50%); z-index:3; display:flex; gap:9px; }
@@ -74899,6 +74904,61 @@ function djsLens(id){ const p=lensPct;
 
 setTimeout(()=>{ try{ if(typeof GVT==='object' && GVT) GVT.djs={ D:DJS, st:DJS_D, song:DJS_SONG, main:djsMain, shade:djsShadeHex, art:DJS_ART, pass:djsPass, refl:djsRefl }; }catch(e){} },0);   
 
+
+
+
+
+
+
+
+
+const DSF={ beat:0.5, sway:0.05, n:7, rx:22, ry:31, hide:['pilotgloves','acegloves','duelglove','muskpads'] };
+const DSF_FR=[ { pt:'M59 74 L77 47', fg:'M77 47 L80.1 42.5' },     
+               { pt:'M58 75 L40 101', fg:'M40 101 L36.9 105.5' } ];   
+const DSF_HIP='M57 73 L45 81 L52 90';   
+const DSF_IMG=new Map();   
+function dsfWears(u){ if(!u || u.type!=='sarge' || u.dead) return false;   
+  const a=sargeWearU(u) || bfDressU(u); if(a) return a.indexOf('discosuit')>=0;
+  if(u.coopSW || u.coopMods) return false; if(S.bf && !bfHumanU(u)) return false; return outfitOn('discosuit'); }
+function dsfPre(u){ if(S.mode!=='play') return false;   
+  if(S.bf){ if(S.bf.resolved || S.bf.ending) return false; for(const o of S.units) if(!o.dead && o.side!==u.side && o.side!=='nem' && !(o.dropT>0) && !o.hlbAir) return false; return true; }
+  if((S.wave|0)!==0 || S.waveActive) return false; return !(S.foes && S.foes.some(f=>f && !f.dead)); }
+function dsfDance(u){ return !!(dsfWears(u) && !(u.toadT>0) && !(u.cloakT>0) && !(u.duckT>0) && !u.falling && !(u.jetT>0) && !u.marching && !(u.wkT && S.t-u.wkT<0.3)
+  && !(S.drag && S.drag.unit===u) && !aimLive(u) && unitSkin('sarge',u)==='sarge' && dsfPre(u)); }
+function dsfFr(){ return reducedMotion()? 0 : (Math.floor(S.t/DSF.beat)&1); }
+function dsfIn(u){ if(!dsfDance(u) || reducedMotion()) return false; const a=Math.sin(S.t*Math.PI/DSF.beat)*DSF.sway*(unitFl(u)? -1 : 1);   
+  cx.save(); cx.translate(u.x,u.y); cx.rotate(a); cx.translate(-u.x,-u.y); return true; }
+function dsfArms(s,fr){ const F=DSF_FR[fr], A1='<path d="M60 72 L76 48" stroke-width="8"/>', A2='<path d="M58 76 L81 72" stroke-width="8"/>', T='<path d="M56 96 L58 68" stroke-width="16"/>',
+    INK='<path d="M60 72 L76 48 M58 76 L81 72" stroke-width="10.6"/>', BAND='(<path d="[^"]*" fill="#(?:000|fff)" fill-opacity="[^"]*" stroke="none"/>)?', esc=x=>x.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  if(s.split(A1).length!==2 || s.split(A2).length!==2 || s.split(T).length!==2 || s.split(INK).length>2) return null;
+  s=s.replace(INK, '<path d="'+DSF_HIP+' '+F.pt+'" stroke-width="10.6"/><path d="'+F.fg+'" stroke-width="5.4"/>');   
+  s=s.replace(new RegExp(esc(A1)+BAND), '');   
+  s=s.replace(new RegExp(esc(A2)+BAND), '<path d="'+F.pt+'" stroke-width="8"/><path d="'+F.fg+'" stroke-width="2.8"/>');   
+  return s.replace(T, '<path d="'+DSF_HIP+'" stroke-width="8"/><path d="'+DSF_HIP+'" stroke="#000" stroke-opacity=".22" stroke-width="8"/>'+T); }   
+function dsfPics(im){ if(DSF_IMG.has(im)) return DSF_IMG.get(im); let P=null;
+  try{ const src=im.src||'', i=src.indexOf('utf8,'); if(src.indexOf('data:image/svg+xml')===0 && i>0){ const s0=decodeURIComponent(src.slice(i+5)), a=dsfArms(s0,0), b=dsfArms(s0,1);
+    if(a && b){ P=[null,null]; [a,b].forEach((x,k)=>{ const m=new Image(); m.onload=()=>{ P[k]=m; }; m.src=src.slice(0,i+5)+encodeURIComponent(x); }); } } }catch(e){ P=null; }
+  DSF_IMG.set(im,P); return P; }
+function dsfPose(u,im){ if(!im || !dsfDance(u)) return im; const P=dsfPics(im); return (P && P[dsfFr()]) || im; }
+function dsfHands(u,on){ return dsfDance(u)? (id=>DSF.hide.indexOf(id)<0 && on(id)) : on; }
+function dsfR(h,i,c){ let x=(h ^ Math.imul(i+1,0x9E3779B1) ^ Math.imul(c+7,0x85EBCA77))>>>0; x^=x>>>15; x=Math.imul(x,0x2C1B3C6D)>>>0; x^=x>>>12; x=Math.imul(x,0x297A2D39)>>>0; x^=x>>>15; return (x>>>0)/4294967296; }
+function dsfH(u){ const id=u.id; if(typeof id==='number') return Math.imul(id|0,0x9E3779B1)>>>0; let h=2166136261; const t=String(id==null? u.seat|0 : id); for(let i=0;i<t.length;i++) h=Math.imul(h^t.charCodeAt(i),16777619); return h>>>0; }
+function dsfSpark(u){ if(!dsfWears(u) || u.toadT>0) return; const rm=reducedMotion(), T=rm? 0 : S.t, h=dsfH(u), x0=u.x, y0=u.y-30, a0=cx.globalAlpha;
+  cx.save();
+  for(let i=0;i<DSF.n;i++){ const per=1.2+dsfR(h,i,-1)*0.9, ph=T/per+dsfR(h,i,-2), cy=Math.floor(ph), f=ph-cy;   
+    const k= rm? 0.75 : Math.sin(Math.min(1,f*1.35)*Math.PI); if(k<0.06) continue;
+    const an=dsfR(h,i,cy)*6.2832, rr=0.62+0.38*dsfR(h,i+11,cy), sx=x0+Math.cos(an)*DSF.rx*rr, sy=y0+Math.sin(an)*DSF.ry*rr, z=(2.3+2.4*dsfR(h,i+23,cy))*k, col=DJS_COL[(i+cy)%6];
+    cx.globalAlpha=a0*0.35*k; cx.fillStyle=col; cx.beginPath(); cx.arc(sx,sy,z*1.05,0,7); cx.fill();   
+    cx.globalAlpha=a0*Math.min(1,k*1.3); cx.fillStyle='#FFFFFF'; cx.save(); cx.translate(sx,sy); cx.rotate(rm? 0 : f*0.9);
+    cx.beginPath(); cx.moveTo(0,-z*1.6); cx.quadraticCurveTo(0,0,z*1.6,0); cx.quadraticCurveTo(0,0,0,z*1.6); cx.quadraticCurveTo(0,0,-z*1.6,0); cx.quadraticCurveTo(0,0,0,-z*1.6); cx.fill();   
+    cx.restore(); }
+  cx.restore(); }
+
+const DSF_STAGE=[[16,28,1,0],[82,20,.8,.5],[88,52,1.1,.95],[10,60,.9,1.35],[68,6,.7,1.75],[30,9,.85,.25],[64,80,.75,1.15],[20,86,.9,.65],[90,84,.7,1.55]];
+function dsfStageHTML(wear){ const on=Array.isArray(wear)? wear.indexOf('discosuit')>=0 : outfitOn('discosuit'); if(!on) return '';
+  return '<div class="dsf-sp" aria-hidden="true">'+DSF_STAGE.map((p,i)=>'<i style="left:'+p[0]+'%;top:'+p[1]+'%;--dsf-s:'+p[2]+';--dsf-d:'+p[3]+'s;--dsf-c:'+DJS_COL[i%6]+'"></i>').join('')+'</div>'; }
+setTimeout(()=>{ try{ if(typeof GVT==='object' && GVT) GVT.dsf={ D:DSF, fr:DSF_FR, img:DSF_IMG, wears:dsfWears, pre:dsfPre, dance:dsfDance, pics:dsfPics, arms:dsfArms }; }catch(e){} },0);   
+
 function sargeWepURI(wk, bodyHex, bladeHex, vb, wear){   
   
   
@@ -82141,7 +82201,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='20.90';        
+let GVT_CV='20.91';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -121041,7 +121101,7 @@ function drawSargeOutfit(u){
     if(S.bf && !bfHumanU(u)) return;               
     if(!(META.outfit && META.outfit.wear && META.outfit.wear.length)) return;
   }
-  const on = djsCvOn(alyOf? (id=>alyOf.indexOf(id)>=0) : outfitOn, u, alyOf);   
+  const on = dsfHands(u, djsCvOn(alyOf? (id=>alyOf.indexOf(id)>=0) : outfitOn, u, alyOf));       
   const fl=unitFl(u);                 
   if(fl){ cx.save(); cx.translate(u.x*2,0); cx.scale(-1,1); }
   const X=u.x, Y=u.y, hx=X-1.4, hy=Y-35.5; gmyWrapCanvas(u,on);             
@@ -122668,7 +122728,8 @@ function drawUnit(u){
   const sl=scSlipIn(u);   
   const cl=cmdLeanIn(u);   
   const ul=uaLeanIn(u);   
-  const sg=sgaIn(u);   
+  const sg=sgaIn(u);
+  const dsf=dsfIn(u);   
   if(u.type==='jane') drawJane(u,kyl);   
   else if(u.type==='kingyeti') drawKing(u,u.x,u.y-kyl,w,unitWob(u),false,unitFl(u));   
   else if(isCroakU(u) && (crFire(u)||crFlinch(u))) drawSprite(u.type,u.x,u.y-kyl,w,cmdoRecoil(u)+croakRc(u),(u.kySwing>0? -0.14 : unitWob(u)),crFire(u)||crFlinch(u),unitFl(u));   
@@ -122680,10 +122741,10 @@ function drawUnit(u){
   else if(u.type==='aagun') aaDraw(u,w,im);   
   else if(u.type==='kingbear' && KBH_ON) drawKbHero(u,w,im,kyl);   
   else { if(u.rxHopT>0 && !(u.type==='kingrex' && kraRig(im))){ cx.fillStyle='rgba(0,0,0,0.22)'; cx.beginPath(); cx.ellipse(u.x,u.y+3,w*0.16,w*0.045,0,0,7); cx.fill(); }   
-    if(!(u.type==='kingrex' && kraPaint(u,u.x,u.y-kyl,w,unitDrawFl(u),(u.rxHopZ||0),(u.rxHopT>0? -0.2 : u.rxHopW>0? 0.12 : unitWob(u)),im,kraKindU(u),1))) drawSprite(u.type,u.x,u.y-kyl-(u.rxHopZ||0),w,cmdoRecoil(u),(u.rxHopT>0? -0.2 : u.rxHopW>0? 0.12 : u.kySwing>0? -0.14 : unitWob(u)),krgPose(u,im),unitDrawFl(u));     }       
+    if(!(u.type==='kingrex' && kraPaint(u,u.x,u.y-kyl,w,unitDrawFl(u),(u.rxHopZ||0),(u.rxHopT>0? -0.2 : u.rxHopW>0? 0.12 : unitWob(u)),im,kraKindU(u),1))) drawSprite(u.type,u.x,u.y-kyl-(u.rxHopZ||0),w,cmdoRecoil(u),(u.rxHopT>0? -0.2 : u.rxHopW>0? 0.12 : u.kySwing>0? -0.14 : unitWob(u)),dsfPose(u,krgPose(u,im)),unitDrawFl(u));         }       
   if(u.type==='radioman') drawRadioCall(u);
   if(S.capGone===1 && !u.kbMount && capActU(u) && !(u.type==='kingrex' && kraHelm(u))) capHelmDraw(u.type, u.x, u.y-kyl-(u.rxHopZ||0), w, unitDrawFl(u), 0);       
-  if(u.type==='sarge'){ drawSargeOutfit(u); drawSargeWeapon(u); if(sg) cx.restore();   if(ul) cx.restore(); if(cl) cx.restore(); if(sl) cx.restore(); if(hv9) cx.restore(); drawAbsorbPips(u); drawCmdBlkPips(u); }   
+  if(u.type==='sarge'){ drawSargeOutfit(u); drawSargeWeapon(u); dsfSpark(u); if(dsf) cx.restore();   if(sg) cx.restore();   if(ul) cx.restore(); if(cl) cx.restore(); if(sl) cx.restore(); if(hv9) cx.restore(); drawAbsorbPips(u); drawCmdBlkPips(u); }   
   if(sg && u.type!=='sarge') cx.restore();   
   drawFz(u,u.x,u.y,w,im,kyl+(u.rxHopZ||0));   
   if(u.type==='commando') drawCmdoPip(u);
@@ -122795,13 +122856,14 @@ function drawBFUnit(u,w,im){
   const hv9=hvbLiftIn(u);   
   const sl=scSlipIn(u);   
   const cl=cmdLeanIn(u);   
+  const dsf=dsfIn(u);   
   const ul=uaLeanIn(u);   
-  if(!hppRide(u,w)){ const hb9=hauBfPose(u,krgPose(u,pchImg(u,im)),flip); kbSwingSprite(u,u.x,u.y-pchLift(u),w,cmdoRecoil(u)+hauBfRc(u), eas2Wob(u,wob,flip), hb9.im, hb9.fl); }           
+  if(!hppRide(u,w)){ const hb9=hauBfPose(u,dsfPose(u,krgPose(u,pchImg(u,im))),flip); kbSwingSprite(u,u.x,u.y-pchLift(u),w,cmdoRecoil(u)+hauBfRc(u), eas2Wob(u,wob,flip), hb9.im, hb9.fl); }           
   drawFz(u,u.x,u.y,w,im,0);   
   if(u.fsq && u.fsq.length) fsqDraw(u,w);   
   if(ck){ if(ul) cx.restore(); if(cl) cx.restore(); if(sl) cx.restore(); if(hv9) cx.restore(); cx.globalAlpha=1; return; }
   if(u.type==='radioman') drawRadioCall(u);
-  if(u.type==='sarge'){ drawSargeOutfit(u); drawSargeWeapon(u); if(ul) cx.restore(); if(cl) cx.restore(); if(sl) cx.restore(); if(hv9) cx.restore(); }   
+  if(u.type==='sarge'){ drawSargeOutfit(u); drawSargeWeapon(u); dsfSpark(u); if(dsf) cx.restore();   if(ul) cx.restore(); if(cl) cx.restore(); if(sl) cx.restore(); if(hv9) cx.restore(); }   
   drawTkFx(u);   
   if(u.hp<u.hpMax){
     const k=Math.max(0,u.hp/u.hpMax);
@@ -122929,7 +122991,8 @@ function cmdLeanIn(u){
 }
 
 function drawSargeWeapon(u){
-  if(unitJet(u)) drawSargePack(u, null, unitFl(u));   
+  if(unitJet(u)) drawSargePack(u, null, unitFl(u));
+  if(dsfDance(u)) return;   
   const usw=unitSargeStats(u);   
   const w=usw.w;
   
@@ -165574,7 +165637,7 @@ function outfitterHTML(){
   
   const dye=dyeHex()||undefined, bank=META.starBank|0;
   const card=id=>{ const h9=shopOutfitHTML(id,'UI.fortOutfit'); return (h9 && !outfitOwns(id) && !OUTFIT_EARN[id] && (OUTFIT_COST[id]|0)>bank)? h9.replace('class="sh-oprice">','class="sh-oprice shpoor">') : h9; };
-  let h='<div class="fh-fit eq-fit"><div class="fh-stage eq-stage"><h3 class="fharea eq-head">'+FORT_TABS.find(t9=>t9[0]==='outfitter')[1]+'</h3>'+gstRowHTML()+'<img class="eq-fig" src="'+ftxStageURI(dye, shopTryLive()? wearWith(SHOP_TRY) : undefined)+'" alt=""><div class="eq-stand"></div>'+eqCapHTML(META.sargeWeapon||'pistol')+'</div><div class="fh-rails eq-rails"><span class="rf-bank fh-bank" data-notr>'+bank+'★</span><div class="acsub">WEAPONS</div>'+eqIronsHTML();   
+  let h='<div class="fh-fit eq-fit"><div class="fh-stage eq-stage"><h3 class="fharea eq-head">'+FORT_TABS.find(t9=>t9[0]==='outfitter')[1]+'</h3>'+gstRowHTML()+'<img class="eq-fig" src="'+ftxStageURI(dye, shopTryLive()? wearWith(SHOP_TRY) : undefined)+'" alt="">'+dsfStageHTML(shopTryLive()? wearWith(SHOP_TRY) : undefined)+'<div class="eq-stand"></div>'+eqCapHTML(META.sargeWeapon||'pistol')+'</div><div class="fh-rails eq-rails"><span class="rf-bank fh-bank" data-notr>'+bank+'★</span><div class="acsub">WEAPONS</div>'+eqIronsHTML();   
   OUTFIT_SLOTS.forEach(g=>{ const cards=OUTFIT_ORDER.filter(id=>g.ids.indexOf(id)>=0).map(card).join(''); if(cards) h+='<div class="acsub">'+g.rule+'</div><div class="sh-ogrp fh-ogrp">'+cards+'</div>'+djsRailHTML(g); });    
   const loose=OUTFIT_ORDER.filter(id=>!outfitSlot(id)).map(card).join(''); if(loose) h+='<div class="sh-ogrp fh-ogrp">'+loose+'</div>';
   h+='</div></div>';
