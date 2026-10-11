@@ -3519,6 +3519,11 @@
   .cs-chip .st { font-size:0.68em; color:#FFD24A; letter-spacing:0.08em; }
   .cs-chip:active { transform:scale(0.93); }
   /*
+*/
+  .cs-chip.rpd-on { border-color:#BFE39A; background:linear-gradient(180deg,rgba(84,118,60,0.96),rgba(44,66,32,0.96)); box-shadow:0 0 14px rgba(191,227,154,0.5); color:#FFFFFF; }
+  .cs-chip.rpd-on .st { color:#FFE38A; }
+  .cs-lvl.rpd-pick { color:#F5F0DC; text-shadow:0 2px 0 rgba(0,0,0,0.55), 0 0 22px rgba(191,227,154,0.45); }
+  /*
 
 
 
@@ -82158,7 +82163,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='20.88';        
+let GVT_CV='20.89';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -157923,14 +157928,31 @@ function parkSceneLayout(){
   if(ph){ const pw=56*s2, box=Math.max(pw+16, 60), pad=(box-pw)/2; ph.style.top=((594-oy)*s2-pad)+'px'; ph.style.width=box+'px'; ph.style.height=box+'px'; ph.style.marginLeft=(-pad)+'px'; }
 }
 window.addEventListener('resize', function(){ if(parkSceneOpen()){ parkSceneLayout(); if(PARK_CUR==='teddy') teddyBitmaps(document.getElementById('parkBg')); } });   
+
+
+
+
+
+
+
+const RPD={ c:0, p:0, t:0 }, RPD_DBL=350;   
+function rpdLvl(k){ return RPD[k]|0; }
+function rpdShow(k, max){ const n=RPD[k]|0; return (n>=1 && n<=(max|0))? n : 0; }   
+function rpdPick(k, n){ n=n|0; const now=Date.now(); if(RPD[k]===n && now-(RPD.t||0)<RPD_DBL){ RPD.t=now; return n; } RPD[k]=(RPD[k]===n)? 0 : n; RPD.t=now; return RPD[k]; }   
+function rpdClear(k){ RPD[k]=0; RPD.t=0; }
+function rpdLine(k, n, of, name){ return (rpdLvl(k)===n? t('REPLAY')+' · ' : '')+tf('LEVEL %1 OF %2', n, of)+' · '+t(name||''); }   
+function rpdSeat(id){ try{ const rrow=document.querySelector('#'+id+' .cs-replay'), on=rrow && rrow.querySelector('.cs-chip.rpd-on'); if(!on) return; const a=rrow.getBoundingClientRect(), b=on.getBoundingClientRect(); rrow.scrollLeft+=(b.left+b.width/2)-(a.left+a.width/2); }catch(e){} }   
+function rpdRig(o){ o=o||{}; if('c' in o) RPD.c=o.c|0; if('p' in o) RPD.p=o.p|0; if('t' in o) RPD.t=o.t|0; return { c:RPD.c, p:RPD.p, t:RPD.t, dbl:RPD_DBL }; }
+
 function renderParkScene(){
   const pk=parkLedger(PARK_CUR), dpk=PARK_CUR==='dino', wpk=PARK_CUR==='western', tpk=PARK_CUR==='teddy', mpk=PARK_CUR==='moon';   
   const PL=parkCap(PARK_CUR);   
   const done=pk.lv>=PL;
   const nextL=Math.min(pk.lv+1, PL);
+  const rpdP=rpdShow('p', Math.min(pk.lv|0, parkLevels(PARK_CUR)));   
   const dye=dyeHex()||undefined;
   const chips = pk.lv>0 ? Array.from({length:Math.min(pk.lv,parkLevels(PARK_CUR))},(_,i)=>
-    '<button type="button" class="cs-chip" onclick="UI.parkPlay('+(i+1)+')"><span data-notr>'+(i+1)+'</span>'
+    '<button type="button" class="cs-chip'+(rpdP===i+1? ' rpd-on' : '')+'" onclick="UI.parkPick('+(i+1)+')"><span data-notr>'+(i+1)+'</span>'
     +'<span class="st" data-notr>'+(pbkChip(PARK_CUR,i+1)   || ((((i<30? (pk.pd>>i) : (pk.pd2>>(i-30))))&1)?'★':'—'))+'</span></button>').join('') : '';
   const pLock=partyLocked('camp'), pLead=partyLeader('camp');
   document.getElementById('parkscene').innerHTML =
@@ -157938,7 +157960,7 @@ function renderParkScene(){
     +'<div class="wt-top"><div class="wt-wordmark" data-notr>'+t(mpk?'GNOME PARK':dpk?'DINO PARK':wpk?'OUTLAW TOWN':tpk?'BEAR PARK':'YETI PARK')+'</div><div class="wt-spacer"></div>'
       +'<button type="button" class="wt-x" onclick="UI.parkClose()">✕</button></div>'
     +'<div class="wt-mid">'
-      +'<div class="cs-lvl" data-notr>'+(done? t(mpk?'GNOME PARK IS YOURS':dpk?'HIS MAJESTY, KING REX':wpk?'THE TOWN IS YOURS':tpk?(pk.lv>=parkLevels('teddy')?'HIS IMPERIAL MAJESTY, EMPEROR BEAR':'HIS HIGHNESS, PRINCE BEAR'):(pk.lv>=parkLevels('yeti')?'HIS MAJESTY, KING YETI':'HIS HIGHNESS, PRINCE YETI'))+' · ✓' : tf('LEVEL %1 OF %2', nextL, PL)+' · '+t(parkNames(PARK_CUR)[nextL-1]||''))+'</div>'
+      +'<div class="cs-lvl'+(rpdP? ' rpd-pick' : '')+'" data-notr>'+(rpdP? rpdLine('p', rpdP, PL, parkNames(PARK_CUR)[rpdP-1]||'')   : done? t(mpk?'GNOME PARK IS YOURS':dpk?'HIS MAJESTY, KING REX':wpk?'THE TOWN IS YOURS':tpk?(pk.lv>=parkLevels('teddy')?'HIS IMPERIAL MAJESTY, EMPEROR BEAR':'HIS HIGHNESS, PRINCE BEAR'):(pk.lv>=parkLevels('yeti')?'HIS MAJESTY, KING YETI':'HIS HIGHNESS, PRINCE YETI'))+' · ✓' : tf('LEVEL %1 OF %2', nextL, PL)+' · '+t(parkNames(PARK_CUR)[nextL-1]||''))+'</div>'
       +'<div class="cs-ladder"><div style="width:'+Math.max(2,Math.min(100,Math.round(pk.lv*100/PL)))+'%"></div></div>'
       +(PARK_CUR==='yeti' && done && !yeti50Open()? '<div class="cs-lvl cs-lock" data-notr>'+gly('lock')+' '+t('30 MORE LEVELS! CLEAR THE ICE CASTLE TO OPEN THEM')+'</div>' : '')   
       +(PARK_CUR==='dino' && done && !dino50Open()? '<div class="cs-lvl cs-lock" data-notr>'+gly('lock')+' '+t('30 MORE LEVELS! DEFEAT KING REX IN HIS LAIR TO OPEN THEM')+'</div>' : '')   
@@ -157949,7 +157971,7 @@ function renderParkScene(){
       +(wpk? '<span class="wt-flank" id="obL"><svg viewBox="0 0 120 140">'+MIRROR(SPRITES_SRC.wbandit).split('currentColor').join(TAN)
         +'<g class="wmz"><path d="M108 60 l12 -5 M108 63 l13 0 M108 66 l12 5" stroke="#FFD24A" stroke-width="3" stroke-linecap="round"/><circle cx="119" cy="63" r="3" fill="#ffe9a8"/></g></svg></span>'
         : '<img class="wt-flank" src="'+(capStandURI()||sargeWepURI(sargeArtW(META.sargeWeapon||'pistol'),dye))+'" alt="">'+petFlankHTML())   
-      +'<button type="button" class="wt-play" onclick="UI.parkPlay()"><span class="big">⚔ DEPLOY!</span></button>'
+      +'<button type="button" class="wt-play" onclick="UI.parkGo()"><span class="big">⚔ DEPLOY!</span></button>'    
       +(dpk? '<span class="wt-flank r" id="dfk">'+dfkSVG()+'</span>' : wpk? '<span class="wt-flank r" id="obR"><svg viewBox="0 56 132 84">'+WSNIPER_PRONE.split('currentColor').join(TAN)
         +'<g class="wmz m2"><path d="M128 86 l12 -5 M128 89 l13 0 M128 92 l12 5" stroke="#FFD24A" stroke-width="3" stroke-linecap="round"/><circle cx="139" cy="89" r="3" fill="#ffe9a8"/></g></svg></span>' : mpk? '<img class="wt-flank r" src="'+sprURI('gnome')+'" alt="">' : tpk? '<img class="wt-flank r" src="'+sprURI('bearnaparte')+'" alt="">' : '<img class="wt-flank r" src="'+sprURI('yeti')+'" alt="">')   
       +'</div>'
@@ -157988,6 +158010,7 @@ function renderParkScene(){
   ptyRender();   
   const rrow=document.querySelector('#parkscene .cs-replay');
   if(rrow) rrow.scrollLeft=rrow.scrollWidth;
+  rpdSeat('parkscene');   
 }
 function openParkScene(id){
   PARK_CUR=(id==='dino')?'dino':(id==='western')?'western':(id==='teddy')?'teddy':(id==='moon')?'moon':'yeti';   
@@ -157996,7 +158019,7 @@ function openParkScene(id){
   safeOnce();   
   PK_RPL=0;   
   document.getElementById('parkscene').classList.remove('hidden');   
-  renderParkScene(); msPauseSync();   
+  rpdClear('p');     renderParkScene(); msPauseSync();   
   clearTimeout(CREW.pollT); crewTick();
   locSync();   
   if(PARK_CUR==='moon') mgEntryChord();   
@@ -158014,11 +158037,12 @@ function closeParkScene(){ document.getElementById('parkscene').classList.add('h
 function renderCampScene(){
   const elite=(META.campaign|0)>=100, third=thirdOn(), top=third? campTop() : elite? ELITE_TOP : 100;   
   const nextL=Math.min(META.campaign+1,top);
+  const rpdC=rpdShow('c', Math.min(META.campaign|0, top)), showL=rpdC||nextL;   
   const dye=dyeHex()||undefined;
   
   
   const chips = META.campaign>0 ? Array.from({length:Math.min(META.campaign,top)},(_,i)=>
-    '<button type="button" class="cs-chip" onclick="UI.campPlay('+(i+1)+')"><span data-notr>'+(i+1)+'</span>'
+    '<button type="button" class="cs-chip'+(rpdC===i+1? ' rpd-on' : '')+'" onclick="UI.campPick('+(i+1)+')"><span data-notr>'+(i+1)+'</span>'
     +'<span class="st" data-notr>'+('★'.repeat(META.levelStars['l'+(i+1)]||0)||'—')+'</span></button>').join('') : '';
   
   
@@ -158034,14 +158058,14 @@ function renderCampScene(){
       
       
       
-      +'<div class="cs-lvl" data-notr>'+tf('LEVEL %1 OF %2', nextL, third? THIRD_OF : top)+' · '+t(campLevelName(nextL))    +'</div>'
+      +'<div class="cs-lvl'+(rpdC? ' rpd-pick' : '')+'" data-notr>'+rpdLine('c', showL, third? THIRD_OF : top, campLevelName(showL))        +'</div>'
       +'<div class="cs-ladder"><div style="width:'+Math.max(2,Math.min(100,third? META.campaign-ELITE_TOP : elite? META.campaign-100 : META.campaign))+'%"></div></div>'
       +'<div class="wt-playwrap">'
       
       +'<img class="wt-flank" src="'+(capStandURI()||sargeWepURI(sargeArtW(META.sargeWeapon||'pistol'),dye))+'" alt="">'+petFlankHTML()   
       
       
-      +'<button type="button" class="wt-play" onclick="UI.campPlay()"><span class="big">⚔ DEPLOY!</span></button>'
+      +'<button type="button" class="wt-play" onclick="UI.campGo()"><span class="big">⚔ DEPLOY!</span></button>'    
       +'<img class="wt-flank r" src="'+sprURI('tanrifle','#C09E6C')+'" alt="">'
       +'</div>'
       
@@ -158077,6 +158101,7 @@ function renderCampScene(){
   
   const rrow=document.querySelector('#campscene .cs-replay');
   if(rrow) rrow.scrollLeft=rrow.scrollWidth;
+  rpdSeat('campscene');   
 }
 
 
@@ -158096,7 +158121,7 @@ function openCampScene(){ wrPreload(); safeOnce();
   
   
   document.getElementById('campscene').classList.remove('hidden');
-  renderCampScene(); msPauseSync();   
+  rpdClear('c');     renderCampScene(); msPauseSync();   
   
   
   clearTimeout(CREW.pollT); crewTick();
@@ -168978,6 +169003,10 @@ window.UI = {
   
   
   campClose(){ SFX.clack(); closeCampScene(); },
+  campPick(n){ audio(); SFX.blip(); if(partyLocked('camp')){ wtLockSpeak('camp'); return; } rpdPick('c', n); if(campSceneOpen()) renderCampScene(); },   
+  campGo(){ UI.campPlay(rpdShow('c', Math.min(META.campaign|0, campTop()))||undefined); },   
+  parkPick(n){ audio(); SFX.blip(); if(partyLocked('camp')){ wtLockSpeak('camp'); return; } rpdPick('p', n); if(parkSceneOpen()) renderParkScene(); },   
+  parkGo(){ const pk9=parkLedger(PARK_CUR); UI.parkPlay(rpdShow('p', Math.min(pk9.lv|0, parkLevels(PARK_CUR)))||undefined); },   
   
   parkPlay(n){ audio(); SFX.blip();
     if(partyLocked('camp')){ wtLockSpeak('camp'); return; }   
@@ -175748,6 +175777,7 @@ window.GVT = {
   cvn(o){ return cvnRig(o); },   
   hun(o){ return hunRig(o); },   
   huv(o){ return huvRig(o); },   
+  rpd(o){ return rpdRig(o); },   
   
   ult(){ const js=jetSarge(), u9=ultMyU();
     return { on:ultOn(), wk:ultWk(), lvl:WPN_MILE.ultLvl, rank:ultRank(ultWk()), live:Object.keys(ULT_LIVE),
