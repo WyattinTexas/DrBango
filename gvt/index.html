@@ -81608,7 +81608,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='20.68';        
+let GVT_CV='20.69';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -82532,7 +82532,7 @@ function coopTick(wk){
     
     
     
-    if(COOP.wantPark) body.cmds=(body.cmds||[]).concat([{k:'park', t:COOP.wantPark.id, n:COOP.wantPark.n|0}]);
+    if(COOP.wantPark) body.cmds=(body.cmds||[]).concat([p87Park({k:'park', t:COOP.wantPark.id, n:COOP.wantPark.n|0})]);   
   }
   const t0=Date.now();   
   COOP.sentSeq=body.seq|0;   
@@ -82770,6 +82770,7 @@ function coopOnPoll(r, sentWant){
   
   
   if(roomBattle() && COOP && !COOP.host && r.beacon && !COOP.ended) roomAdoptBeacon(r.beacon);
+  if(S.coop && COOP && !COOP.host && r.beacon && r.beacon.gd && !COOP.ended) p87Adopt(r.beacon.gd);   
   if(!COOP) return;                            
   
   if(r.state!=='battle' && sentWant){ COOP.wantBattle=false; COOP.wantLvl=0; COOP.wantPark=null; }
@@ -83085,6 +83086,7 @@ function coopApply(cm){
   
   
   if(cm.k==='park'){
+    p87ParkHear(cm);   
     if(COOP && COOP.state==='battle' && !S.coop && S.mode!=='play' && (cm.t==='yeti'||cm.t==='dino'||cm.t==='western'||cm.t==='teddy'||cm.t==='moon') && (cm.n|0)>=1 && (cm.n|0)<=parkLevels(cm.t))   
       COOP.parkPend={ id:cm.t, n:cm.n|0 };   
     else if(COOP && COOP.state==='battle' && !S.coop && S.mode!=='play' && ptyRaidWord(cm.t, cm.n|0))               
@@ -83185,6 +83187,7 @@ function coopApply(cm){
       if(n9>(hi9[t9]|0) && !(RBN_ON && n9>=RBN_KID_BASE)) hi9[t9]=n9;   
       if(ac9 && !ac9.seen[t9+':'+n9]){ ac9.seen[t9+':'+n9]=1; ac9.c++; }
       const f9=S.foes.find(g9=>g9.type===t9 && (g9.foN|0)===n9);
+      if(!f9) p87Birth(t9,n9,p9);   
       if(!f9 || f9.dead || f9.pendDie) continue;
       if(RBN_ON && (c9>=RBN_DASH || rbnDash(f9))){ f9.pinT=null; f9.pvT=null; continue; }   
       const nx=Math.max(-400,Math.min(W+4000,parseInt(p9[2],36)|0)), ny=Math.max(40,Math.min(WORLD_H-40,parseInt(p9[3],36)|0));   
@@ -83497,6 +83500,7 @@ function bcnCamp(){
   
   if(S.park && S.park.id && PTY_PARKS.indexOf(S.park.id)>=0) b.pk={ t:S.park.id, n:S.park.n|0 };
   else if(S.raid && S.raid.k && (RAID_TIERS.indexOf(S.raid.t)>=0 || (raidInfo(S.raid.k).pg && S.raid.t==='g'))) b.pk={ t:S.raid.k, n:(S.raid.t==='g')? 4 : RAID_TIERS.indexOf(S.raid.t)+1 };           
+  p87BcnAdd(b);   
   return b;
 }
 function sqWaitShow(){
@@ -171847,7 +171851,7 @@ function gmyCfg(tier){ const T=GMY.tier[tier]||GMY.tier.e; MID=CAMP_GRAND_W/2;
     waves:[ { name:'THE HAUNTED LIBRARY', boss:'gmummy', groups:[ { f:'solo', t:'mumrifle', n:0, e:'right', at:1e9, gmyHold:1 } ] } ],   
     terrain:{ rocks:[], river:null, ground:'library', gmy:1 } }; }
 function gmyNew(){ MID=W/2; try{ buildUnitTint(ZB_HEX); }catch(e){}
-  const R=(a)=>a[0]+Math.random()*a[1];
+  const R9=p87Die(null,'n'), R=(a)=>a[0]+R9()*a[1];   
   return { st:-1, ph:'open', t:0, stT:0, bw:0, boss:null, troopT:GMY.troop0, medicT:GMY.medic0, booksDone:0, log:[], fx:[], shouts:[], rolls:[], strips:[], tracers:[], cleared:[],
     H:{ t:0, hungry:0, meals:0, taken:0, saved:0, crushed:0, zombN:0, landAt:null, spider:{ st:'wait', at:R(GMY.spider.first), t:0, x:W/2, y:WORLD_H/2, took:null }, bats:[], batAt:R(GMY.bat.first), batI:0, candies:[], rains:[], zq:[], books:{ st:'wait', t:0 } } }; }
 function gmyBag(){ const rd=S.raid; return (rd && rd.k==='gmy' && rd.cfg===S.cfg)? (rd.gmy||(rd.gmy=gmyNew())) : null; }
@@ -171877,12 +171881,12 @@ function gmyTick(dt){ const G=gmyBag(); if(!G || S.mode!=='play' || !(dt>0)) ret
     SFX.trumpet(); gmyLog(G,'stage '+(G.st+1)+' cleared'); return; }   
   G.troopT-=dt; G.medicT-=dt;
   if(G.st===2) gmyWaveTick(G,dt);   
-  else if(G.troopT<=0){ G.troopT=S0.every*T9.k; if(S.foes.filter(f=>f.type==='mumrifle' && !f.dead).length<S0.cap+T9.n) spawnGroup({ f:'solo', t:'mumrifle', n:1, e:'right' }); }
-  if(G.medicT<=0){ G.medicT=S0.mEvery*T9.k; if(S.foes.filter(f=>f.type==='mummedic' && !f.dead).length<S0.mCap+(T9.n>1? 1 : 0)) spawnGroup({ f:'solo', t:'mummedic', n:1, e:'right' }); } }
-function gmyStage(G,n){ const S0=GMY.stages[n]; if(!S0) return; G.st=n; G.ph='fight'; G.stT=0; G.troopT=GMY.troop0*0.5; G.medicT=GMY.medic0;
+  else if(G.troopT<=0){ G.troopT=S0.every*T9.k; const r9=((S.foeSeq||{}).mumrifle)|0; if(p87Live('mumrifle')<p87Cap(S0.cap+T9.n)) spawnGroup({ f:'solo', t:'mumrifle', n:p87N(1), e:'right' }); p87Res('mumrifle',r9,p87N(1)); }   
+  if(G.medicT<=0){ G.medicT=S0.mEvery*T9.k; const r9=((S.foeSeq||{}).mummedic)|0; if(p87Live('mummedic')<p87Cap(S0.mCap+(T9.n>1? 1 : 0))) spawnGroup({ f:'solo', t:'mummedic', n:p87N(1), e:'right' }); p87Res('mummedic',r9,p87N(1)); } }   
+function gmyStage(G,n){ const S0=GMY.stages[n]; if(!S0) return; G.st=n; G.ph='fight'; G.stT=0; G.troopT=GMY.troop0*0.5; G.medicT=GMY.medic0; p87StageBase(n);   
   const y0=WORLD_H/2; spawnGroup({ f:'boss', t:S0.boss, n:1, px:-40, py:y0, bnm:S0.name });
   G.boss=S.foes.slice().reverse().find(f=>f.type===S0.boss && !f.dead)||null;
-  if(S0.escort){ for(let i=0;i<S0.escort;i++){ const m=spawnFoe('mummedic', W+10, foeBandY(y0+(i? 70 : -70)), null, false); if(m){ m.gmyEsc=G.boss; } } }   
+  if(S0.escort){ for(let i=0, e9=p87N(S0.escort);i<e9;i++){ const m=spawnFoe('mummedic', W+10, foeBandY(y0+(i%2? 70 : -70)*(1+(i>>1))), null, false); if(m){ m.gmyEsc=G.boss; } } }   
   SFX.horn(); gmyLog(G,'stage '+(n+1)+' '+S0.boss); gmySay(G,S0.boss);   
   if(n===2){ G.waveT=GMY.wave3.first; G.waveN=0; if(gmyTier()==='g') G.H.batAt=Math.min(G.H.batAt, G.H.t+GMY.wave3.first+1.5); } }
 function gmyHudLine(){ return t('THE HAUNTED LIBRARY'); }   
@@ -171939,14 +171943,14 @@ function gmxTick(G,dt){ const rd=S.raid, tr=gmyTier(); gmxBoost(G); if(!gmxOnTie
   if(gmxHard()){ X.bT-=dt; if(X.bT<=0){ X.bT=GMX.bats.every; gmxBats(G,X); } gmxDrops(G,X,tr); }
   if(tr==='g'){ gmxPumpTick(G,X,dt); gmxFlyWatch(G,X); } }
 
-function gmxHorde(G,X,tr){ const D=GMX.horde, r=D.n[tr]||D.n.m, want=r[0]+Math.floor(Math.random()*(r[1]-r[0]+1)), have=S.foes.filter(f=>f.gmyHorde && !f.dead).length, k=Math.max(0,Math.min(want,(D.cap[tr]||15)-have));
-  if(!k) return; const T9=GMY.tier[tr]||GMY.tier.e, hp=Math.max(1,Math.round(D.hp*T9.hp)), yc=FOE_TOP+60+Math.random()*(FOE_BOT-FOE_TOP-120);
-  for(let i=0;i<k;i++){ const y=Math.max(FOE_TOP+14,Math.min(FOE_BOT-8,yc+(i-(k-1)/2)*46+(Math.random()-0.5)*18)); const f=spawnFoe('gmyzomb', W-34-(i%2)*26, y, null, false); if(!f) continue;
-    f.hp=f.hpMax=hp; f.gmyHorde=1; f.gmyZt=D.types[(Math.random()*D.types.length)|0]; f.gmyFace=-1; f.phase=Math.random()*6.283185; S.fx.push({ k:'puff', x:f.x, y:f.y-10, t:0, dur:0.45, R:16, col:ZB_HEX }); }
-  X.n.horde+=k; bfSfx(SFX.groan,W-60,yc); gmyLog(G,'horde x'+k);
-  if(X.witches.filter(w=>w.st!=='gone').length<(GMX.witch.cap[tr]||2)) gmxWitchIn(G,X,yc); }
-function gmxWitchIn(G,X,y){ const D=GMX.witch, w={ x:W+50, y:y, st:'fly', t:0, cd:D.cd0, a:Math.random()*6.283, fx:-1, balls:[], hb:null, hop:0, tgt:null };
-  const r=spawnFoe('gmywitch', w.x, w.y-D.alt, null, false); if(r){ r.gmxW=w; w.hb=r; } X.witches.push(w); X.n.witch++; bfSfx(SFX.wcackle,W-40,y); gmyLog(G,'witch in'); }
+function gmxHorde(G,X,tr){ const D=GMX.horde, R9=p87Die(G,'h'), r=D.n[tr]||D.n.m, want=p87N(r[0]+Math.floor(R9()*(r[1]-r[0]+1))), have=p87Live('gmyzomb',f=>f.gmyHorde), k=Math.max(0,Math.min(want,p87Cap(D.cap[tr]||15)-have)), z9=((S.foeSeq||{}).gmyzomb)|0;   
+  if(!k){ p87Res('gmyzomb',z9,want); return; } const T9=GMY.tier[tr]||GMY.tier.e, hp=Math.max(1,Math.round(D.hp*T9.hp)), yc=FOE_TOP+60+R9()*(FOE_BOT-FOE_TOP-120);
+  for(let i=0, kw=p87Party()? want : k;i<k;i++){ const y=Math.max(FOE_TOP+14,Math.min(FOE_BOT-8,yc+(i-(kw-1)/2)*46+(R9()-0.5)*18)); const f=spawnFoe('gmyzomb', W-34-(i%2)*26, y, null, false); if(!f) continue;
+    f.hp=f.hpMax=hp; f.gmyHorde=1; f.gmyZt=D.types[(R9()*D.types.length)|0]; f.gmyFace=-1; f.phase=R9()*6.283185; S.fx.push({ k:'puff', x:f.x, y:f.y-10, t:0, dur:0.45, R:16, col:ZB_HEX }); }
+  X.n.horde+=k; bfSfx(SFX.groan,W-60,yc); gmyLog(G,'horde x'+k); p87Res('gmyzomb',z9,want);
+  if(X.witches.filter(w=>w.st!=='gone').length<p87Cap(GMX.witch.cap[tr]||2)) gmxWitchIn(G,X,yc,R9); }
+function gmxWitchIn(G,X,y,R9){ const D=GMX.witch, w={ x:W+50, y:y, st:'fly', t:0, cd:D.cd0, a:(R9||Math.random)()*6.283, fx:-1, balls:[], hb:null, hop:0, tgt:null };   
+  const r=(R9 && G.p87n && G.p87n.h)? p87As('gmywitch',G.p87n.h,()=>spawnFoe('gmywitch', w.x, w.y-D.alt, null, false)) : spawnFoe('gmywitch', w.x, w.y-D.alt, null, false); if(r){ r.gmxW=w; w.hb=r; }     X.witches.push(w); X.n.witch++; bfSfx(SFX.wcackle,W-40,y); gmyLog(G,'witch in'); }
 function gmxWitchDown(G,w){ w.st='down'; w.t=0; w.hop=0; w.balls=[]; S.fx.push({ k:'puff', x:w.x, y:w.y-GMX.witch.alt-14, t:0, dur:0.5, R:26 }); if(!reducedMotion()) S.fx.push({ k:'ring', x:w.x, y:w.y-GMX.witch.alt-14, r:4, R:30, t:0, dur:0.4, col:WX_GREEN });
   S.floats.push({ x:w.x, y:w.y-GMX.witch.alt-46, txt:t('RIBBIT!'), t:0, col:WX_GREEN }); bfSfx(SFX.wpoof,w.x,w.y); bfSfx(SFX.wribbit,w.x,w.y); gmyLog(G,'witch down'); }   
 function gmxWitchStep(G,X,w,dt){ const D=GMX.witch;
@@ -171969,18 +171973,18 @@ function gmxWitchBalls(G,w,dt){ const D=GMX.witch; if(!w.balls.length) return; c
     keep.push(B); }
   w.balls=keep; }
 
-function gmxBats(G,X){ const H=G.H, B=GMX.bats, n=B.n[0]+Math.floor(Math.random()*(B.n[1]-B.n[0]+1)); let k=0;
-  for(let i=0;i<n;i++){ if(H.bats.filter(b=>b.st!=='gone').length>=B.max) break; const tg=gmyBatPick(H,1); if(!tg) break; H.batI++; const y=100+Math.random()*100;
+function gmxBats(G,X){ const H=G.H, B=GMX.bats, R9=p87Die(G,'x'), n=p87N(B.n[0]+Math.floor(R9()*(B.n[1]-B.n[0]+1))); let k=0;   
+  for(let i=0;i<n;i++){ if(H.bats.filter(b=>b.st!=='gone').length>=p87Cap(B.max)) break; const tg=gmyBatPick(H,1,R9); if(!tg) break; H.batI++; const y=100+R9()*100;
     H.bats.push({ i:H.batI, st:'in', t:0, tt:0, x:W+60+i*55, y:y, dir:-1, tgt:tg, car:null, row:null, hit:0, lastHp:GMY.bat.hp }); k++; }
   if(k){ X.n.bats+=k; bfSfx(SFX.screech,W-60,140); gmyLog(G,'bats x'+k); } }
 
 function gmxWeb(G,u){ const D=GMY.mummy; if(!u || u.dead || u.gmyWrap>0) return false; u.gmyWrap=D.wrap; u.gmyWeb=1; u.kyHeldT=Math.max(u.kyHeldT||0,D.wrap); u.gmyPin=[u.x,u.y]; if(S.sel===u) S.sel=null; if(S.drag && S.drag.unit===u) S.drag=null;
   S.floats.push({ x:u.x, y:u.y-64, txt:t('WEBBED!'), t:0, col:'#EEF0F6' }); bfSfx(SFX.swish,u.x,u.y); gmyLog(G,'webbed '+u.type); return true; }   
 function gmxDrops(G,X,tr){ const D=GMX.spider; if(X.drop) return;
-  if(!X.dropDone){ if(X.t<D.dropAt) return; const sg=S.units.find(u=>u.type==='sarge' && gmyStand(u)), L=gmyMen().filter(u=>!(u.def && u.def.vehicle)), u=sg||(L.length? L[(Math.random()*L.length)|0] : null); if(!u) return; X.dropDone=1; gmxDropGo(G,X,u,!!sg); return; }
-  const n=S.foes.filter(f=>f.type==='gmyspider' && !f.dead).length; if(n>=(D.cap[tr]||1)){ X.spNext=null; return; }
+  if(!X.dropDone){ if(X.t<D.dropAt) return; const sg=p87Party()? p87PickT(G,'s',S.units.filter(u=>u.type==='sarge' && gmyStand(u))) : S.units.find(u=>u.type==='sarge' && gmyStand(u)), L=gmyMen().filter(u=>!(u.def && u.def.vehicle)), u=sg||p87PickT(G,'d',L); if(!u) return; X.dropDone=1; gmxDropGo(G,X,u,!!sg); return; }   
+  const n=p87Live('gmyspider'); if(n>=p87Cap(D.cap[tr]||1)){ X.spNext=null; return; }   
   if(X.spNext==null){ X.spNext=X.t+D.again; return; }
-  if(X.t>=X.spNext){ X.spNext=null; const L=gmyMen().filter(u=>!(u.def && u.def.vehicle)); if(L.length) gmxDropGo(G,X,L[(Math.random()*L.length)|0],false); } }
+  if(X.t>=X.spNext){ X.spNext=null; const L=gmyMen().filter(u=>!(u.def && u.def.vehicle)); if(L.length) gmxDropGo(G,X,p87PickT(G,'d',L),false); } }
 function gmxDropGo(G,X,u,sarge){ X.drop={ u:u, x:u.x, y:u.y, t:0, sarge:sarge }; X.n.drops++; bfSfx(SFX.creak,u.x,u.y); gmyLog(G,'spider drops on '+u.type); }
 function gmxDropTick(G,X,dt){ const p=X.drop; if(!p) return; const D=GMX.spider; p.t+=dt; const u=p.u;
   if(u && gmyStand(u) && p.t<D.thread*0.85){ p.x=u.x; p.y=u.y; }   
@@ -172027,14 +172031,14 @@ function gmxPumpRoll(G,X,dt){ const D=GMX.pk;
 function gmxHhIn(G,X,why){ if(X.hhIn) return; X.hhIn=1; const D=GMX.hh, f=spawnFoe('gmyhh', W+90, Math.max(FOE_TOP+D.yMin,foeBandY(WORLD_H/2+60)), null, false); if(!f) return;
   f.hp=f.hpMax=Math.max(1,Math.round(D.hp*bhpNow())); f.barOff=1; f.gmyFace=-1; X.hh=f;     f.gmx={ st:'enter', T:0, leg:0, next:2, way:null, h:Math.PI, mv:1, lob:D.lob0, ram:{}, pr:0, rest:0, oa:0 };
   SFX.horn(); bfSfx(SFX.gmxNeigh,W-60,f.y); setTimeout(()=>{ try{ SFX.gmxLaugh(); }catch(e){} }, 700); gmyLog(G,'horseman in ('+why+')'); }
-function gmxHhPick(f,m){ const D=GMX.hh; m.leg++; m.legT=0;
+function gmxHhPick(f,m){ const D=GMX.hh, R9=p87Die(gmyBag(),'k'); m.leg++; m.legT=0;   
   if(m.leg>=m.next){ const men=gmyMen().filter(u=>!(u.def && u.def.vehicle)).sort((a,b)=>a.x-b.x).slice(0,D.back);   
-    if(men.length){ const u=men[(Math.random()*men.length)|0]; m.next=m.leg+D.legs[0]+Math.floor(Math.random()*(D.legs[1]-D.legs[0]+1)); m.way={ x:u.x, y:u.y, charge:1, u:u }; m.pr=D.prance;
+    if(men.length){ const u=p87Pick(men,R9); m.next=m.leg+D.legs[0]+Math.floor(R9()*(D.legs[1]-D.legs[0]+1)); m.way={ x:u.x, y:u.y, charge:1, u:u }; m.pr=D.prance;
       S.fx.push({ k:'ring', x:f.x, y:f.y-20, r:8, R:64, t:0, dur:0.45, col:'#FF8A2A' }); S.fx.push({ k:'ring', x:u.x, y:u.y-10, r:8, R:60, t:0, dur:0.5, lw:4, col:KB_HUE_QUARRY }); bfSfx(SFX.gmxNeigh,f.x,f.y); const G9=gmyBag(); if(G9) gmyLog(G9,'charge '+u.type+' x'+Math.round(u.x)); return; } }
-  m.oa=(m.oa||0)+0.9+Math.random()*0.7; const cx0=W*0.56, cy0=(FOE_TOP+D.yMin+FOE_BOT)/2;   
+  m.oa=(m.oa||0)+0.9+R9()*0.7; const cx0=W*0.56, cy0=(FOE_TOP+D.yMin+FOE_BOT)/2;   
   m.way={ x:Math.max(T.x+D.xMin,cx0+Math.cos(m.oa)*D.orbitR[0]), y:Math.max(FOE_TOP+D.yMin,Math.min(FOE_BOT-30,cy0+Math.sin(m.oa)*D.orbitR[1])), charge:0 }; }
-function gmxHhLob(G,X,f){ const D=GMX.hh, x=T.x+140+Math.random()*(W-T.x-220), y=FOE_TOP+24+Math.random()*(FOE_BOT-FOE_TOP-48), fl=(f.gmyFace===1)? 1 : -1;   
-  X.lobs.push({ x0:f.x+fl*40, y0:f.y-D.draw*0.86, x1:x, y1:y, t:0, T:D.lobT, spin:Math.random()*6 }); X.n.lob++; bfSfx(SFX.whoosh,f.x,f.y); }
+function gmxHhLob(G,X,f){ const D=GMX.hh, R9=p87Die(G,'l'), x=T.x+140+R9()*(W-T.x-220), y=FOE_TOP+24+R9()*(FOE_BOT-FOE_TOP-48), fl=(f.gmyFace===1)? 1 : -1;   
+  X.lobs.push({ x0:f.x+fl*40, y0:f.y-D.draw*0.86, x1:x, y1:y, t:0, T:D.lobT, spin:R9()*6 }); X.n.lob++; bfSfx(SFX.whoosh,f.x,f.y); }
 function gmxHhStep(G,f,dt){ const D=GMX.hh, m=f.gmx||(f.gmx={ st:'enter', T:0, leg:0, next:2, way:null, h:Math.PI, mv:1, lob:D.lob0, ram:{}, pr:0, rest:0, oa:0 }), X=G.X||(G.X=gmxNew()); m.T+=dt; hl7HhWatch(G,X,f,m,dt);    
   if(m.st!=='enter' && !m.lap){ m.lob-=dt; if(m.lob<=0){ m.lob=D.lob; gmxHhLob(G,X,f); } }
   if(m.pr>0){ m.pr-=dt; m.mv=0; return; }   
@@ -172213,7 +172217,7 @@ const HL7={
 function hl7Saber(u){ if(!u || u.type!=='sarge') return false; let sw=null; try{ sw=unitSargeStats(u); }catch(e){ return false; } return !!(sw && sw.w==='lightsaber' && !unarmedU(u,sw)); }   
 function hl7Reflector(u){ if(!gmyStand(u) || (u.def && u.def.vehicle) || (u.hl7Rf!=null && S.t-u.hl7Rf<HL7.pk.cd)) return false; return u.type==='commando' || hl7Saber(u) || tkTealRefl(u); }   
 
-function hl7Bowl(G,X,ps){ const D=GMX.pk, men=gmyMen(); if(!men.length) return; const took=X.hl7vU||(X.hl7vU=[]), L=men.filter(u=>took.indexOf(u)<0), u=(L.length? L : men)[((L.length? L : men).length*Math.random())|0]; took.push(u);
+function hl7Bowl(G,X,ps){ const D=GMX.pk, men=gmyMen(); if(!men.length) return; const took=X.hl7vU||(X.hl7vU=[]), L=men.filter(u=>took.indexOf(u)<0), u=p87Pick(L.length? L : men, p87Die(G,'p')); took.push(u);   
   const fl=(ps.gmyFace===1)? 1 : -1, x0=ps.x+fl*24, y0=ps.y; const dx=u.x-x0, dy=u.y-y0, d=Math.hypot(dx,dy)||1;
   X.pks.push({ x:x0, y:y0, vx:dx/d*D.spd, vy:dy/d*D.spd, t:0, rot:0, tr:0, src:ps }); X.n.pk++; ps.gmyFlash={ t:S.t, hip:0, hv:1 }; bfSfx(SFX.whoosh,x0,y0); gmyLog(G,'pumpkin at '+u.type); }
 
@@ -172233,7 +172237,7 @@ function hl7ReflBurst(G,X,p){ const D=GMX.pk, P=HL7.pk; let n=0;
   bfSfx(SFX.boom,p.x,p.y); if(!reducedMotion()) S.shake=Math.max(S.shake||0,0.6); gmyLog(G,'reflected pumpkin burst '+n); }
 
 function hl7HhWatch(G,X,f,m,dt){ const K=HL7.stuck, L=HL7.lap;
-  if(m.st==='ride' && !m.lap) m.lapT=(m.lapT==null? L.first+Math.random()*L.var : m.lapT)-dt;
+  if(m.st==='ride' && !m.lap) m.lapT=(m.lapT==null? L.first+p87Die(G,'a')()*L.var : m.lapT)-dt;   
   const w=m.hl7w||(m.hl7w={ x:f.x, y:f.y, t:0 });
   if(m.st==='enter' || m.pr>0 || m.rest>0 || !m.way){ w.x=f.x; w.y=f.y; w.t=0; return; }
   w.t+=dt; if(w.t<K.T) return; const moved=Math.hypot(f.x-w.x,f.y-w.y); w.x=f.x; w.y=f.y; w.t=0; if(moved>=K.d) return;
@@ -172252,7 +172256,7 @@ function hl7Lap(G,f,m){ const D=GMX.hh, L=HL7.lap; if(m.st==='enter') return fal
   if(!m.lapQ){ if(!(m.lapT<=0)) return false;
     const x0=T.x+D.xMin+L.pad, x1=W-60-L.pad, y0=FOE_TOP+D.yMin+L.pad, y1=FOE_BOT-14-L.pad, C=[[x0,y0],[x1,y0],[x1,y1],[x0,y1]]; let k=0, bd=1e9; C.forEach((c,i)=>{ const d=Math.hypot(c[0]-f.x,c[1]-f.y); if(d<bd){ bd=d; k=i; } });
     m.lapQ=[0,1,2,3,4].map(i=>C[(k+i)%4]); m.lap=1; bfSfx(SFX.gmxNeigh,f.x,f.y); setTimeout(()=>{ try{ SFX.gmxLaugh(); }catch(e){} }, 300); const X=G.X; if(X) X.n.lap=(X.n.lap|0)+1; gmyLog(G,'horseman lap'); }
-  if(!m.lapQ.length){ m.lapQ=null; m.lap=0; m.lapT=L.every+Math.random()*L.var; return false; }
+  if(!m.lapQ.length){ m.lapQ=null; m.lap=0; m.lapT=L.every+p87Die(G,'a')()*L.var; return false; }   
   const c=m.lapQ.shift(); m.way={ x:c[0], y:c[1], charge:0, lap:1 }; m.legT=0; return true; }   
 
 function hl7BatBar(bt){ const r=bt.row; if(bt.st!=='carry' || !r || r.dead || !(r.hpMax>0) || !(r.hp<r.hpMax)) return; const k=Math.max(0,r.hp/r.hpMax), x=bt.x-20, y=bt.y-40;
@@ -172282,8 +172286,8 @@ function gmySayTick(G){ if(!G || !G.says || !G.says.length) return; const q=G.sa
 
 
 function gmyWaveN(){ return GMY.wave3.n[gmyTier()]||GMY.wave3.n.e; }
-function gmyWaveTick(G,dt){ const D=GMY.wave3; G.waveT-=dt; if(G.waveT>0) return; const n=gmyWaveN();
-  if(S.foes.filter(f=>f.type==='mumrifle' && !f.dead).length+n>n*D.full){ G.waveT=D.retry; return; }
+function gmyWaveTick(G,dt){ const D=GMY.wave3; G.waveT-=dt; if(G.waveT>0) return; const n0=gmyWaveN(), n=p87N(n0);   
+  if(p87Live('mumrifle')+n>p87Cap(n0*D.full)){ G.waveT=D.retry; return; }
   G.waveT=D.every; G.waveN=(G.waveN|0)+1; spawnGroup({ f:'solo', t:'mumrifle', n:n, e:'right' }); gmyLog(G,'wave '+G.waveN+' x'+n);
   if(G.waveN===D.frankAt) gmyFrankHelp(G); }
 function gmyFrankHelp(G){ const f=bhpBare(()=>spawnFoe('frank', W+10, foeBandY(WORLD_H/2), null, false)); if(!f) return;     f.boss=false; f.barOff=1; f.gmyHelp=1; gmyLog(G,'frank helps'); gmySay(G,'frank'); }
@@ -172304,9 +172308,9 @@ function gmyMummyStep(G,f,dt){ const D=GMY.mummy, m=f.gmy||(f.gmy={ st:'walk', T
   else if(m.st==='windup'){ m.pose='windup'; if(m.T>=D.wind){ gmyThrow(G,f,1); m.st='throw'; m.T=0; } }
   else if(m.st==='pack'){ m.pose='pack'; m.sway=Math.sin(m.T*9)*0.02; if(m.T>=D.packHold){ gmyThrow(G,f,D.packN); m.st='throw'; m.T=0; } }
   else if(m.st==='throw'){ m.pose='throw'; m.sway=0; if(m.T>=D.throwT){ m.st='walk'; m.T=0; m.stepT=0; m.x0=f.x; m.y0=f.y; m.vx=null; } } }
-function gmyThrow(G,f,n){ const D=GMY.mummy, w=f.def.w, hand={ x:f.x-0.33*w, y:f.y-0.62*w };
+function gmyThrow(G,f,n){ const D=GMY.mummy, w=f.def.w, hand={ x:f.x-0.33*w, y:f.y-0.62*w }, R9=p87Die(G,'t');   
   const tg=gmyMen().filter(u=>Math.hypot(u.x-f.x,u.y-f.y)<D.rng).sort((a,b)=>Math.hypot(a.x-f.x,a.y-f.y)-Math.hypot(b.x-f.x,b.y-f.y)).slice(0,n); if(!tg.length) return;
-  for(let i=0;i<n;i++){ const u=tg[i%tg.length], jx=(n>1)? (i-(n-1)/2)*6 : 0; G.rolls.push({ x0:hand.x, y0:hand.y, x1:u.x+jx, y1:u.y-10, t:-i*0.06, T:D.fly+(n>1? 0.1 : 0), u:u, spin:Math.random()*6 }); }
+  for(let i=0;i<n;i++){ const u=tg[i%tg.length], jx=(n>1)? (i-(n-1)/2)*6 : 0; G.rolls.push({ x0:hand.x, y0:hand.y, x1:u.x+jx, y1:u.y-10, t:-i*0.06, T:D.fly+(n>1? 0.1 : 0), u:u, spin:R9()*6 }); }
   bfSfx(SFX.gmyRoll,f.x,f.y); gmyLog(G,'throw '+n); }
 function gmyWrap(G,u){ const D=GMY.mummy; if(!u || u.dead) return false; u.gmyWrap=D.wrap; u.kyHeldT=Math.max(u.kyHeldT||0,D.wrap); u.gmyPin=[u.x,u.y]; if(S.sel===u) S.sel=null; if(S.drag && S.drag.unit===u) S.drag=null;
   S.floats.push({ x:u.x, y:u.y-64, txt:t('WRAPPED!'), t:0, col:'#F3EEE0' }); gmyLog(G,'wrapped '+u.type); return true; }
@@ -172374,7 +172378,8 @@ function gmyBlackout(H){ if(H.books.st==='fall') return true; if(H.landAt==null)
 function gmySpiderTick(G,H,dt){ const sp=H.spider, cx0=W/2, cy0=WORLD_H/2;
   if(sp.st==='wait'){ if(H.t<sp.at || gmyBlackout(H)) return; sp.st='shadow'; sp.t=0; sp.took=null;
     const L=gmyFigs().filter(o=>Math.hypot(o.x-cx0,o.y-cy0)<=HLB_R);
-    if(L.length){ const o=L[(Math.random()*L.length)|0]; sp.x=o.x; sp.y=o.y; } else { const a=Math.random()*6.283185, r=Math.sqrt(Math.random())*HLB_R*0.9; sp.x=cx0+Math.cos(a)*r; sp.y=Math.max(110,Math.min(WORLD_H-130,cy0+Math.sin(a)*r)); }
+    const R9=p87Die(G,'w');   
+    if(L.length){ const o=p87Pick(L,R9); sp.x=o.x; sp.y=o.y; } else { const a=R9()*6.283185, r=Math.sqrt(R9())*HLB_R*0.9; sp.x=cx0+Math.cos(a)*r; sp.y=Math.max(110,Math.min(WORLD_H-130,cy0+Math.sin(a)*r)); }
     if(!H.hungry){ H.hungry=1; }     bfSfx(SFX.creak,sp.x,sp.y); gmyLog(G,'spider shadow'); return; }
   sp.t+=dt;
   if(sp.st==='shadow'){ if(sp.t>=HLB_SHADOW_T){ sp.st='drop'; sp.t=0; bfSfx(SFX.swish,sp.x,sp.y); } return; }
@@ -172383,13 +172388,13 @@ function gmySpiderTick(G,H,dt){ const sp=H.spider, cx0=W/2, cy0=WORLD_H/2;
     if(best){ const foe=S.foes.indexOf(best)>=0, took={ veh:!!(best.def && best.def.vehicle), hex:foe? (best.def && best.def.gmyB==='zomb'? ZB_HEX : TAN) : (dyeHex()||GREEN) };
       if(gmyTake(best,'spider')){ sp.took=took; H.taken++; gmyMeal(H); sp.st='rise'; sp.t=0; bfSfx(SFX.snap,sp.x,sp.y); if(!reducedMotion()) S.shake=Math.max(S.shake,0.25); gmyLog(G,'spider took '+best.type); return; } }
     sp.st='snap'; sp.t=0; bfSfx(SFX.snap,sp.x,sp.y); S.fx.push({ k:'puff', x:sp.x, y:sp.y-4, t:0, dur:0.35, R:14 }); return; }
-  if(sp.st==='rise' || sp.st==='snap'){ if(sp.t>=(sp.st==='rise'? HLB_RISE_T : HLB_SNAP_T)){ sp.st='wait'; sp.at=H.t+GMY.spider.every[0]+Math.random()*GMY.spider.every[1]; sp.took=null; } } }
-function gmyBatPick(H,mine){ const L=(mine? S.units.filter(u=>gmyStand(u)) : gmyFigs()).filter(o=>!(o.def && (o.def.vehicle)) && !(o.cloakT>0 && o.type==='spy') && Math.abs(o.x-W/2)<=GMY.bat.zone && !(o.gmyWrap>0 && false)); return L.length? L[(Math.random()*L.length)|0] : null; }
+  if(sp.st==='rise' || sp.st==='snap'){ if(sp.t>=(sp.st==='rise'? HLB_RISE_T : HLB_SNAP_T)){ sp.st='wait'; sp.at=H.t+GMY.spider.every[0]+p87Die(G,'v')()*GMY.spider.every[1]; sp.took=null; } } }   
+function gmyBatPick(H,mine,R9){ const L=(mine? S.units.filter(u=>gmyStand(u)) : gmyFigs()).filter(o=>!(o.def && (o.def.vehicle)) && !(o.cloakT>0 && o.type==='spy') && Math.abs(o.x-W/2)<=GMY.bat.zone && !(o.gmyWrap>0 && false)); return p87Pick(L,R9||Math.random); }   
 function gmyBatsTick(G,H,dt){ const B=gmyBatRule(G);   
-  if(H.t>=H.batAt){ H.batAt=H.t+B.every[0]+Math.random()*B.every[1]; if(H.bats.filter(b=>b.st!=='gone').length<B.max){ const tg=gmyBatPick(H,B.mine); if(tg){ H.batI++; const sd=(Math.random()<0.5)? 1 : -1, y=120+Math.random()*80;
-      H.bats.push({ i:H.batI, st:'in', t:0, tt:0, x:(sd<0? -60 : W+60), y:y, dir:-sd, tgt:tg, car:null, row:null, hit:0, lastHp:B.hp, sx:0, sy:0 }); bfSfx(SFX.screech,Math.max(0,Math.min(W,sd<0? 0 : W)),y); gmyLog(G,'bat in'); } } }
+  if(H.t>=H.batAt){ const R9=p87Die(G,'b'); H.batAt=H.t+B.every[0]+R9()*B.every[1]; for(let j9=0, n9=p87N(1);j9<n9;j9++){ if(H.bats.filter(b=>b.st!=='gone').length<p87Cap(B.max)){ const tg=gmyBatPick(H,B.mine,R9); if(tg){ H.batI++; const sd=(R9()<0.5)? 1 : -1, y=120+R9()*80;   
+      H.bats.push({ i:H.batI, st:'in', t:0, tt:0, x:(sd<0? -60 : W+60), y:y, dir:-sd, tgt:tg, car:null, row:null, hit:0, lastHp:B.hp, sx:0, sy:0 }); bfSfx(SFX.screech,Math.max(0,Math.min(W,sd<0? 0 : W)),y); gmyLog(G,'bat in'); } } } }
   for(let i=H.bats.length-1;i>=0;i--){ const b=H.bats[i]; b.t+=dt; b.tt+=dt; if(b.hit>0) b.hit-=dt*4;
-    if(b.st==='in'){ if(!gmyStand(b.tgt) || (b.tgt.def && b.tgt.def.boss)){ const nu=gmyBatPick(H,B.mine); if(nu) b.tgt=nu; else { b.st='off'; b.t=0; continue; } }
+    if(b.st==='in'){ if(!gmyStand(b.tgt) || (b.tgt.def && b.tgt.def.boss)){ const nu=gmyBatPick(H,B.mine,p87Die(G,'r'+b.i,b)); if(nu) b.tgt=nu; else { b.st='off'; b.t=0; continue; } }
       const dx=b.tgt.x-b.x, dy=(b.tgt.y-60)-b.y, d=Math.hypot(dx,dy)||1; if(d<=90){ b.st='swoop'; b.t=0; b.sx=b.x; b.sy=b.y; continue; }
       b.x+=dx/d*B.fly*dt; b.y+=dy/d*B.fly*dt*0.6; b.dir=dx>0? 1 : -1; continue; }
     if(b.st==='swoop'){ const u=b.tgt; if(!gmyStand(u)){ b.st='off'; b.t=0; continue; }
@@ -172405,7 +172410,7 @@ function gmyBatsTick(G,H,dt){ const B=gmyBatRule(G);
     if(b.st==='gone') H.bats.splice(i,1); } }
 function gmyBatGrab(G,H,b,u){ b.st='carry'; b.t=0; b.car=u; u.gmyAir=b; if(S.sel===u) S.sel=null; if(S.drag && S.drag.unit===u) S.drag=null; if(u.gmyWrap>0){ u.gmyWrap=0; u.gmyPin=null; u.kyHeldT=0; }
   b.mine=S.units.indexOf(u)>=0;
-  if(b.mine){ const r=spawnFoe('gmybat', b.x, b.y, null, false); if(r){ r.hp=r.hpMax=GMY.bat.hp; r.gmyBatOf=b; b.row=r; b.lastHp=r.hp; } }   
+  if(b.mine){ const r=p87As('gmybat', b.i|0, ()=>spawnFoe('gmybat', b.x, b.y, null, false));     if(r){ r.hp=r.hpMax=GMY.bat.hp; r.gmyBatOf=b; b.row=r; b.lastHp=r.hp; } }   
   bfSfx(SFX.yip,b.x,b.y); S.fx.push({ k:'ring', x:u.x, y:u.y-20, r:4, R:30, t:0, dur:0.3, col:'#C9B2E6' }); gmyLog(G,'bat grab '+u.type); }
 function gmyBatFree(b){ if(b.row && !b.row.dead){ const i=S.foes.indexOf(b.row); if(i>=0) S.foes.splice(i,1); } b.row=null; const u=b.car; b.car=null; if(u) u.gmyAir=null; }
 function gmyBatSaved(G,H,b,u){ b.row=null; b.car=null; u.gmyAir=null; H.saved++; u.haltT=0;
@@ -172417,8 +172422,8 @@ function gmyBatDeliver(G,H,b,u){ const x=Math.max(40,Math.min(W-40,b.x)); gmyBat
   if(gmyTake(u,'bat')){ H.taken++; gmyMeal(H); S.floats.push({ x:x, y:44, txt:t('TAKEN!'), t:0, col:'#E7D3FF' }); bfSfx(SFX.howl,x,40); gmyLog(G,'taken '+u.type); }
   b.st='gone'; }
 function gmyCandyTick(G,H,dt){ const cx0=W/2, cy0=WORLD_H/2;
-  for(let i=H.rains.length-1;i>=0;i--){ if(H.t<H.rains[i]) continue; H.rains.splice(i,1);
-    for(let k=0;k<HLB_CANDY_N;k++){ const a=Math.random()*6.283185, r=Math.sqrt(Math.random())*HLB_CANDY_R; H.candies.push({ x:cx0+Math.cos(a)*r, y:cy0+Math.sin(a)*r, kind:['corn','wrap','lolly'][(Math.random()*3)|0], rot:(Math.random()-0.5)*1.2, at:H.t+k*HLB_CANDY_GAP, st:'wait', t:0 }); } }
+  for(let i=H.rains.length-1;i>=0;i--){ if(H.t<H.rains[i]) continue; H.rains.splice(i,1); const R9=p87Die(G,'c');   
+    for(let k=0;k<HLB_CANDY_N;k++){ const a=R9()*6.283185, r=Math.sqrt(R9())*HLB_CANDY_R; H.candies.push({ x:cx0+Math.cos(a)*r, y:cy0+Math.sin(a)*r, kind:['corn','wrap','lolly'][(R9()*3)|0], rot:(R9()-0.5)*1.2, at:H.t+k*HLB_CANDY_GAP, st:'wait', t:0 }); } }
   for(let i=H.candies.length-1;i>=0;i--){ const c=H.candies[i];
     if(c.st==='wait'){ if(H.t>=c.at){ c.st='mark'; c.t=0; } continue; }
     c.t+=dt;
@@ -172445,7 +172450,7 @@ function gmyZombRise(G,H,dt){ const D=GMY.zomb;
     if(!z.rang && z.t>=D.tip){ z.rang=1; S.fx.push({ k:'ring', x:z.x, y:z.y-16, r:4, R:34, t:0, dur:0.4, col:ZB_HEX }); S.fx.push({ k:'puff', x:z.x, y:z.y-10, t:0, dur:0.45, R:16, col:ZB_HEX }); bfSfx(SFX.groan,z.x,z.y); }
     if(!z.said && z.t>=D.tip+0.4){ z.said=1; S.floats.push({ x:z.x, y:z.y-70, txt:t('ZOMBIE!'), t:0, col:ZB_HEX }); }    
     if(z.t<D.tip+D.rise) continue; H.zq.splice(i,1); H.zombN++;
-    const f=spawnFoe('gmyzomb', z.x, z.y, null, false); if(f){ f.hp=f.hpMax=D.hp; f.gmyZt=z.type; f.gmyFace=z.fl? -1 : 1;     f.phase=Math.random()*6.283185; } bfSfx(SFX.zthud,z.x,z.y); } }
+    const f=p87Party()? p87As('gmyzomb',P87.cz+(G.p87cz=(G.p87cz|0)+1),()=>spawnFoe('gmyzomb', z.x, z.y, null, false),1) : spawnFoe('gmyzomb', z.x, z.y, null, false); if(f){ f.hp=f.hpMax=D.hp;     f.gmyZt=z.type; f.gmyFace=z.fl? -1 : 1;     f.phase=p87Die(G,'z')()*6.283185;   } bfSfx(SFX.zthud,z.x,z.y); } }
 function gmyBooksFall(G){ const H=G.H; H.books.st='fall'; H.books.t=0; bfSfx(SFX.whoosh,W/2,WORLD_H/2); gmyLog(G,'books fall'); }   
 function gmyBookX(s){ return W/2+(s? 1 : -1)*HLB_BOOK_DX; }
 function gmyBooksTick(G,H,dt){ const b=H.books; if(b.st!=='fall') return; b.t+=dt; if(b.t<HLB_BOOK_FALL) return;
@@ -172612,6 +172617,97 @@ function gmyRig(v){ v=v||{}; const rd=S.raid, G=gmyBag();
     won:!!(rd2 && rd2.won), kingDown:!!(rd2 && rd2.kingDown), p3King:!!(rd2 && rd2.p3King), hud:gmyOn()? gmyHudLine() : null, ground:S.cfg && S.cfg.terrain? S.cfg.terrain.ground : null, mid:MID, W:W, WH:WORLD_H,
     books:G3? G3.H.books.st : null, rocks:(S.cfg && S.cfg.terrain && S.cfg.terrain.rocks)? S.cfg.terrain.rocks.filter(r=>r.art==='book').length : 0, hz:G3? { taken:G3.H.taken, saved:G3.H.saved, crushed:G3.H.crushed, meals:G3.H.meals, zombN:G3.H.zombN, spider:G3.H.spider.st, bats:G3.H.bats.length, candies:G3.H.candies.length } : null,
     foes:S.foes.filter(f=>!f.dead).map(P), units:S.units.filter(u=>!u.dead).map(P) }; }
+
+
+
+
+
+
+
+
+
+
+
+const P87={ on:1, capMax:2, tol:0.6, big:3, arm:2, owe:1e-6, max:470, stage:1000, cz:50000, birth:['mumrifle','mummedic','gmyzomb','gmyspider'] };
+function p87Party(){ return !!(P87.on && S.coop && COOP && !S.bf && gmyOn()); }   
+function p87Hash(s){ s=String(s); let h=2166136261>>>0; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619)>>>0; } return h; }   
+function p87Die(G,tag,o){ if(!p87Party()) return Math.random;   
+  const B=o||G, N=B? (B.p87n||(B.p87n={})) : null, n=N? (N[tag]=(N[tag]|0)+1) : 1;   
+  return dice9(p87Hash(String(COOP.code||'')+':'+(COOP.p87s|0)+':'+gmyTier()+':'+((S.raid && S.raid.n)|0)+':'+tag+':'+n)); }
+function p87Who(o){ return o.cid? 'u'+o.cid : (S.foes.indexOf(o)>=0? 'f'+o.type+':'+(o.foN|0) : 'u'+o.type+':'+(o.id|0)); }   
+function p87Pick(L,R){ if(!L || !L.length) return null; if(R===Math.random) return L[(R()*L.length)|0];   
+  const s=(R()*4294967296)>>>0; let b=null, bs=-1; for(const o of L){ const h=p87Hash(s+':'+p87Who(o)); if(h>bs){ bs=h; b=o; } } return b; }   
+function p87PickT(G,tag,L){ return L.length? p87Pick(L,p87Die(G,tag)) : null; }
+function p87M(){ const n=(S.raid && S.raid.k==='gmy' && (S.raid.n|0)) || 1; return n>1? sqTroopMul(n) : 1; }   
+function p87N(k){ const m=p87M(); return m===1? k : Math.round(k*m); }   
+function p87Cap(c){ const m=p87M(); return m===1? c : Math.round(c*Math.min(m,P87.capMax)); }   
+
+
+
+function p87StageBase(n){ if(!p87Party()) return; const q0=S.foeSeq||(S.foeSeq={}), b=Math.max(0,n|0)*P87.stage; for(const t of ['mumrifle','mummedic']) q0[t]=Math.max(q0[t]|0, b); }
+function p87As(t,n,fn,own){ if(!p87Party() || !(n>0)) return fn(); const q0=S.foeSeq||(S.foeSeq={}), keep=q0[t]|0; q0[t]=n-1; try{ return fn(); } finally { q0[t]=own? keep : Math.max(keep,n); } }   
+function p87Res(t,s,k){ if(!p87Party()) return; const q0=S.foeSeq||(S.foeSeq={}); q0[t]=Math.max(q0[t]|0, (s|0)+(k|0)); }   
+function p87Park(cm){ try{ if(cm && cm.t==='gmy' && COOP && COOP.wantPark){ const s=COOP.wantPark.s||(COOP.wantPark.s=1+Math.floor(Math.random()*999999998)); cm.x=s; COOP.p87s=s; } }catch(e){} return cm; }   
+function p87ParkHear(cm){ if(COOP && cm && cm.t==='gmy' && typeof cm.x==='number' && cm.x>0 && cm.x<1e9) COOP.p87s=cm.x|0; }   
+function p87PhR(p){ return p==='fight'? 1 : p==='between'? 2 : 0; }
+function p87Bag(){ const G=gmyBag(); if(!G) return null; const H=G.H, X=G.X, r=v=>+(+v||0).toFixed(2);
+  const o={ sd:(COOP && COOP.p87s)|0, s:G.st, p:p87PhR(G.ph), c:r(S.t), t:r(G.t), st:r(G.stT), bw:r(G.bw), h:r(H.t), tr:r(G.troopT), md:r(G.medicT), w:G.waveN|0, wt:r(G.waveT), ba:r(H.batAt-H.t), bk:(H.books.st==='down')? 2 : (H.books.st==='fall')? 1 : 0, n:Object.assign({}, G.p87n||{}) };
+  if(H.spider.st==='wait') o.sa=r(H.spider.at-H.t);
+  if(X) o.x={ t:r(X.t), h:r(X.hT), b:r(X.bT), k:(X.pkT==null)? -1 : r(X.pkT), d:X.dropDone|0, sp:(X.spNext==null)? -1 : r(X.spNext-X.t), hi:X.hhIn|0, f:X.flyN|0 };
+  return o; }
+function p87BcnAdd(b){ try{ if(!p87Party() || !COOP.host) return; const gd=p87Bag(); if(!gd) return; b.gd=gd;   
+  if(JSON.stringify(b).length>P87.max){ delete gd.n; if(JSON.stringify(b).length>P87.max) delete b.gd; } }catch(e){} }   
+function p87Log(){ const G=gmyBag(); return G? (G.p87a||(G.p87a={ n:0, stage:0, clock:0, sd:0, miss:0, born:0, last:null })) : null; }
+function p87Adopt(gd){ if(!p87Party() || COOP.host || !gd || typeof gd!=='object' || S.mode!=='play') return false; const G=gmyBag(); if(!G) return false; const A=p87Log();   
+  if((gd.sd|0)>0 && (COOP.p87s|0)!==(gd.sd|0)){ COOP.p87s=gd.sd|0; A.sd++; }   
+  if(COOP_OWE_K===S && COOP_OWE_S>P87.owe){ A.miss=0; return false; }   
+  const age=Math.max(0,Math.min(3,S.t-(+gd.c||0))), rs=gd.s|0, rp=gd.p|0, mp=p87PhR(G.ph), same=(rs===G.st && rp===mp);
+  const lagD=(+gd.t||0)+age-G.t, lagS=(same && rp===1)? (+gd.st||0)+age-G.stT : 0, lagB=(same && rp===2)? G.bw-((+gd.bw||0)-age) : 0;
+  const why=(rs>G.st || (rs===G.st && rp>mp))? 'stage' : (lagD>P87.big || lagS>P87.big)? 'clock' : (lagD>P87.tol || lagS>P87.tol || lagB>P87.tol)? 'ff' : null;
+  if(!why){ A.miss=0; return false; }
+  if(++A.miss<2) return false;   
+  A.miss=0; A.n++; A[why]=(A[why]|0)+1;
+  const H=G.H, X=G.X, st0=G.st, ph0=G.ph;
+  if(why==='ff'){   
+    if(lagD>P87.tol){ const d=lagD; G.t+=d; H.t+=d; G.stT+=d; G.troopT-=d; G.medicT-=d; if(G.waveT!=null) G.waveT-=d; if(G.ph==='between') G.bw-=d; if(X){ X.t+=d; X.hT-=d; X.bT-=d; if(X.pkT!=null) X.pkT-=d; } }
+    else if(lagS>P87.tol){ const d=lagS; G.stT+=d; G.troopT-=d; G.medicT-=d; if(G.st===2 && G.waveT!=null) G.waveT-=d; }
+    else G.bw-=lagB;
+    A.last={ why:why, at:+S.t.toFixed(2), lag:[+lagD.toFixed(2), +lagS.toFixed(2), +lagB.toFixed(2)] }; gmyLog(G,'p87 ff '+lagD.toFixed(2)+'/'+lagS.toFixed(2)+'/'+lagB.toFixed(2)); return true; }
+  const q0=S.foeSeq||(S.foeSeq={}); G.t=(+gd.t||0)+age; H.t=(+gd.h||0)+age;   
+  if(why==='stage'){ const done=(rp===2)? rs : rs-1;   
+    for(let i=Math.max(0,st0);i<=done;i++){ const b9=GMY.stages[i] && GMY.stages[i].boss; if(!b9) continue;
+      if(i===st0 && ph0==='fight'){ const f=G.boss; if(f && !f.dead && S.foes.indexOf(f)>=0) evKillByWord(f); }   
+      else if(i>st0 || ph0==='open'){ q0[b9]=(q0[b9]|0)+1; if(S.pendFd) S.pendFd=S.pendFd.filter(e=>!(e.t===b9 && e.id===q0[b9])); }   
+      if(G.cleared.indexOf(i)<0) G.cleared.push(i); }
+    if(gd.bk>=1 && H.books.st==='wait'){ G.booksDone=1; gmyBooksFall(G); if(gd.bk===2) H.books.t=HLB_BOOK_FALL; }   
+    if(rp===1) gmyStage(G,rs);   
+    else if(rp===2){ G.st=rs; G.ph='between'; G.boss=null; G.bw=Math.max(0,(+gd.bw||0)-age); } }
+  if(G.st===rs) G.stT=(+gd.st||0)+age; G.troopT=(+gd.tr||0)-age; G.medicT=(+gd.md||0)-age;   
+  if(G.st===2 && rp===1){ const w0=G.waveN|0; G.waveN=Math.max(w0,gd.w|0); G.waveT=(+gd.wt||0)-age; if(w0<GMY.wave3.frankAt && G.waveN>=GMY.wave3.frankAt) gmyFrankHelp(G); }
+  H.batAt=H.t+(+gd.ba||0)-age; if(gd.sa!=null && H.spider.st==='wait') H.spider.at=H.t+(+gd.sa)-age;
+  if(gd.x && gmxOnTier()){ const X2=G.X||(G.X=gmxNew()), x=gd.x; X2.t=(+x.t||0)+age; X2.hT=(+x.h||0)-age; X2.bT=(+x.b||0)-age; if(x.k>=0) X2.pkT=x.k-age; if(x.d) X2.dropDone=1; X2.spNext=(x.sp>=0)? X2.t+x.sp-age : null; X2.flyN=Math.max(X2.flyN|0, x.f|0); if(x.hi && !X2.hhIn) gmxHhIn(G,X2,'the referee'); }
+  if(gd.n){ const N=G.p87n||(G.p87n={}); for(const k in gd.n) N[k]=Math.max(N[k]|0, gd.n[k]|0); }   
+  A.last={ why:why, at:+S.t.toFixed(2), from:[st0,ph0], to:[rs,rp], lag:+lagD.toFixed(2) }; gmyLog(G,'p87 adopt '+why+' '+st0+'>'+rs);
+  return true; }
+function p87Live(t,pred){ let n=0; for(const f of S.foes) if(f.type===t && !f.dead && (!pred || pred(f))) n++;   
+  if(p87Party() && !COOP.host && S.fdSeen){ const G=gmyBag(), R=G && (G.p87r||(G.p87r={})), p=t+':';   
+    if(R) for(const k in S.fdSeen){ if(k.indexOf(p)!==0 || (t==='gmyzomb' && +k.slice(p.length)>=P87.cz)) continue; if(R[k]==null) R[k]=S.t; if(S.t-R[k]<=4) n++; } }
+  return n; }
+function p87Birth(t,n,p){ if(!p87Party() || COOP.host || P87.birth.indexOf(t)<0 || !(n>0)) return false; const G=gmyBag(); if(!G || G.st<0) return false;   
+  if(COOP_OWE_K===S && COOP_OWE_S>P87.owe) return false;
+  const k=t+':'+n; if(S.fdSeen && S.fdSeen[k]){ const R=G.p87r||(G.p87r={}); if(R[k]==null) R[k]=S.t; if(S.t-R[k]<=4) return false; }   
+  if(S.foes.some(f=>f.type===t && (f.foN|0)===n)) return false;
+  const M=G.p87m||(G.p87m={}), a=M[k];
+  if(!a || S.t-a.t1>3){ M[k]={ t0:S.t, t1:S.t }; return false; }   
+  a.t1=S.t; if(S.t-a.t0<P87.arm) return false; delete M[k];
+  const x=Math.max(-400,Math.min(W+4000,parseInt(p[2],36)|0)), y=Math.max(40,Math.min(WORLD_H-40,parseInt(p[3],36)|0)), q0=S.foeSeq||(S.foeSeq={}), keep=q0[t]|0;
+  const cz=(t==='gmyzomb' && n>=P87.cz); q0[t]=n-1; let f=null; try{ f=spawnFoe(t,x,y,null,false); } finally { q0[t]=cz? keep : Math.max(keep,n); } if(!f) return false;   
+  if(cz) G.p87cz=Math.max(G.p87cz|0, n-P87.cz);   
+  const T9=GMY.tier[gmyTier()]||GMY.tier.e;
+  if(t==='gmyzomb'){ if(gmxOnTier() && n<P87.cz){ f.hp=f.hpMax=Math.max(1,Math.round(GMX.horde.hp*T9.hp)); f.gmyHorde=1; f.gmyZt=GMX.horde.types[n%GMX.horde.types.length]; } else { f.hp=f.hpMax=GMY.zomb.hp; f.gmyZt='rifleman'; } f.gmyFace=-1; f.phase=0; }
+  else if(t==='gmyspider'){ f.gmyFace=-1; f.gmx={ st:'rest', T:GMX.spider.rest*0.4, web:GMX.spider.web0, bite:0.6, a:Math.PI/2, lift:0 }; }
+  f.p87b=1; const A=p87Log(); if(A) A.born++; gmyLog(G,'p87 born '+k); return true; }
+function p87Rig(){ const G=gmyBag(); return { on:!!P87.on, party:p87Party(), host:!!(COOP && COOP.host), sd:COOP? (COOP.p87s|0) : 0, m:+p87M().toFixed(3), n:(S.raid && S.raid.n)|0, cap10:p87Cap(10), n1:p87N(1), bag:G? p87Bag() : null, a:(G && G.p87a)? Object.assign({}, G.p87a) : null, owe:+(COOP_OWE_S||0).toFixed(2) }; }   
 
 
 
