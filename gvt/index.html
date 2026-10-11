@@ -80607,9 +80607,8 @@ function campGrandArm(){
   
   
   
-  for(const j of (t.jax||[])){
+  for(const j of (t.jax||[]))
     S.mines.push({ owner:null, side:'jax', seat:null, x:j.x, y:j.y, armT:0, big:!!j.big, sl:false, jx:true });
-    if(j.lm) S.mines[S.mines.length-1].lm=1; }   
   
   
   
@@ -82741,7 +82740,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='21.07';        
+let GVT_CV='21.08';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -94673,7 +94672,7 @@ CAMP_DRESS[PBM5.rung]={ rocks:pbm5Rows(), props:[{ x:PBM5.siege, y:300, art:'pbl
 
 
 const CMX={ l6:{ x:502, w:56, bridgeY:278, bw:76 }, cross:{ x:598, w:56, bridgeY:172, bridgeY2:428, bw:78 }, crossRocks:[[213,150],[213,452],[1027,150],[1027,452]], crossR:30, l9:{ x:473, w:56, bw:76 }, l9Y:0,
-  mines:[[430,250],[430,350],[810,250],[810,350]], name:{ 5:'THE HILL VILLAGE', 8:'THE CROSSING', 10:'GNOME PARK' }, stats:{ foe:0 } };   
+  mines:[[430,250],[430,350],[810,250],[810,350]], name:{ 5:'THE HILL VILLAGE', 8:'THE CROSSING', 10:'GNOME PARK' }, noRun:{ 8:1 }, stats:{ foe:0 } };   
 CMX.l9Y=(function(){ const cx9=CMX.l9.x+CMX.l9.w/2; for(let i=1;i<PATH_PTS.length;i++){ const a=PATH_PTS[i-1], b=PATH_PTS[i]; if((a.x-cx9)*(b.x-cx9)<=0 && a.x!==b.x) return Math.round(a.y+(b.y-a.y)*(cx9-a.x)/(b.x-a.x)); } return 400; })();   
 function cmxVillage(t){   
   WORLD_W=W; MID=W/2;
@@ -94682,19 +94681,8 @@ function cmxVillage(t){
 function cmxGnome(t){ t.night=1; t.moon=1; }   
 function cmxRung(){ return (!S.bf && !S.park && !S.raid && !S.momRaid && S.cfg && (S.levelN|0)>0 && (S.cfg.n|0)===(S.levelN|0))? campBaseRung(S.levelN|0) : 0; }   
 function cmxName(){ return CMX.name[cmxRung()] || null; }   
-function cmxNoRun(){ return !!(!S.bf && S.cfg && S.cfg.terrain && S.cfg.terrain.cmx); }   
+function cmxNoRun(){ return !!(!S.bf && S.cfg && S.cfg.terrain && (S.cfg.terrain.cmx || CMX.noRun[cmxRung()])); }   
 function cmxFoeAim(f,dt){ const G=S.cfg.terrain.streets; if(!G || !HVIL.guide || S.bf) return null; CMX.stats.foe++; return hvilPlan(f,G,T.x,T.y,dt); }   
-function cmxMineDraw(mn){   
-  const x=mn.x, y=mn.y;
-  cx.fillStyle='rgba(0,0,0,0.32)'; cx.beginPath(); cx.ellipse(x+2,y+6,16,5.5,0,0,7); cx.fill();
-  cx.fillStyle='#3F4235'; cx.beginPath(); cx.ellipse(x,y,15,10,0,0,7); cx.fill();
-  cx.strokeStyle='#E4E8D2'; cx.lineWidth=2.4; cx.beginPath(); cx.ellipse(x,y,15,10,0,0,7); cx.stroke();
-  cx.fillStyle='#727860'; cx.beginPath(); cx.ellipse(x,y-2,8,5,0,0,7); cx.fill();
-  cx.strokeStyle='#23251D'; cx.lineWidth=1.4; cx.beginPath(); cx.ellipse(x,y-2,8,5,0,0,7); cx.stroke();
-  const p9=reducedMotion()? 0.5 : 0.5+0.5*Math.sin(S.t*5+x*0.07);   
-  cx.fillStyle='rgba(226,54,79,'+(0.18+0.3*p9).toFixed(3)+')'; cx.beginPath(); cx.arc(x,y-3,6,0,7); cx.fill();
-  cx.fillStyle='#FF4A5E'; cx.beginPath(); cx.arc(x,y-3,3,0,7); cx.fill();
-}
 CAMP_GRAND[5]=2; CAMP_STAGES[5]='grass';
 CAMP_EDITS.levels[5]={ terrain:{ river:null, rocks:[] } };
 CAMP_DRESS[5]={ make:cmxVillage };
@@ -94705,9 +94693,9 @@ CAMP_EDITS.levels[8]={ terrain:{ river:CMX.cross, rocks:CMX.crossRocks.map(q=>({
 CAMP_DRESS[8]={ duck:1 };
 CAMP_EDITS.levels[9]={ terrain:{ river:{ x:CMX.l9.x, w:CMX.l9.w, bridgeY:CMX.l9Y, bw:CMX.l9.bw } } };
 CAMP_STAGES[10]='grass';
-CAMP_DRESS[10]={ jax:CMX.mines.map(q=>({ x:q[0], y:q[1], lm:1 })), make:cmxGnome };
+CAMP_DRESS[10]={ jax:CMX.mines.map(q=>({ x:q[0], y:q[1] })), make:cmxGnome };   
 function cmxRig(o){ o=o||{}; const t=S.cfg&&S.cfg.terrain;
-  return { rung:cmxRung(), name:cmxName(), l9Y:CMX.l9Y, foe:CMX.stats.foe, hv:Object.assign({}, HVIL.stats), cmx:!!(t&&t.cmx), streets:!!(t&&t.streets), mines:S.mines.filter(m=>m.lm).map(m=>[m.x,m.y]), ground:t&&t.ground, night:t&&t.night, moon:t&&t.moon,
+  return { rung:cmxRung(), name:cmxName(), l9Y:CMX.l9Y, foe:CMX.stats.foe, hv:Object.assign({}, HVIL.stats), cmx:!!(t&&t.cmx), streets:!!(t&&t.streets), jax:S.mines.filter(m=>m.jx).map(m=>[m.x,m.y]), noRun:cmxNoRun(), ground:t&&t.ground, night:t&&t.night, moon:t&&t.moon,
     W:W, WH:WORLD_H, WW:WORLD_W, river:t&&t.river, duck:!!(t&&t.riverDuck), rocks:t? t.rocks.length : 0 }; }
 
 
@@ -119229,7 +119217,6 @@ function drawCactus(rk){
 
 
 function drawJack(mn){
-  if(mn.lm){ cmxMineDraw(mn); return; }   
   const x=mn.x, y=mn.y;
   cx.fillStyle='rgba(0,0,0,0.22)'; cx.beginPath(); cx.ellipse(x+2,y+5,13,4.5,0,0,7); cx.fill();
   cx.lineCap='round';
