@@ -80333,7 +80333,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='20.30';        
+let GVT_CV='20.31';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -94130,6 +94130,7 @@ function obxFlag(bf, r9, done){ if(!bf.opener || r9==='ko' || r9==='koLoss' || S
 const SGA={ on:1, live:0.2, windT:0.16, snapT:0.05, hitT:0.11, backT:0.26, windX:-3.5, windA:-0.11, lungeX:9, lungeA:0.17, recT:0.2, recX:2.4, recA:0.075, sabUp:0.1, sabLean:0.11, sabX:4, uaT:0.22 };   
 function sgaKind(u,d){   
   const t=u.type; if(t==='jane' || t==='aagun' || t==='dogfighter') return null;
+  if(hbsOwn(u)) return null;   
   if(t==='sarge'){ const sw=unitSargeStats(u), w=sw.w; if(w==='lightsaber') return unarmedU(u,sw)? 'ua' : 'sab'; if(w==='commander') return 'cmd'; }
   if((d||0)>LEAK_R+10) return t==='grenadier'? 'thr' : 'gun';   
   return 'jab'; }
@@ -94216,7 +94217,8 @@ function campSmash(u,dist){
   if(u.type==='jane' && !(u.jInT!=null && S.t-u.jInT<JZ_ZIP+JZ_LAND)){ u.jkAt=S.t; u.jkH=u.jkH?0:1; }   
   if(u.type==='mgunner') u.mgRootT=MG_ROOT;   
   const tx=b.x-10+(Math.random()-0.5)*30, ty=b.y-42+(Math.random()-0.5)*26;
-  if(arm==='lightsaber'){
+  if(hbsSmash(u,dist,b)){   
+  } else if(arm==='lightsaber'){
     S.fx.push({k:'ring',x:tx,y:ty,r:5,R:42,t:0,dur:0.24,col:saberHexU(u)});
     bfSfx(SFX.laser, u.x, u.y);
   } else if((dist||0)>LEAK_R+10){
@@ -94399,6 +94401,8 @@ function campFrontX(){
 function campSiegeRng(u){
   const melee=LEAK_R+8;
   if(u.type==='radioman'||u.type==='minesweeper') return melee;
+  if(hbsRider(u)) return melee+HBS_HORSE;   
+  if((u.type==='kingbear' && kbHeroU(u)) || u.type==='cksnake') return melee;   
   if(u.type==='sarge'){
     const sw=unitSargeStats(u);
     if(sw.w==='lightsaber' || sw.w==='commander') return melee;   
@@ -100015,11 +100019,12 @@ function kbHeroFace(u,dx){
   u.faceAt=S.t; u.faceTo=S.t+AIM_HOLD;
 }
 function kbHeroTick(u,dt){   
-  if(u.falling || u.shv || u.jetT>0 || u.duckT>0 || u.dropT>0 || u.cloakT>0 || (S.drag && S.drag.unit===u)){ u.kbWind=null; u.kbDash=null; u.kbWalkTo=null; return false; }   
+  if(u.falling || u.shv || u.jetT>0 || u.duckT>0 || u.dropT>0 || u.cloakT>0 || (S.drag && S.drag.unit===u)){ u.kbWind=null; u.kbDash=null; u.hbsL=null; u.kbWalkTo=null; return false; }   
   if(u.kbDashCd==null) u.kbDashCd=(u.type==='kbguard' && KB_ROY_STAG>0)? kbRnd(u)*KB_ROY_STAG : 1.0;   
-  if(u.kbMount){ kbSteedTick(u,dt); u.marching=false; return true; }   
+  if(u.kbMount){ if(hbsRide(u,hbsSteedP(u))) return false; kbSteedTick(u,dt); u.marching=false; return true; }   
   if(u.kbWind){ kbWindTick(u,dt); if(u.kbWind) kbHeroFace(u,u.kbWind.u.x-u.x); u.marching=false; return true; }   
   if(u.kbDash){ const L=u.kbDash; if(L.left>0) kbDashStep(u,dt); kbDashTick(u,dt); kbHeroFace(u,L.hx); u.marching=false; return true; }   
+  hbsCutTick(u,dt);   
   u.kbDashCd-=dt;
   if(u.kbDashCd<=0){ const f=kbDashPick(u); if(f){ u.kbWalk=0; kbHeroFace(u,f.x-u.x); kbWindGo(u,f); u.marching=false; return true; } else u.kbDashCd=0.3; }   
   if(!kbHuntFoot(u,dt)){ u.kbWalkTo=null; return false; }   
@@ -100085,8 +100090,9 @@ function kbAllyTrample(u,P){
 }
 function kbAllyBrain(u,dt){   
   if(u.dead || u.shv || u.falling || (S.drag && S.drag.unit===u)) return false;
-  if(u.def.bur) return ckSnakeTick(u,dt);
+  if(u.def.bur){ if(hbsSnake(u)) return false; return ckSnakeTick(u,dt); }   
   const P=kbCavP(); if(!u.kbRide) kbAllyRideStart(u,P);
+  if(hbsRide(u,P)) return false;   
   kbAllyRideStep(u,dt,P); u.marching=false; return true;
 }
 function kbCourtSpawn(k,u,dx,dy,col){ const c=ckSpawn(k,u,dx,dy); if(!c) return null; c.kbOf=u.id; c.kbGait0=c.gait; ckArrive(c,col); tdLog(u,'court',k); return c; }   
@@ -100100,6 +100106,46 @@ function kbCourtIn(u){
 }
 function kbCourtPace(u){ for(const c of S.units){ if(c.type!=='kbguard' || c.dead || c.kbOf!==u.id) continue; const near=Math.hypot(c.x-u.x,c.y-u.y)<=KB_COURT_HOLD; c.gait=(c.kbGait0||1)*(near? (CAMP_SPD.kingbear||44)/(CAMP_SPD.kbguard||64) : 1); } }   
 function kbEmpBorn(u){ if(!u || u.dead || u.type!=='kingbear' || u.kbBorn) return 0; u.kbBorn=1; kbCourtIn(u); if(kbSteedOn(u)) kbSteedStart(u); return 1; }   
+
+const HBS_ON=1,            
+      HBS_HORSE=40,        
+      HBS_SLACK=32,        
+      HBS_CAV_DY=52,       
+      HBS_REAR_T=0.5;      
+function hbsRider(u){ return !!(u && !u.dead && !S.bf && ((u.type==='kingbear' && u.kbMount) || u.type==='kbcavalry')); }   
+function hbsOwn(u){ return !!(u && !S.bf && (hbsRider(u) || (u.type==='kingbear' && kbHeroU(u)))); }   
+function hbsBox(){ const b=S.tanBase; return (HBS_ON && !S.bf && b && !b.dead && !(S.sq && S.wave===0))? b : null; }   
+function hbsSteedP(u){ return Object.assign({},KB_STEED_P,{ eye:kbDashROf(u), iron:kbIronOn(u) }); }   
+function hbsRide(u,P){   
+  const b=hbsBox(); if(!b) return false; const R=u.kbRide; if(!R) return false;
+  if(R.way && R.way.u) return false;   
+  if(kbAllyNear(u,(P && P.eye>0)? P.eye : 0)) return false;   
+  const ring=campSiegeRng(u), d=Math.hypot(b.x-u.x,b.y-u.y);
+  if(d<=ring+HBS_SLACK){ if(R.way || R.mv) tdLog(u,'box-stand',Math.round(d)); R.way=null; R.mv=0; R.rest=0; R.pr=0; kbAllyFace(u,b.x-u.x); return true; }   
+  if(!R.way && !(R.rest>0) && !(R.pr>0)){ const sg=(b.x>=u.x)? 1 : -1, p=kbAllyBand(b.x-sg*(ring-KB_ARRIVE+4), b.y+((u.type==='kbcavalry')? HBS_CAV_DY : 0)); R.way={ x:p.x, y:p.y, charge:0, u:null, box:1 }; R.leg++; R.legT=0; tdLog(u,'box',[Math.round(p.x),Math.round(p.y)]); }   
+  return false;
+}
+function hbsSnake(u){   
+  if(!hbsBox() || u.burrow || (u.snakeState && u.snakeState!=='surf')) return false;
+  return !kbAllyNear(u,0);
+}
+function hbsCutTick(u,dt){   
+  const L=u.hbsL; if(!L) return;
+  L.t+=dt;
+  if(L.n<KB_CUT_N && L.t>=CMD_DUEL_C*L.n){ kbCut(u,L); L.n++; }
+  if(L.n>=KB_CUT_N && L.t>=CMD_DUEL_C*KB_CUT_N+0.25) u.hbsL=null;
+}
+function hbsRear(u){ return !!(u && u.hbsRearAt!=null && S.t-u.hbsRearAt<HBS_REAR_T); }   
+function hbsSmash(u,dist,b){   
+  if(!hbsOwn(u)) return false;
+  const fs=(b.x>=u.x)? 1 : -1;
+  if(hbsRider(u)){ u.hbsRearAt=S.t; const hx=b.x-fs*34, hy=b.y-6;   
+    S.fx.push({k:'ring',x:hx,y:hy-8,r:6,R:52,t:0,dur:0.3,col:KB_HERO_HUE}); S.fx.push({k:'puff',x:hx,y:hy,t:0,dur:0.4,R:18,col:'#ffffff'}); bfSfx(SFX.thock,u.x,u.y); if(!reducedMotion()) S.shake=Math.max(S.shake,0.15);
+    return true; }
+  const L=u.hbsL={ hx:fs, hy:0, left:0, n:0, t:0, fs:fs };   
+  kbCut(u,L); L.n=1; bfSfx(SFX.swish,u.x,u.y);
+  return true;
+}
 function kbEmpTick(u,dt){   
   if(!u || u.dead || u.type!=='kingbear') return;
   kbEmpBorn(u);
@@ -100118,8 +100164,8 @@ function kbUnhorseHero(u){
   S.fx.push({k:'tdie',kind:'rocker',x:u.x,y:u.y,w:KB_UNIT_W,t:0,dur:2.0,flip:unitDrawFl(u)}); S.fx.push({k:'ring',x:u.x,y:u.y-20,r:8,R:60,t:0,dur:0.45,col:'#ffffff'});
   bfSfx(SFX.snap,u.x,u.y); if(!reducedMotion()) S.shake=Math.max(S.shake,0.35); if(heroMine(u)) commSayAs(bearSpeaker(),'EN GARDE!',{rank:3,hz:KB_HZ,hold:3.5}); SFX.horn(); tdLog(u,'unhorse');
 }
-function drawKbSteed(u,w,kyl){ const R=u.kbRide||{}, ch=!!(R.way && R.way.charge && R.mv), flip=unitDrawFl(u); tdMount(u,u.x,u.y-kyl,w*1.35,R.pr>0,(R.mv||ch||R.pr>0)? 'kbsteedup' : 'kbsteed',ch? 0.1*(flip? -1 : 1) : 0,flip,undefined,w); }   
-function drawKbCav(u,w,kyl){ const R=u.kbRide||{}, ch=!!(R.way && R.way.charge && R.mv), flip=unitDrawFl(u); tdMount(u,u.x,u.y-kyl,w*1.35,R.pr>0,(R.mv||ch||R.pr>0)? 'kbcavalryup' : 'kbcavalry',ch? 0.1*(flip? -1 : 1) : 0,flip); }
+function drawKbSteed(u,w,kyl){ const R=u.kbRide||{}, ch=!!(R.way && R.way.charge && R.mv), flip=unitDrawFl(u); tdMount(u,u.x,u.y-kyl,w*1.35,R.pr>0||hbsRear(u),(R.mv||ch||R.pr>0||hbsRear(u))? 'kbsteedup' : 'kbsteed',ch? 0.1*(flip? -1 : 1) : 0,flip,undefined,w); }   
+function drawKbCav(u,w,kyl){ const R=u.kbRide||{}, ch=!!(R.way && R.way.charge && R.mv), flip=unitDrawFl(u); tdMount(u,u.x,u.y-kyl,w*1.35,R.pr>0||hbsRear(u),(R.mv||ch||R.pr>0||hbsRear(u))? 'kbcavalryup' : 'kbcavalry',ch? 0.1*(flip? -1 : 1) : 0,flip); }
 function drawCkSnake(u,w,im,kyl){   
   if(u.burrow){ const bw8=5.44; cx.fillStyle='rgba(0,0,0,0.18)'; cx.beginPath(); cx.ellipse(u.x,u.y+4,22*bw8,8*bw8,0,0,7); cx.fill(); cx.fillStyle='#9a5a4a'; cx.beginPath(); cx.ellipse(u.x,u.y-2,19*bw8,10*bw8,0,0,7); cx.fill(); cx.strokeStyle='rgba(255,255,255,0.25)'; cx.lineWidth=2; cx.beginPath(); cx.arc(u.x-6,u.y-4,5,3.4,5.6); cx.stroke(); return; }
   drawSprite('wsnake',u.x,u.y-kyl,w,0,unitWob(u),im,unitDrawFl(u));
@@ -100607,7 +100653,7 @@ function kbDrawSabre(x,y,rot,len){
   cx.fillStyle='#E8C24A'; cx.fillRect(-4,-5,8,5); cx.strokeStyle='#C0473A'; cx.lineWidth=2; cx.beginPath(); cx.moveTo(-1,0); cx.quadraticCurveTo(-8,6,-6,12); cx.stroke(); cx.restore(); cx.lineCap='butt';
 }
 function drawKbHero(u,w,im,kyl){   
-  const L=u.kbDash, fly=!!(L && L.left>0), cut=!!(L && !fly), wd9=u.kbWind||null, wq9=wd9? Math.max(0,Math.min(1,wd9.t/KB_DASH_WIND)) : 0, RM=reducedMotion(), flip=unitDrawFl(u), sg=flip? -1 : 1;
+  const L=u.kbDash||u.hbsL, fly=!!(L && L.left>0), cut=!!(L && !fly), wd9=u.kbWind||null, wq9=wd9? Math.max(0,Math.min(1,wd9.t/KB_DASH_WIND)) : 0, RM=reducedMotion(), flip=unitDrawFl(u), sg=flip? -1 : 1;   
   if(wd9){ const wr=14+(KB_WIND_R-14)*wq9; cx.save(); cx.strokeStyle='rgba(234,244,255,'+(0.4+0.5*wq9).toFixed(2)+')'; cx.lineWidth=2.4+2.2*wq9; cx.beginPath(); cx.ellipse(u.x,u.y+4,wr,wr*0.36,0,0,7); cx.stroke(); cx.strokeStyle='rgba(201,210,216,0.55)'; cx.lineWidth=1.2; cx.beginPath(); cx.ellipse(u.x,u.y+4,wr*0.62,wr*0.36*0.62,0,0,7); cx.stroke(); cx.restore();
   }   
   kbSwingSprite(u,u.x,u.y-kyl,w,0,eas2Wob(u,unitWob(u),flip),im,flip);   
@@ -100642,7 +100688,7 @@ function kbArmMix(A,B,p){ return [A[0]+(B[0]-A[0])*p, A[1]+(B[1]-A[1])*p, A[2]+(
 function kbArmWhip(A,B,q){ const cl=v=>Math.max(0,Math.min(1,v)); return [A[0]+(B[0]-A[0])*kbArmCut(cl(q/0.8)), A[1]+(B[1]-A[1])*kbArmCut(q), A[2]+(B[2]-A[2])*kbArmCut(cl((q-0.08)/0.92))]; }   
 function kbArmCut(q){ return 1-Math.pow(1-q,2.4); }   
 function kbSwingA(u){   
-  const wd=u.kbWind, L=u.kbDash, cl=v=>Math.max(0,Math.min(1,v)), eo=p=>1-(1-p)*(1-p), sm=p=>p*p*(3-2*p);
+  const wd=u.kbWind, L=u.kbDash||u.hbsL, cl=v=>Math.max(0,Math.min(1,v)), eo=p=>1-(1-p)*(1-p), sm=p=>p*p*(3-2*p);   
   if(wd) return kbArmMix(KB_ARM_REST,KB_ARM_COCK,eo(cl(wd.t/KB_DASH_WIND)));   
   if(!L) return null;
   if(L.left>0 || !(L.n>0)) return KB_ARM_COCK;   
@@ -100703,7 +100749,7 @@ const EAS2_FLY=0.28, EAS2_CUT=0.12, EAS2_EASE=0.06, EAS2_COIL=0.03;
 const EAS2_CUTS=KB_ARM_CUTS.map(c=>Object.assign({},c,{f:c.f+EAS2_CUT,to:c.to+EAS2_CUT}));   
 const EAS2_LAST=new WeakMap(), EAS2_IN=new WeakMap();   
 function eas2Lean(u){   
-  const wd=u.kbWind, L=u.kbDash; if(u.type!=='kingbear' || !(wd||L) || reducedMotion()) return null;
+  const wd=u.kbWind, L=u.kbDash||u.hbsL; if(u.type!=='kingbear' || !(wd||L) || reducedMotion()) return null;   
   const cl=v=>Math.max(0,Math.min(1,v)), eo=p=>1-(1-p)*(1-p), sm=p=>p*p*(3-2*p), mx=(a,b,p)=>a+(b-a)*p;
   let a;
   if(wd) a=-KB_WIND_LEAN*wd.fs*cl(wd.t/KB_DASH_WIND);   
@@ -100725,7 +100771,7 @@ function eas2Cuts(){ return reducedMotion()? KB_ARM_CUTS : EAS2_CUTS; }
 
 
 
-function eas3Home(u){ const L=u.kbDash; if(!L || L.left>0 || !(L.n>=KB_CUT_N)) return 0; const C=CMD_DUEL_C, T0=KB_SW_SWEEP, T1=C+0.25, p=Math.max(0,Math.min(1,(L.t-C*(KB_CUT_N-1)-T0)/(T1-T0))); return p*p*(3-2*p); }   
+function eas3Home(u){ const L=u.kbDash||u.hbsL; if(!L || L.left>0 || !(L.n>=KB_CUT_N)) return 0;     const C=CMD_DUEL_C, T0=KB_SW_SWEEP, T1=C+0.25, p=Math.max(0,Math.min(1,(L.t-C*(KB_CUT_N-1)-T0)/(T1-T0))); return p*p*(3-2*p); }   
 function drawKbGuard(u,w,im,kyl){   
   const L=u.kbDash, fly=!!(L && L.left>0), cut=!!(L && !fly), wd9=u.kbWind||null, wq9=wd9? Math.max(0,Math.min(1,wd9.t/KB_DASH_WIND)) : 0, act=!!(L||wd9), RM=reducedMotion(), flip=unitDrawFl(u), sg=flip? -1 : 1;
   if(wd9){ const wr=10+(KB_ROY_WIND_R-10)*wq9; cx.save(); cx.strokeStyle='rgba(234,244,255,'+(0.4+0.5*wq9).toFixed(2)+')'; cx.lineWidth=2+1.6*wq9; cx.beginPath(); cx.ellipse(u.x,u.y+4,wr,wr*0.36,0,0,7); cx.stroke(); cx.restore(); }
