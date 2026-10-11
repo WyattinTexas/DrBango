@@ -9005,6 +9005,9 @@
   .tc-tab.hw { color:#FFA83C; background:#17120E; border-color:#B85E14; }
   .tc-tab.on { color:#EDEADF; background:none; border-color:transparent; border-bottom:3px solid #FFD24A; border-radius:0; box-shadow:none; padding:6px 4px 5px; cursor:default; }
   .tc-tab.hw.on { color:#FFB457; }
+  .tc-tab.xm { color:#FF8F80; background:#0F1B12; border-color:#B8322C; }   /**/
+  .tc-tab.xm.on { color:#FF9E91; background:none; border-color:transparent; border-bottom-color:#FFD24A; }   /**/
+  .tc-tabs { flex-wrap:wrap; row-gap:8px; }   /**/
   .tc-tab:not(.on):active { transform:translateY(2px); box-shadow:none; }
   .tc-tabjk { width:1.6em; height:1.3em; flex:0 0 auto; overflow:visible; }
   .mb-win svg.wpap-sw { border-radius:8px; outline:3px solid #F4EBD3; }   /**/
@@ -81445,7 +81448,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='20.61';        
+let GVT_CV='20.62';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -138085,11 +138088,11 @@ function chestSells(id){ return !decOwns(id) && (!decEarned(id) || decSold(id)) 
 function chestSaleN(){ return CHEST_GALLERY().filter(chestShows).filter(chestSells).length; }
 function chestHeadHTML(){ const rm=roomCur(), n=chestOutN(rm);   
   return chtTabsHTML()+'<h3>THE TREASURE CHEST</h3><span class="tc-count" id="tcCount">'+n+' / '+CHEST_CAP+' OUT</span>'    
-    +'<div class="tc-line">'+(chtHw()? chtLineHTML() : '<span id="tcSale">'+chestSaleN()+' FOR SALE</span>')+'<b id="tcStars">'+META.starBank+'★</b></div>'; }    
+    +'<div class="tc-line">'+((chtHw() || chtXm())? chtLineHTML() : '<span id="tcSale">'+chestSaleN()+' FOR SALE</span>')+'<b id="tcStars">'+META.starBank+'★</b></div>'; }    
 function chestHeadSync(){ const h=document.getElementById('tcHead'); if(h) h.innerHTML=chestHeadHTML(); }   
 function chestHTML(){
   return '<div class="tc-head" id="tcHead">'+chestHeadHTML()+'</div>'
-    +'<div class="tc-grid">'+(chtHw()? chtGridHTML() : vtcCardsHTML()+CHEST_GALLERY().filter(chestShows).map(id=>shopDecHTML(id,'c')).join(''))+'</div>'       
+    +'<div class="tc-grid">'+((chtHw() || chtXm())? chtGridHTML() : vtcCardsHTML()+CHEST_GALLERY().filter(chestShows).map(id=>shopDecHTML(id,'c')).join(''))+'</div>'       
     +'<div class="tc-foot"><button type="button" class="mbtn alt" onclick="UI.chestClear()">PUT EVERYTHING AWAY</button>'
     +'<button type="button" class="mbtn" id="tcWpap" onclick="UI.wpapOpen()">WALLPAPERS</button></div>';   
 }
@@ -138124,16 +138127,34 @@ let CHT_VIEW='all';
 const CHT_HW_MORE=['gmyfig','gmypumpkin','witch','zombie'];
 function chtSet(){ return DECOR_HALLOW.concat(CHT_HW_MORE); }   
 function chtHw(){ return CHT_VIEW==='hw' && halloweenOn(); }   
-function chtSil(id){ return chtHw() && chtSet().indexOf(id)>=0 && DECOR_ORDER.indexOf(id)<0 && !decOwns(id); }       
+function chtSil(id){ return ((chtHw() && chtSet().indexOf(id)>=0) || (chtXm() && chxSet().indexOf(id)>=0)) && DECOR_ORDER.indexOf(id)<0 && !decOwns(id); }       
 function chtN(){ return chtSet().filter(decOwns).length; }   
-function chtLand(){ const c=chestNew().filter(chestShows)[0]; CHT_VIEW=(halloweenOn() && c && chtSet().indexOf(c)>=0)? 'hw' : 'all'; }       
-function chtTabsHTML(){ if(!halloweenOn()) return '';
+function chtLand(){ const c=chestNew().filter(chestShows)[0]; CHT_VIEW=(halloweenOn() && c && chtSet().indexOf(c)>=0)? 'hw' : (chxOn() && c && chxSet().indexOf(c)>=0)? 'xm' : 'all'; }       
+function chtTabsHTML(){ if(!halloweenOn() && !chxOn()) return '';    
   const hw=chtHw();
-  return '<div class="tc-tabs" id="tcTabs"><button type="button" class="tc-tab'+(hw? '' : ' on')+'" id="tcTabAll" onclick="chtTab(\'all\')">ALL</button>'
-    +'<button type="button" class="tc-tab hw'+(hw? ' on' : '')+'" id="tcTabHw" onclick="chtTab(\'hw\')"><svg class="tc-tabjk" viewBox="-10 -13 20 16" aria-hidden="true" data-notr>'+pumpkinLampSVG(1)+'</svg><span>HALLOWEEN</span></button></div>'; }
-function chtLineHTML(){ return '<span id="tcSale">'+chtN()+' / '+chtSet().length+' FOUND</span>'; }       
-function chtGridHTML(){ return chtSet().map(id=>shopDecHTML(id,'c')).join(''); }       
-function chtTab(v){ if(!chestStands() || !halloweenOn()) return; v=(v==='hw')? 'hw' : 'all'; if(v===CHT_VIEW) return; CHT_VIEW=v; SFX.blip(); roomModal(chestHTML(), 'medalhall tccard'); }   
+  return '<div class="tc-tabs" id="tcTabs"><button type="button" class="tc-tab'+((hw || chtXm())? '' : ' on')+'" id="tcTabAll" onclick="chtTab(\'all\')">ALL</button>'
+    +(halloweenOn()? '<button type="button" class="tc-tab hw'+(hw? ' on' : '')+'" id="tcTabHw" onclick="chtTab(\'hw\')"><svg class="tc-tabjk" viewBox="-10 -13 20 16" aria-hidden="true" data-notr>'+pumpkinLampSVG(1)+'</svg><span>HALLOWEEN</span></button>' : '')+chxTabHTML()+'</div>'; }
+function chtLineHTML(){ const L=chtSetIn(); return '<span id="tcSale">'+L.filter(decOwns).length+' / '+L.length+' FOUND</span>'; }           
+function chtGridHTML(){ return chtSetIn().map(id=>shopDecHTML(id,'c')).join(''); }           
+function chtTab(v){ if(!chestStands() || (!halloweenOn() && !chxOn())) return; v=(v==='hw' && halloweenOn())? 'hw' : (v==='xm' && chxOn())? 'xm' : 'all'; if(v===CHT_VIEW) return; CHT_VIEW=v; SFX.blip(); roomModal(chestHTML(), 'medalhall tccard'); }    
+
+
+
+
+
+
+
+const CHT_XM_MORE=[];   
+function chxSet(){ return DECOR_XMAS.concat(CHT_XM_MORE); }   
+function chxOn(){ return xmasLive(); }   
+function chtXm(){ return CHT_VIEW==='xm' && chxOn(); }   
+function chtSetIn(){ return chtXm()? chxSet() : chtSet(); }   
+function chxTreeSVG(){ return '<circle cx="0" cy="-5" r="11" fill="#FFD27A" opacity="0.22"/>'
+    +'<path d="M0 -10.4 L5 -4.4 H2.6 L7.4 0.8 H-7.4 L-2.6 -4.4 H-5 Z" fill="#3E9B4A" stroke="#1F5E2A" stroke-width="1" stroke-linejoin="round"/>'
+    +'<rect x="-1.3" y="0.8" width="2.6" height="2.2" fill="#7A4B22"/>'
+    +'<circle cx="-2.7" cy="-1.3" r="1" fill="#E8402F"/><circle cx="2.6" cy="-1.9" r="0.9" fill="#FFD24A"/><circle cx="0.5" cy="-6.1" r="0.85" fill="#E8402F"/><circle cx="4.3" cy="-0.2" r="0.75" fill="#9ED0FF"/>'
+    +'<path d="M0 -13.6 L0.95 -11.6 L3 -11.4 L1.45 -10.05 L1.9 -8 L0 -9.05 L-1.9 -8 L-1.45 -10.05 L-3 -11.4 L-0.95 -11.6 Z" fill="#FFD24A" stroke="#C9A227" stroke-width="0.4"/>'; }   
+function chxTabHTML(){ return chxOn()? '<button type="button" class="tc-tab xm'+(chtXm()? ' on' : '')+'" id="tcTabXm" onclick="chtTab(\'xm\')"><svg class="tc-tabjk" viewBox="-10 -13 20 16" aria-hidden="true" data-notr>'+chxTreeSVG()+'</svg><span>CHRISTMAS</span></button>' : ''; }   
 function chestDeny(dn9){   
   SFX.clack();
   const el=document.getElementById(dn9); if(el){ el.classList.remove('deny'); void el.offsetWidth; el.classList.add('deny'); setTimeout(()=>{ try{ el.classList.remove('deny'); }catch(e){} }, 500); }
@@ -173154,6 +173175,9 @@ window.GVT = {
   cht(v){ v=v||{}; if(v.view!==undefined) CHT_VIEW=v.view; if(v.tab) chtTab(v.tab); const m=document.getElementById('roomModal'), q=s=>m? m.querySelector(s) : null, R=el=>{ if(!el) return null; const r=el.getBoundingClientRect(); return [Math.round(r.left*10)/10,Math.round(r.top*10)/10,Math.round(r.width*10)/10,Math.round(r.height*10)/10]; };   
     return { cv:GVT_CV, on:halloweenOn(), view:CHT_VIEW, hw:chtHw(), set:chtSet(), own:chtSet().filter(decOwns), n:chtN(), stands:chestStands(), tabs:!!q('#tcTabs'), tabOn:(q('.tc-tab.on')||{}).id||null, tabAll:R(q('#tcTabAll')), tabHw:R(q('#tcTabHw')), tabAllTx:(q('#tcTabAll')||{}).textContent||null, tabHwTx:(q('#tcTabHw')||{}).textContent||null, x:R(q('.rmx')), head:R(q('#tcHead')), h3:R(q('#tcHead h3')), line:(q('#tcSale')||{}).textContent||null, stars:(q('#tcStars')||{}).textContent||null, count:(q('#tcCount')||{}).textContent||null, scroll:(q('.rmback')||{}).scrollTop, grid:(q('.tc-grid')||{}).innerHTML||null,
       cards:[...(m? m.querySelectorAll('.tccard .sh-dec') : [])].map(b=>({ id:b.id.slice(6), own:b.classList.contains('own'), off:b.classList.contains('off'), sil:b.classList.contains('sil'), mys:b.classList.contains('mys'), nw:!!b.querySelector('.sh-new'), fresh:b.classList.contains('fresh'), price:(b.querySelector('.sh-dprice')||{}).textContent||null, name:(b.querySelector('.sh-dn')||{}).textContent||null, stamp:(b.querySelector('.sh-dstamp')||{}).textContent||null })) }; },
+  chx(v){ v=v||{}; if(v.tab) chtTab(v.tab); const m=document.getElementById('roomModal'), q=s=>m? m.querySelector(s) : null, R=el=>{ if(!el) return null; const r=el.getBoundingClientRect(); return [Math.round(r.left*10)/10,Math.round(r.top*10)/10,Math.round(r.width*10)/10,Math.round(r.height*10)/10]; };   
+    return { cv:GVT_CV, today:todayStr(), on:chxOn(), hwOn:halloweenOn(), view:CHT_VIEW, xm:chtXm(), set:chxSet(), own:chxSet().filter(decOwns), stands:chestStands(), tabs:!!q('#tcTabs'), tabIds:[...(m? m.querySelectorAll('.tc-tab') : [])].map(b=>b.id), tabOn:(q('.tc-tab.on')||{}).id||null, tabXm:R(q('#tcTabXm')), tabXmTx:(q('#tcTabXm')||{}).textContent||null, tabsBox:R(q('#tcTabs')), head:R(q('#tcHead')), line:(q('#tcSale')||{}).textContent||null,
+      cards:[...(m? m.querySelectorAll('.tccard .sh-dec') : [])].map(b=>({ id:b.id.slice(6), own:b.classList.contains('own'), sil:b.classList.contains('sil'), mys:b.classList.contains('mys'), nw:!!b.querySelector('.sh-new'), name:(b.querySelector('.sh-dn')||{}).textContent||null })) }; },
   wbn(v){ v=v||{}; if(v.take){ for(const k of (v.take===true? ['bunbun','erniedog'] : [v.take])){ if(!decOwns(k)) META.decor.own.push(k); if(META.decorSeen.indexOf(k)<0) META.decorSeen.push(k); } saveMeta(); }   
     return { cv:GVT_CV, own:{ bunbun:decOwns('bunbun'), erniedog:decOwns('erniedog') }, nw:['bunbun','erniedog'].filter(k=>chestNew().indexOf(k)>=0), home:{ bunbun:decorHome('bunbun'), erniedog:decorHome('erniedog') }, atc:{ bun:!!document.getElementById('wbAtcBun'), ern:!!document.getElementById('wbAtcErnie') }, rows:ROOM_SPOTS.filter(r=>/^wb/.test(r.id) && r.due()).map(r=>r.id), order:['bunbun','erniedog'].map(k=>DECOR_EARN_ORDER.indexOf(k)), allN:DECOR_ALL_N, drag:['bunbun','erniedog'].map(k=>RDRAG_DECOR.indexOf(k)), seat:{ bunbun:Object.assign({},DECOR_SPOTS.bunbun), erniedog:Object.assign({},DECOR_SPOTS.erniedog) } }; },
   fztk(){ return { pair:fztPairLine(), knockBd:evKnockName('bd'), knockEv:evKnockName('ev'), kind:bdKind(), bdBell:BD.bell, evBell:EV.bell, evKing:evKing(), bdDay:evTZDay(BD.bell||0), evDay:evTZDay(EV.bell||0) }; },   
