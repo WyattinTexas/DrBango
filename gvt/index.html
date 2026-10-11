@@ -81352,7 +81352,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='20.49';        
+let GVT_CV='20.50';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -91068,7 +91068,7 @@ function cenBeat(){
 
 
 const OW_ON=true,
-      OW_CPU_EV=false,  
+      OW_CPU_EV=true,   
       OW_CPU=true,     
       OW_CPU_WORDS=2,   
       OW_ROWS=60,       
@@ -91094,7 +91094,7 @@ function owLive(seat){ const st=OW_ON && S.bf && S.bf.seats[seat]; return !!(st 
 
 function owCpuOn(){ return OW_CPU && !(COOP && COOP.bd && !OW_CPU_EV); }   
 function owCpuMine(seat){ const st=owCpuOn() && S.bf && S.bf.seats[seat]; return !!(st && !st.human && !st.empty && COOP && COOP.host && (seat|0)!==bfMySeat()); }
-function owCpuSpeak(){ if(!owCpuOn() || !owSpeak()) return false; const me=bfMySeat(), ss=S.bf.seats; for(let i=0;i<ss.length;i++) if(i!==me && ss[i].human && !ss[i].away && !ss[i].owC) return false; return true; }
+function owCpuSpeak(){ if(!owCpuOn() || !owSpeak() || S.bf.owOld) return false; const me=bfMySeat(), ss=S.bf.seats;     for(let i=0;i<ss.length;i++) if(i!==me && ss[i].human && !ss[i].away && !ss[i].owC) return false; return true; }
 function owNum(u){ if((u.seat|0)===bfMySeat()) return owRid(u); if(u.owId!=null) return u.owId; const bf=S.bf, st=bf.seats[u.seat]; if(!st) return 0; if(!st.owCn) st.owCn=(1+((Math.random()*34)|0))*1296;
   for(let k=0;k<3000;k++){ st.owCn++; if(st.owCn>=46600) st.owCn=1297; if(!owTombed(u.seat,st.owCn) && !(bf.owM && bf.owM.has(owKey(u.seat,st.owCn)))) break; } owStamp(u,u.seat,st.owCn); return u.owId; }
 function owCpuSay(){ const bf=S.bf; if(!bf || !coopIsHost() || !owCpuSpeak()) return; const cs=[], by={}; for(let i=0;i<bf.seats.length;i++) if(owCpuMine(i)){ cs.push(i); by[i]=[]; } if(!cs.length) return;
@@ -91123,7 +91123,7 @@ function owDash(u){ return !!((u.saberState && u.saberState!=='idle') || u.sgDas
 function owOwnBrain(u){ return HEROES.indexOf(u.type)>=0 || /^king/.test(u.type) || u.type==='spy' || !!(u.def && (u.def.vehicle || u.def.ram || u.def.mine)); }   
 function owPuppet(u){ return u.owId!=null && u.owAt!=null && S.t-u.owAt<OW_FRESH && owLive(u.seat) && !owOwnBrain(u); }
 function owHello(){ const bf=S.bf; if(!bf || bf.owHi || !owRoom()) return; bf.owHi=1; coopSend({ k:'ow', n:(owCpuOn()? 2 : 1) }); }    
-function owHearHello(cm){ const bf=S.bf; if(!OW_ON || !bf) return; const s9=parseInt(cm.p,10); if(!(s9>=0 && bf.seats[s9] && s9!==bfMySeat())) return; if(bf.seats[s9].owS && bf.owD) delete bf.owD[s9]; bf.seats[s9].owS=1; bf.seats[s9].owC=((cm.n|0)>=2)? 1 : 0; }       
+function owHearHello(cm){ const bf=S.bf; if(!OW_ON || !bf) return; const s9=parseInt(cm.p,10); if(!(s9>=0 && bf.seats[s9] && s9!==bfMySeat())) return; if(bf.seats[s9].owS && bf.owD) delete bf.owD[s9]; bf.seats[s9].owS=1; bf.seats[s9].owC=((cm.n|0)>=2)? 1 : 0; if((cm.n|0)<2) bf.owOld=1; }       
 function owPlaceId(cm,seat,type){   
   if(!(seat===bfMySeat() || owCpuMine(seat)) || !owRoom()) return;    
   for(let i=S.units.length-1;i>=0;i--){ const u=S.units[i]; if(u.dead || u.seat!==seat || u.type!==type || u.owSaid) continue; u.owSaid=1; cm.id=owNum(u); cm.r=+S.t.toFixed(2); return; } }   
