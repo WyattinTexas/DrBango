@@ -9945,6 +9945,9 @@
   #roomStage .wr-rider.wlhit { animation:wlhit 0.9s ease-out forwards; }
   @keyframes wlhit { from{transform:translate(0px,0px) rotate(0deg) scale(1); opacity:1} to{transform:translate(-40px,-60px) rotate(-540deg) scale(.6); opacity:0} }
   #roomStage .wlburst-in { animation:wlburst 0.5s ease-out forwards; }
+  #roomStage #wrd-want .wrd-wants { animation:wrdwant 0.5s ease-in-out infinite alternate; }   /**/
+  @keyframes wrdwant { from{opacity:.5} to{opacity:1} }
+  @media (prefers-reduced-motion:reduce){ #roomStage #wrd-want .wrd-wants { animation:none; } }
   #roomStage .wr-dust.wlgone { opacity:0; }
   @keyframes wlburst { from{transform:scale(1); opacity:.7} to{transform:scale(1.8); opacity:0} }
   #roomStage .wr-walkE { animation:wrwalkE 34s linear infinite; }
@@ -50690,7 +50693,7 @@ const META_DEFAULT = {
   
   
   
-  wstar:0, dmeteor:0, moonStar:0, fmeteor:0, skyEgg:0, elderSab:0, pigStar:0, rabbitStar:0, wfSled:0, roofFed:0, floopTap:0, wxTap:0, cvnGot:0, hunHug:'',   
+  wstar:0, dmeteor:0, moonStar:0, fmeteor:0, skyEgg:0, elderSab:0, pigStar:0, rabbitStar:0, wfSled:0, wrdTrain:0, wrdHorse:0, roofFed:0, floopTap:0, wxTap:0, cvnGot:0, hunHug:'',   
   
   
   
@@ -81737,7 +81740,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='20.76';        
+let GVT_CV='20.77';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -127503,7 +127506,7 @@ function wrPosseWatch(ph){
     if(t>=WR_POSSE_GALLOP[0]){ const sr=st2.getBoundingClientRect(), k=960/(sr.width||960);
       const cars=[...svg.querySelectorAll('#wl-train .wl-car')].map(c=>{ const b=c.getBoundingClientRect(); const x=(b.left+b.width/2-sr.left)*k, y=(b.top+b.height/2-sr.top)*k; let op=1; try{ op=+getComputedStyle(c).opacity; }catch(e){} return [x, y, x>0 && x<960 && y>0 && y<600 && op>0.5 && !wrInShell(x,y)]; }).filter(c=>c[2]);   
       if(cars.length) for(const r of pg2.querySelectorAll('.wr-rider:not(.wlhit)')){ const b=r.getBoundingClientRect(); const x=(b.left+b.width/2-sr.left)*k, y=(b.bottom-sr.top)*k-24; if(x<0 || x>960) continue;   
-        if(cars.some(c=>Math.hypot(c[0]-x,c[1]-y)<WR_HIT_R)){ W.hits++; wrRiderHit(svg, r, x, y); } } }
+        if(cars.some(c=>Math.hypot(c[0]-x,c[1]-y)<WR_HIT_R)){ if(wrdJump(r)) continue; W.hits++; wrRiderHit(svg, r, x, y); }     } }
     requestAnimationFrame(tick); };
   requestAnimationFrame(tick);
 }
@@ -127515,6 +127518,133 @@ function wrRiderHit(svg, r, x, y){
   b.innerHTML='<g class="wlburst-in">'+dustPuff(-18,0,1.5,.7)+dustPuff(14,-8,1.3,.6)+dustPuff(0,-22,1.1,.5)+'</g>'; pg.appendChild(b);
   setTimeout(()=>{ try{ b.remove(); }catch(e){} }, 600);
 }
+
+
+
+
+
+
+
+
+
+
+
+const WRD={ pad:24, rpad:20, track:22, lane:[446,498], lapMs:26000, hopMs:450, offMs:550, stars:100, dx:[0,54,112,168], px0:1010, py:472, glowX:200, jumpMs:600 };
+let WRD_RIDE=null, WRD_WAIT=null, WRD_RAF=0, WRD_TRK=null, WRD_LW=0;
+const WRD_NS='http://www.w3.org/2000/svg';
+function wrdOn(){ return S.mode==='menu' && roomCur()==='western' && !reducedMotion(); }
+function wrdSvg(){ return document.querySelector('#roomStage > svg'); }
+function wrdPg(){ const s9=wrdSvg(); return s9 && s9.querySelector('#wr-posse'); }   
+function wrdXY(el){ const st=document.getElementById('roomStage'); if(!st || !el) return null; const sr=st.getBoundingClientRect(), b=el.getBoundingClientRect(); if(!sr.width || !b.width) return null; const k=960/sr.width; return [(b.left+b.width/2-sr.left)*k, (b.top+b.height/2-sr.top)*k, b.width*k, b.height*k]; }   
+function wrdCarOk(c, p){ let op=1; try{ op=+getComputedStyle(c).opacity; }catch(e){} return !!p && op>0.5 && p[0]>0 && p[0]<960 && p[1]>0 && p[1]<600 && !wrInShell(p[0], p[1]); }   
+function wrdCars(){ const s9=wrdSvg(); if(!s9) return []; return [...s9.querySelectorAll('#wl-train > .wl-car')].map(c=>{ const p=wrdXY(c); return wrdCarOk(c, p)? p : null; }).filter(Boolean); }
+function wrdCoal(){ const s9=wrdSvg(), c=s9 && s9.querySelectorAll('#wl-train > .wl-car')[1]; if(!c) return null; const p=wrdXY(c); if(!p) return null; p.push(wrdCarOk(c, p)); return p; }   
+function wrdTx(){ const pg=wrdPg(), g=pg && pg.querySelector('.wr-posse'); if(!g) return null; try{ const t=getComputedStyle(g).transform; if(!t || t==='none') return 0; return new DOMMatrixReadOnly(t).e; }catch(e){ return null; } }   
+function wrdRiders(){ const pg=wrdPg(), tx=wrdTx(); if(!pg || tx===null) return []; return [...pg.querySelectorAll('.wr-rider')].map((r, i)=>({ r:r, i:i, x:WRD.px0+WRD.dx[i]+tx, y:WRD.py })); }   
+function wrdFree(q){ return !q.r.classList.contains('wlhit') && !q.r.classList.contains('wrd-mine') && q.x>20 && q.x<940; }
+function wrdTrackD(x, y){ if(!WRD_TRK) WRD_TRK=wlSample(WL_TRACK, 6); let m=1e9; for(const p of WRD_TRK){ const d=Math.hypot(p[0]-x, p[1]-y); if(d<m) m=d; } return m; }
+function wrdFeet(k){ const tb=VTROOPS.find(r9=>r9.k===k); if(!tb) return null; const d=rpXY(k); return [tb.x+tb.w/2+d[0], tb.y+tb.h+d[1]]; }   
+function wrdAway(k){ return !!(WRD_RIDE && WRD_RIDE.k===k && WRD_RIDE.ph!=='after'); }   
+
+function wrdDropAt(d){
+  if(!d || d.dx===undefined || !d.base || !/^vt[1-4]$/.test(d.k) || WRD_RIDE || !wrdOn()) return null;
+  const b=d.base, cx=b.x+b.w/2+d.dx, P=[[cx, b.y+b.h+d.dy], [cx, b.y+b.h/2+d.dy]]; if(d.mx!==undefined) P.push([d.mx, d.my]);
+  for(const c of wrdCars()){ const hx=c[2]/2+WRD.pad, hy=c[3]/2+WRD.pad; if(P.some(p=>Math.abs(p[0]-c[0])<=hx && Math.abs(p[1]-c[1])<=hy)) return { kind:'train', how:'now', at:c, from:P[0] }; }
+  for(const q of wrdRiders()){ if(!wrdFree(q)) continue; if(P.some(p=>p[0]>=q.x-24-WRD.rpad && p[0]<=q.x+24+WRD.rpad && p[1]>=q.y-58-WRD.rpad && p[1]<=q.y+4+WRD.rpad)) return { kind:'horse', how:'now', r:q.r, i:q.i, x:q.x }; }
+  for(const f of P) if(f[0]>70 && f[0]<940 && !wrInShell(f[0], f[1]) && wrdTrackD(f[0], f[1])<=WRD.track) return { kind:'train', how:'wait', at:P[0] };   
+  for(const f of P) if(f[0]>30 && f[0]<930 && f[1]>=WRD.lane[0] && f[1]<=WRD.lane[1]) return { kind:'horse', how:'wait', at:P[0] };   
+  return null;
+}
+
+function wrdDrop(d){ if(WRD_WAIT && WRD_WAIT.k===d.k) WRD_WAIT=null; const v=wrdDropAt(d); if(!v) return false;
+  if(v.how==='wait'){ WRD_WAIT={ kind:v.kind, k:d.k }; wrdGo(); return false; }
+  return v.kind==='train'? wrdTrainMount(d.k, v.from) : wrdHorseMount(d.k, v); }
+
+function wrdWantSet(v){ const pg=wrdPg(); let e=pg && pg.querySelector('#wrd-want'); if(!v){ if(e) e.remove(); return; } if(!pg) return;
+  let x, y, rx, ry; if(v.kind==='train' && v.how==='now'){ x=v.at[0]; y=v.at[1]+4; rx=v.at[2]/2+10; ry=Math.max(10, v.at[3]/3); } else if(v.how==='now'){ x=v.x; y=WRD.py-2; rx=34; ry=10; } else { x=v.at[0]; y=v.at[1]; rx=26; ry=8; }
+  if(!e){ e=document.createElementNS(WRD_NS, 'g'); e.id='wrd-want'; e.setAttribute('pointer-events', 'none'); e.innerHTML='<ellipse class="wrd-wantf" fill="#FFE9A8" opacity="0.28"/><ellipse class="wrd-wants" fill="none" stroke="#FFD24A" stroke-width="2.5" stroke-dasharray="6 5"/>'; pg.appendChild(e); }
+  for(const q of e.children){ q.setAttribute('cx', x.toFixed(1)); q.setAttribute('cy', y.toFixed(1)); q.setAttribute('rx', rx.toFixed(1)); q.setAttribute('ry', ry.toFixed(1)); }
+  e.setAttribute('data-k', v.kind+':'+v.how); }
+function wrdPic(k){ const w=document.getElementById('ro-'+k), im=w && w.querySelector('image'); if(k==='vt3' || !im) return [sprURI('rifleman', dyeHex() || '#4A6B35'), 54]; return [im.getAttribute('href'), +im.getAttribute('width') || 54]; }   
+function wrdManG(k, s, flip){ const P=wrdPic(k), w=P[1]*s, h=w*7/6, g=document.createElementNS(WRD_NS, 'g'); g.setAttribute('pointer-events', 'none');
+  const im=document.createElementNS(WRD_NS, 'image'); im.setAttribute('href', P[0]); im.setAttribute('x', (-w/2).toFixed(1)); im.setAttribute('y', (-h).toFixed(1)); im.setAttribute('width', w.toFixed(1)); im.setAttribute('height', h.toFixed(1));
+  if(flip){ const f=document.createElementNS(WRD_NS, 'g'); f.setAttribute('transform', 'scale(-1,1)'); f.appendChild(im); g.appendChild(f); } else g.appendChild(im); return g; }
+function wrdPose(g, x, y, op, sc){ g.setAttribute('transform', 'translate('+x.toFixed(1)+','+y.toFixed(1)+')'+(sc && sc!==1? ' scale('+sc.toFixed(3)+')' : '')); g.style.visibility=op? '' : 'hidden'; }
+function wrdHome(k, ms){ const s0=rpXY(k); rdragApply(k, s0[0], s0[1]); dlgHold(k, ms, 1); const w=document.getElementById('ro-'+k); if(w) w.style.visibility='hidden'; }   
+function wrdShow(k){ const w=document.getElementById('ro-'+k); if(w) w.style.visibility=''; dlgHold(k, DLG_HOLD_MS, 1); }   
+function wrdStars(key){ if(META[key]) return 0; META[key]=1; const w9=starX(WRD.stars); META.starBank+=w9; checkAch(); saveMeta(); return w9; }   
+function wrdPuff(x, y, s){ const pg=wrdPg(); if(!pg) return; const b=document.createElementNS(WRD_NS, 'g'); b.setAttribute('class', 'wlburst'); b.setAttribute('pointer-events', 'none'); b.setAttribute('transform', 'translate('+x.toFixed(1)+','+y.toFixed(1)+') scale('+s+')');
+  b.innerHTML='<g class="wlburst-in">'+dustPuff(-18, 0, 1.5, .7)+dustPuff(14, -8, 1.3, .6)+dustPuff(0, -22, 1.1, .5)+'</g>'; pg.appendChild(b); setTimeout(()=>{ try{ b.remove(); }catch(e){} }, 600); }
+function wrdPurse(w9, p){ try{ SFX.twink(); }catch(e){} const st=document.getElementById('roomStage');
+  if(st && p){ const f=document.createElement('div'); f.className='starfloat big'; f.textContent='+'+w9+'★'; f.style.left=Math.round(p[0]-34)+'px'; f.style.top=Math.round(p[1]-96)+'px'; st.appendChild(f); setTimeout(()=>{ try{ f.remove(); }catch(e){} }, 1120); }
+  setTimeout(()=>{ if(S.mode==='menu') wfBankChip(); }, 1200); }
+
+function wrdTrainMount(k, from){ const s9=wrdSvg(), tun=s9 && s9.querySelector('#wl-tunnels'); if(!tun || !from) return false;
+  wrdHome(k, WRD.lapMs+8000);
+  const g=wrdManG(k, 0.78, false); g.id='wrd-rider'; tun.parentNode.insertBefore(g, tun);   
+  WRD_RIDE={ kind:'train', k:k, g:g, t0:performance.now(), from:from.slice(), last:null, ph:'on', w9:wrdStars('wrdTrain') };
+  wrdPose(g, from[0], from[1], 1); try{ SFX.whistle(); }catch(e){} wrdGo(); return true; }
+function wrdTrainStep(R, t){ const c=wrdCoal(); if(c) R.last=[c[0], c[1]+6, c[4]]; const T=R.last || [R.from[0], R.from[1], 1];
+  if(R.ph==='on'){ const u=Math.min(1, t/WRD.hopMs), a=R.from; wrdPose(R.g, a[0]+(T[0]-a[0])*u, a[1]+(T[1]-a[1])*u-34*Math.sin(Math.PI*u), 1); if(u>=1) R.ph='ride'; return; }
+  if(R.ph==='ride'){ wrdPose(R.g, T[0], T[1], T[2]); if(t>=WRD.lapMs && T[2]){ R.ph='off'; R.t1=t; R.a=[T[0], T[1]]; R.b=wrdFeet(R.k) || R.a; } return; }
+  if(R.ph==='off'){ const u=Math.min(1, (t-R.t1)/WRD.offMs), a=R.a, b=R.b; wrdPose(R.g, a[0]+(b[0]-a[0])*u, a[1]+(b[1]-a[1])*u-40*Math.sin(Math.PI*u), 1, 0.78+0.22*u); if(u>=1){ try{ R.g.remove(); }catch(e){} wrdLand(R, b); WRD_RIDE=null; } } }
+function wrdLand(R, p){ wrdShow(R.k); wrdPuff(p[0], p[1]+2, 0.55); try{ SFX.thock(); }catch(e){} if(R.w9) wrdPurse(R.w9, p); }
+
+function wrdHorseMount(k, v){ const r=v.r, sp=r && r.firstElementChild, rm=sp && sp.querySelector('.rman'), A=rm && rm.parentNode, B0=A && A.nextElementSibling, B=(B0 && B0.getAttribute('transform')==='translate(75,36)')? B0 : null;   
+  const body=sp && [...sp.children].find(e=>e.tagName==='path' && /^M40 100/.test(e.getAttribute('d') || '')); if(!A || !body) return false;
+  wrdHome(k, 90000);
+  const cow=A.outerHTML+(B? B.outerHTML : ''); A.style.display='none'; if(B) B.style.display='none'; r.classList.add('wrd-mine');
+  const man=wrdManG(k, 1.8, true); man.setAttribute('transform', 'translate(76,100)'); sp.insertBefore(man, body);   
+  const x=WRD.px0+WRD.dx[v.i]+(wrdTx()||0), P0=[x+0.84, 453.5];   
+  const pg=wrdPg(), cg=document.createElementNS(WRD_NS, 'g'); cg.setAttribute('class', 'wrd-cow'); cg.setAttribute('pointer-events', 'none'); cg.innerHTML='<g transform="scale(0.42) translate(-72,-88)">'+cow+'</g>'; pg.appendChild(cg);
+  const st=document.createElementNS(WRD_NS, 'path'); st.setAttribute('d', 'M0 -12 L3 -3 L12 0 L3 3 L0 12 L-3 3 L-12 0 L-3 -3 Z'); st.setAttribute('fill', '#FFE07A'); st.setAttribute('stroke', '#B07A10'); st.setAttribute('stroke-width', '1.5'); st.setAttribute('transform', 'translate('+(x+22).toFixed(1)+','+(WRD.py-26)+') scale(1.1)'); pg.appendChild(st); setTimeout(()=>{ try{ st.remove(); }catch(e){} }, 320);
+  wrdPuff(x+28, WRD.py, 0.7); try{ SFX.thock(); }catch(e){}
+  WRD_RIDE={ kind:'horse', k:k, r:r, i:v.i, sp:sp, spT:sp.getAttribute('transform'), man:man, hid:B? [A, B] : [A], ph:'ride', t0:performance.now(), px:x, armed:0, jump:0, glow:null,
+    cow:{ g:cg, t0:0, P0:P0, hat:cg.querySelector('.rhat') }, w9:wrdStars('wrdHorse') };
+  wrdCowStep(WRD_RIDE, 0); wrdGo(); return true; }
+function wrdCowStep(R, t){ const C=R.cow; if(!C) return; const a=t-C.t0, P=C.P0; let x, y, rot, op=1;
+  if(a<700){ const u=a/700; x=P[0]+60*u; y=P[1]-58*Math.sin(Math.PI*u)+14*u; rot=-360*u; if(C.hat) C.hat.setAttribute('transform', 'translate('+(30*u).toFixed(1)+','+(-70*Math.sin(Math.PI*u)+60*u).toFixed(1)+') rotate('+(240*u).toFixed(0)+')'); }   
+  else if(a<1700){ x=P[0]+60; y=P[1]+14; rot=14+6*Math.sin((a-700)/1000*Math.PI*8); if(!C.sat){ C.sat=1; wrdPuff(x, P[1]+22, 0.5); } }   
+  else if(a<5200){ const u=(a-1700)/3500; if(C.hat && !C.on){ C.on=1; C.hat.removeAttribute('transform'); } x=P[0]+60+130*u; y=P[1]+8-2*Math.abs(Math.sin(u*Math.PI*10)); rot=0; op=u<0.75? 1 : Math.max(0, (1-u)/0.25); }   
+  else { try{ C.g.remove(); }catch(e){} R.cow=null; return; }
+  C.g.setAttribute('transform', 'translate('+x.toFixed(1)+','+y.toFixed(1)+') rotate('+rot.toFixed(1)+')'); C.g.setAttribute('opacity', op.toFixed(2)); }
+function wrdGlowStep(R, t){ if(!R.glow) return; const a=t-R.glow.t0, op=a<500? a/500 : a<1700? 1 : Math.max(0, 1-(a-1700)/600); R.glow.g.setAttribute('opacity', (0.9*op).toFixed(3)); if(a>=2300){ try{ R.glow.g.remove(); }catch(e){} R.glow=null; } }
+function wrdGlowOn(R, t){ const pg=wrdPg(); if(!pg) return; const g=document.createElementNS(WRD_NS, 'g'); g.id='wrd-glow'; g.setAttribute('opacity', '0'); g.setAttribute('pointer-events', 'none');
+  g.innerHTML='<defs><radialGradient id="wrd-sun" cx="0.1" cy="0.62" r="0.7"><stop offset="0" stop-color="#FFD27A" stop-opacity="0.9"/><stop offset="0.5" stop-color="#FF8A4C" stop-opacity="0.38"/><stop offset="1" stop-color="#FF8A4C" stop-opacity="0"/></radialGradient></defs><rect x="-40" y="250" width="440" height="350" fill="url(#wrd-sun)"/>';
+  pg.insertBefore(g, pg.firstChild); R.glow={ g:g, t0:t }; }   
+function wrdJump(r){ const R=WRD_RIDE; if(!R || R.kind!=='horse' || R.r!==r || !R.man.isConnected) return false; if(!R.jump) R.jump=performance.now()-R.t0; return true; }   
+function wrdHorseStep(R, t){ const tx=wrdTx(); if(tx===null) return wrdEnd(R); const x=WRD.px0+WRD.dx[R.i]+tx;
+  wrdCowStep(R, t); wrdGlowStep(R, t);
+  if(R.jump){ const u=(t-R.jump)/WRD.jumpMs; if(u>=1){ R.sp.setAttribute('transform', R.spT); R.jump=0; } else R.sp.setAttribute('transform', 'translate(0,'+(-36*Math.sin(Math.PI*u)).toFixed(1)+') '+R.spT); }
+  if(R.ph==='ride'){ if(x<WRD.glowX && !R.glow && !R.glowed){ R.glowed=1; wrdGlowOn(R, t); } if(x<-150 || x>R.px+40) R.ph='away'; }   
+  else if(R.ph==='away'){ const f=wrdFeet(R.k); if(!f) return wrdEnd(R); if(x>980) R.armed=1;
+    if(R.armed && x<=f[0] && x<940){ R.ph='off'; R.t1=t; try{ R.man.remove(); }catch(e){} R.a=[x+2.5, WRD.py-22]; R.b=f; R.hop=wrdManG(R.k, 0.6, false); wrdPg().appendChild(R.hop); } }   
+  else if(R.ph==='off'){ const u=Math.min(1, (t-R.t1)/WRD.offMs), a=R.a, b=R.b; wrdPose(R.hop, a[0]+(b[0]-a[0])*u, a[1]+(b[1]-a[1])*u-46*Math.sin(Math.PI*u), 1, 0.6+0.4*u); if(u>=1){ try{ R.hop.remove(); }catch(e){} wrdLand(R, b); R.ph='after'; R.t2=t; } }
+  else if(R.ph==='after'){ if((x>980 && t-R.t2>1500) || t-R.t2>40000){ wrdRestore(R); WRD_RIDE=null; return; } }   
+  R.px=x; }
+function wrdRestore(R){ if(R.kind!=='horse') return; for(const e of R.hid) e.style.display=''; try{ R.man.remove(); }catch(e){} if(R.hop) try{ R.hop.remove(); }catch(e){} R.r.classList.remove('wrd-mine'); if(R.spT) R.sp.setAttribute('transform', R.spT);
+  if(R.cow) try{ R.cow.g.remove(); }catch(e){} if(R.glow) try{ R.glow.g.remove(); }catch(e){} }
+function wrdEnd(R){ if(R.kind==='train'){ try{ R.g.remove(); }catch(e){} } else wrdRestore(R); if(R.ph!=='after') wrdShow(R.k); WRD_RIDE=null; }   
+
+function wrdWaitStep(){ const W=WRD_WAIT; if(!W || WRD_RIDE) return; if(RDRAG && RDRAG.k===W.k) return; const f=wrdFeet(W.k); if(!f || !document.getElementById('ro-'+W.k)){ WRD_WAIT=null; return; }
+  if(W.kind==='train'){ if(wrdTrackD(f[0], f[1])>WRD.track+44){ WRD_WAIT=null; return; } const c=wrdCoal(); if(c && c[4] && Math.hypot(c[0]-f[0], c[1]-f[1])<50){ WRD_WAIT=null; wrdTrainMount(W.k, f); } return; }   
+  if(f[1]<WRD.lane[0]-44 || f[1]>WRD.lane[1]+44){ WRD_WAIT=null; return; }
+  const Q=wrdRiders().filter(wrdFree); if(!Q.length) return; const q=Q[Q.length-1];
+  if(Math.abs(q.x-f[0])<16){ WRD_WAIT=null; wrdHorseMount(W.k, q); } }
+function wrdGo(){ if(!WRD_RAF) WRD_RAF=requestAnimationFrame(wrdTick); }
+function wrdTick(){ WRD_RAF=0;
+  if(!wrdOn()){ if(WRD_RIDE) wrdEnd(WRD_RIDE); WRD_WAIT=null; return; }
+  const R=WRD_RIDE, now=performance.now();
+  if(R){ if(!(R.kind==='train'? R.g.isConnected : R.r.isConnected)) wrdEnd(R); else if(R.kind==='train') wrdTrainStep(R, now-R.t0); else wrdHorseStep(R, now-R.t0); }
+  else if(WRD_WAIT && now-WRD_LW>80){ WRD_LW=now; wrdWaitStep(); }
+  if(WRD_RIDE || WRD_WAIT) WRD_RAF=requestAnimationFrame(wrdTick); }
+
+function wrdRig(o){ o=o||{}; const R=WRD_RIDE, pg=wrdPg(), w=pg && pg.querySelector('#wrd-want');
+  return { cv:GVT_CV, on:wrdOn(), ride:R? { kind:R.kind, k:R.k, ph:R.ph, t:Math.round(performance.now()-R.t0), i:R.kind==='horse'? R.i : null, cow:!!R.cow, glow:!!R.glow, jump:!!R.jump, seat:R.kind==='train'? (R.g.getAttribute('transform')||'') : null } : null,
+    wait:WRD_WAIT? Object.assign({}, WRD_WAIT) : null, flags:{ train:META.wrdTrain|0, horse:META.wrdHorse|0 }, coal:wrdCoal(), riders:wrdRiders().map(q=>[q.i, Math.round(q.x), q.r.classList.contains('wlhit')? 'hit' : q.r.classList.contains('wrd-mine')? 'mine' : '']),
+    want:w? w.getAttribute('data-k') : null, verdict:o.at? (v=>v? { kind:v.kind, how:v.how } : null)(wrdDropAt(o.at)) : undefined, T:Object.assign({}, WRD) }; }
+setTimeout(()=>{ try{ if(window.GVT && !GVT.wrd) GVT.wrd=wrdRig; }catch(e){} }, 0);
+
 
 function wlRig(){
   const g=id=>!!document.getElementById(id), svg=document.querySelector('#roomStage > svg'), st=document.getElementById('roomStage'), q=s=>svg? svg.querySelector(s) : null;
@@ -135244,7 +135374,7 @@ function rdragPick(p){
   
   if(document.querySelector('[id^="ro-vt"]'))
     for(let i=VTROOPS.length-1;i>=0;i--){ const tb=VTROOPS[i], d=rpXY(tb.k);
-      if(roofGone(tb.k) || vtcIn(tb.k) || BALL_DOWN.has(tb.k) || GRAV_FALLING.has(tb.k) || (SLED_RIDE && SLED_RIDE.k===tb.k)) continue;   
+      if(roofGone(tb.k) || vtcIn(tb.k) || BALL_DOWN.has(tb.k) || GRAV_FALLING.has(tb.k) || (SLED_RIDE && SLED_RIDE.k===tb.k) || wrdAway(tb.k)) continue;       
       if(p.x>=tb.x+d[0] && p.x<=tb.x+tb.w+d[0] && p.y>=tb.y+d[1] && p.y<=tb.y+tb.h+d[1])
         return { k:tb.k, base:tb }; }
   
@@ -136862,7 +136992,7 @@ function rdragEnd(e){
   
   if(e && e.pointerId!==undefined && d.pid!==undefined && e.pointerId!==d.pid) return;
   RDRAG=null;
-  chestHoverSet(false); dogHoverSet(false); if(wfLive()) sledHoverSet(false);   
+  chestHoverSet(false); dogHoverSet(false); if(wfLive()) sledHoverSet(false); wrdWantSet(null);       
   if(!d.moved){
     if(d.menu) return;   
     
@@ -136921,7 +137051,8 @@ function rdragEnd(e){
     if(xh2Drop(d)) return;   
     if(dogDropHit(d)){ dogFeed(d); return; }   
     if(chestDropHit(d)){ chestSwallow(d); return; }   
-    if(sledDropHit(d)){ sledMount(d.k, [d.dx, d.dy]); return; }   
+    if(sledDropHit(d)){ sledMount(d.k, [d.dx, d.dy]); return; }
+    if(wrdDrop(d)) return;   
     
     
     
@@ -137001,6 +137132,7 @@ document.addEventListener('pointermove', e=>{
   }
   RDRAG.mx=p.x; RDRAG.my=p.y; RDRAG.mt=nw;
   chestHoverSet(!dogDropHit(RDRAG) && chestDropHit(RDRAG)); dogHoverSet(dogDropAt(RDRAG));   
+  if(/^vt[1-4]$/.test(RDRAG.k) && roomCur()==='western') wrdWantSet(wrdDropAt(RDRAG));   
   if(sledRiderOk(RDRAG.k) && wfLive()) sledHoverSet(sledDropHit(RDRAG));   
 }, {passive:false});
 document.addEventListener('pointerup', rdragEnd);
