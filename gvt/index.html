@@ -81230,7 +81230,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='20.43';        
+let GVT_CV='20.44';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -144930,6 +144930,8 @@ const TRC={ page:null, k:null, back:null, chain:0, rolls:{}, err:0 };
 function trcM(){ let M=META.trc; if(!M || typeof M!=='object' || Array.isArray(M)) M=META.trc={}; for(const f of ['seen','seat','wseen','left']){ if(!M[f] || typeof M[f]!=='object' || Array.isArray(M[f])) M[f]={}; } return M; }   
 function trcLv(k){ if(trcIsG(k)) return Math.max(0,Math.min(TRC_GA_TOP,META.tv|0));     if(trcIsW(k)) return Math.max(0,Math.min(RANK_MAX, k==='pistol'? pistolRank() : ((META.sargeUp && META.sargeUp[k])|0)));     return Math.max(0,Math.min(RANK_MAX,(META.up && META.up[k])|0)); }
 function trcHas(k){ return trcLv(k)>=RANK_MAX || !!trcM().seat[k]; }   
+function trcShow(k){ return k!=='commander' || cmdOwned() || trcHas(k); }   
+function trcVis(){ return TRC_ALL.filter(trcShow); }   
 function trcGot(){ return TRC_ALL.filter(trcHas); }   
 function trcL100(){ return TRC_ORDER.concat(TRC_WPN).filter(k=>trcLv(k)>=RANK_MAX); }   
 function trcSeatN(k){ const s=trcM().seat[k]; return Array.isArray(s)? (s[0]|0) : 0; }
@@ -144998,8 +145000,8 @@ function trcRender(){
     p.className='case'; p.innerHTML='<div class="trc-grain"></div><div class="trc-head"><span class="trc-h1" data-notr>'+escH(t('TROPHY CASE'))+'</span></div>'+X    
       +trcShelvesHTML(seat); }   
   trcFit(); trcScrollSeat(); try{ if(document.fonts && document.fonts.ready) document.fonts.ready.then(()=>{ if(TRC.page) trcFit(); }); }catch(e){} }   
-function trcShelvesHTML(seat){ const c=Math.ceil(TRC_ALL.length/2);   
-  return '<div class="trc-shelves" style="--trc-c:'+Math.max(c, TRC_ALL.length-c+(Array.isArray(META.hrdTro)? META.hrdTro.length : 0))+';--trc-v:'+TRC_VIS+'" onscroll="trcNavSet()"><div class="trc-shelf">'+TRC_ALL.slice(0,c).map(seat).join('')+'</div><div class="trc-shelf">'+TRC_ALL.slice(c).map(seat).join('')+hrdTroSeats()+'</div></div>'
+function trcShelvesHTML(seat){ const c=Math.ceil(TRC_ALL.length/2), lo=TRC_ALL.slice(c).filter(trcShow);   
+  return '<div class="trc-shelves" style="--trc-c:'+Math.max(c, lo.length+(Array.isArray(META.hrdTro)? META.hrdTro.length : 0))+';--trc-v:'+TRC_VIS+'" onscroll="trcNavSet()"><div class="trc-shelf">'+TRC_ALL.slice(0,c).map(seat).join('')+'</div><div class="trc-shelf">'+lo.map(seat).join('')+hrdTroSeats()+'</div></div>'
     +'<button type="button" class="trc-nav l" data-notr aria-label="‹" onclick="trcNav(-1)">'+trcChev(-1)+'</button><button type="button" class="trc-nav r" data-notr aria-label="›" onclick="trcNav(1)">'+trcChev(1)+'</button>'; }
 function trcChev(d){ return '<svg viewBox="0 0 18 26" aria-hidden="true"><path d="'+(d>0? 'M5 4 L14 13 L5 22' : 'M13 4 L4 13 L13 22')+'" fill="none" stroke="#FFE9A8" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>'; }   
 function trcShelfEl(){ return document.querySelector('#trcPage.case .trc-shelves'); }
@@ -145032,7 +145034,7 @@ function trcCard(k,which){
   const p=document.getElementById('milePop'); if(!p) return false; const nm=trcName(k), n=trcSeatN(k), w=(which==='world');
   p.innerHTML='<div class="mb-card mbfeat trc-card">'
     +'<span class="mb-band" data-notr>'+escH(t(w? 'WORLD ACHIEVEMENT' : trcIsG(k)? '100 VICTORIES' : 'LEVEL 100'))+'</span>'
-    +'<span class="mb-band wk" data-notr>'+escH(w? tf('THE FIRST FIFTY · %1', nm) : tf('THE TROPHY CASE · %1 / %2', trcGot().length, TRC_ALL.length))+'</span>'
+    +'<span class="mb-band wk" data-notr>'+escH(w? tf('THE FIRST FIFTY · %1', nm) : tf('THE TROPHY CASE · %1 / %2', trcGot().length, trcVis().length))+'</span>'
     +'<h2 class="mb-h" data-notr>'+escH(w? tf('%1 OF 50', trcOrd(n).toUpperCase()) : nm)+'</h2>'
     +'<span class="mb-win">'+MB_RAYS+'<span class="trc-cardart">'+trcTrophyHTML(k,{ world:w? n : 0 })+'</span></span>'
     +'<span class="mb-line" data-notr>'+escH(trcIsG(k)? (w? tf('YOU ARE %1 IN THE WORLD TO WIN THE GAUNTLET 100 TIMES. YOUR NAME IS ON THE ROLL.', trcOrd(n).toUpperCase()) : t('YOU WON THE GAUNTLET 100 TIMES. A GOLD TROPHY STANDS IN YOUR FORT.')) : w? tf(trcIsW(k)? 'YOU ARE %1 IN THE WORLD TO TAKE THE %2 TO LEVEL 100. YOUR NAME IS ON THE ROLL.' : 'YOU ARE %1 IN THE WORLD TO TAKE A %2 TO LEVEL 100. YOUR NAME IS ON THE ROLL.', trcOrd(n).toUpperCase(), nm) : tf('YOUR %1 REACHED LEVEL 100. A GOLD TROPHY STANDS IN YOUR FORT.', nm))+'</span>'
