@@ -14816,6 +14816,14 @@
   #ro-campaign.beacon { filter:none; animation-name:none; }
   #ro-campaign.beacon > g:first-child:not(.patrol) { filter:url(#bcnCS); animation:bcnhaloC 1.7s ease-in-out infinite; }
   @media (prefers-reduced-motion: reduce){ #ro-campaign.beacon > g:first-child:not(.patrol) { animation:none; } }
+  /**/
+  .dlge-halo { pointer-events:none; }
+  .dlge-halo > .dlge-cv { position:absolute; pointer-events:none; }
+  @keyframes dlgeTr { 0%,100% { opacity:1; } 50% { opacity:0; } }
+  @keyframes dlgePk { 0%,100% { opacity:0; } 50% { opacity:1; } }
+  @keyframes dlgeDn { from { opacity:1; } to { opacity:0; } }
+  @keyframes dlgeUp { from { opacity:0; } to { opacity:1; } }
+  @media (prefers-reduced-motion: reduce){ .dlge-halo > .dlge-cv { animation:none !important; } }
 </style>
 <style id="glcss">
   /**/
@@ -82156,7 +82164,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='20.84';        
+let GVT_CV='20.85';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -172305,6 +172313,7 @@ function dlgLayers(aw, only){ const svg=DLGP.svg; if(!svg || !svg.isConnected) r
   dlgDrawTo(DLGP.back, on(0)); dlgDrawTo(DLGP.mid, on(2)); dlgDrawTo(DLGP.front, on(4));
   let sq=0; for(const u of asleep){ if(u.__p && (!u.__pe || u.__pe.nextElementSibling!==u)) dlgPicEl(u); const v=u.__top? 5 : lay.get(u); const inSvg=(v===1 || v===3 || v===5); dlgPicShow(u, inSvg); if(inSvg && !u.__top) sq++; }
   DLGP.layMs=performance.now()-t0; DLGP.layN={ back:on(0).length, mid:on(2).length, front:on(4).length, squeezed:sq, top:DLGP.topN };
+  try{ dlgeSync(); }catch(e){}   
   if(DLGP.glass || document.getElementById('roomGlassFly')) dlgGlass(); }   
 
 
@@ -172396,7 +172405,7 @@ async function dlgSettle(tok){ if(!dlgRoomOk()) return; const svg=document.query
   await dlgLay(tok); if(tok!==DLGP.tok) return;
   DLGP.settleMs=performance.now()-t0; DLGP.log.push(['settle', +DLGP.settleMs.toFixed(1), 'make', +DLGP.makeMs.toFixed(1), 'enc', +DLGP.encMs.toFixed(1), 'made', DLGP.made, 'hits', DLGP.hits, 'Mpx', +(DLGP.px/1e6).toFixed(2), 'asleep', DLGP.sleep.size, 'units', DLGP.units.length]); if(DLGP.log.length>40) DLGP.log.splice(0, 20); }
 
-function dlgOff(){ const svg=DLGP.svg; DLGP.tok++; dlgGlassOff(); if(DLGP.mo) DLGP.mo.disconnect(); if(svg && svg.isConnected){ for(const u of DLGP.units){ u.style.display=''; clearTimeout(u.__hold); } for(const p of [...document.querySelectorAll('#roomStage image.dlg-pic')]) p.remove(); for(const u of DLGP.units) u.__pe=null;
+function dlgOff(){ try{ dlgeOff(); }catch(e){}     const svg=DLGP.svg; DLGP.tok++; dlgGlassOff(); if(DLGP.mo) DLGP.mo.disconnect(); if(svg && svg.isConnected){ for(const u of DLGP.units){ u.style.display=''; clearTimeout(u.__hold); } for(const p of [...document.querySelectorAll('#roomStage image.dlg-pic')]) p.remove(); for(const u of DLGP.units) u.__pe=null;
     if(DLGP.belt && DLGP.top){ const tops=[...DLGP.top.children]; svg.appendChild(DLGP.belt); for(const e of tops){ if(e.id==='ro-rave') svg.insertBefore(e, DLGP.belt); else svg.appendChild(e); } } }   
   for(const id of ['dlgBack', 'dlgMid', 'dlgFront', 'dlgBelt', 'dlgTop']){ const e=document.getElementById(id); if(e) e.remove(); } dlgDrop(); }
 function dlgRelay(){ if(!DLGP.on) return; dlgOff(); dlgAfterPaint(); }
@@ -172564,6 +172573,71 @@ function dlgfProbe(){ const c=[...DLGF.cards], n=s=>c.filter(r=>r.st===s).length
   parking:DLGF.parking.size, q:DLGF.q.length, cant:DLGF.cant, made:DLGF.made, hits:DLGF.hits, misses:DLGF.misses, wakes:DLGF.wakes, deals:DLGF.deals, syncs:DLGF.syncs, falls:DLGF.falls, writes:DLGF.writes, lastW:DLGF.lastW, syncMs:+DLGF.syncMs.toFixed(1), dealMs:+DLGF.dealMs.toFixed(1), serMs:+DLGF.ms.toFixed(1), cache:DLGF.keys.length, log:DLGF.log.slice(-6) }; }
 function dlgfCard(id){ const b=document.getElementById('shdcc-'+id), r=b && b.__dlgf; return r? { st:r.st, near:r.near, held:r.held, frz:r.frz, cant:r.cant, kids:r.svg.childNodes.length, pic:!!(r.im && r.im.parentNode) } : null; }
 setTimeout(()=>{ try{ if(window.GVT && !GVT.dlgBox) GVT.dlgBox={ st:dlgfProbe, card:dlgfCard, on:v=>{ DLGF.on=v? 1 : 0; if(v) dlgfDeal(); else dlgfOff(); try{ msPauseSync(); }catch(e){} return DLGF.on; } }; }catch(e){} }, 0);
+
+
+
+
+
+
+
+
+const DLGE_LIT='.beacon, .beckon, .nudge, .evlive, .tcover';
+const DLGE_BREATH={ beaconhalo:['bcnH0', 'bcnH20', 0], bcnhaloW:['bcnW0', 'bcnW20', 0], bcnhaloC:['bcnC0', 'bcnC20', 0], shopbeck:['bcnB0', 'bcnB24', 1] };   
+const DLGE={ on:1, halos:new Map(), made:0, ms:0, err:0, tok:0 };   
+function dlgeHaloEl(u){ const L=[u, ...u.querySelectorAll('*')]; for(const e of L){ try{ if(/#bcn/.test(getComputedStyle(e).filter)) return e; }catch(err){} } return null; }   
+function dlgeSpec(h){ const cs=getComputedStyle(h), nm=String(cs.animationName).split(',')[0].trim(), B=DLGE_BREATH[nm];
+  if(B && !reducedMotion()) return { ids:[B[0], B[1]], alt:B[2], dur:String(cs.animationDuration).split(',')[0].trim(), delay:String(cs.animationDelay).split(',')[0].trim(), ease:String(cs.animationTimingFunction).split(',')[0].trim() };
+  const m=/#(bcn\w+)/.exec(cs.filter); return m? { ids:[m[1]], alt:0 } : null; }   
+function dlgePath(u, h){ const p=[]; for(let n=h; n && n!==u; n=n.parentNode) p.unshift([...n.parentNode.children].indexOf(n)); return p; }
+
+function dlgeMap(svg){ const cs=getComputedStyle(svg), W=parseFloat(cs.width), H=parseFloat(cs.height), vb=svg.viewBox && svg.viewBox.baseVal; if(!(W>0) || !(H>0)) return null; if(!vb || !vb.width || !vb.height) return { sx:1, sy:1, tx:0, ty:0, W, H };
+  const pa=svg.preserveAspectRatio.baseVal, al=pa.align; if(al===1) return { sx:W/vb.width, sy:H/vb.height, tx:-vb.x*W/vb.width, ty:-vb.y*H/vb.height, W, H };
+  const s=(pa.meetOrSlice===2)? Math.max(W/vb.width, H/vb.height) : Math.min(W/vb.width, H/vb.height), xp=(al-2)%3, yp=Math.floor((al-2)/3);
+  return { sx:s, sy:s, tx:-vb.x*s+(W-vb.width*s)*xp/2, ty:-vb.y*s+(H-vb.height*s)*yp/2, W, H }; }
+function dlgeAnchor(u){ if(u.__top) return DLGP.top; const v=DLGP.lay && DLGP.lay.get(u); return ({ 0:DLGP.back, 1:DLGP.svg, 2:DLGP.mid, 3:DLGP.beltSvg, 4:DLGP.front })[v] || null; }   
+function dlgeDecode(doc){ return new Promise(res=>{ const im=new Image(); im.onload=()=>res(im); im.onerror=()=>res(null); im.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(doc); }); }
+
+
+async function dlgeMake(u, h, sp, box, sc){ const t0=performance.now(); const hid=DLGP.sleep.has(u); if(hid) u.style.display=''; let part=null; try{ part=dlgSer0(u); }catch(e){} if(hid) u.style.display='none'; if(!part) return null;
+  const path=dlgePath(u, h), defs=document.getElementById('bcnDefs'), [x0, y0, x1, y1]=box, W=Math.max(1, Math.ceil((x1-x0)*sc)), H=Math.max(1, Math.ceil((y1-y0)*sc));
+  const root=s=>'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="'+W+'" height="'+H+'" viewBox="'+x0+' '+y0+' '+((x1-x0))+' '+((y1-y0))+'">'+DLGP.defs+s+'</svg>';
+  const P=new DOMParser(), ser=new XMLSerializer();
+  const trim=(alone, filt)=>{ const d=P.parseFromString(part, 'image/svg+xml'), r=d.documentElement; if(r.nodeName==='parsererror' || r.querySelector('parsererror')) return null; let n=r;
+    for(const i of path){ const kids=[...n.children], k=kids[i]; if(!k) return null; kids.forEach((s, j)=>{ if(j!==i && (alone || j<i)) s.remove(); }); n=k; }   
+    for(const e of [r, ...r.querySelectorAll('*')]){ const st=e.getAttribute('style'); if(st && /#bcn/.test(st)) e.setAttribute('style', st.replace(/filter:\s*url\([^)]*#bcn\w+[^)]*\)\s*;?/g, '')); }
+    if(filt) n.setAttribute('style', (n.getAttribute('style')||'')+';filter:url(#dlgeG)');
+    return ser.serializeToString(r); };
+  const ap=trim(0, 0); const art=ap? await dlgeDecode(root(ap)) : null;
+  const out=[];
+  for(const id of sp.ids){ const f=defs && defs.querySelector('filter[id="'+id+'"]'); if(!f){ DLGE.err++; return null; }
+    let g=''; for(const ds of f.querySelectorAll('feDropShadow')) { const k='b'+g.length; g+='<feGaussianBlur in="SourceAlpha" stdDeviation="'+ds.getAttribute('stdDeviation')+'" result="'+k+'"/><feFlood flood-color="'+ds.getAttribute('flood-color')+'" flood-opacity="'+ds.getAttribute('flood-opacity')+'"/><feComposite in2="'+k+'" operator="in" result="'+k+'c"/>'; }
+    const ks=[...g.matchAll(/result="(b\d+c)"/g)].map(m=>m[1]); g+='<feMerge>'+ks.map(k=>'<feMergeNode in="'+k+'"/>').join('')+'</feMerge>';   
+    const fl='<filter id="dlgeG" x="'+f.getAttribute('x')+'" y="'+f.getAttribute('y')+'" width="'+f.getAttribute('width')+'" height="'+f.getAttribute('height')+'" color-interpolation-filters="sRGB">'+g+'</filter>';
+    const hp=trim(1, 1); if(!hp){ DLGE.err++; return null; } const im=await dlgeDecode(root('<defs>'+fl+'</defs>'+hp)); if(!im){ DLGE.err++; return null; }
+    const cv=document.createElement('canvas'); cv.width=W; cv.height=H; const c=cv.getContext('2d'); c.drawImage(im, 0, 0, W, H); if(art){ c.globalCompositeOperation='destination-out'; c.drawImage(art, 0, 0, W, H); } out.push(cv); }
+  DLGE.made+=out.length; DLGE.ms+=performance.now()-t0; return out; }
+function dlgeDrop(u){ const H=DLGE.halos.get(u); if(!H) return; DLGE.halos.delete(u); if(H.el) H.el.remove(); }
+function dlgeSeat(H, box, M){ const k=(v, a, t)=>(a*v+t); const L=k(box[0], M.sx, M.tx), T=k(box[1], M.sy, M.ty), Wd=(box[2]-box[0])*M.sx, Ht=(box[3]-box[1])*M.sy;
+  for(const cv of H.cvs){ const s=cv.style; s.left=L+'px'; s.top=T+'px'; s.width=Wd+'px'; s.height=Ht+'px'; } }
+
+function dlgeSync(){ const svg=DLGP.svg; const ok=DLGE.on && DLGP.on && svg && svg.isConnected;
+  for(const [u, H] of [...DLGE.halos]){ let lit=false; try{ lit=u.matches(DLGE_LIT); }catch(e){} if(!ok || !u.isConnected || !DLGP.sleep.has(u) || !lit || !H.el.isConnected) dlgeDrop(u); }   
+  if(!ok) return; let M=null;
+  for(const u of DLGP.units){ if(!DLGP.sleep.has(u) || !u.__p) continue; let lit=false; try{ lit=u.matches(DLGE_LIT); }catch(e){} if(!lit) continue;
+    const an=dlgeAnchor(u); if(!an || !an.isConnected) continue; const h=dlgeHaloEl(u); if(!h){ dlgeDrop(u); continue; } const sp=dlgeSpec(h); if(!sp){ dlgeDrop(u); continue; }
+    M=M||dlgeMap(svg); if(!M) return; const f=document.querySelector('#bcnDefs filter[id="'+sp.ids[sp.ids.length-1]+'"]'); const fr=v=>Math.abs(parseFloat(v)||0)/100;
+    const b=u.__box, bw=b[2]-b[0], bh=b[3]-b[1], gx=f? fr(f.getAttribute('x'))*bw : 0, gy=f? fr(f.getAttribute('y'))*bh : 0; let box=[b[0]-gx, b[1]-gy, b[2]+gx, b[3]+gy];
+    const V=DLGP.vis; if(V){ box=[Math.max(box[0], V[0]), Math.max(box[1], V[1]), Math.min(box[2], V[2]), Math.min(box[3], V[3])]; if(box[2]<=box[0] || box[3]<=box[1]){ dlgeDrop(u); continue; } }   
+    const key=sp.ids.join('/')+'|'+(sp.dur||'')+'|'+(sp.delay||'')+'|'+box.map(v=>v.toFixed(1)).join(',')+'|'+u.getAttribute('class')+'|'+u.__p.rec.vurl.length;
+    let H=DLGE.halos.get(u); if(H && H.key===key){ if(H.el.previousSibling!==an) an.parentNode.insertBefore(H.el, an.nextSibling); if(H.cvs) dlgeSeat(H, box, M); continue; }
+    dlgeDrop(u); const el=document.createElement('div'); el.className='dlge-halo'; if(u.id) el.setAttribute('data-gid', u.id); dlgLike(svg, el, 0); el.style.overflow='hidden';
+    H={ el, key, cvs:null, box }; DLGE.halos.set(u, H); an.parentNode.insertBefore(el, an.nextSibling);
+    const r=svg.getBoundingClientRect(), sc=M.sx*(r.width>0? r.width/M.W : 1)*(DLGP.dd||dlgDots()); const tok=DLGE.tok;
+    dlgeMake(u, h, sp, box, sc).then(cvs=>{ if(DLGE.halos.get(u)!==H || tok!==DLGE.tok || !cvs){ if(!cvs && DLGE.halos.get(u)===H) DLGE.err++; return; }
+      cvs.forEach((cv, i)=>{ cv.className='dlge-cv'; if(sp.ids.length>1){ const nm=sp.alt? (i? 'dlgeUp' : 'dlgeDn') : (i? 'dlgePk' : 'dlgeTr'); cv.style.animation=nm+' '+sp.dur+' '+sp.ease+' '+sp.delay+' infinite '+(sp.alt? 'alternate' : 'normal'); } H.el.appendChild(cv); });
+      H.cvs=cvs; dlgeSeat(H, box, M); }); } }
+function dlgeOff(){ DLGE.tok++; for(const u of [...DLGE.halos.keys()]) dlgeDrop(u); }
+setTimeout(()=>{ try{ if(window.GVT && !GVT.dlgHalo) GVT.dlgHalo={ st:()=>({ on:DLGE.on, n:DLGE.halos.size, made:DLGE.made, ms:+DLGE.ms.toFixed(1), err:DLGE.err, halos:[...DLGE.halos].map(([u, H])=>({ id:u.id, cvs:H.cvs? H.cvs.length : 0, anim:H.cvs? H.cvs.map(c=>c.style.animationName) : [], seat:H.el.previousElementSibling? (H.el.previousElementSibling.id||H.el.previousElementSibling.tagName) : null })) }), on:v=>{ DLGE.on=v? 1 : 0; if(v) dlgeSync(); else dlgeOff(); return DLGE.on; } }; }catch(e){} }, 0);   
 
 function frame(ts){
   requestAnimationFrame(frame);
