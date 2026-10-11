@@ -74692,13 +74692,13 @@ function csmHeard(){   // the song really going out of the game's audio right no
 function csmTick(){ try{
   const now=Date.now(), gap=now-CSM.w; CSM.w=now;
   const id=csmHeard();
-  if(!id || enhOwns(CSM_SONGS[id].mod)){ CSM.run=null; return; }
+  if(!id || (enhOwns(CSM_SONGS[id].mod) && !ec5ArbWants(id))){ CSM.run=null; return; }   // CARD-EAR2: her Arabesque is still listened to for its crystal once the part is his
   CSM.n++;
   const pos=AC.currentTime-LOC.t0, r=CSM.run;
   if(!r || r.id!==id || r.t0!==LOC.t0 || r.gen!==LOC.gen || gap>CSM_GAP || pos<r.a){ CSM.run={ id:id, t0:LOC.t0, gen:LOC.gen, a:pos }; return; }   // a fresh run from here
   const sg=CSM_SONGS[id], dur=LOC.buf.duration; if(!(dur>sg.tail+CSM_SLACK)) return;
   const c=Math.max(0, Math.ceil((r.a-CSM_SLACK)/dur))*dur;   // the first loop start this run heard from its first note
-  if(pos>=c+dur-sg.tail){ CSM.run=null; csmGrant(sg.mod); }
+  if(pos>=c+dur-sg.tail){ CSM.run=null; try{ csmGrant(sg.mod); }catch(e){} ec5ArbHeard(id); }   // CARD-EAR2: the same last note pays THE ARABESQUE CRYSTAL (after her part's card, when that is new; a card that throws never eats the crystal)
 }catch(e){} }
 CSM.iv=setInterval(csmTick, CSM_TICK);
 function csmGrant(mod){ if(!trophyGrant(mod)) return false; CSM.won++; csmCard(mod); return true; }   // once ever: an owned part is never granted twice (trophyGrant answers false and touches nothing)
@@ -79927,7 +79927,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='20.07';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='20.08';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -102222,17 +102222,17 @@ function rf2CaseHTML(){ const b=rfPick2();   // CARD-OCR-B7: the case's second r
 // lobby on the right, King Rex's lair by the magma on the bottom right; a tap takes it, then the Refinery opens on the spot) and two are EARNED (the saber at rank 100, ten levels won
 // with a friend: the ledgers the game already keeps, so an old save is owed at once). ONE save cell META.ec5 = { f:{ conga|ice|rex:1 } the finds, r:{ key:{col,pick} } the refinements }
 // (device-local like sabRefine/sabRefine2: no sync key, no server byte). rfPick(col) reads the five after the first two, so every power, the aisle, the book and a co-op word read them.
-const EC5_KEYS=['conga','ice','saber','coop','rex'];   // the rite's order when two are owed (his list's order)
+const EC5_KEYS=['conga','ice','saber','coop','arb','rex'];   // the rite's order when two are owed (his list's order)   // CARD-EAR2: + arb = THE ARABESQUE CRYSTAL (her whole song heard in the palace); coop stands only as a cell refined under the replaced laws
 const EC5={ saber:100, coop:10, take:0.9, pop:1.7 };   // the saber's rank, the levels won with a friend, the lift (s), the word before the Refinery opens (s)
-const EC5_FROM={ conga:'FOUND ON THE CONGA ROOM BAR', ice:'FOUND IN THE ICE CASTLE', rex:"FOUND IN KING REX'S LAIR", saber:'THE SABER AT RANK 100', coop:'HER ARABESQUE, HEARD TO THE LAST NOTE' };   // CARD-EAR: the slot keeps its save key `coop` (a cell refined under the old law stays), its law is her Arabesque
+const EC5_FROM={ conga:'FOUND ON THE CONGA ROOM BAR', ice:'FOUND IN THE ICE CASTLE', rex:"FOUND IN KING REX'S LAIR", saber:'THE SABER AT RANK 100', coop:'10 LEVELS WON WITH A FRIEND', arb:'HER ARABESQUE, HEARD TO THE LAST NOTE' };   // CARD-EAR2: arb = the listen's crystal; coop = a cell refined under the replaced laws (v19.55 ten wins with a friend, v19.58 the part owned)
 // the hidden two in the raid lobbies: the tap box in painting units [x, y, w, h] (lairBoneLayout's seat grammar) and the crystal's foot inside it; the dress at the foot
 const EC5_SEAT={ ice:{ k:'ice', box:[1392,470,100,100], foot:[50,86], dress:'snow' }, bone:{ k:'rex', box:[1325,400,100,100], foot:[50,90], dress:'lava' } };   // CARD-RCL (Wyatt 10/10 13:20: "popping out of the lava, not over the group button"): the right lava stream beside Rex's rock (was 1344,488 'rock', under GROUP)   // a kid's thumb on the smallest glass (100 units = 58 px at 667 x 375)
 function ec5Get(){ const e=META.ec5; return (e && typeof e==='object')? e : null; }
 function ec5Found(k){ const e=ec5Get(); return !!(e && e.f && e.f[k]); }
 function ec5CoopN(){ return ['coopLevels','coopElite','coopThird'].reduce((n,q)=>n+(Array.isArray(META[q])? META[q].length : 0),0); }   // every level won with a friend, in each hundred's ledger
-function ec5Arb(){ try{ return enhOwns('arabesquemod'); }catch(e){ return false; } }   // CARD-EAR (Wyatt 10/10 12:56 EDT: "earned instead if you listen to the full arabesque in the palace"): CARD-CSM's listen pays the part once ever, so owning it = heard to the last note (an old save that already heard her is owed at once)
+function ec5Arb(){ try{ return enhOwns('arabesquemod'); }catch(e){ return false; } }   // CARD-EAR2: the probe's read alone (the part is his); the crystal is the listen's own find (ec5ArbHeard), never the part owned
 function ec5SabRank(){ try{ return ultRank('lightsaber')|0; }catch(e){ return 0; } }
-function ec5Earned(k){ if(k==='saber') return ec5SabRank()>=EC5.saber || ec5Found(k); if(k==='coop') return ec5Arb() || ec5Found(k); return EC5_KEYS.indexOf(k)>=0 && ec5Found(k); }
+function ec5Earned(k){ if(k==='saber') return ec5SabRank()>=EC5.saber || ec5Found(k); return EC5_KEYS.indexOf(k)>=0 && ec5Found(k); }   // CARD-EAR2: coop + arb read their own stamps (coop: a refinement under the replaced laws, never owed again; arb: her whole song heard, ec5ArbHeard)
 // the standing refinements: a cell stands when its crystal is his, its colour is no other refinement's (the first two before it, then the list's order)
 function ec5Cells(){ const out={}, e=ec5Get(); if(!e || !e.r || typeof e.r!=='object') return out;
   const used=[], a=rfCell(META.sabRefine), b=rfPick2(); if(a) used.push(a.col); if(b) used.push(b.col);
@@ -102310,9 +102310,22 @@ function ec5Pop(k){ let p=document.getElementById('ec5Pop'); if(p) p.remove();
   p.innerHTML='<svg class="ec5-pgem" viewBox="-30 -58 60 64" aria-hidden="true">'+ec5GemSVG('pop','')+'</svg><b>'+escH(t('AN ENHANCED CRYSTAL!'))+'</b><span>'+escH(t(EC5_FROM[k]||''))+'</span>';
   document.body.appendChild(p);
   clearTimeout(ec5Pop.t); ec5Pop.t=setTimeout(()=>{ try{ p.classList.add('ec5-out'); }catch(x){} setTimeout(()=>{ try{ p.remove(); }catch(x){} }, 320); if(ec5OwedK(k) && !rfRiteIsOpen()) openRfRite(0,0,k); }, EC5.pop*1000); }
+// CARD-EAR2 THE LISTEN PAYS IT (design/ec5-arabesque-1010/00-BUILD-EAR.md; Wyatt 10/11/2026 00:25 UTC on Discord: "listening to the whole song didnt get me a refined crystal when it should
+// have"): her whole Arabesque heard in the palace (CARD-CSM's run: from her first note to her last sound, unbroken, HQ's sound + the music chip on) pays THE ARABESQUE CRYSTAL at that last
+// note, on the spot, the part already his or not (csmTick keeps listening while ec5ArbWants). A find (ec5Find's grammar): saved first, the chime, the word, the Refinery over the palace.
+// A first whole listen also wins her part: its card speaks first, the crystal after its OKAY (still in her palace; else the room's arrival offers it, ec5Owed).
+function ec5ArbWants(id){ return id==='arabesque' && !ec5Found('arb'); }
+function ec5ArbHeard(id){ if(!ec5ArbWants(id)) return false;
+  const m=document.getElementById('milePop');
+  if(m && !m.classList.contains('hidden')){ const e=ec5Get()||{}; META.ec5={ f:Object.assign({}, e.f||{}, { arb:1 }), r:Object.assign({}, e.r||{}) }; saveMeta(); ec5ArbWait(0); return true; }   // the save first, the word after the card
+  return ec5Find('arb', null); }
+function ec5ArbWait(n){ const m=document.getElementById('milePop');
+  if(m && !m.classList.contains('hidden')){ if(n<1200) setTimeout(()=>ec5ArbWait(n+1), 250); return; }   // the card still up (5 minutes at most; then the room's chain offers it)
+  if(rfRiteIsOpen() || !(raidSceneOpen() && RAID_CUR==='palace')) return;   // CHECK IT OUT! took him to the lab, or a rite stands: the room's arrival offers it
+  try{ SFX.twink(); }catch(x){} try{ SFX.soul(); }catch(x){} ec5Pop('arb'); }
 // the rigs' read
 function ec5Probe(){ const hot=document.getElementById('ec5Hot'), hb=hot? hot.getBoundingClientRect() : null, cg=document.querySelector('#x-hits .ec5-cg'), cb=cg? cg.getBoundingClientRect() : null;
-  return { cv:GVT_CV, keys:EC5_KEYS, save:ec5Get(), earned:EC5_KEYS.filter(ec5Earned), cells:ec5Cells(), owed:ec5Owed(), refined:ec5Refined(), free:ec5Free(), sab:ec5SabRank(), coop:ec5CoopN(), arb:ec5Arb(),
+  return { cv:GVT_CV, keys:EC5_KEYS, save:ec5Get(), earned:EC5_KEYS.filter(ec5Earned), cells:ec5Cells(), owed:ec5Owed(), refined:ec5Refined(), free:ec5Free(), sab:ec5SabRank(), coop:ec5CoopN(), arb:ec5Arb(), heard:ec5Found('arb'),
     rite:{ open:rfRiteIsOpen(), ec:RFRITE.ec||'', col:RFRITE.col, pick:RFRITE.pick, done:RFRITE.done, swap:RFRITE.swap }, hot:hb? { k:hot.getAttribute('data-ec5'), l:hb.left, t:hb.top, w:hb.width, h:hb.height } : null,
     conga:cb? { l:cb.left, t:cb.top, w:cb.width, h:cb.height } : null, pop:!!document.getElementById('ec5Pop') }; }
 // ===== /CARD-EC5 =====
