@@ -7,6 +7,7 @@
 <!-- no referrer meta: Google's button reads the page's origin off the Referer ("The given origin is not allowed" without it); the key rides the #fragment, which no Referer ever carries -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https://nationgame.live https://accounts.google.com http://127.0.0.1:* http://localhost:*; img-src 'self' data: https://*.googleusercontent.com; style-src 'self' 'unsafe-inline' https://accounts.google.com; script-src 'self' 'unsafe-inline' https://accounts.google.com; frame-src https://accounts.google.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Green vs Tan · Sign in</title>
+<!-- CARD-AGI (PND-08): the iPhone app opens this page in Safari too (&p=i in the #fragment = its way back). -->
 <!-- CARD-GDR THE GOOGLE DOOR ON ANDROID (design/android-google-door-1010/00-BUILD-GDR.md; Wyatt 10/10/2026 by phone: "Signing in on android tablet we tried to go
      through good and nothing would load"). The Android app is a web view, and Google signs nobody in inside one: the app's button opens THIS page in Chrome
      (#k=<the app's 32-hex key>&l=<lang>). Google's own button works here; the token is parked at HQ under the key (POST /gvt/gdr/put, server v121) and the app,
@@ -42,7 +43,8 @@
 (function(){
   const CLIENT='972602551061-qlbq1drqfoh45gto7hr91cs78n2d3ki7.apps.googleusercontent.com';   // index.html's GOOGLE_WEB_CLIENT (HQ's GVT_GOOGLE_CLIENT)
   const NET='https://nationgame.live/gvt';
-  const BACK='intent://playgvt.net/join#Intent;scheme=https;package=com.corkscrewgames.gvt;end';   // the app's own link filter: the app comes to the front, nothing reloads
+  const BACK_A='intent://playgvt.net/join#Intent;scheme=https;package=com.corkscrewgames.gvt;end';   // the Android app's own link filter: the app comes to the front, nothing reloads
+  const BACK_I='https://drbango.com/gvt/join/';   // CARD-AGI: the iPhone app (&p=i): a link to the OTHER site is a universal link (the App Store's 1.0.10); no squad code = the app just comes forward
   const W={
     en:['SIGN IN WITH GOOGLE','Sign in here, then go back to Green vs Tan. Your army waits for you there.','SIGNED IN!','Go back to Green vs Tan. It finishes signing you in.','BACK TO THE GAME',"COULDN'T SIGN IN. TRY AGAIN.",'Open this page from the Green vs Tan app.','Google did not load. Check the connection and try again.'],
     de:['MIT GOOGLE ANMELDEN','Melde dich hier an und geh dann zurück zu Green vs Tan. Deine Armee wartet dort.','ANGEMELDET!','Geh zurück zu Green vs Tan. Dort wird die Anmeldung abgeschlossen.','ZURÜCK ZUM SPIEL','ANMELDUNG FEHLGESCHLAGEN. VERSUCH ES NOCHMAL.','Öffne diese Seite aus der Green-vs-Tan-App.','Google wurde nicht geladen. Prüfe die Verbindung und versuch es nochmal.'],
@@ -55,6 +57,7 @@
   };
   const q=new URLSearchParams(String(location.hash||'').replace(/^#/,''));
   const K=String(q.get('k')||''); const keyOk=/^[a-f0-9]{32}$/.test(K);
+  const BACK=String(q.get('p')||'')==='i'? BACK_I : BACK_A;   // CARD-AGI: which app opened this page
   let L=String(q.get('l')||'').toLowerCase().slice(0,2); if(!W[L]) L=String(navigator.language||'en').toLowerCase().slice(0,2); if(!W[L]) L='en';
   const w=W[L]; document.documentElement.lang=L; if(L==='ar') document.documentElement.dir='rtl';
   const $=id=>document.getElementById(id);
