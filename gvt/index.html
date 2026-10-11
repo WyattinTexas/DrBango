@@ -77659,6 +77659,198 @@ function cavesBedGen(ok,bad){ try{
 
 
 
+const CPG={ on:0, floor:600, syncMs:400, late:2500, noWorker:0, sent:0, got:0, sync:0 };   
+const CPG_TIER={ e:{d:1,slip:.33,ms:600}, m:{d:2,q:1,slip2:.10,ms:800}, h:{d:4,q:1,book:1,ms:1500}, g:{d:99,q:1,book:1,eg:1,ms:2000} };   
+const CPG_BOOK=[   
+ 'e2e4 e7e5 g1f3 b8c6 f1b5 a7a6 b5a4 g8f6 e1g1 f8e7','e2e4 e7e5 g1f3 b8c6 f1b5 g8f6 e1g1 f6e4 d2d4 e4d6 b5c6 d7c6 d4e5 d6f5','e2e4 e7e5 g1f3 b8c6 f1c4 f8c5 c2c3 g8f6 d2d3 d7d6','e2e4 e7e5 g1f3 b8c6 f1c4 g8f6 d2d3 f8c5','e2e4 e7e5 g1f3 b8c6 d2d4 e5d4 f3d4 g8f6 b1c3 f8b4','e2e4 e7e5 g1f3 g8f6 f3e5 d7d6 e5f3 f6e4 d2d4 d6d5',
+ 'e2e4 e7e5 b1c3 g8f6 f1c4 b8c6 d2d3 f8b4','e2e4 c7c5 g1f3 d7d6 d2d4 c5d4 f3d4 g8f6 b1c3 a7a6','e2e4 c7c5 g1f3 b8c6 d2d4 c5d4 f3d4 g8f6 b1c3 e7e5','e2e4 c7c5 g1f3 e7e6 d2d4 c5d4 f3d4 a7a6','e2e4 c7c5 b1c3 b8c6 g2g3 g7g6 f1g2 f8g7','e2e4 c7c5 c2c3 g8f6 e4e5 f6d5 d2d4 c5d4',
+ 'e2e4 e7e6 d2d4 d7d5 b1c3 g8f6 c1g5 f8e7 e4e5 f6d7','e2e4 e7e6 d2d4 d7d5 e4e5 c7c5 c2c3 b8c6 g1f3 d8b6','e2e4 e7e6 d2d4 d7d5 b1d2 g8f6 e4e5 f6d7','e2e4 c7c6 d2d4 d7d5 b1c3 d5e4 c3e4 c8f5 e4g3 f5g6','e2e4 c7c6 d2d4 d7d5 e4e5 c8f5 g1f3 e7e6 f1e2 c6c5','e2e4 d7d5 e4d5 d8d5 b1c3 d5a5 d2d4 g8f6 g1f3 c7c6',
+ 'e2e4 d7d6 d2d4 g8f6 b1c3 g7g6 g1f3 f8g7','e2e4 g8f6 e4e5 f6d5 d2d4 d7d6 g1f3 c8g4','d2d4 d7d5 c2c4 e7e6 b1c3 g8f6 c1g5 f8e7 e2e3 e8g8','d2d4 d7d5 c2c4 c7c6 g1f3 g8f6 b1c3 d5c4 a2a4 c8f5','d2d4 d7d5 c2c4 d5c4 g1f3 g8f6 e2e3 e7e6 f1c4 c7c5','d2d4 g8f6 c2c4 e7e6 b1c3 f8b4 e2e3 e8g8 f1d3 d7d5',
+ 'd2d4 g8f6 c2c4 g7g6 b1c3 f8g7 e2e4 d7d6 g1f3 e8g8','d2d4 g8f6 c2c4 g7g6 b1c3 d7d5 c4d5 f6d5 e2e4 d5c3 b2c3 f8g7','d2d4 g8f6 c2c4 e7e6 g1f3 b7b6 g2g3 c8b7 f1g2 f8e7','d2d4 g8f6 g1f3 d7d5 c1f4 e7e6 e2e3 c7c5 c2c3 b8c6','d2d4 d7d5 g1f3 g8f6 c1f4 c7c5 e2e3 b8c6','d2d4 f7f5 g2g3 g8f6 f1g2 e7e6 g1f3 f8e7',
+ 'd2d4 g8f6 c2c4 c7c5 d4d5 e7e6 b1c3 e6d5 c4d5 d7d6','c2c4 e7e5 b1c3 g8f6 g1f3 b8c6 g2g3 d7d5 c4d5 f6d5','c2c4 c7c5 g1f3 g8f6 b1c3 b8c6 g2g3 g7g6','g1f3 d7d5 g2g3 g8f6 f1g2 c7c6 e1g1 c8f5','g1f3 g8f6 c2c4 e7e6 b1c3 d7d5 d2d4 f8e7','e2e4 e7e5 f2f4 e5f4 g1f3 g7g5 h2h4 g5g4 f3e5 g8f6' ];
+function cpgCore(){   
+  
+  const START='rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', FILES='abcdefgh', KINDS='.pnbrqk', MAXPLY=64, STK=16384, MATE=30000, INF=32000;
+  const B=new Int8Array(128), sC=new Int8Array(STK), sE=new Int16Array(STK), sH=new Int16Array(STK), sLo=new Int32Array(STK), sHi=new Int32Array(STK), sM=new Int32Array(STK), sN=new Int16Array(STK);
+  let side=0, cast=0, ep=-1, half=0, full=1, kW=4, kB=116, hLo=0, hHi=0, sp=0, npW=0, npB=0, fromStart=1; const line=[];   
+  const KN=[-33,-31,-18,-14,14,18,31,33], KG=[-17,-16,-15,-1,1,15,16,17], BD=[-17,-15,15,17], RD=[-16,-1,1,16], CM=new Int8Array(128).fill(15); CM[0]=13; CM[7]=14; CM[4]=12; CM[112]=7; CM[119]=11; CM[116]=3;
+  
+  let zs=0x2F6E2B1; const zr=()=>{ zs^=zs<<13; zs^=zs>>>17; zs^=zs<<5; return zs|0; };
+  const ZPl=new Int32Array(2048), ZPh=new Int32Array(2048), ZCl=new Int32Array(16), ZCh=new Int32Array(16), ZEl=new Int32Array(8), ZEh=new Int32Array(8);
+  for(let i=0;i<2048;i++){ ZPl[i]=zr(); ZPh[i]=zr(); } for(let i=0;i<16;i++){ ZCl[i]=zr(); ZCh[i]=zr(); } for(let i=0;i<8;i++){ ZEl[i]=zr(); ZEh[i]=zr(); } const ZSl=zr(), ZSh=zr();
+  function rekey(){ let lo=0, hi=0; for(let s=0;s<120;s++){ if(s&0x88){ s+=7; continue; } const p=B[s]; if(p){ lo^=ZPl[(p<<7)|s]; hi^=ZPh[(p<<7)|s]; } } lo^=ZCl[cast]; hi^=ZCh[cast]; if(ep>=0){ lo^=ZEl[ep&7]; hi^=ZEh[ep&7]; } if(side){ lo^=ZSl; hi^=ZSh; } hLo=lo; hHi=hi; }
+  const sqName=s=>FILES[s&7]+((s>>4)+1), sqOf=t=>((t.charCodeAt(1)-49)<<4)|(t.charCodeAt(0)-97), mvStr=m=>sqName(m&127)+sqName((m>>7)&127)+(((m>>14)&7)? KINDS[(m>>14)&7] : '');
+
+  function att(sq,by){ const c=by<<3; let i,t,p,d;   
+    if(by){ t=sq+15; if(!(t&0x88) && B[t]===9) return 1; t=sq+17; if(!(t&0x88) && B[t]===9) return 1; } else { t=sq-15; if(!(t&0x88) && B[t]===1) return 1; t=sq-17; if(!(t&0x88) && B[t]===1) return 1; }
+    for(i=0;i<8;i++){ t=sq+KN[i]; if(!(t&0x88) && B[t]===(c|2)) return 1; t=sq+KG[i]; if(!(t&0x88) && B[t]===(c|6)) return 1; }
+    for(i=0;i<4;i++){ d=BD[i]; t=sq+d; while(!(t&0x88)){ p=B[t]; if(p){ if(p===(c|3) || p===(c|5)) return 1; break; } t+=d; } d=RD[i]; t=sq+d; while(!(t&0x88)){ p=B[t]; if(p){ if(p===(c|4) || p===(c|5)) return 1; break; } t+=d; } }
+    return 0; }
+  const inCheck=()=>att(side? kB : kW, side^1);
+
+  
+  function make(m){ const f=m&127, t=(m>>7)&127, pr=(m>>14)&7, fl=(m>>17)&3, cap=(m>>19)&15, p=B[f];
+    sC[sp]=cast; sE[sp]=ep; sH[sp]=half; sLo[sp]=hLo; sHi[sp]=hHi; sM[sp]=m; sN[sp]=npW|(npB<<6); sp++;
+    let lo=hLo^ZCl[cast], hi=hHi^ZCh[cast]; if(ep>=0){ lo^=ZEl[ep&7]; hi^=ZEh[ep&7]; } ep=-1; half++;
+    if(cap){ half=0; const cs=(fl===1)? (side? t+16 : t-16) : t; if(fl===1) B[cs]=0; lo^=ZPl[(cap<<7)|cs]; hi^=ZPh[(cap<<7)|cs]; if((cap&7)>1){ if(side) npW--; else npB--; } }
+    B[f]=0; lo^=ZPl[(p<<7)|f]; hi^=ZPh[(p<<7)|f]; const np=pr? ((p&8)|pr) : p; B[t]=np; lo^=ZPl[(np<<7)|t]; hi^=ZPh[(np<<7)|t];
+    if((p&7)===1){ half=0; if(pr){ if(side) npB++; else npW++; } else if(fl===3){ const foe=side? 1 : 9; if((!((t-1)&0x88) && B[t-1]===foe) || (!((t+1)&0x88) && B[t+1]===foe)) ep=(f+t)>>1; } }
+    else if((p&7)===6){ if(side) kB=t; else kW=t; if(fl===2){ const rf=(t>f)? t+1 : t-2, rt=(t>f)? t-1 : t+1, r=B[rf]; B[rf]=0; B[rt]=r; lo^=ZPl[(r<<7)|rf]^ZPl[(r<<7)|rt]; hi^=ZPh[(r<<7)|rf]^ZPh[(r<<7)|rt]; } }
+    cast&=CM[f]&CM[t]; lo^=ZCl[cast]; hi^=ZCh[cast]; if(ep>=0){ lo^=ZEl[ep&7]; hi^=ZEh[ep&7]; } if(side) full++; side^=1; hLo=lo^ZSl; hHi=hi^ZSh; }
+  function unmake(){ sp--; const m=sM[sp], f=m&127, t=(m>>7)&127, pr=(m>>14)&7, fl=(m>>17)&3, cap=(m>>19)&15; side^=1; if(side) full--;
+    let p=B[t]; if(pr) p=(p&8)|1; B[f]=p; B[t]=0; if(cap){ if(fl===1) B[side? t+16 : t-16]=cap; else B[t]=cap; }
+    if((p&7)===6){ if(side) kB=f; else kW=f; if(fl===2){ if(t>f){ B[t+1]=B[t-1]; B[t-1]=0; } else { B[t-2]=B[t+1]; B[t+1]=0; } } }
+    cast=sC[sp]; ep=sE[sp]; half=sH[sp]; hLo=sLo[sp]; hHi=sHi[sp]; npW=sN[sp]&63; npB=sN[sp]>>6; }
+  function makeNull(){ sC[sp]=cast; sE[sp]=ep; sH[sp]=half; sLo[sp]=hLo; sHi[sp]=hHi; sM[sp]=0; sN[sp]=npW|(npB<<6); sp++; if(ep>=0){ hLo^=ZEl[ep&7]; hHi^=ZEh[ep&7]; } ep=-1; half=0; side^=1; hLo^=ZSl; hHi^=ZSh; }   
+  function unmakeNull(){ sp--; side^=1; ep=sE[sp]; half=sH[sp]; hLo=sLo[sp]; hHi=sHi[sp]; }
+
+  
+  const ML=new Int32Array((MAXPLY+4)<<8), MV=new Int32Array((MAXPLY+4)<<8);
+  function gen(ply,caps){ let n=ply<<8; const us=side<<3, them=us^8, d=side? -16 : 16, lastR=side? 1 : 6, homeR=side? 6 : 1; let sq,p,k,t,c,i,o;
+    for(sq=0;sq<120;sq++){ if(sq&0x88){ sq+=7; continue; } p=B[sq]; if(!p || (p&8)!==us) continue; k=p&7;
+      if(k===1){ const last=(sq>>4)===lastR; t=sq+d;
+        if(!B[t]){ if(last){ ML[n++]=sq|(t<<7)|(5<<14); if(!caps){ ML[n++]=sq|(t<<7)|(2<<14); ML[n++]=sq|(t<<7)|(4<<14); ML[n++]=sq|(t<<7)|(3<<14); } } else if(!caps){ ML[n++]=sq|(t<<7); if((sq>>4)===homeR && !B[t+d]) ML[n++]=sq|((t+d)<<7)|(3<<17); } }
+        for(i=-1;i<2;i+=2){ t=sq+d+i; if(t&0x88) continue; c=B[t];
+          if(c && (c&8)===them){ if(last){ ML[n++]=sq|(t<<7)|(5<<14)|(c<<19); if(!caps){ ML[n++]=sq|(t<<7)|(2<<14)|(c<<19); ML[n++]=sq|(t<<7)|(4<<14)|(c<<19); ML[n++]=sq|(t<<7)|(3<<14)|(c<<19); } } else ML[n++]=sq|(t<<7)|(c<<19); }
+          else if(t===ep) ML[n++]=sq|(t<<7)|(1<<17)|((them|1)<<19); }
+      } else if(k===2 || k===6){ const O=(k===2)? KN : KG; for(i=0;i<8;i++){ t=sq+O[i]; if(t&0x88) continue; c=B[t]; if(!c){ if(!caps) ML[n++]=sq|(t<<7); } else if((c&8)===them) ML[n++]=sq|(t<<7)|(c<<19); }
+      } else { if(k!==4) for(i=0;i<4;i++){ o=BD[i]; t=sq+o; while(!(t&0x88)){ c=B[t]; if(!c){ if(!caps) ML[n++]=sq|(t<<7); } else { if((c&8)===them) ML[n++]=sq|(t<<7)|(c<<19); break; } t+=o; } }
+               if(k!==3) for(i=0;i<4;i++){ o=RD[i]; t=sq+o; while(!(t&0x88)){ c=B[t]; if(!c){ if(!caps) ML[n++]=sq|(t<<7); } else { if((c&8)===them) ML[n++]=sq|(t<<7)|(c<<19); break; } t+=o; } } } }
+    if(!caps){ const h=side? 112 : 0, K=side? 4 : 1, Q=side? 8 : 2, foe=side^1;   
+      if((cast&K) && B[h+4]===(us|6) && B[h+7]===(us|4) && !B[h+5] && !B[h+6] && !att(h+4,foe) && !att(h+5,foe) && !att(h+6,foe)) ML[n++]=(h+4)|((h+6)<<7)|(2<<17);
+      if((cast&Q) && B[h+4]===(us|6) && B[h]===(us|4) && !B[h+3] && !B[h+2] && !B[h+1] && !att(h+4,foe) && !att(h+3,foe) && !att(h+2,foe)) ML[n++]=(h+4)|((h+2)<<7)|(2<<17); }
+    return n-(ply<<8); }
+  function legal(){ const out=[], n0=(MAXPLY+2)<<8, cnt=gen(MAXPLY+2,0); for(let i=0;i<cnt;i++){ const m=ML[n0+i]; make(m); if(!att(side? kW : kB, side)) out.push(m); unmake(); } return out; }   
+  function perft(d){ if(d<=0) return 1; const ply=MAXPLY+2-d, n0=ply<<8, cnt=gen(ply,0); let n=0; for(let i=0;i<cnt;i++){ make(ML[n0+i]); if(!att(side? kW : kB, side)) n+=(d===1)? 1 : perft(d-1); unmake(); } return n; }   
+
+  
+  function reps(){ let n=0; for(let i=sp-2, lim=sp-half; i>=lim && i>=0; i-=2){ if(sLo[i]===hLo && sHi[i]===hHi) n++; } return n; }   
+  function few(){ let minors=0; for(let s=0;s<120;s++){ if(s&0x88){ s+=7; continue; } const k=B[s]&7; if(k===1 || k===4 || k===5) return 0; if(k===2 || k===3) minors++; } return minors<2? 1 : 0; }   
+
+  function set(fen){ const P=String(fen||START).trim().split(/\s+/), rows=(P[0]||'').split('/'); if(rows.length!==8) return false; const nb=new Int8Array(128); let wk=-1, bk=-1, nw=0, nbk=0;
+    for(let r=0;r<8;r++){ let f=0; for(const ch of rows[7-r]){ if(ch>='1' && ch<='8'){ f+=+ch; continue; } const k=KINDS.indexOf(ch.toLowerCase()); if(k<1 || f>7) return false; const s=(r<<4)|f, bl=(ch===ch.toLowerCase()); nb[s]=k|(bl? 8 : 0); if(k===6){ if(bl){ if(bk>=0) return false; bk=s; } else { if(wk>=0) return false; wk=s; } } if(k===1 && (r===0 || r===7)) return false; if(k>1 && k<6){ if(bl) nbk++; else nw++; } f++; } if(f!==8) return false; }
+    if(wk<0 || bk<0) return false; B.set(nb); kW=wk; kB=bk; npW=nw; npB=nbk; side=(P[1]==='b')? 1 : 0; cast=0; const cs=P[2]||'-';
+    if(cs.indexOf('K')>=0 && B[4]===6 && B[7]===4) cast|=1; if(cs.indexOf('Q')>=0 && B[4]===6 && B[0]===4) cast|=2; if(cs.indexOf('k')>=0 && B[116]===14 && B[119]===12) cast|=4; if(cs.indexOf('q')>=0 && B[116]===14 && B[112]===12) cast|=8;
+    ep=-1; if(P[3] && /^[a-h][36]$/.test(P[3])){ const e=sqOf(P[3]), pw=side? e+16 : e-16, me=side? 9 : 1, foe=side? 1 : 9; if(B[pw]===foe && !B[e] && ((!((pw-1)&0x88) && B[pw-1]===me) || (!((pw+1)&0x88) && B[pw+1]===me))) ep=e; }
+    half=Math.max(0,Math.min(200,parseInt(P[4],10)||0)); full=Math.max(1,parseInt(P[5],10)||1); sp=0; line.length=0; rekey(); fromStart=(fenOut()===START)? 1 : 0;
+    if(att(side? kW : kB, side)){ set(START); return false; } return true; }   
+  function fenOut(){ let s=''; for(let r=7;r>=0;r--){ let e=0; for(let f=0;f<8;f++){ const p=B[(r<<4)|f]; if(!p){ e++; continue; } if(e){ s+=e; e=0; } const ch=KINDS[p&7]; s+=(p&8)? ch : ch.toUpperCase(); } if(e) s+=e; if(r) s+='/'; }
+    return s+(side? ' b ' : ' w ')+(cast? ((cast&1? 'K' : '')+(cast&2? 'Q' : '')+(cast&4? 'k' : '')+(cast&8? 'q' : '')) : '-')+' '+(ep>=0? sqName(ep) : '-')+' '+half+' '+full; }
+
+  
+  const VAL=[0,100,320,330,500,900,0], PB=[0,5,10,20,35,60,100,0];
+  const T0=[[],
+   [0,0,0,0,0,0,0,0, 50,50,50,50,50,50,50,50, 10,10,20,30,30,20,10,10, 5,5,10,25,25,10,5,5, 0,0,0,20,20,0,0,0, 5,-5,-10,0,0,-10,-5,5, 5,10,10,-20,-20,10,10,5, 0,0,0,0,0,0,0,0],
+   [-50,-40,-30,-30,-30,-30,-40,-50, -40,-20,0,0,0,0,-20,-40, -30,0,10,15,15,10,0,-30, -30,5,15,20,20,15,5,-30, -30,0,15,20,20,15,0,-30, -30,5,10,15,15,10,5,-30, -40,-20,0,5,5,0,-20,-40, -50,-40,-30,-30,-30,-30,-40,-50],
+   [-20,-10,-10,-10,-10,-10,-10,-20, -10,0,0,0,0,0,0,-10, -10,0,5,10,10,5,0,-10, -10,5,5,10,10,5,5,-10, -10,0,10,10,10,10,0,-10, -10,10,10,10,10,10,10,-10, -10,5,0,0,0,0,5,-10, -20,-10,-10,-10,-10,-10,-10,-20],
+   [0,0,0,0,0,0,0,0, 5,10,10,10,10,10,10,5, -5,0,0,0,0,0,0,-5, -5,0,0,0,0,0,0,-5, -5,0,0,0,0,0,0,-5, -5,0,0,0,0,0,0,-5, -5,0,0,0,0,0,0,-5, 0,0,0,5,5,0,0,0],
+   [-20,-10,-10,-5,-5,-10,-10,-20, -10,0,0,0,0,0,0,-10, -10,0,5,5,5,5,0,-10, -5,0,5,5,5,5,0,-5, 0,0,5,5,5,5,0,-5, -10,5,5,5,5,5,0,-10, -10,0,5,0,0,0,0,-10, -20,-10,-10,-5,-5,-10,-10,-20],
+   [-30,-40,-40,-50,-50,-40,-40,-30, -30,-40,-40,-50,-50,-40,-40,-30, -30,-40,-40,-50,-50,-40,-40,-30, -30,-40,-40,-50,-50,-40,-40,-30, -20,-30,-30,-40,-40,-30,-30,-20, -10,-20,-20,-20,-20,-20,-20,-10, 20,20,0,0,0,0,20,20, 20,30,10,0,0,10,30,20]],
+   KE=[-50,-40,-30,-20,-20,-30,-40,-50, -30,-20,-10,0,0,-10,-20,-30, -30,-10,20,30,30,20,-10,-30, -30,-10,30,40,40,30,-10,-30, -30,-10,30,40,40,30,-10,-30, -30,-10,20,30,30,20,-10,-30, -30,-30,0,0,0,0,-30,-30, -50,-30,-30,-30,-30,-30,-30,-50];
+  const PT=new Int16Array(2048), PE=new Int16Array(256);   
+  for(let k=1;k<7;k++) for(let r=0;r<8;r++) for(let f=0;f<8;f++){ const s=(r<<4)|f; PT[(k<<7)|s]=VAL[k]+T0[k][((7-r)<<3)|f]; PT[((k|8)<<7)|s]=-(VAL[k]+T0[k][(r<<3)|f]); if(k===6){ PE[s]=KE[((7-r)<<3)|f]; PE[128|s]=-KE[(r<<3)|f]; } }
+  const PH=[0,0,1,1,2,4,0], wMin=new Int8Array(10), bMax=new Int8Array(10), pwn=new Int16Array(16);
+  const dist=(a,b)=>Math.max(Math.abs((a&7)-(b&7)), Math.abs((a>>4)-(b>>4))), cmd=s=>{ const f=s&7, r=s>>4; return (f<4? 3-f : f-4)+(r<4? 3-r : r-4); };
+  let useEg=0;
+  function evalPos(){ let s=0, ph=0, nP=0, wB=0, bB=0, mW=0, mB=0, sq, p, k; wMin.fill(9); bMax.fill(-1);
+    for(sq=0;sq<120;sq++){ if(sq&0x88){ sq+=7; continue; } p=B[sq]; if(!p) continue; k=p&7; if(k!==6) s+=PT[(p<<7)|sq]; ph+=PH[k];
+      if(p&8){ mB+=VAL[k]; if(k===1){ pwn[nP++]=sq|128; if((sq>>4)>bMax[(sq&7)+1]) bMax[(sq&7)+1]=sq>>4; } else if(k===3) bB++; }
+      else { mW+=VAL[k]; if(k===1){ pwn[nP++]=sq; if((sq>>4)<wMin[(sq&7)+1]) wMin[(sq&7)+1]=sq>>4; } else if(k===3) wB++; } }
+    if(!nP && ph<2) return 0;   
+    if(ph>24) ph=24; const e=24-ph;
+    if(useEg) s+=((PT[768|kW]+PT[1792|kB])*ph+(PE[kW]+PE[128|kB])*e)/24|0; else s+=PT[768|kW]+PT[1792|kB];
+    if(wB>1) s+=30; if(bB>1) s-=30;
+    for(let i=0;i<nP;i++){ const q=pwn[i]&127, f=(q&7)+1, r=q>>4;   
+      if(pwn[i]&128){ if(wMin[f-1]>=r && wMin[f]>=r && wMin[f+1]>=r){ let b=PB[7-r]; if(useEg) b+=(b*e/24|0)+((dist(kW,q&7)-dist(kB,q&7))*5*e/24|0); s-=b; } }
+      else if(bMax[f-1]<=r && bMax[f]<=r && bMax[f+1]<=r){ let b=PB[r]; if(useEg) b+=(b*e/24|0)+((dist(kB,112|(q&7))-dist(kW,112|(q&7)))*5*e/24|0); s+=b; } }
+    if(mW-mB>=400 && mB<=330) s+=20*cmd(kB)+8*(14-Math.abs((kW&7)-(kB&7))-Math.abs((kW>>4)-(kB>>4)));   
+    else if(mB-mW>=400 && mW<=330) s-=20*cmd(kW)+8*(14-Math.abs((kW&7)-(kB&7))-Math.abs((kW>>4)-(kB>>4)));
+    return side? -s : s; }
+
+  
+  const now=(typeof performance!=='undefined' && performance.now)? ()=>performance.now() : ()=>Date.now();
+  let nodes=0, stop=0, deadline=0, useQ=0, deep=0, tBits=0, tMask=0, tLo=null, tHi=null, tM=null, tV=null, tD=null, tF=null;
+  const kil=new Int32Array((MAXPLY+4)*2), hist=new Int32Array(2048);
+  function table(bits){ if(tLo && tBits===bits){ tLo.fill(0); tHi.fill(0); tD.fill(0); return; } tBits=bits; const n=1<<bits; tMask=n-1; tLo=new Int32Array(n); tHi=new Int32Array(n); tM=new Int32Array(n); tV=new Int16Array(n); tD=new Int8Array(n); tF=new Int8Array(n); }
+  function order(ply,cnt,ttm){ const n0=ply<<8, k1=kil[ply*2], k2=kil[ply*2+1]; for(let i=n0;i<n0+cnt;i++){ const m=ML[i], cap=(m>>19)&15; MV[i]=(m===ttm)? 1e7 : cap? 1e6+(VAL[cap&7]<<4)-VAL[B[m&127]&7]/10+(((m>>14)&7)? 900 : 0) : ((m>>14)&7)? 9e5 : (m===k1)? 8e5 : (m===k2)? 7e5 : hist[(B[m&127]<<7)|((m>>7)&127)]; } }
+  function pick(n0,i,cnt){ let b=i, bv=MV[n0+i]; for(let j=i+1;j<cnt;j++){ if(MV[n0+j]>bv){ bv=MV[n0+j]; b=j; } } if(b!==i){ const m=ML[n0+b], v=MV[n0+b]; ML[n0+b]=ML[n0+i]; MV[n0+b]=MV[n0+i]; ML[n0+i]=m; MV[n0+i]=v; } return ML[n0+i]; }
+  function quiet(alpha,beta,ply){ if((++nodes&2047)===0 && now()>deadline) stop=1; if(stop) return 0; const st=evalPos(); if(st>=beta || ply>=MAXPLY) return st; if(st>alpha) alpha=st;
+    const n0=ply<<8, cnt=gen(ply,1); order(ply,cnt,0);
+    for(let i=0;i<cnt;i++){ const m=pick(n0,i,cnt); make(m); if(att(side? kW : kB, side)){ unmake(); continue; } const v=-quiet(-beta,-alpha,ply+1); unmake(); if(stop) return 0; if(v>alpha){ if(v>=beta) return v; alpha=v; } }
+    return alpha; }
+  function search(depth,alpha,beta,ply,nullOk){ if((++nodes&2047)===0 && now()>deadline) stop=1; if(stop) return 0;
+    if(half>=100 || reps()) return 0;   
+    const chk=inCheck(); if(chk && useQ) depth++;
+    if(depth<=0) return useQ? quiet(alpha,beta,ply) : evalPos(); if(ply>=MAXPLY) return evalPos();
+    const ix=hLo&tMask, a0=alpha; let ttm=0;
+    if(tLo[ix]===hLo && tHi[ix]===hHi && tD[ix]>0){ ttm=tM[ix]; if(tD[ix]>=depth){ let v=tV[ix]; if(v>MATE-200) v-=ply; else if(v<-MATE+200) v+=ply; const fl=tF[ix]; if(fl===0 || (fl===1 && v>=beta) || (fl===2 && v<=alpha)) return v; } }
+    if(deep && nullOk && !chk && depth>=3 && (side? npB : npW)>0 && evalPos()>=beta){ makeNull(); const v=-search(depth-3,-beta,-beta+1,ply+1,0); unmakeNull(); if(stop) return 0; if(v>=beta && v<MATE-200) return beta; }
+    const n0=ply<<8, cnt=gen(ply,0); order(ply,cnt,ttm); let best=-INF, bm=0, n=0;
+    for(let i=0;i<cnt;i++){ const m=pick(n0,i,cnt); make(m); if(att(side? kW : kB, side)){ unmake(); continue; } n++; const calm=!((m>>19)&15) && !((m>>14)&7); let v;
+      if(deep && depth>=3 && n>4 && calm && !chk){ v=-search(depth-2,-alpha-1,-alpha,ply+1,1); if(v>alpha && !stop) v=-search(depth-1,-beta,-alpha,ply+1,1); } else v=-search(depth-1,-beta,-alpha,ply+1,1);
+      unmake(); if(stop) return 0;
+      if(v>best){ best=v; bm=m; if(v>alpha){ alpha=v; if(v>=beta){ if(calm){ if(kil[ply*2]!==m){ kil[ply*2+1]=kil[ply*2]; kil[ply*2]=m; } hist[(B[m&127]<<7)|((m>>7)&127)]+=depth*depth; } break; } } } }
+    if(!n) return chk? -MATE+ply : 0;   
+    let sv=best; if(sv>MATE-200) sv+=ply; else if(sv<-MATE+200) sv-=ply; tLo[ix]=hLo; tHi[ix]=hHi; tM[ix]=bm; tV[ix]=sv; tD[ix]=depth>127? 127 : depth; tF[ix]=(best>=beta)? 1 : (best>a0)? 0 : 2;
+    return best; }
+  function root(maxd,skip){ const lm=legal().filter(m=>m!==skip); let best=lm[0]||0, bestV=-INF, d9=0; if(lm.length<2 && !skip) return { m:best, v:0, d:0 };
+    for(let d=1; d<=maxd && d<MAXPLY-4; d++){ let alpha=-INF, bm=0, done=0;
+      for(let i=0;i<lm.length;i++){ make(lm[i]); const v=-search(d-1,-INF,-alpha,1,1); unmake(); if(stop) break; done++; if(v>alpha || !bm){ alpha=v; bm=lm[i]; } }
+      if(bm && (!stop || done)){ best=bm; bestV=alpha; d9=stop? d-1 : d; const j=lm.indexOf(bm); lm.splice(j,1); lm.unshift(bm); }   
+      if(stop || bestV>MATE-200 || bestV<-MATE+200) break; }
+    return { m:best, v:bestV, d:d9 }; }
+
+  
+  
+  function think(T,o){ o=o||{}; const t0=now(), lm=legal(); if(!lm.length) return null; let z=((o.seed|0)^hLo^Math.imul(sp+1,0x9E3779B1))|0; const rnd=()=>{ z=(z+0x6D2B79F5)|0; let t=Math.imul(z^(z>>>15),1|z); t=(t+Math.imul(t^(t>>>7),61|t))^t; return ((t^(t>>>14))>>>0)/4294967296; };
+    const out=(m,x)=>Object.assign({ move:mvStr(m), nodes, ms:Math.round(now()-t0) }, x);
+    nodes=0;
+    if(T.book && o.book && fromStart){ const pre=line.join(' '), next=[]; for(const L of o.book){ if(pre.length && L.indexOf(pre+' ')!==0) continue; const w=L.slice(pre.length? pre.length+1 : 0).split(' ')[0]; if(w && lm.some(m=>mvStr(m)===w)) next.push(w); } if(next.length){ const w=next[Math.floor(rnd()*next.length)]; return out(lm.find(m=>mvStr(m)===w),{ book:1, depth:0, score:0 }); } }
+    if(T.slip && lm.length>1 && rnd()<T.slip) return out(lm[Math.floor(rnd()*lm.length)],{ slip:1, depth:0, score:0 });   
+    useQ=T.q? 1 : 0; useEg=T.eg? 1 : 0; deep=(T.d>=6)? 1 : 0; stop=0; deadline=t0+(o.ms||T.ms||1000)*(deep? 0.9 : 1); table(o.bits||18); kil.fill(0); hist.fill(0);
+    let R=root(T.d,0), slip=0;
+    if(T.slip2 && lm.length>1 && !stop && rnd()<T.slip2){ const R2=root(T.d,R.m); if(R2.m && !stop){ R=R2; slip=2; } }   
+    return out(R.m,{ depth:R.d, score:R.v, slip, cut:stop }); }
+
+  
+  const s64=s=>(s&7)|((s>>4)<<3), show=m=>({ s:mvStr(m), from:s64(m&127), to:s64((m>>7)&127), piece:KINDS[B[m&127]&7], take:((m>>19)&15)? KINDS[(m>>19)&7] : '', ep:((m>>17)&3)===1, castle:(((m>>17)&3)===2)? ((((m>>7)&127)>(m&127))? 'k' : 'q') : '', promo:((m>>14)&7)? KINDS[(m>>14)&7] : '' });
+  function play(s){ const m=legal().find(x=>mvStr(x)===s); if(!m) return null; const v=show(m); make(m); line.push(v.s); return v; }
+  function undo(){ if(!line.length) return false; unmake(); line.pop(); return true; }
+  function state(){ const n=legal().length, chk=!!inCheck(); let over=null; if(!n) over=chk? 'mate' : 'stale'; else if(few()) over='few'; else if(half>=100) over='fifty'; else if(reps()>=2) over='rep';
+    return { turn:side? 'b' : 'w', check:chk, over, win:(over==='mate')? (side? 'w' : 'b') : null, fen:fenOut(), moves:line.slice(), half, full, n, key:(hLo>>>0).toString(16)+'.'+(hHi>>>0).toString(16) }; }
+  function load(o){ if(!set(START)) return false; const mv=(o && o.moves) || []; for(const s of mv){ if(!play(s)) break; } if(o && o.fen && (line.length!==mv.length || fenOut()!==o.fen)) return set(o.fen); return true; }   
+  function board(){ const a=[]; for(let i=0;i<64;i++){ const p=B[((i>>3)<<4)|(i&7)]; a.push(p? ((p&8)? KINDS[p&7] : KINDS[p&7].toUpperCase()) : ''); } return a; }   
+  set(START);
+  return { START, set, load, fen:fenOut, board, moves:()=>legal().map(show), play, undo, state, perft, think, evalNow:eg=>{ useEg=eg? 1 : 0; return evalPos(); } }; }
+
+
+function cpgNew(tier,o){ o=o||{}; const G={ tier:CPG_TIER[tier]? tier : 'e', seed:(o.seed!=null)? (o.seed|0) : ((Date.now()^0x5F3759DF)&0x7fffffff), E:cpgCore(), want:0 }; if(o.moves || o.fen) G.E.load({ fen:o.fen, moves:o.moves }); return G; }
+function cpgSave(G){ const s=G.E.state(); return { fen:s.fen, moves:s.moves, tier:G.tier, seed:G.seed }; }
+function cpgLoad(o){ return (o && CPG_TIER[o.tier] && typeof o.fen==='string')? cpgNew(o.tier,{ seed:o.seed, fen:o.fen, moves:Array.isArray(o.moves)? o.moves : [] }) : null; }
+
+let CPG_W=null, CPG_ID=0; const CPG_ASK={};
+function cpgWorkerSrc(){ return 'const E=('+cpgCore.toString()+')();\nonmessage=function(ev){ const d=ev.data||{}; let r=null, err=null; try{ if(!E.load({ fen:d.fen, moves:d.moves })) err="position"; else r=E.think(d.T,{ seed:d.seed, book:d.book, bits:18 }); }catch(e){ err=String((e && e.message) || e); } postMessage({ id:d.id, r:r, err:err }); };'; }
+function cpgWorkerDown(){ CPG.noWorker=1; const w=CPG_W; CPG_W=null; try{ if(w) w.terminate(); }catch(e){} for(const id of Object.keys(CPG_ASK)){ const a=CPG_ASK[id]; delete CPG_ASK[id]; clearTimeout(a.late); cpgThinkHere(a); } }   
+function cpgWorker(){ if(CPG_W || CPG.noWorker) return CPG_W;
+  try{ const w=new Worker(URL.createObjectURL(new Blob([cpgWorkerSrc()],{ type:'text/javascript' })));
+    w.onmessage=ev=>{ const d=ev.data||{}, a=CPG_ASK[d.id]; if(!a) return; delete CPG_ASK[d.id]; clearTimeout(a.late); if(d.err || !d.r){ cpgThinkHere(a); return; } CPG.got++; d.r.via='worker'; cpgLand(a,d.r); };
+    w.onerror=()=>cpgWorkerDown(); CPG_W=w; }catch(e){ CPG.noWorker=1; CPG_W=null; }
+  return CPG_W; }
+function cpgLand(a,r){ const T=CPG_TIER[a.G.tier], floor=a.now? 0 : (T.d<4)? T.ms : CPG.floor, left=floor-(Date.now()-a.t0); setTimeout(()=>{ if(a.G.want===a.id){ a.G.want=0; a.cb(r); } }, Math.max(0,left)); }   
+function cpgThinkHere(a){ setTimeout(()=>{ let r=null; try{ r=a.G.E.think(CPG_TIER[a.G.tier],{ seed:a.G.seed, book:a.book, bits:16, ms:Math.min(CPG_TIER[a.G.tier].ms,CPG.syncMs) }); }catch(e){} CPG.sync++; if(r) r.via='page'; cpgLand(a,r); }, 30); }   
+function cpgThink(G,cb,o){ o=o||{}; const T=CPG_TIER[G.tier], s=G.E.state(), a={ id:++CPG_ID, G, cb, t0:Date.now(), now:o.now? 1 : 0, book:T.book? CPG_BOOK : null, late:0 }; G.want=a.id; CPG.sent++;   
+  if(s.over){ cpgLand(a,null); return a.id; } const w=o.here? null : cpgWorker(); if(!w){ cpgThinkHere(a); return a.id; }
+  CPG_ASK[a.id]=a; a.late=setTimeout(()=>{ if(CPG_ASK[a.id]) cpgWorkerDown(); }, T.ms+CPG.late);
+  try{ w.postMessage({ id:a.id, fen:s.fen, moves:s.moves, T, seed:G.seed, book:a.book }); }catch(e){ cpgWorkerDown(); }
+  return a.id; }
+function cpgStop(G){ if(G) G.want=0; }
+setTimeout(()=>{ try{ if(window.GVT && !GVT.cpg) GVT.cpg={ on:v=>{ if(v!=null) CPG.on=v? 1 : 0; return CPG.on; }, dial:()=>CPG, tiers:()=>CPG_TIER, book:()=>CPG_BOOK, core:()=>cpgCore(), fresh:(tier,o)=>cpgNew(tier,o), think:(G,cb,o)=>cpgThink(G,cb,o), stop:G=>cpgStop(G), save:G=>cpgSave(G), load:o=>cpgLoad(o), src:()=>cpgWorkerSrc(), worker:()=>!!cpgWorker(), down:()=>cpgWorkerDown(), read:()=>({ on:CPG.on, worker:!!CPG_W, noWorker:CPG.noWorker, sent:CPG.sent, got:CPG.got, sync:CPG.sync, owed:Object.keys(CPG_ASK).length }) }; }catch(e){} }, 0);   
+
+
+
+
+
+
 
 
 
@@ -82481,7 +82673,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='20.97';        
+let GVT_CV='20.98';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
