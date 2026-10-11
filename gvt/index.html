@@ -80125,7 +80125,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='20.16';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='20.17';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -152782,6 +152782,51 @@ function sra2Always(face){
 }
 (window.SRA_ALWAYS=window.SRA_ALWAYS||[]).push(sra2Always);
 // ═══ CARD-SRA2 ends ═══
+// ═══ CARD-P43 THE HULA DANCER'S AND THE LIMBO MAN'S TAP AREAS MOVE INWARD (PND-43; design/conga-dancers-1009/p43/00-BUILD-P43.md; board P43, lane gvt). WYATT'S WORD by Discord,
+// Sat 10/10/2026 21:02 EDT, his reply to the WAITING ON WYATT list, verbatim: "Go with recommendations for all here" (PND-43: "the hula dancer's and the limbo man's tap areas sit at your
+// phone's left edge" · REC "move both inward"). Laura's room (her tap areas, SRA's layoutHits, untouched): on a glass that cuts her picture (his phone shows x 95 .. 1505 of 1600), the hula
+// dancer's area lay mostly past the left edge (about 10 px of it on the glass) and the limbo man's started past it. NOW each of the two slides right, its size kept, until it starts at the
+// glass's left edge, whenever part of its figure shows there (3 px or more; a figure wholly past the edge keeps its area there: no tap on an empty floor plays an unseen dance); never further
+// right than that, so as the pinch widens the view it slides back with the edge and, the whole room on the glass, sits where Laura laid it. Where a slid area meets a still neighbour's (the left
+// stool man's, the hibiscus pot's) the slid one gives way; the movers' areas stay under the still ones, as she laid them. It follows every lay-out (each face load, a card's SRA.layoutHits),
+// every resize and every pinch (a number compared on the room's own clock; the glass is read only when the view changes). No picture, no other area, no word, save, wire or server byte. ═══
+const P43 = { keys: ['hula', 'limbo'], els: null, home: null, fig: null, z: null };
+function p43Win(){   // the glass's own window on Laura's picture (x0 .. x1 in her units) through the top layer's matrix: the slice, the pinch, the meet all in it · k = css px a unit
+  const bg = document.getElementById('srmBg'), sv = SRA.svg, m = sv && sv.getScreenCTM && sv.getScreenCTM(); if(!bg || !m) return null;
+  const r = bg.getBoundingClientRect(); if(!r.width || !r.height) return null;
+  const i = m.inverse(), a = new DOMPoint(r.left, r.top).matrixTransform(i), b = new DOMPoint(r.right, r.bottom).matrixTransform(i);
+  return b.x > a.x ? { x0: a.x, x1: b.x, k: r.width / (b.x - a.x) } : null;
+}
+function p43Place(){
+  const L = document.getElementById('x-hits'); if(!L || !srmSceneOpen()) return;
+  const els = P43.keys.map(k => { const g = L.querySelector('g.hit[data-k="' + k + '"]'); return g && g.querySelector('rect'); });
+  if(!P43.els || els.some((e, i) => e !== P43.els[i])){   // a new lay-out minted new areas: read Laura's places once (and her figures' boxes, at rest)
+    P43.els = els; P43.home = els.map(e => e && { x0: +e.getAttribute('x'), y0: +e.getAttribute('y'), x1: +e.getAttribute('x') + +e.getAttribute('width'), y1: +e.getAttribute('y') + +e.getAttribute('height') });
+    P43.fig = P43.keys.map(k => { const t = SRA.TARGETS.find(q => q.fn === k); try { return t ? SRA.boxOf(t) : null; } catch(e){ return null; } });
+  }
+  const W = p43Win(); if(!W) return; P43.z = SRZ.z;
+  const movers = SRA.MOVING.map(m => m.fn), still = [...L.querySelectorAll('g.hit')].filter(g => { const k = g.getAttribute('data-k'); return !P43.keys.includes(k) && !movers.includes(k); })
+    .map(g => g.querySelector('rect')).filter(Boolean).map(e => ({ x0: +e.getAttribute('x'), y0: +e.getAttribute('y'), x1: +e.getAttribute('x') + +e.getAttribute('width'), y1: +e.getAttribute('y') + +e.getAttribute('height') }));
+  P43.keys.forEach((k, i) => {
+    const e = P43.els[i], h = P43.home[i], f = P43.fig[i]; if(!e || !h) return;
+    const a = { x0: h.x0, x1: h.x1, y0: h.y0, y1: h.y1 }, shows = f && (Math.min(f.x1, W.x1) - Math.max(f.x0, W.x0)) * W.k >= 3;
+    if(shows && a.x0 < W.x0){ const d = W.x0 - a.x0; a.x0 += d; a.x1 += d;   // inward: it starts at the glass's left edge
+      for(const o of still){ const ox = Math.min(a.x1, o.x1) - Math.max(a.x0, o.x0), oy = Math.min(a.y1, o.y1) - Math.max(a.y0, o.y0); if(ox <= 0.01 || oy <= 0.01) continue;   // the slid one gives way
+        if(ox < oy){ if(a.x0 + a.x1 < o.x0 + o.x1) a.x1 = o.x0; else a.x0 = o.x1; } else { if(a.y0 + a.y1 < o.y0 + o.y1) a.y1 = o.y0; else a.y0 = o.y1; } } }
+    const w = a.x1 - a.x0, hh = a.y1 - a.y0, f2 = v => (+v).toFixed(2), tight = w < 69.5 || hh < 69.5, g = e.parentNode, lb = g && g.querySelector('text');
+    e.setAttribute('x', f2(a.x0)); e.setAttribute('y', f2(a.y0)); e.setAttribute('width', f2(w)); e.setAttribute('height', f2(hh));
+    if(g){ g.classList.toggle('tight', tight); }
+    if(lb){ lb.setAttribute('x', f2(a.x0 + 3)); lb.setAttribute('y', f2(a.y0 + 12)); lb.textContent = String(lb.textContent).split(' ')[0] + (tight ? '  ' + Math.round(w) + 'x' + Math.round(hh) : ''); }
+  });
+}
+(function p43Seat(){
+  if(typeof SRA === 'undefined') return;
+  const lh = SRA.layoutHits; SRA.layoutHits = function(){ const r = lh.apply(this, arguments); p43Place(); return r; };   // a card's own call (the shark fin's, a tick after the load)
+  (window.SRA_ALWAYS = window.SRA_ALWAYS || []).push(function p43Always(){ P43.els = null; p43Place(); P43.z = NaN;   // every face load: after her lay-out, and again on the clock's first tick (srmRender crops the room after the load)
+    SRA.tick(function p43Tick(){ if(SRZ.z !== P43.z) p43Place(); }); });   // the pinch, on the room's clock
+  window.addEventListener('resize', function(){ if(srmSceneOpen()) p43Place(); });   // after srmLayout's own (the crop, the pinch's box)
+})();
+// ═══ CARD-P43 ends ═══
 function parkHeroURI(id){
   const key=id+'URI';
   if(PARK_HERO[key]) return PARK_HERO[key];
