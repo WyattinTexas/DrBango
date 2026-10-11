@@ -74274,7 +74274,8 @@ function themeDecode(){ try{
 
 
 
-if(META.themeOn && roomCur()==='bedroom' && !rcpOn()) themeDecode();   
+
+    
 
 
 
@@ -74285,13 +74286,31 @@ const TRS={ on:1, watch:48, n:0, iv:0 };
 function trsSeat(){ return S.mode==='menu' || (!!TRS.on && S.mode==='title'); }   
 function trsDoor(){ try{ if(!TRS.on) return; if(THEME.armed && !THEME.started && !THEME.dead){ themeDisarm(); THEME.probed=false; } else if(THEME.dead && !THEME.src && !THEME.armed) themeHome(); }catch(e){} }   
 function trsTick(){ try{ if(!TRS.on || S.mode!=='title' || THEME.started || THEME.dead || ++TRS.n>TRS.watch){ clearInterval(TRS.iv); TRS.iv=0; return; } if(THEME.armed && THEMEB.buf && AC && AC.state==='running') themeTry(); }catch(e){} }   
-if(TRS.on && THEMEB.busy){ THEME.want=true; TRS.n=0; TRS.iv=setInterval(trsTick, 250); }   
+
+
+
+
+
+const ODVT={ on:1, light:1 };   
+function odvThemeBoot(){ try{
+  if(!ODVT.on){ themeDecode(); if(TRS.on && THEMEB.busy){ THEME.want=true; TRS.n=0; TRS.iv=setInterval(trsTick, 250); } return; }   
+  if(!TRS.on || (window.GVT_TIER|0)>=ODVT.light) return;   
+  const a=new Audio(THEME_PROBE), p=a.play();   
+  if(p && p.then) p.then(()=>{ try{ a.pause(); }catch(e){} odvThemeTitle(); }, ()=>{});
+}catch(e){} }
+function odvThemeTitle(){ try{
+  if(S.mode!=='title' || THEME.started || THEME.dead || !META.themeOn || locNow() || (window.GVT_TIER|0)>=ODVT.light) return;   
+  THEME.want=true; themeDecode();   
+  if(THEMEB.busy && !TRS.iv){ TRS.n=0; TRS.iv=setInterval(trsTick, 250); }   
+}catch(e){} }
+if(META.themeOn && roomCur()==='bedroom' && !rcpOn()) odvThemeBoot();   
+
 try{ document.getElementById('title').addEventListener('pointerdown', trsDoor); }catch(e){}   
 
 function themeTry(){
   if(THEME.started||THEME.dead||!trsSeat()||!META.themeOn||locNow()) return;   
   if(qtWait()){ THEME.want=true; return; }                   
-  if(!THEMEB.buf){ THEME.want=true; return; }               
+  if(!THEMEB.buf){ THEME.want=true; themeDecode(); return; }   
   if(AC && AC.state==='running'){ themeStart(); return; }   
   if(!THEME.probed){ THEME.probed=true; themeProbe(); return; }
   themeArm();
@@ -80241,7 +80260,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='20.22';        
+let GVT_CV='20.23';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
