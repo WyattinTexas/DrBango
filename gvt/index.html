@@ -81230,7 +81230,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='20.42';        
+let GVT_CV='20.43';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -136138,7 +136138,7 @@ function glassSpawnFly(wx,wy){
     f.addEventListener('pointermove', glassMoveEv);
     f.addEventListener('pointerup', glassDropEv);
     f.addEventListener('pointercancel', glassDropEv);
-    st.appendChild(f);
+    st.appendChild(f); try{ dlgGlass(); }catch(e){}   
     
     const g=document.getElementById('ro-glass'); if(g) g.style.opacity='0';
     
@@ -170498,6 +170498,10 @@ const DLG_DOZE_MS=(typeof window.__DLG_DOZE==='number')? window.__DLG_DOZE : 450
 const DLG_FEW=8, DLG_SLICE_MS=8, DLG_HOLD_MS=1500, DLG_STIR_MS=1200, DLG_DRAG_MS=2500, DLG_PARK_MAX=12000, DLG_ROAM=40;   
 const DLG_LIFE_MORE='#ro-zombie, #ro-witch, #ro-witch-sh, .ro-wch, #ro-ship, #ro-glass, #ro-raid, #ro-rave, #ro-chest';   
 function dlgLifeSel(){ return GV_WALK_SEL+', '+GV_LIFE_SEL+', '+DLG_LIFE_MORE; }
+
+
+
+const DLG_LIFE_FLOOR={ backyard:'.rfloor, #by-live', winter:'#wf-movers, #fg-tee', rooftop:'.rfloor, #rf-hole, #rf-pigeons, #ro-skyfort, #ro-hookrig', attic:'.rfloor' };
 const DLGP={ on:1, moved:new Set(), snapMax:0, svg:null, belt:null, units:[], sleep:new Set(), held:new Set(), until:new Map(), budget:[], queue:[], pics:new Map(), serCache:new Map(), park:null, parkT:0, pend:0, busy:0, rotT:0, touchT:0, dozeN:0, capK:'', parking:new Set(), layDue:0, layT:0, raf:0, tok:0, mo:null, ro:null, vis:null, defs:'', ctx:'', dd:3, sc:0, scT:0, fr:0,
   back:null, mid:null, front:null, beltSvg:null, top:null, topN:0, lay:null, layN:null, layMs:0, cuts:0, settleMs:0, makeMs:0, encMs:0, made:0, hits:0, px:0, stirs:0, stirBy:{}, dozing:0, fmt:'png', log:[] };   
 
@@ -170549,15 +170553,15 @@ function dlgDots(){ const dpr=window.devicePixelRatio||1; return Math.min(dpr, (
 
 function dlgPicture(u){ const svg=DLGP.svg, m=svg.getScreenCTM(); if(!m) return Promise.resolve(null); const dpr=window.devicePixelRatio||1, sc=Math.abs(m.a)*DLGP.dd;
   let bx=u.__box; const V=DLGP.vis; if(bx && V){ bx=[Math.max(bx[0], V[0]), Math.max(bx[1], V[1]), Math.min(bx[2], V[2]), Math.min(bx[3], V[3])]; if(bx[2]<=bx[0] || bx[3]<=bx[1]) bx=null; }   
-  if(!bx) return Promise.resolve(null);
+  if(!bx) return Promise.resolve(null); const whole=!V || dlgIn(u.__box, V);   
   let [x0, y0, x1, y1]=bx; { const dx=(m.a*x0+m.e)*dpr, dy=(m.d*y0+m.f)*dpr; x0=(Math.floor(dx)/dpr-m.e)/m.a; y0=(Math.floor(dy)/dpr-m.f)/m.d; }   
   const W=Math.max(1, Math.ceil((x1-x0)*sc)), H=Math.max(1, Math.ceil((y1-y0)*sc)); const w=W/sc, h=H/sc;
   const hid=DLGP.sleep.has(u); if(hid){ u.style.display=''; dlgSpend(u); dlgLoops0(u); }   
   const part=dlgSer(u); if(hid) u.style.display='none'; if(!part) return Promise.resolve(null);
-  const ck=W+'x'+H+'|'+bx.map(v=>v.toFixed(2)).join(',')+'|'+part; DLGP.px+=W*H; const hit=DLGP.pics.get(ck); if(hit){ DLGP.hits++; return Promise.resolve({ rec:hit, x:x0, y:y0, w, h }); }
+  const ck=W+'x'+H+'|'+bx.map(v=>v.toFixed(2)).join(',')+'|'+part; DLGP.px+=W*H; const hit=DLGP.pics.get(ck); if(hit){ DLGP.hits++; return Promise.resolve({ rec:hit, x:x0, y:y0, w, h, whole }); }
   const doc='<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="'+W+'" height="'+H+'" viewBox="'+x0+' '+y0+' '+w+' '+h+'">'+DLGP.defs+part+'</svg>';
   return new Promise(res=>{ const im=new Image(); im.onload=()=>{ const t1=performance.now(); const cv=document.createElement('canvas'); cv.width=W; cv.height=H; cv.getContext('2d').drawImage(im, 0, 0, W, H);   
-      const rec={ cv, url:'' }; if(DLGP.pics.size>360) DLGP.pics.delete(DLGP.pics.keys().next().value); DLGP.pics.set(ck, rec); DLGP.encMs+=performance.now()-t1; DLGP.made++; res({ rec, x:x0, y:y0, w, h }); };
+      const rec={ cv, url:'', vurl:im.src }; if(DLGP.pics.size>360) DLGP.pics.delete(DLGP.pics.keys().next().value); DLGP.pics.set(ck, rec); DLGP.encMs+=performance.now()-t1; DLGP.made++; res({ rec, x:x0, y:y0, w, h, whole }); };   
     im.onerror=()=>{ DLGP.log.push(['pic-error', u.id||u.getAttribute('class'), doc.length]); res(false); };   
     im.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(doc); }); }   
 
@@ -170617,7 +170621,25 @@ function dlgLayers(aw, only){ const svg=DLGP.svg; if(!svg || !svg.isConnected) r
   DLGP.lay=lay; const asleep=DLGP.units.filter(u=>DLGP.sleep.has(u)); const on=k=>asleep.filter(u=>!u.__top && lay.get(u)===k);
   dlgDrawTo(DLGP.back, on(0)); dlgDrawTo(DLGP.mid, on(2)); dlgDrawTo(DLGP.front, on(4));
   let sq=0; for(const u of asleep){ if(u.__p && (!u.__pe || u.__pe.nextElementSibling!==u)) dlgPicEl(u); const v=u.__top? 5 : lay.get(u); const inSvg=(v===1 || v===3 || v===5); dlgPicShow(u, inSvg); if(inSvg && !u.__top) sq++; }
-  DLGP.layMs=performance.now()-t0; DLGP.layN={ back:on(0).length, mid:on(2).length, front:on(4).length, squeezed:sq, top:DLGP.topN }; }
+  DLGP.layMs=performance.now()-t0; DLGP.layN={ back:on(0).length, mid:on(2).length, front:on(4).length, squeezed:sq, top:DLGP.topN };
+  if(DLGP.glass || document.getElementById('roomGlassFly')) dlgGlass(); }   
+
+
+
+function dlgGlassTwins(z){ const T=dlgCollect(z), U=DLGP.units; if(z.getAttribute('viewBox')!==DLGP.svg.getAttribute('viewBox')) return null; const out=[]; let j=0;   
+  for(const u of U){ const k=T.indexOf(T.find((t, x)=>x>=j && t.tagName===u.tagName && (t.id||'')===(u.id||''))); if(k<0 || (!u.id && k!==j)){ out.push(null); continue; } out.push(T[k]); j=k+1; } return out.filter(Boolean).length>=U.length-4? out : null; }
+function dlgGlass(){ const z=document.querySelector('#roomGlassFly .rg-zoom > svg'); if(!z || !DLGP.svg || !DLGP.svg.isConnected || !DLGP.units.length){ DLGP.glass=null; return 0; }
+  let G=DLGP.glass; if(!G || G.svg!==z) G=DLGP.glass={ svg:z, twins:dlgGlassTwins(z), n:0 }; if(!G.twins) return 0; let n=0;
+  DLGP.units.forEach((u, i)=>{ const t=G.twins[i]; if(!t) return; if(t.__gok===undefined) t.__gok=(dlgIs(t, '.rgonly') || (u.__loop && !dlgHasLoop(t)))? 0 : 1;
+    const P=u.__p, on=!!(t.__gok && DLGP.sleep.has(u) && P && P.whole && P.rec.vurl); let gi=t.__gi;
+    if(on){ if(!gi || gi.parentNode!==t.parentNode || gi.nextElementSibling!==t){ if(gi) gi.remove(); gi=t.__gi=document.createElementNS('http://www.w3.org/2000/svg', 'image'); gi.setAttribute('class', 'dlg-pic'); gi.setAttribute('pointer-events', 'none'); gi.setAttribute('preserveAspectRatio', 'none'); t.parentNode.insertBefore(gi, t); }
+      for(const [k, v] of [['x', P.x], ['y', P.y], ['width', P.w], ['height', P.h]]) if(gi.getAttribute(k)!==String(v)) gi.setAttribute(k, v); if(gi.getAttribute('href')!==P.rec.vurl) gi.setAttribute('href', P.rec.vurl); n++; }
+    if(gi){ const d=on? '' : 'none'; if(gi.style.display!==d) gi.style.display=d; } const td=on? 'none' : ''; if(t.style.display!==td) t.style.display=td; });
+  G.n=n; dlgGlassPark(z.parentNode, 1); return n; }
+
+
+function dlgGlassPark(zz, on){ if(!zz) return; let A=[]; try{ A=zz.getAnimations({ subtree:true }); }catch(e){} for(const a of A){ try{ if(a.effect.getTiming().iterations!==Infinity) continue; const t=a.effect.target; if(t && t.closest && t.closest('.rgonly')) continue; if(on){ a.pause(); a.currentTime=0; MFP.A.delete(a); } else if(a.playState==='paused') a.play(); }catch(e){} } }
+function dlgGlassOff(){ const G=DLGP.glass; DLGP.glass=null; if(!G || !G.twins) return; for(const t of G.twins){ if(!t) continue; if(t.__gi){ t.__gi.remove(); t.__gi=null; } t.style.display=''; } if(G.svg) dlgGlassPark(G.svg.parentNode, 0); }   
 
 function dlgRoam(all){ if(!DLGP.lay || !DLGP.svg || !DLGP.svg.isConnected || DLGP.busy) return; const L=all? dlgOrder() : [...DLGP.moved]; DLGP.moved.clear(); for(const e of L){ const live=!e.__dlgU || e.__life; if(!live || !e.__cb || !e.isConnected) continue; const b=dlgBox(e, 0); if(b && !dlgIn(b, e.__cb)){ dlgLayers(dlgAwake(), 1); return; } } }   
 
@@ -170634,6 +170656,7 @@ function dlgMut(recs){ if(!DLGP.svg || !DLGP.svg.isConnected) return; let redraw
     u.__dirty=1; DLGP.stirs++; const k=u.id||u.getAttribute('class')||'?'; DLGP.stirBy[k]=(DLGP.stirBy[k]||0)+1; if(dlgHoldU(u, DLG_STIR_MS)) redraw=1; }
   if(redraw) dlgLayers(dlgAwake()); }
 function dlgWatch(){ if(typeof MutationObserver!=='function') return; if(!DLGP.mo) DLGP.mo=new MutationObserver(dlgMut); const o={ subtree:true, childList:true, attributes:true, attributeOldValue:true, characterData:true };
+  if(DLGP.units.some(u=>u.__fix)){ DLGP.mo.observe(DLGP.svg, { childList:true }); for(const u of DLGP.units) if(!u.__fix && u.parentNode===DLGP.svg) DLGP.mo.observe(u, o); } else   
   DLGP.mo.observe(DLGP.svg, o); if(DLGP.beltSvg) DLGP.mo.observe(DLGP.beltSvg, o); if(DLGP.top) DLGP.mo.observe(DLGP.top, o); }
 
 function dlgHoldU(u, ms, drag){ DLGP.held.add(u); const was=dlgShow(u); if(drag || was) u.__dirty=1; if(u.id){ const t=performance.now()+ms; if(!(DLGP.until.get(u.id)>t)) DLGP.until.set(u.id, t); }
@@ -170666,8 +170689,8 @@ function dlgTick(ts){ DLGP.raf=requestAnimationFrame(dlgTick); if(!DLGP.on || S.
   if(!DLGP.park) return; { const over=ts-DLGP.parkT>=DLG_PARK_MAX; DLGP.park=DLGP.park.filter(e=>{ if(over || dlgParkStep(e.L)){ DLGP.parking.delete(e.u); DLGP.layDue=1; return false; } return true; }); }   
   if(!DLGP.layDue || (DLGP.park.length && ts-DLGP.layT<250)) return; DLGP.layDue=0; DLGP.layT=ts; if(!DLGP.park.length) DLGP.park=null; DLGP.busy=1;     const tok=DLGP.tok; dlgLay(tok).then(()=>{ DLGP.busy=0; }, e=>{ DLGP.busy=0; DLGP.log.push(['lay-error', String(e).slice(0, 120)]); }); }
 
-function dlgRoomOk(){ try{ return !!DLGP.on && S.mode==='menu' && !MAPPIN && roomCur()==='bedroom'; }catch(e){ return false; } }
-function dlgDrop(){ if(DLGP.mo) DLGP.mo.disconnect(); for(const u of DLGP.units) clearTimeout(u.__hold); DLGP.svg=null; DLGP.belt=null; DLGP.beltSvg=null; DLGP.units=[]; DLGP.sleep=new Set(); DLGP.held=new Set(); DLGP.park=null; DLGP.parking=new Set(); DLGP.layDue=0; DLGP.pend=0; DLGP.top=null; DLGP.lay=null; DLGP.layN=null; DLGP.busy=0;
+function dlgRoomOk(){ try{ return !!DLGP.on && S.mode==='menu' && !MAPPIN && ROOM_ORDER.indexOf(roomCur())>=0; }catch(e){ return false; } }
+function dlgDrop(){ DLGP.glass=null; if(DLGP.mo) DLGP.mo.disconnect(); for(const u of DLGP.units) clearTimeout(u.__hold); DLGP.svg=null; DLGP.belt=null; DLGP.beltSvg=null; DLGP.units=[]; DLGP.sleep=new Set(); DLGP.held=new Set(); DLGP.park=null; DLGP.parking=new Set(); DLGP.layDue=0; DLGP.pend=0; DLGP.top=null; DLGP.lay=null; DLGP.layN=null; DLGP.busy=0;
   for(const id of ['dlgBack', 'dlgMid', 'dlgFront', 'dlgBelt', 'dlgTop']){ const e=document.getElementById(id); if(e && !e.closest('#roomStage')) e.remove(); } }   
 
 const dlgSz=s=>{ const r=s.getBoundingClientRect(); return Math.round(r.width)+'x'+Math.round(r.height); };
@@ -170675,11 +170698,11 @@ function dlgAfterPaint(){ const tok=++DLGP.tok; dlgDrop(); if(!dlgRoomOk()) retu
   if(!DLGP.wired){ DLGP.wired=1; document.addEventListener('pointerdown', dlgFinger, { capture:true, passive:true }); if(typeof ResizeObserver==='function') DLGP.ro=new ResizeObserver(()=>{ const s=DLGP.svg; if(s && s.isConnected && DLGP.top && dlgSz(s)!==DLGP.sz) dlgRelay(); }); }   
   requestAnimationFrame(()=>{ if(tok===DLGP.tok) dlgSettle(tok).catch(e=>{ DLGP.log.push(['settle-error', String(e).slice(0, 120)]); }); }); }
 async function dlgSettle(tok){ if(!dlgRoomOk()) return; const svg=document.querySelector('#roomStage > svg'); if(!svg) return; const t0=performance.now(); DLGP.encMs=0; DLGP.px=0; DLGP.made=0; DLGP.hits=0; DLGP.makeMs=0;
-  DLGP.svg=svg; DLGP.belt=svg.querySelector(':scope > #ychars'); DLGP.dd=dlgDots(); const mn=document.getElementById('menu'); { const m=svg.getScreenCTM(); DLGP.sc=m? +Math.abs(m.a).toFixed(3) : 0; DLGP.sz=dlgSz(svg); }
+  DLGP.svg=svg; DLGP.room=roomCur(); DLGP.belt=svg.querySelector(':scope > #ychars'); DLGP.dd=dlgDots(); const mn=document.getElementById('menu'); { const m=svg.getScreenCTM(); DLGP.sc=m? +Math.abs(m.a).toFixed(3) : 0; DLGP.sz=dlgSz(svg); }
   DLGP.ctx=DLGP.dd+'|'+(svg.getAttribute('data-rn')||'')+'|'+(svg.getAttribute('class')||'')+'|'+document.body.className+'|'+(mn? mn.className : '');   
   DLGP.units=dlgCollect(svg); DLGP.defs=[...svg.querySelectorAll(':scope > defs')].map(d=>new XMLSerializer().serializeToString(d)).join('');
   { const m=svg.getScreenCTM(), r=svg.getBoundingClientRect(); DLGP.vis=m? [(r.left-m.e)/m.a, (r.top-m.f)/m.d, (r.right-m.e)/m.a, (r.bottom-m.f)/m.d] : null; }
-  const life=dlgLifeSel(), now=performance.now(); for(const u of DLGP.units){ u.__dlgU=1; u.__life=dlgIs(u, life) || dlgCant(u); u.__loop=dlgHasLoop(u); u.__box=dlgBox(u); u.__nl=u.__loop? dlgLoopsOf(u).length : 0;
+  const life=dlgLifeSel(), fl=DLG_LIFE_FLOOR[DLGP.room]||'', now=performance.now(); for(const u of DLGP.units){ u.__dlgU=1; u.__fix=(fl && dlgIs(u, fl))? 1 : 0; u.__life=dlgIs(u, life) || dlgCant(u) || u.__fix;     u.__loop=dlgHasLoop(u); u.__box=dlgBox(u); u.__nl=u.__loop? dlgLoopsOf(u).length : 0;
     const t=u.id? DLGP.until.get(u.id) : 0, rem=dlgIntro(u); if(t>now || (rem>0 && !u.__life)) dlgHoldU(u, Math.max(t-now, rem+100)); }   
   for(const [k, t] of DLGP.until) if(!(t>now)) DLGP.until.delete(k);
   const dk=u=>{ const k=String(u.id||'').replace(/^ro-/, ''); return !!(k && (DECOR_SPOTS[k] || HW_BY[k] || XM_BY[k])); };   
@@ -170690,13 +170713,13 @@ async function dlgSettle(tok){ if(!dlgRoomOk()) return; const svg=document.query
   await dlgLay(tok); if(tok!==DLGP.tok) return;
   DLGP.settleMs=performance.now()-t0; DLGP.log.push(['settle', +DLGP.settleMs.toFixed(1), 'make', +DLGP.makeMs.toFixed(1), 'enc', +DLGP.encMs.toFixed(1), 'made', DLGP.made, 'hits', DLGP.hits, 'Mpx', +(DLGP.px/1e6).toFixed(2), 'asleep', DLGP.sleep.size, 'units', DLGP.units.length]); if(DLGP.log.length>40) DLGP.log.splice(0, 20); }
 
-function dlgOff(){ const svg=DLGP.svg; DLGP.tok++; if(DLGP.mo) DLGP.mo.disconnect(); if(svg && svg.isConnected){ for(const u of DLGP.units){ u.style.display=''; clearTimeout(u.__hold); } for(const p of [...document.querySelectorAll('#roomStage image.dlg-pic')]) p.remove(); for(const u of DLGP.units) u.__pe=null;
+function dlgOff(){ const svg=DLGP.svg; DLGP.tok++; dlgGlassOff(); if(DLGP.mo) DLGP.mo.disconnect(); if(svg && svg.isConnected){ for(const u of DLGP.units){ u.style.display=''; clearTimeout(u.__hold); } for(const p of [...document.querySelectorAll('#roomStage image.dlg-pic')]) p.remove(); for(const u of DLGP.units) u.__pe=null;
     if(DLGP.belt && DLGP.top){ const tops=[...DLGP.top.children]; svg.appendChild(DLGP.belt); for(const e of tops){ if(e.id==='ro-rave') svg.insertBefore(e, DLGP.belt); else svg.appendChild(e); } } }   
   for(const id of ['dlgBack', 'dlgMid', 'dlgFront', 'dlgBelt', 'dlgTop']){ const e=document.getElementById(id); if(e) e.remove(); } dlgDrop(); }
 function dlgRelay(){ if(!DLGP.on) return; dlgOff(); dlgAfterPaint(); }
 
-function dlgProbe(){ const aw=DLGP.svg? dlgAwake() : new Set(); return { on:DLGP.on, room:DLGP.svg? 'bedroom' : null, units:DLGP.units.length, asleep:DLGP.sleep.size, awake:[...aw].map(u=>u.id||u.getAttribute('class')), budget:DLGP.budget.map(u=>u.id), queue:DLGP.queue.length, held:[...DLGP.held].map(u=>u.id),
-  cache:DLGP.pics.size, dots:DLGP.dd, dozing:DLGP.dozing, dozeN:DLGP.dozeN, touchAgo:Math.round(performance.now()-(DLGP.touchT||0)), caps:dlgCaps(), loops:DLGP.budget.reduce((s, u)=>s+dlgNl(u), 0), beat:dchHz(performance.now()), layN:DLGP.layN, layMs:+DLGP.layMs.toFixed(1), cuts:DLGP.cuts, settleMs:+DLGP.settleMs.toFixed(1), snapMax:+DLGP.snapMax.toFixed(1), stirs:DLGP.stirs, stirBy:Object.assign({}, DLGP.stirBy), log:DLGP.log.slice(-6) }; }
+function dlgProbe(){ const aw=DLGP.svg? dlgAwake() : new Set(); return { on:DLGP.on, room:DLGP.svg? DLGP.room : null, units:DLGP.units.length, asleep:DLGP.sleep.size, awake:[...aw].map(u=>u.id||u.getAttribute('class')), budget:DLGP.budget.map(u=>u.id), queue:DLGP.queue.length, held:[...DLGP.held].map(u=>u.id),
+  cache:DLGP.pics.size, glass:DLGP.glass? { twins:DLGP.glass.twins? DLGP.glass.twins.filter(Boolean).length : 0, pics:DLGP.glass.n } : null, dots:DLGP.dd, dozing:DLGP.dozing, dozeN:DLGP.dozeN, touchAgo:Math.round(performance.now()-(DLGP.touchT||0)), caps:dlgCaps(), loops:DLGP.budget.reduce((s, u)=>s+dlgNl(u), 0), beat:dchHz(performance.now()), layN:DLGP.layN, layMs:+DLGP.layMs.toFixed(1), cuts:DLGP.cuts, settleMs:+DLGP.settleMs.toFixed(1), snapMax:+DLGP.snapMax.toFixed(1), stirs:DLGP.stirs, stirBy:Object.assign({}, DLGP.stirBy), log:DLGP.log.slice(-6) }; }
 async function dlgSettleNow(all){ if(!DLGP.svg) return dlgProbe(); if(all){ DLGP.queue=DLGP.budget.concat(DLGP.queue); DLGP.budget=[]; for(const u of DLGP.held) clearTimeout(u.__hold); DLGP.held.clear(); DLGP.until.clear(); }
   const aw=dlgAwake(); for(const u of DLGP.units) if(!aw.has(u) && !u.__life && !DLGP.sleep.has(u)){ dlgSpend(u); dlgLoops0(u); }
   DLGP.park=null; DLGP.parking.clear(); DLGP.layDue=0; DLGP.busy=1; try{ await dlgLay(DLGP.tok); } finally{ DLGP.busy=0; } return dlgProbe(); }
