@@ -15135,6 +15135,79 @@ function odvTierDoor(v){
 
 
 
+let ODV_FIELD_ON=false;
+const ODF={ v:1, sent:false, why:'', how:'', rig:false, wait:180000, hideMs:30000, maxGap:2000, kinds:{}, kind:'', kindAt:-1e9, rd:-1, fought:false, wasPlay:false, edges:[17.5,20,25,33.5,50,100], lab:[17,20,25,33,50,100,101], scenes:['campscene','parkscene','raidscene'] };
+function odfKindNow(){ try{
+  if(S.mode==='title') return 'title';
+  if(S.mode==='play' || S.mode==='lose'){ let c=!!S.camCine; try{ if(!c && COMM && COMM.brief) c=true; }catch(e){} try{ if(!c && CFC_CAM && CFC_CAM.on) c=true; }catch(e){} try{ if(!c && CHS10 && CHS10.on) c=true; }catch(e){} return c? 'cine' : 'fight'; }
+  for(const id of ODF.scenes){ const e=document.getElementById(id); if(e && !e.classList.contains('hidden')) return 'park'; }
+  return roomCur()==='bedroom'? 'bed' : 'floor';
+}catch(e){ return 'floor'; } }
+function odfFrame(ts, gap){ if(ODF.sent) return; try{
+  if(ODF.rd<0) ODF.rd=performance.now();   
+  if(S.mode==='play') ODF.wasPlay=true; else if(ODF.wasPlay){ ODF.wasPlay=false; ODF.fought=true; }
+  const ms=gap*1000; if(!(ms>0) || ms>ODF.maxGap || document.hidden) return;
+  if(ts-ODF.kindAt>=250){ ODF.kindAt=ts; ODF.kind=odfKindNow(); }
+  let r=ODF.kinds[ODF.kind]; if(!r) r=ODF.kinds[ODF.kind]={ f:0, o20:0, o50:0, h:[0,0,0,0,0,0,0], mfp:0 };
+  r.f++; if(ms>20) r.o20++; if(ms>50) r.o50++;
+  const E=ODF.edges; let i=0; while(i<E.length && ms>E[i]) i++; r.h[i]++;
+  if(S.mode==='menu' && typeof MFP!=='undefined' && MFP.half===1) r.mfp+=ms/1000;
+}catch(e){} }
+function odfShell(){ try{ const u=navigator.userAgent||'';
+  if(/GVTShell-Steam/.test(u)) return 'steam';
+  if(window.GVTBillingAmazon) return 'amazon';
+  if(typeof window.GVTShellAndroid==='object' || /GVTShell-Android/.test(u)) return 'android';
+  if(window.__GVTSHELL || (window.webkit && window.webkit.messageHandlers)) return 'ios';
+  return 'web'; }catch(e){ return 'web'; } }
+function odfOs(){ const u=navigator.userAgent||''; let m;
+  if((m=/(?:iPhone|iPad|iPod|CPU) OS (\d+)_/.exec(u))) return 'ios'+m[1];
+  if((m=/Android (\d+)/.exec(u))) return 'android'+m[1];
+  if(window.__GVTSHELL || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1)){ m=/Version\/(\d+)/.exec(u); return 'ios'+(m? m[1] : ''); }   
+  if(/CrOS/.test(u)) return 'cros'; if(/Mac OS X/.test(u)) return 'mac'; if(/Windows/.test(u)) return 'win'; if(/Linux/.test(u)) return 'linux'; return 'other'; }
+function odfEng(os){ const u=navigator.userAgent||''; let m;
+  if(os.indexOf('ios')===0) return os;   
+  if((m=/(?:Chrome|Chromium)\/(\d+)/.exec(u))) return 'c'+m[1];
+  if((m=/Firefox\/(\d+)/.exec(u))) return 'f'+m[1];
+  if((m=/Version\/(\d+)[.\d]* (?:Mobile\/\w+ )?Safari/.exec(u))) return 's'+m[1];
+  return 'o'; }
+function odfScr(){ const W=(screen && screen.width) || innerWidth, H=(screen && screen.height) || innerHeight, r=x=>Math.max(50, Math.min(5000, Math.round(x/50)*50)), d=Math.max(0.5, Math.min(5, Math.round((window.devicePixelRatio||1)*2)/2));
+  return r(Math.min(W,H))+'x'+r(Math.max(W,H))+'@'+d; }   
+function odfReload(){ try{ if(window.GVT_RELAUNCH===true) return 1; const n=performance.getEntriesByType && performance.getEntriesByType('navigation')[0]; if(n) return n.type==='reload'? 1 : 0; return (performance.navigation && performance.navigation.type===1)? 1 : 0; }catch(e){ return 0; } }
+function odfBody(){ try{
+  const os=odfOs(), sh=odfShell(), b={ v:ODF.v, sh, os, eng:odfEng(os), scr:odfScr(), cv:String(GVT_CV), t:Math.max(0, Math.min(2, window.GVT_TIER|0)), ts:ODV_T.src||'error', tr:0, rd:0, rl:odfReload(), k:{} };
+  let ra=+ODV_T.ratio||0; if(!ra){ const st=odvTierLoad(); ra=(st && +st.r)||0; } b.tr=Math.max(0, Math.min(100, Math.round(ra*2)/2));
+  b.rd=Math.max(0, Math.min(120000, Math.round((ODF.rd<0? performance.now() : ODF.rd)/250)*250));
+  const dm=+navigator.deviceMemory||0; if(os.indexOf('android')===0 && dm>0) b.mem=dm;
+  for(const k in ODF.kinds){ const r=ODF.kinds[k]; if(!(r.f>0)) continue; const f=Math.min(1e6, r.f); let c=0, p=ODF.lab[ODF.lab.length-1];
+    for(let i=0;i<r.h.length;i++){ c+=r.h[i]; if(c>=r.f*0.95){ p=ODF.lab[i]; break; } }
+    b.k[k]={ f, s20:Math.round(100*r.o20/r.f), s50:Math.round(100*r.o50/r.f), p95:p, mfp:Math.min(86400, Math.round(r.mfp)) }; }
+  return b;
+}catch(e){ return null; } }
+function odfCan(){ if(!ODV_FIELD_ON) return 'off'; if(!netAllowed()) return 'host'; if(navigator.onLine===false) return 'offline'; if(navigator.webdriver && !ODF.rig) return 'rig'; return ''; }
+function odfSend(beacon, how){ if(ODF.sent) return false; const why=odfCan(); if(why){ ODF.why=why; return false; }
+  const b=odfBody(); if(!b) return false; ODF.sent=true; ODF.why='sent'; ODF.how=how||''; const s=JSON.stringify(b);
+  if(beacon){ try{ if(navigator.sendBeacon && navigator.sendBeacon(NET+'/odf', s)){ ODF.how+=':beacon'; return true; } }catch(e){} }
+  try{ netFetch(NET+'/odf', { method:'POST', headers:{ 'Content-Type':'text/plain;charset=UTF-8' }, body:s, keepalive:true }).catch(()=>{}); ODF.how+=':fetch'; }catch(e){}
+  return true; }   
+function odfTick(){ try{ if(ODF.sent || typeof ready==='undefined' || !ready) return; if(ODF.fought) odfSend(false, 'fight'); else if(performance.now()>=ODF.wait) odfSend(false, 'clock'); }catch(e){} }
+try{
+  setInterval(odfTick, 1000);
+  document.addEventListener('visibilitychange', ()=>{ if(document.hidden && performance.now()>=ODF.hideMs) odfSend(true, 'hidden'); });
+  window.addEventListener('pagehide', ()=>odfSend(true, 'pagehide'));
+}catch(e){}
+function odfDoor(v){
+  if(v===true || v===false){ ODV_FIELD_ON=v; ODF.rig=v; }
+  else if(v && typeof v==='object'){ if(v.wait>=0) ODF.wait=+v.wait; if(v.hideMs>=0) ODF.hideMs=+v.hideMs; }
+  const o={ on:ODV_FIELD_ON, sent:ODF.sent, why:ODF.why, how:ODF.how, rig:ODF.rig, wait:ODF.wait, fought:ODF.fought, rd:ODF.rd, kind:ODF.kind, can:odfCan(), kinds:JSON.parse(JSON.stringify(ODF.kinds)) };
+  if(v==='body') o.body=odfBody(); return o; }
+
+
+
+
+
+
+
+
 
 
 
@@ -80127,7 +80200,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='20.19';        
+let GVT_CV='20.20';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -168307,6 +168380,7 @@ function frame(ts){
   if(QT.skip){ QT.skip=0; last=ts; return; }        
   if(S.mode==='play' && odvTier()>=1 && odvHalfSkip(ts)) return;   
   const gap=(ts-last)/1000||0.016; last=ts; gvTick(ts, gap);   
+  odfFrame(ts, gap);   
   if(S.mode==='play') odvDynTick(ts, gap);   
   const dt=Math.min(SIM_STEP_S,gap);   
   if(S.hitStop>0) S.hitStop=Math.max(0,S.hitStop-dt);   
