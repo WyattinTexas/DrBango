@@ -82741,7 +82741,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='21.04';        
+let GVT_CV='21.05';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -119622,8 +119622,86 @@ const CPS={ rung:1, y:300, x0:1110, x1:120, n:240 }, CPS_PTS=[];
 for(let i=0;i<=CPS.n;i++) CPS_PTS.push({ x:CPS.x0+(CPS.x1-CPS.x0)*i/CPS.n, y:CPS.y });
 CAMP_DRESS[CPS.rung]={ rocks:[226,374].flatMap(y=>[0,1,2,3,4,5,6,7,8,9].map(i=>i*26+503).map(x=>({ x, y, r:16, art:'bags', row:y<CPS.y? 'n' : 's' }))) };
 function cpsOn(){ return !!(!S.bf && !S.park && !S.raid && !S.momRaid && S.cfg && (S.levelN|0)>0 && (S.cfg.n|0)===(S.levelN|0) && campBaseRung(S.levelN|0)===CPS.rung); }   
-function cpsPath(){ return cpsOn()? CPS_PTS : PATH_PTS; }
+function cpsPath(){ return cpsOn()? CPS_PTS : pthOn()? pthPath() : PATH_PTS; }   
 function pathStroke(){ if(cmxNoRun()) return; const k=S.gk||1, P=cpsPath();     cx.beginPath(); cx.moveTo(P[0].x*k,P[0].y); for(let i=1;i<P.length;i+=3) cx.lineTo(P[i].x*k,P[i].y); cx.stroke(); }   
+
+
+
+
+
+
+
+
+const PTH={ on:1, step:6, bend:3, lead:90, half:35, gap:10, plank:12, up:170, down:150, end:130, home:120, bank:40, radius:120 };   
+const PTH_STY=['bow','s','wave','s','bow','wave'];   
+const PTH_M={ bow:[1,100,165], s:[2,80,150], wave:[3,70,135], snake:[4,60,130] };   
+let PTH_C=null;
+function pthOn(){ return !!(PTH.on && !S.bf && !S.park && !S.raid && !S.momRaid && S.cfg && S.cfg.terrain && (S.levelN|0)>0 && (S.cfg.n|0)===(S.levelN|0) && !roofField() && !cmxNoRun()); }   
+function pthRng(seed){ let s=((seed|0)%233280+233280)%233280; return ()=>{ s=(s*9301+49297)%233280; return s/233280; }; }
+
+function pthGround(){ const T=S.cfg.terrain, C=[], E=[], R=[], X=[];
+  for(const key of ['rocks','props','pits','nests','eggs']) for(const o of (T[key]||[])) if(o && isFinite(o.x) && isFinite(o.y)) C.push({ x:o.x, y:o.y, r:+o.r||14 });
+  for(const p of (T.ponds||[])) if(p && isFinite(p.x)) E.push({ x:p.x, y:p.y, rx:+p.rx||+p.r||30, ry:+p.ry||+p.r||30 });
+  for(const rv of [T.river].concat(T.rivers||[])) if(rv && isFinite(rv.x)) R.push({ x:rv.x, w:+rv.w||56, bw:+rv.bw||76, ys:rvBridges(rv) });
+  const cut=tr=>{ if(!tr) return; if(tr.multi){ tr.multi.forEach(cut); return; } if(tr.pts && tr.pts.length>1) X.push({ P:tr.pts, w:+tr.w||48 }); }; cut(T.trench);
+  R.sort((a,b)=>b.x-a.x); return { C, E, R, X }; }
+
+
+function pthGap(G,x,y){ let g=1e9; for(const c of G.C){ const d=Math.hypot(x-c.x,y-c.y)-c.r-PTH.half; if(d<g) g=d; }
+  for(const e of G.E){ const nx=(x-e.x)/(e.rx+PTH.half), ny=(y-e.y)/(e.ry+PTH.half), d=(Math.sqrt(nx*nx+ny*ny)-1)*Math.min(e.rx,e.ry); if(d<g) g=d; } return g; }
+function pthCut(G,x,y){ for(const tr of G.X) for(let k=1;k<tr.P.length;k++) if(pthSegD(x,y,tr.P[k-1][0],tr.P[k-1][1],tr.P[k][0],tr.P[k][1])<tr.w/2+PTH.half) return 1; return 0; }
+function pthBridge(G,x){ for(const rv of G.R) if(x>rv.x-PTH.plank && x<rv.x+rv.w+PTH.plank) return rv; return null; }
+function pthGrid(G,ax,zx,ty){ const c=10, NX=Math.max(2,Math.round((ax-zx)/c)), y0=ty-PTH.up, NY=Math.round((PTH.up+PTH.down)/c), gap=new Float32Array((NX+1)*(NY+1)), cut=new Uint8Array((NX+1)*(NY+1));
+  const X=i=>ax-(ax-zx)*i/NX, Y=j=>y0+j*c; for(let i=0;i<=NX;i++) for(let j=0;j<=NY;j++){ gap[i*(NY+1)+j]=pthGap(G,X(i),Y(j)); cut[i*(NY+1)+j]=pthCut(G,X(i),Y(j)); }
+  return { c, NX, NY, y0, X, Y, gap, cut }; }
+function pthPlan(G,Gr,ty,guide,bs,hard){ const { c, NX, NY, X, Y }=Gr, R1=NY+1, INF=1e18, D=5, cost=new Float64Array((NX+1)*R1*D).fill(INF), from=new Int8Array((NX+1)*R1*D), j0=Math.round((ty-Gr.y0)/c), cc=new Float64Array(R1);
+  
+  cost[(0*R1+j0)*D+2]=0;
+  for(let i=1;i<=NX;i++){ const x=X(i), rv=pthBridge(G,x), b=rv? bs[G.R.indexOf(rv)] : 0, gx=guide(x);
+    for(let j=0;j<=NY;j++){ const y=Y(j); let v=INF; if(!(rv && Math.abs(y-b)>c/2+0.01)){ const g=Gr.gap[i*R1+j]; if(g>=hard) v=Math.abs(y-gx)*0.06+(g<40? (40-g)*0.5 : 0)+Gr.cut[i*R1+j]*6; } cc[j]=v; }
+    for(let j=0;j<=NY;j++){ if(cc[j]>=INF) continue; for(let d=-2;d<=2;d++){ const pj=j-d; if(pj<0||pj>NY) continue; let bst=INF, bp=0;
+        for(let pd=-2;pd<=2;pd++){ const v=cost[((i-1)*R1+pj)*D+pd+2]; if(v>=INF) continue; const w=v+Math.abs(d-pd)*PTH.bend; if(w<bst){ bst=w; bp=pd; } }
+        if(bst>=INF) continue; const k=(i*R1+j)*D+d+2; cost[k]=bst+cc[j]+Math.abs(d)*0.4; from[k]=bp; } } }
+  let bk=-1, bv=INF; for(let d=-2;d<=2;d++){ const v=cost[(NX*R1+j0)*D+d+2]; if(v<bv){ bv=v; bk=d; } } if(bk<-2 || bv>=INF) return null;
+  const ys=new Array(NX+1); let j=j0, d=bk; for(let i=NX;i>=0;i--){ ys[i]=Y(j); if(i){ const pd=from[(i*R1+j)*D+d+2]; j-=d; d=pd; } }
+  return ys; }
+
+
+function pthShape(G,Gr,pys,ax,zx,ty,bs,K){ const NX=Gr.NX, sm=pys.map((y,i)=>{ let t=0, c=0; for(let d=-2;d<=2;d++){ const j=i+d; if(j>=0 && j<=NX){ t+=pys[j]; c++; } } return t/c; }), at=x=>{ const u=Math.max(0,Math.min(NX,(ax-x)/(ax-zx)*NX)), a=Math.min(NX-1,Math.floor(u)), t=u-a; return sm[a]*(1-t)+sm[a+1]*t; };
+  const runs=[[ax,ax-PTH.bank,ty]]; G.R.forEach((rv,i)=>runs.push([rv.x+rv.w+PTH.plank, rv.x-PTH.plank, bs[i]])); runs.push([zx+PTH.bank,zx,ty]); runs.sort((p,q)=>q[0]-p[0]);
+  const kn=[]; for(let r=0;r<runs.length;r++){ const R=runs[r]; kn.push([R[0],R[2],1],[R[1],R[2],1]); const nx=runs[r+1]; if(!nx) break; const L=R[1]-nx[0], m=Math.max(0,Math.round(L/K)-1);
+    for(let j=1;j<=m;j++){ const x=R[1]-L*j/(m+1); kn.push([x,at(x),0]); } }
+  for(let i=0;i<kn.length;i++){ const q=kn[i]; q[3]=q[2]? 0 : (kn[i+1][1]-kn[i-1][1])/(kn[i+1][0]-kn[i-1][0]); }
+  const Q=[]; for(let i=0;i<kn.length-1;i++){ const p0=kn[i], p1=kn[i+1], h=p1[0]-p0[0]; if(Math.abs(h)<1e-6) continue; const n=Math.max(1,Math.ceil(Math.abs(h)/PTH.step));
+    for(let j=(i? 1 : 0);j<=n;j++){ const t=j/n, t2=t*t, t3=t2*t; Q.push([p0[0]+h*t, (2*t3-3*t2+1)*p0[1]+(t3-2*t2+t)*h*p0[3]+(-2*t3+3*t2)*p1[1]+(t3-t2)*h*p1[3]]); } }
+  return Q; }
+function pthSegD(px,py,ax,ay,bx,by){ const dx=bx-ax, dy=by-ay, l=dx*dx+dy*dy||1, u=Math.max(0,Math.min(1,((px-ax)*dx+(py-ay)*dy)/l)); return Math.hypot(px-ax-dx*u, py-ay-dy*u); }
+
+function pthJudge(Q,G,ty,guide){ let gap=1e9, cut=0, amp=0, rad=1e9, dev=0;
+  for(let i=0;i<Q.length;i++){ const x=Q[i][0], y=Q[i][1]; const g=pthGap(G,x,y); if(g<gap) gap=g; if(i%3===0) cut+=pthCut(G,x,y); const a=Math.abs(y-ty); if(a>amp) amp=a; dev+=Math.abs(y-guide(x));
+    if(i>0 && i<Q.length-1){ const x0=Q[i-1][0], y0=Q[i-1][1], x2=Q[i+1][0], y2=Q[i+1][1], A=Math.hypot(x-x0,y-y0), B=Math.hypot(x2-x,y2-y), C=Math.hypot(x2-x0,y2-y0), cr=Math.abs((x-x0)*(y2-y0)-(y-y0)*(x2-x0)); if(cr>1e-6){ const R=A*B*C/(2*cr); if(R<rad) rad=R; } } }
+  for(const rv of G.R) for(const q of Q) if(q[0]>rv.x-8 && q[0]<rv.x+rv.w+8 && !rv.ys.some(b=>Math.abs(q[1]-b)<1)) return null;
+  return { gap, cut, amp, rad, dev:dev/Q.length }; }
+
+function pthRoute(){ const k=S.gk||1, oy=(WORLD_H-H)/2, ty=(S.tanBase? S.tanBase.y : 300), n=campBaseRung(S.levelN|0), G=pthGround();
+  const ax=W-PTH.end, zx=PTH.home, rnd=pthRng(n*7919+(W|0)*31+17);
+  let sty=PTH_STY[n%PTH_STY.length]; if(sty==='wave' && W>=1600) sty='snake'; const M=PTH_M[sty];
+  const picks=[[]]; for(const rv of G.R){ const nx=[]; for(const p of picks) for(const b of rv.ys) nx.push(p.concat([b])); picks.splice(0,picks.length,...nx); }
+  const s0=rnd()<0.5? 1 : -1, A1=M[1]+rnd()*(M[2]-M[1]), A2=M[1]+rnd()*(M[2]-M[1]);
+  const Gr=pthGrid(G,ax,zx,ty); let best=null;
+  for(const hard of [PTH.gap+6, 4, -12, -1e9]){
+    for(const h of [M[0], Math.max(1,M[0]-1)]) for(const sg of [s0,-s0]) for(const A of [A1,A2]) for(const bs of picks){
+      const A9=Math.min(A,(sg>0? PTH.down : PTH.up)-25), g0=ax-PTH.lead, g1=zx+PTH.lead, guide=x=>(x>=g0 || x<=g1)? ty : ty+sg*A9*Math.sin(Math.PI*h*(g0-x)/(g0-g1)), pl=pthPlan(G,Gr,ty,guide,bs,hard); if(!pl) continue;
+      for(const K of [150,115,85,60]){ const Q=pthShape(G,Gr,pl,ax,zx,ty,bs,K), J=pthJudge(Q,G,ty,guide); if(!J) continue;
+        const sc=(J.gap>=PTH.gap? 1000 : J.gap*4)+Math.min(J.rad,PTH.radius)*0.8-J.dev*0.3-J.cut*3-(h===M[0]? 0 : 25)+K*0.08;
+        if(!best || sc>best.sc) best={ Q, sc, gap:J.gap, cut:J.cut, amp:J.amp, rad:J.rad, m:h, sty, hard }; } }
+    if(best && best.gap>=Math.min(PTH.gap,hard)) break; }
+  if(!best){ const Q=[]; for(let x=ax;x>=zx;x-=PTH.step) Q.push([x,ty]); best={ Q, gap:null, m:0, sty:'level', hard:null }; }
+  const pts=best.Q.map(p=>({ x:p[0]/k, y:p[1]-oy }));
+  return { pts, sty:best.sty, m:best.m, gap:best.gap==null? null : Math.round(best.gap), rad:Math.round(Math.min(best.rad||0,9999)), cut:best.cut|0, amp:Math.round(best.amp||0), pass:best.hard, n, k, oy, ty, rivers:G.R.length }; }
+function pthPath(){ const key=(W|0)+':'+(H|0)+':'+(S.gk||1)+':'+(S.levelN|0); if(!PTH_C || PTH_C.cfg!==S.cfg || PTH_C.key!==key){ let r=null; try{ r=pthRoute(); }catch(e){ r=null; } PTH_C={ cfg:S.cfg, key, r }; } return PTH_C.r? PTH_C.r.pts : PATH_PTS; }
+function pthRig(){ const on=!cpsOn() && pthOn(), P=on? pthPath() : null, r=on && PTH_C && PTH_C.r; return { on, cps:cpsOn(), sty:r&&r.sty, m:r&&r.m, gap:r&&r.gap, cut:r&&r.cut, rad:r&&r.rad, amp:r&&r.amp, pass:r&&r.pass, n:r&&r.n, k:r&&r.k, oy:r&&r.oy, ty:r&&r.ty, rivers:r&&r.rivers, a:P&&P[0], z:P&&P[P.length-1], len:P&&P.length }; }
+
 
 
 function drawBase(side){
@@ -176692,6 +176770,7 @@ window.GVT = {
   ypv(o){ return ypvRig(o); },
   dpv(o){ return dpvRig(o); },
   cmx(o){ return cmxRig(o); },   
+  pth(){ return pthRig(); },   
   
   ult(){ const js=jetSarge(), u9=ultMyU();
     return { on:ultOn(), wk:ultWk(), lvl:WPN_MILE.ultLvl, rank:ultRank(ultWk()), live:Object.keys(ULT_LIVE),
