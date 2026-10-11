@@ -6,13 +6,18 @@
 const SW_K = 'gvt-open-door-v1';   // the cache; a new name here = every old cache dropped at activate
 const SW_NET_MS = 20000;           // the network's silence (headers not yet in) before the cache answers — ⚑ PT-C
 const SW_PAGE = new URL('./index.html', self.location.href).href;
+// CARD-ODV-SHIP THE MUSIC KEEPS (Wyatt 10/10/2026 19:00 EDT on Maker 1: "Do it. Plan it out. Execute to the best of your ability."; his plan's point 2: "The music and
+// pictures would then download once and stay saved on the device."): the served page carries its music as files, m/<sha256/12>.<m4a|mp3|wav> (tools/gvt-dist).
+// A name is its content's hash, so a file in this cache is never stale: CACHE FIRST, filled from the network on the first fetch; a new track is a new name.
+const SW_M = 'gvt-media-v1';
+const SW_MDIR = new URL('./m/', self.location.href).pathname;
 self.addEventListener('install', e => {
   self.skipWaiting();
   // the first copy: the browser's HTTP cache answers this when the page just loaded (max-age on Pages) — no second download
   e.waitUntil(caches.open(SW_K).then(c => c.add(new Request(SW_PAGE, { cache: 'default' }))).catch(() => {}));
 });
 self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== SW_K).map(k => caches.delete(k)))).then(() => self.clients.claim()).catch(() => {}));
+  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== SW_K && k !== SW_M).map(k => caches.delete(k)))).then(() => self.clients.claim()).catch(() => {}));
 });
 function isPage(rq) {
   if (rq.method !== 'GET') return false;
@@ -21,8 +26,23 @@ function isPage(rq) {
   if (rq.mode === 'navigate') return true;
   return u.href === SW_PAGE || u.pathname === new URL('./', self.location.href).pathname;
 }
+function isMedia(rq) {
+  if (rq.method !== 'GET') return false;
+  const u = new URL(rq.url);
+  return u.origin === self.location.origin && u.pathname.indexOf(SW_MDIR) === 0 && /^[0-9a-f]{12}\.(m4a|mp3|wav)$/.test(u.pathname.slice(SW_MDIR.length));
+}
+const SW_DEAD = () => new Response('', { status: 504, statusText: 'offline' });
+function mediaFetch(e, rq) {
+  const key = new URL(rq.url).origin + new URL(rq.url).pathname;   // the query (a cache-buster) never makes a second copy
+  return caches.open(SW_M).then(c => c.match(key).catch(() => null).then(hit => hit || fetch(rq).then(r => {
+    if (r && r.status === 200 && (r.type === 'basic' || r.type === 'default')) { const cl = r.clone(); e.waitUntil(c.put(key, cl).catch(() => {})); }
+    return r;
+  }, () => SW_DEAD())),   // a dead line and no copy: a plain 504 (the page's odvBytes reads !ok and takes its failure road; a rejected or error reply makes WebKit log a page error)
+  () => fetch(rq).catch(() => SW_DEAD()));   // no cache to open: the network's own answer, as before
+}
 self.addEventListener('fetch', e => {
   const rq = e.request;
+  if (isMedia(rq)) { e.respondWith(mediaFetch(e, rq)); return; }   // CARD-ODV-SHIP: m/ cache first
   if (!isPage(rq)) return;   // everything else: the browser's own road, untouched
   e.respondWith((async () => {
     const net = fetch(rq).then(r => {
