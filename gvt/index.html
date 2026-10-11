@@ -81608,7 +81608,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='20.67';        
+let GVT_CV='20.68';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -171387,9 +171387,21 @@ function dlgFill(){ const [cn, cl]=dlgCaps(); let n=DLGP.budget.reduce((s, u)=>s
 function dlgTrim(){ const [cn, cl]=dlgCaps(); let n=DLGP.budget.reduce((s, u)=>s+dlgNl(u), 0); while(DLGP.budget.length && (DLGP.budget.length>cn || (n>cl && DLGP.budget.length>1))){ const u=DLGP.budget.pop(); n-=dlgNl(u); DLGP.queue.unshift(u); } }   
 function dlgAwake(){ const aw=new Set(); for(const u of DLGP.units) if(u.__life || DLGP.held.has(u) || DLGP.parking.has(u) || (!DLGP.dozing && DLGP.budget.includes(u))) aw.add(u); return aw; }   
 
+
+
+
+
+function dlgScrM(svg){ const r=svg.getBoundingClientRect(), cs=getComputedStyle(svg), W=parseFloat(cs.width), H=parseFloat(cs.height);
+  if(!(W>0) || !(H>0) || !r.width || !r.height) return svg.getScreenCTM();   
+  const kx=r.width/W, ky=r.height/H, v=svg.viewBox && svg.viewBox.baseVal; let sx=1, sy=1, tx=0, ty=0;
+  if(v && v.width>0 && v.height>0){ const p=(svg.getAttribute('preserveAspectRatio')||'xMidYMid meet').trim().split(/\s+/), al=p[0]||'xMidYMid';
+    sx=W/v.width; sy=H/v.height; if(al!=='none'){ sx=sy=(p[1]==='slice')? Math.max(sx, sy) : Math.min(sx, sy); }
+    const fx=al.indexOf('xMin')>=0? 0 : al.indexOf('xMax')>=0? 1 : 0.5, fy=al.indexOf('YMin')>=0? 0 : al.indexOf('YMax')>=0? 1 : 0.5;
+    tx=(al==='none'? 0 : (W-v.width*sx)*fx)-v.x*sx; ty=(al==='none'? 0 : (H-v.height*sy)*fy)-v.y*sy; }
+  return { a:kx*sx, b:0, c:0, d:ky*sy, e:r.left+kx*tx, f:r.top+ky*ty }; }
 function dlgDots(){ const dpr=window.devicePixelRatio||1; return Math.min(dpr, (GV.tier>=1 || (window.GVT_TIER|0)>=1)? 2 : 3); }
 
-function dlgPicture(u){ const svg=DLGP.svg, m=svg.getScreenCTM(); if(!m) return Promise.resolve(null); const dpr=window.devicePixelRatio||1, sc=Math.abs(m.a)*DLGP.dd;
+function dlgPicture(u){ const svg=DLGP.svg, m=dlgScrM(svg); if(!m) return Promise.resolve(null); const dpr=window.devicePixelRatio||1, sc=Math.abs(m.a)*DLGP.dd;
   let bx=u.__box; const V=DLGP.vis; if(bx && V){ bx=[Math.max(bx[0], V[0]), Math.max(bx[1], V[1]), Math.min(bx[2], V[2]), Math.min(bx[3], V[3])]; if(bx[2]<=bx[0] || bx[3]<=bx[1]) bx=null; }   
   if(!bx) return Promise.resolve(null); const whole=!V || dlgIn(u.__box, V);   
   let [x0, y0, x1, y1]=bx; { const dx=(m.a*x0+m.e)*dpr, dy=(m.d*y0+m.f)*dpr; x0=(Math.floor(dx)/dpr-m.e)/m.a; y0=(Math.floor(dy)/dpr-m.f)/m.d; }   
@@ -171445,7 +171457,7 @@ function dlgSvg(id, after){ const svg=DLGP.svg; let t=document.getElementById(id
   for(const a of ['viewBox', 'preserveAspectRatio', 'class', 'data-rn']){ const v=svg.getAttribute(a); if(v!=null) t.setAttribute(a, v); else t.removeAttribute(a); } dlgLike(svg, t, 1); svg.parentNode.insertBefore(t, after.nextSibling); return t; }   
 function dlgDrawTo(cv, list){ if(!list.length){ if(cv.style.display!=='none') cv.style.display='none'; return 0; } if(cv.style.display==='none') cv.style.display='';   
   const r=DLGP.svg.getBoundingClientRect(), dpr=window.devicePixelRatio||1, W=Math.round(r.width*dpr), H=Math.round(r.height*dpr); if(cv.width!==W) cv.width=W; if(cv.height!==H) cv.height=H;
-  const g=cv.getContext('2d'); g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, cv.width, cv.height); const m=DLGP.svg.getScreenCTM(); if(!m || !r.width) return 0; const sx=cv.width/r.width, sy=cv.height/r.height;
+  const g=cv.getContext('2d'); g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, cv.width, cv.height); const m=dlgScrM(DLGP.svg); if(!m || !r.width) return 0; const sx=cv.width/r.width, sy=cv.height/r.height;
   let n=0; for(const u of list){ const P=u.__p; if(!P) continue; g.drawImage(P.rec.cv, (m.a*P.x+m.e-r.left)*sx, (m.d*P.y+m.f-r.top)*sy, m.a*P.w*sx, m.d*P.h*sy); n++; } return n; }   
 
 function dlgLayers(aw, only){ const svg=DLGP.svg; if(!svg || !svg.isConnected) return; const t0=performance.now();
@@ -171506,7 +171518,7 @@ function dlgHold(id, ms, drag){ dlgRouse(); if(!DLGP.svg || !DLGP.svg.isConnecte
 
 function dlgRouse(){ DLGP.touchT=performance.now(); if(DLGP.dozing){ DLGP.dozing=0; DLGP.rotT=0; DLGP.pend=1; } }
 function dlgBeat(){ try{ return !!(DLGP.on && DLGP.svg && DLGP.svg.isConnected); }catch(e){ return false; } }   
-function dlgFinger(e){ dlgRouse(); const svg=DLGP.svg; if(!svg || !svg.isConnected || !DLGP.sleep.size) return; const m=svg.getScreenCTM(); if(!m) return; const x=(e.clientX-m.e)/m.a, y=(e.clientY-m.f)/m.d, p=[x, y, x, y]; let n=0;
+function dlgFinger(e){ dlgRouse(); const svg=DLGP.svg; if(!svg || !svg.isConnected || !DLGP.sleep.size) return; const m=dlgScrM(svg); if(!m) return; const x=(e.clientX-m.e)/m.a, y=(e.clientY-m.f)/m.d, p=[x, y, x, y]; let n=0;
   for(const u of DLGP.sleep) if(dlgIn(p, u.__box) && /^(ro-|dec[A-Z])/.test(u.id||'')){ dlgHoldU(u, DLG_HOLD_MS+300); n++; } if(n) dlgLayers(dlgAwake()); }
 
 function dlgLoopsOf(u){ let A; try{ A=u.getAnimations({ subtree:true }); }catch(e){ return []; } const L=[];
@@ -171521,7 +171533,7 @@ function dlgTick(ts){ DLGP.raf=requestAnimationFrame(dlgTick); if(!DLGP.on || S.
   { const ck=dlgCaps().join(); if(ck!==DLGP.capK){ DLGP.capK=ck; dlgTrim(); dlgFill(); DLGP.pend=1; } }   
   if(!DLGP.touchT) DLGP.touchT=ts; { const dz=DLG_DOZE_MS>0 && ts-DLGP.touchT>DLG_DOZE_MS; if(dz!==!!DLGP.dozing){ DLGP.dozing=dz? 1 : 0; if(dz) DLGP.dozeN++; DLGP.rotT=ts; DLGP.pend=1; } }   
   { const f=++DLGP.fr; if((f % 120)===60) dlgChaosSoon();     if((f % 120)===0 || (DLGP.moved.size && (f % 3)===0)) setTimeout(dlgRoam, 0, (f % 120)===0); }   
-  if(ts-DLGP.scT>500){ DLGP.scT=ts; const m=DLGP.svg.getScreenCTM(), sc=m? +Math.abs(m.a).toFixed(3) : 0; if(sc && DLGP.sc && sc!==DLGP.sc){ if(DLGP.scW===sc){ DLGP.scW=0; dlgRelay(); return; } DLGP.scW=sc; } else DLGP.scW=0; }   
+  if(ts-DLGP.scT>500){ DLGP.scT=ts; const m=dlgScrM(DLGP.svg), sc=m? +Math.abs(m.a).toFixed(3) : 0; if(sc && DLGP.sc && sc!==DLGP.sc){ if(DLGP.scW===sc){ DLGP.scW=0; dlgRelay(); return; } DLGP.scW=sc; } else DLGP.scW=0; }   
   if(DLG_ROT_MS>0 && !DLGP.dozing && DLGP.queue.length && dlgCaps()[0]>0 && ts-DLGP.rotT>DLG_ROT_MS){ DLGP.rotT=ts; const out=DLGP.budget.shift(); if(out){ DLGP.queue.push(out); if(dlgNl(out)>DLG_LOOPS) DLGP.budget.length=0; } for(const u of DLGP.budget){ const i=DLGP.queue.indexOf(u); if(i>=0) DLGP.queue.splice(i, 1); } const was0=new Set(DLGP.budget); dlgFill(); DLGP.pend=1; dlgPlayTurn(DLGP.budget.filter(u=>!was0.has(u))); }   
   if(DLGP.pend){ DLGP.pend=0; DLGP.parking.clear(); const aw=dlgAwake(); const L=[]; for(const u of DLGP.units) if(!aw.has(u) && !u.__life && !DLGP.sleep.has(u)) L.push({ u, L:dlgLoopsOf(u) }); if(!DLGP.park) DLGP.parkT=ts; DLGP.park=L; for(const e of L) DLGP.parking.add(e.u); DLGP.layDue=1; }   
   if(!DLGP.park) return; { const over=ts-DLGP.parkT>=DLG_PARK_MAX; DLGP.park=DLGP.park.filter(e=>{ if(over || dlgParkStep(e.L)){ DLGP.parking.delete(e.u); DLGP.layDue=1; return false; } return true; }); }   
@@ -171536,10 +171548,10 @@ function dlgAfterPaint(){ const tok=++DLGP.tok; dlgDrop(); dlgChaosSoon();     i
   if(!DLGP.wired){ DLGP.wired=1; document.addEventListener('pointerdown', dlgFinger, { capture:true, passive:true }); if(typeof ResizeObserver==='function') DLGP.ro=new ResizeObserver(()=>{ const s=DLGP.svg; if(s && s.isConnected && DLGP.top && dlgSz(s)!==DLGP.sz) dlgRelay(); }); }   
   requestAnimationFrame(()=>{ if(tok===DLGP.tok) dlgSettle(tok).catch(e=>{ DLGP.log.push(['settle-error', String(e).slice(0, 120)]); }); }); }
 async function dlgSettle(tok){ if(!dlgRoomOk()) return; const svg=document.querySelector('#roomStage > svg'); if(!svg) return; const t0=performance.now(); DLGP.encMs=0; DLGP.px=0; DLGP.made=0; DLGP.hits=0; DLGP.makeMs=0;
-  DLGP.svg=svg; DLGP.room=roomCur(); DLGP.belt=svg.querySelector(':scope > #ychars'); DLGP.dd=dlgDots(); const mn=document.getElementById('menu'); { const m=svg.getScreenCTM(); DLGP.sc=m? +Math.abs(m.a).toFixed(3) : 0; DLGP.sz=dlgSz(svg); }
+  DLGP.svg=svg; DLGP.room=roomCur(); DLGP.belt=svg.querySelector(':scope > #ychars'); DLGP.dd=dlgDots(); const mn=document.getElementById('menu'); { const m=dlgScrM(svg); DLGP.sc=m? +Math.abs(m.a).toFixed(3) : 0; DLGP.sz=dlgSz(svg); }
   DLGP.ctx=DLGP.dd+'|'+(svg.getAttribute('data-rn')||'')+'|'+(svg.getAttribute('class')||'')+'|'+document.body.className+'|'+(mn? mn.className : '');   
   DLGP.units=dlgCollect(svg); DLGP.defs=[...svg.querySelectorAll(':scope > defs')].map(d=>new XMLSerializer().serializeToString(d)).join('');
-  { const m=svg.getScreenCTM(), r=svg.getBoundingClientRect(); DLGP.vis=m? [(r.left-m.e)/m.a, (r.top-m.f)/m.d, (r.right-m.e)/m.a, (r.bottom-m.f)/m.d] : null; }
+  { const m=dlgScrM(svg), r=svg.getBoundingClientRect(); DLGP.vis=m? [(r.left-m.e)/m.a, (r.top-m.f)/m.d, (r.right-m.e)/m.a, (r.bottom-m.f)/m.d] : null; }
   const life=dlgLifeSel(), fl=DLG_LIFE_FLOOR[DLGP.room]||'', now=performance.now(); for(const u of DLGP.units){ u.__dlgU=1; u.__fix=(fl && dlgIs(u, fl))? 1 : 0; u.__life=dlgIs(u, life) || dlgCant(u) || u.__fix;     u.__loop=dlgHasLoop(u); u.__box=dlgBox(u); u.__nl=u.__loop? dlgLoopsOf(u).length : 0;
     const t=u.id? DLGP.until.get(u.id) : 0, rem=dlgIntro(u); if(t>now || (rem>0 && !u.__life)) dlgHoldU(u, Math.max(t-now, rem+100)); }   
   for(const [k, t] of DLGP.until) if(!(t>now)) DLGP.until.delete(k);
