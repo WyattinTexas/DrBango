@@ -4614,6 +4614,12 @@
   #travelMap .lsw-stars { position:absolute; left:50%; bottom:16.5px; margin-left:-20px; width:48px; height:16px; display:flex; justify-content:space-between; align-items:center; z-index:2; pointer-events:none; }
   #travelMap .lsw-stars > svg { display:block; flex:0 0 auto; width:16px; height:16px; overflow:visible; }
   /**/
+  #travelMap .sls-slot.tpo .sls-art { display:none; }
+  #travelMap .tpo-cov { position:absolute; left:17px; top:8px; right:8px; height:52px; overflow:hidden; pointer-events:none; background:#1E1A12; }
+  #travelMap .tpo-cov > svg { display:block; width:100%; height:100%; }
+  #travelMap .lg-stage.sls.lsw .sls-slot.tpo .tpo-cov { height:44px; }   /**/
+  #travelMap .lg-art > svg.tpo-page { position:absolute; left:0; top:0; width:100%; height:100%; display:block; }
+  /**/
   #travelMap .lg-book { --cbk-k:1; --cbk-f:Cochin,Baskerville,'Hoefler Text','Palatino Linotype',Georgia,serif; --cbk-e:'Academy Engraved LET',Cochin,Baskerville,Georgia,serif; }
   html:is([data-script="ar"],[data-script="jp"],[data-script="kr"],[data-script="cn"],[data-script="cyr"]) #travelMap .lg-book { --cbk-f:Cochin,Baskerville,Georgia,var(--ui); --cbk-e:Cochin,Baskerville,Georgia,var(--ui); }   /**/
   #travelMap .lg-stage.sls .cbk-seat { position:absolute; left:26px; top:248px; width:80px; height:100px; margin:0; padding:0; border:0; background:none; cursor:pointer; z-index:35; -webkit-tap-highlight-color:transparent; touch-action:manipulation; appearance:none; -webkit-appearance:none; }
@@ -82922,7 +82928,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='21.14';        
+let GVT_CV='21.15';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -141599,7 +141605,7 @@ function lg3KnownHTML(){ const nx=lg3NextTok(); let keys='';
     +lgTape('left:-6px;top:-2px;transform:rotate(-40deg)')+lgTape('right:-6px;top:-2px;transform:rotate(40deg)')+lgTape('left:-6px;bottom:-2px;transform:rotate(40deg)')+lgTape('right:-6px;bottom:-2px;transform:rotate(-40deg)')+'</div>'; }
 
 
-function lg3Left(c, scene, cap){ return '<div class="lg-page l"><div class="lg-edge l"></div><div class="lg-art">'+scene
+function lg3Left(c, scene, cap){ return '<div class="lg-page l"><div class="lg-edge l"></div><div class="lg-art">'+(tpoOn()? tpoLeftScene(c, scene) : scene)  
     +'<div class="lg-h1 l3-h1">'+LG3_E(t(c.name))+'</div>'+(c.place? '<div class="lg-slab yel l3-yel">'+LG3_E(t(c.place))+'</div>' : '')
     +'<div class="lg-cap1">'+LG3_E(t(cap||c.cap))+'</div></div>'+lgTape('left:-14px;top:6px;transform:rotate(-40deg)')+lgTape('right:-12px;top:334px;transform:rotate(-40deg)')
     +(c.crayon? '<div class="lg-crayon">'+LG3_E(c.crayon)+'</div>' : '')+'<div class="lg-no l">'+c.pg[0]+'</div>'+LG_GRAIN+'</div>'; }
@@ -142373,8 +142379,8 @@ function meter(b){ const s=b.st; if(s.frac!==null) return '<div class="l3-mb"><i
 const CLOTH={ camp:'#3F4A24', elite:'#1E2B50', over:'#4E2E78', dino:'#9A3B12', yeti:'#235A80', west:'#6B4A22', teddy:'#8E1F2C', caves:'#0F3843', sky:'#37569A', moon:'#1A5F3D' };   
 function cloth(b){ if(OPT.cloth==='theme') return CLOTH[b.id]||'#3F4A24'; if(OPT.cloth==='land'){ if(b.kind!=='quest') return b.kind==='camp'? '#3F4A24' : b.id==='elite'? '#2F5FB8' : '#4A2C78'; const p=safe(()=>amPin(b.tok)); return (p && AM_LAND[p.room])||'#3F4A24'; } return '#3F4A24'; }
 function bookHTML(b, w){ const nm=nameOf(b), win=OPT.books==='sections'? lg3Win(b.id) : '', art=win||(LG3_MENU[b.tok]? LG3_MENU[b.tok]() : ''), king=!win && (b.tok==='bone' || b.tok==='ice'), face=!win && !!LG3_THRONE[b.tok];   
-  return '<div class="lg-ch sls-slot k-'+b.kind+(pbkTok(b.tok)? ' pbk-gold' : '')  +(b.st.lock? ' lock' : '')+(b.next && !b.st.lock? ' next' : '')+'" data-ch="'+b.ch+'" data-book="'+b.id+'" style="--bw:'+w+'px;--cloth:'+cloth(b)+'">'
-    +'<div class="sls-book"><i class="sls-spine"></i>'+WEAVE+'<i class="sls-frame"></i><div class="sls-art'+(win? ' win' : king? ' king' : face? ' face' : '')+'">'+art+'</div><div class="sls-nm'+(nm.length>13? ' long' : '')+(nm.split(/\s+/).some(w=>w.length>13)? ' xl' : '')+'">'+E(nm)+'</div>'+LSW.stars(b.id)+meter(b)+'</div>'
+  return '<div class="lg-ch sls-slot k-'+b.kind+(pbkTok(b.tok)? ' pbk-gold' : '')+(tpoOn() && TPO_IDS[b.id]? ' tpo' : '')    +(b.st.lock? ' lock' : '')+(b.next && !b.st.lock? ' next' : '')+'" data-ch="'+b.ch+'" data-book="'+b.id+'" style="--bw:'+w+'px;--cloth:'+cloth(b)+'">'
+    +'<div class="sls-book"><i class="sls-spine"></i>'+WEAVE+'<i class="sls-frame"></i>'+(tpoOn()? tpoCoverHTML(b.id) : '')  +'<div class="sls-art'+(win? ' win' : king? ' king' : face? ' face' : '')+'">'+art+'</div><div class="sls-nm'+(nm.length>13? ' long' : '')+(nm.split(/\s+/).some(w=>w.length>13)? ' xl' : '')+'">'+E(nm)+'</div>'+LSW.stars(b.id)+meter(b)+'</div>'
     +(pbkTok(b.tok)? pbkMarkHTML(b.tok) : '')  +(b.st.lock? '<div class="sls-lk"><b>'+LOCK()+'</b>'+(b.lockLine? '<span>'+E(b.lockLine)+'</span>' : '')+'</div>' : '')
     +(b.next && !b.st.lock? '<div class="lg-ribbon"><span>'+E(W('NEXT'))+'</span></div>' : '')+'</div>'; }
 function atlasHTML(w){ return '<div class="lg-ch sls-slot k-atlas" data-ch="theater" style="--bw:'+w+'px;--cloth:#8B5E34"><div class="sls-book"><i class="sls-spine"></i>'+WEAVE+'<i class="sls-frame"></i><div class="sls-art atlas"><svg viewBox="0 0 824 364" preserveAspectRatio="xMidYMid slice">'+lg3Inner(lg3KingdomSVG())+'</svg></div><div class="sls-nm long">'+E(W('THE KNOWN WORLD'))+'</div></div></div>'; }
@@ -142927,6 +142933,118 @@ function lg3Win(id){ try{ const k=String(lg3Safe(()=>skyCorpsHex())||''); if(!LG
     for(const tk of ['camp2','camp3','teddy','moon']) A[tk]=lg3Safe(()=>LG3_MENU[tk]())||'';
     const sc=lg3WinScenes(S, A); LG3_WIN={}; for(const b in sc) LG3_WIN[b]=lg3WinDisc(sc[b], b); LG3_WIN_K=k; }
   return LG3_WIN[id]||''; }catch(e){ try{ console.error('lg3Win', e); }catch(e2){} return ''; } }
+
+
+
+
+const TPO={ on:(function(){ try{ const q=/[?&]tpo=([01])/.exec(location.search||''); if(q){ if(q[1]==='1') localStorage.setItem('gvt_tpo','1'); else localStorage.removeItem('gvt_tpo'); } return localStorage.getItem('gvt_tpo')==='1'? 1 : 0; }catch(e){ return 0; } })(), k:null, art:null };
+const TPO_IDS={ camp:1, elite:1, over:1, dino:1, yeti:1, west:1, teddy:1, caves:1, sky:1, moon:1 };   
+const TPO_TAG={ camp:'ONE HUNDRED LEVELS ON THE RUG', elite:'THEY COME AFTER DARK', over:'THE STORM IN THE BEDROOM', dino:'VISIT BONE VALLEY', yeti:'THE SNOW PALACE AT DUSK', west:'MAIN STREET AT SUNDOWN', teddy:'CAMP SNUGG, ON THE BED', caves:'FOUR EYES IN THE DARK', sky:'OVER YOUR ROOF', moon:'THE GARDEN AT NIGHT' };   
+const TPO_TOP={ camp:'#C8571F', elite:'#0B1A3A', over:'#2A1544', dino:'#3B1B5A', yeti:'#16233A', west:'#241030', teddy:'#6D4118', caves:'#04090E', sky:'#1B2A4A', moon:'#0E1A2E' };   
+const TPO_SPR=['toybox','tan:tanrifle','rifleman','commando','red:tanrifle','flappy','kingrex','gsnowman','kingyeti','kingcroak','tcannon','tguardbear','kingbear','sky:skyfort','skyace','skyfighter','wasp','toadstool','gnome'];   
+const TPO_DEFS='<defs><filter id="tpogr"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="5"/><feColorMatrix type="matrix" values="0 0 0 0 .5  0 0 0 0 .4  0 0 0 0 .25  0 0 0 .13 0"/></filter><radialGradient id="tpovg" cx=".5" cy=".5" r=".72"><stop offset=".6" stop-color="#1E1A12" stop-opacity="0"/><stop offset="1" stop-color="#1E1A12" stop-opacity=".42"/></radialGradient></defs>';
+const TPO_OVER='<rect x="-100" y="-100" width="200" height="200" fill="url(#tpovg)"/><rect x="-100" y="-100" width="200" height="200" filter="url(#tpogr)"/>';   
+function tpoOn(){ return !!TPO.on; }
+function tpoScenes(S, A){   
+  const img=(id, x, y, w, h)=>S[id]? `<image href="${S[id]}" x="${x}" y="${y}" width="${w}" height="${h||w}" preserveAspectRatio="xMidYMid meet"/>` : '';
+  const paint=(tok, x, y, w)=>{ const m=(A[tok]||'').match(/^<svg viewBox="([^"]+)"[^>]*>([\s\S]*)<\/svg>$/); return m? `<svg x="${x}" y="${y}" width="${w}" height="${w}" viewBox="${m[1]}" preserveAspectRatio="xMidYMid meet">${m[2]}</svg>` : ''; };
+  const bands=rows=>rows.map(([y, h, c])=>`<rect x="-100" y="${y}" width="200" height="${h}" fill="${c}"/>`).join('');   
+  const sun=(cx, cy, r, c, n, rc, op)=>{ let s='<g>'; for(let i=0; i<(n||0); i++){ const a=i*2*Math.PI/n, b=a+Math.PI/n*.5; s+=`<path d="M${cx} ${cy} L${(cx+Math.cos(a)*300).toFixed(1)} ${(cy+Math.sin(a)*300).toFixed(1)} L${(cx+Math.cos(b)*300).toFixed(1)} ${(cy+Math.sin(b)*300).toFixed(1)} Z" fill="${rc||c}" opacity="${op||.22}"/>`; } return s+`<circle cx="${cx}" cy="${cy}" r="${r}" fill="${c}"/></g>`; };   
+  const dots=(n, seed, x0, x1, y0, y1, r0, r1, col, op)=>{ let s='', r=seed; const R=()=>(r=(r*9301+49297)%233280)/233280; for(let i=0; i<n; i++) s+=`<circle cx="${(x0+R()*(x1-x0)).toFixed(1)}" cy="${(y0+R()*(y1-y0)).toFixed(1)}" r="${(r0+R()*(r1-r0)).toFixed(1)}" fill="${col}" opacity="${op||1}"/>`; return s; };   
+  const cloud=(x, y, w, c)=>`<g fill="${c}"><circle cx="${x}" cy="${y}" r="${(w*.22).toFixed(1)}"/><circle cx="${(x+w*.28).toFixed(1)}" cy="${(y-w*.1).toFixed(1)}" r="${(w*.3).toFixed(1)}"/><circle cx="${(x+w*.6).toFixed(1)}" cy="${y}" r="${(w*.24).toFixed(1)}"/><rect x="${(x-w*.2).toFixed(1)}" y="${y}" width="${w}" height="${(w*.24).toFixed(1)}" rx="${(w*.1).toFixed(1)}"/></g>`;
+  return {
+    
+    camp: `${bands([[-100, 64, '#F6D27C'], [-36, 30, '#F0A24A'], [-6, 26, '#C8571F']])}${sun(34, -34, 30, '#FFF4C6', 18, '#FFE08A', .28)}
+      <path d="M-120 18 L120 18 L150 100 L-150 100 Z" fill="#B23A2A"/><path d="M-116 28 H116 M-130 66 H130 M-138 88 H138" stroke="#E8C46A" stroke-width="3"/>
+      ${img('toybox', -88, -60, 78)}
+      <g transform="translate(-26 52)"><rect x="-15" y="-15" width="30" height="30" rx="3" fill="#3D7FD1" stroke="#1F3F6B" stroke-width="2"/><path d="M-7 10 L0 -9 L7 10 M-4 3 H4" stroke="#FFE27A" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/></g>
+      ${img('tan:tanrifle', 46, -20, 40)}${img('rifleman', 0, -2, 102)}`,
+    
+    elite: `${bands([[-100, 200, '#0B1A3A']])}${dots(26, 7, -100, 100, -100, -10, .6, 1.6, '#FFF6D0', .9)}
+      <circle cx="-44" cy="-46" r="34" fill="#DDE8FF" opacity=".16"/><circle cx="-44" cy="-46" r="22" fill="#F2F0DC"/><circle cx="-37" cy="-50" r="18" fill="#0B1A3A"/>
+      <path d="M-70 100 L-96 -100 L-56 -100 Z" fill="#DDE8FF" opacity=".16"/><path d="M60 100 L44 -100 L84 -100 Z" fill="#DDE8FF" opacity=".16"/>
+      <rect x="-100" y="20" width="200" height="80" fill="#2B3448"/><path d="M-100 20 Q-40 12 0 20 T100 18" stroke="#8FA3C8" stroke-width="2.4" fill="none" opacity=".7"/>
+      ${paint('camp2', -80, -46, 74)}${img('commando', -6, -6, 106)}`,
+    
+    over: `${bands([[-100, 120, '#2A1544'], [20, 80, '#22113A']])}
+      <path d="M-100 -30 Q-70 -56 -40 -34 Q-10 -62 24 -36 Q56 -58 100 -32 L100 -100 L-100 -100 Z" fill="#1B0E2C"/>
+      <path d="M30 -100 L14 -54 L30 -50 L2 -4" fill="none" stroke="#FFE9F0" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/><path d="M30 -100 L14 -54 L30 -50 L2 -4" fill="none" stroke="#FFB3C8" stroke-width="2"/>
+      <g transform="translate(-66 -26)"><circle r="12" fill="#FF3B30" opacity=".35"/><circle cx="22" r="12" fill="#FF3B30" opacity=".35"/><ellipse rx="5" ry="3" fill="#FF5A4A"/><ellipse cx="22" rx="5" ry="3" fill="#FF5A4A"/></g>
+      ${paint('camp3', -98, -40, 86)}${img('red:tanrifle', -4, -2, 102)}`,
+    
+    dino: `${bands([[-100, 56, '#3B1B5A'], [-44, 36, '#C8481F'], [-8, 40, '#FFB347']])}${sun(0, -14, 40, '#FFE6A0', 20, '#FFD37A', .25)}
+      <path d="M-100 -62 Q0 -46 100 -64" stroke="#F2E6C8" stroke-width="1.6" fill="none"/>${[-88, -66, -44, -22, 0, 22, 44, 66, 88].map((x, i)=>`<path d="M${x} ${(-62+Math.abs(x)*.16).toFixed(1)} l6 12 l6 -12 Z" fill="${['#C0473A', '#D9A544', '#4A8CA0'][i%3]}"/>`).join('')}
+      ${[[14, -76, 10], [22, -90, 13], [8, -100, 9]].map(([x, y, r])=>`<circle cx="${x}" cy="${y}" r="${r}" fill="#8C7A72" opacity=".8"/>`).join('')}
+      <path d="M-76 30 L-6 -64 L14 -64 L84 30 Z" fill="#5B3426"/><path d="M-6 -64 L14 -64 L10 -54 L-2 -55 Z" fill="#FF6A1A"/><path d="M10 -55 Q20 -30 14 -4 Q24 -24 18 -55 Z" fill="#FF8A1E"/>
+      <path d="M-100 40 Q-60 10 -20 34 Q20 10 60 36 Q80 24 100 34 L100 100 L-100 100 Z" fill="#2E5E2A"/><rect x="-100" y="62" width="200" height="38" fill="#1F4A1F"/>
+      ${img('flappy', -92, -78, 44)}${img('kingrex', -34, -22, 124)}
+      <path d="M-100 100 Q-90 60 -76 74 Q-72 50 -58 70 Q-50 56 -40 76 Q-34 68 -26 100 Z M56 100 Q62 66 72 76 Q80 54 90 72 L100 68 L100 100 Z" fill="#163A16"/>`,
+    
+    yeti: `${bands([[-100, 46, '#16233A'], [-54, 50, '#3D5A78'], [-4, 40, '#C8DCEC']])}${sun(-48, -56, 20, '#F6F3E6', 12, '#DDE8FF', .14)}${dots(16, 11, -100, 100, -100, -50, .5, 1.1, '#FFF6D0', .9)}
+      <path d="M-100 6 L-66 -44 L-44 -22 L-14 -60 L22 -14 L50 -38 L100 2 L100 30 L-100 30 Z" fill="#E4EEF7"/><path d="M-66 -44 L-54 -6 L-44 -22 Z M-14 -60 L-2 -10 L22 -14 Z M50 -38 L62 -4 L100 2 Z" fill="#9FBAD3"/>
+      <g transform="translate(-8 -48) scale(2.2)" fill="#C9B6E8" stroke="#6E58A0" stroke-width=".8"><rect x="-6" y="0" width="12" height="10"/><path d="M-6 0 L-3 -6 L0 0 M0 0 L3 -10 L6 0 Z"/><rect x="-11" y="3" width="5" height="7"/><rect x="6" y="3" width="5" height="7"/><path d="M-11 3 L-8.5 -3 L-6 3 M6 3 L8.5 -3 L11 3"/><rect x="-1.5" y="3" width="3" height="3" fill="#FFD84A" stroke="none"/><rect x="-9.5" y="5" width="2" height="2" fill="#FFD84A" stroke="none"/><rect x="7.5" y="5" width="2" height="2" fill="#FFD84A" stroke="none"/></g>
+      <path d="M-100 34 Q-40 16 10 30 Q60 44 100 24 L100 100 L-100 100 Z" fill="#F4F9FF"/>
+      ${img('gsnowman', -98, -6, 52)}${img('kingyeti', -26, -34, 126)}
+      <path d="M-100 76 Q-34 58 26 80 Q68 92 100 72 L100 100 L-100 100 Z" fill="#E6F0FA"/>${dots(30, 5, -100, 100, -100, 80, 1, 2.4, '#fff', .9)}`,
+    
+    west: `${bands([[-100, 36, '#241030'], [-64, 30, '#6B2416'], [-34, 30, '#D97E35'], [-4, 30, '#FFD9A0']])}${dots(8, 5, -100, 100, -100, -66, .5, 1.1, '#FFF6D0', .9)}${sun(20, -12, 44, '#FFEFA8', 22, '#F7B65A', .26)}
+      <path d="M-100 22 L-92 -8 L-70 -8 L-62 22 Z M40 22 L50 -18 L82 -18 L90 22 Z M-30 22 L-22 2 L-6 2 L0 22 Z" fill="#9A4B33"/>
+      <rect x="-100" y="22" width="200" height="78" fill="#D9A15E"/><path d="M-100 56 Q0 44 100 58" stroke="#C18848" stroke-width="3" fill="none"/>
+      <g transform="translate(-100 -40) scale(2.4)"><rect x="0" y="6" width="26" height="24" fill="#7A4A26"/><path d="M0 0 H26 V8 H0 Z" fill="#8F5A2F"/><rect x="2" y="2" width="22" height="5" fill="#E6C27A"/><rect x="9" y="18" width="8" height="12" fill="#3A2312"/><rect x="3" y="12" width="5" height="5" fill="#F7D98A"/><rect x="18" y="12" width="5" height="5" fill="#F7D98A"/></g>
+      <g transform="translate(72 -34) scale(2.1)" stroke="#5A3820" stroke-width="1.6" fill="none"><path d="M0 0 V26 M-4 26 L0 6 L4 26"/><path d="M0 0 L0 -9 M0 0 L9 0 M0 0 L0 9 M0 0 L-9 0 M0 0 L6 -6 M0 0 L6 6 M0 0 L-6 6 M0 0 L-6 -6"/></g>
+      <path d="M86 70 V30 M86 48 Q98 48 98 30 M86 56 Q74 56 74 38" stroke="#3F7A3A" stroke-width="8" stroke-linecap="round" fill="none"/>
+      <ellipse cx="-2" cy="92" rx="52" ry="7" fill="#8C5A2A" opacity=".45"/>${img('kingcroak', -40, -8, 106)}
+      <g transform="translate(-80 84)"><circle r="10" fill="none" stroke="#8C6A3A" stroke-width="2.4" stroke-dasharray="4 2.8"/><circle r="6" fill="none" stroke="#8C6A3A" stroke-width="2"/></g>`,
+    
+    teddy: `${bands([[-100, 56, '#6D4118'], [-44, 40, '#CF9D5C'], [-4, 44, '#E6CB9B']])}${sun(-44, -30, 28, '#FFE8B0', 14, '#FFE8B0', .2)}
+      <ellipse cx="0" cy="10" rx="130" ry="40" fill="#F6EDE0"/><path d="M-120 10 Q0 -22 120 10" stroke="#E2D2BE" stroke-width="2.4" fill="none"/>
+      ${paint('teddy', -66, -82, 96)}<g transform="translate(-50 -76)"><path d="M0 0 V28" stroke="#5A3820" stroke-width="2.4"/><path d="M0 0 L22 5 L0 13 Z" fill="#2E8B4A"/></g>
+      ${[-100, -50, 0, 50].map((x, i)=>`<rect x="${x}" y="40" width="50" height="60" fill="${['#B5793E', '#E8D2A8', '#3F7A4A', '#B5793E'][i]}"/>`).join('')}<path d="M-100 40 H100 M-50 40 V100 M0 40 V100 M50 40 V100 M-100 72 H100" stroke="#FFF7E8" stroke-width="2" stroke-dasharray="4 3.2" opacity=".8"/><rect x="-100" y="72" width="200" height="28" fill="#000" opacity=".08"/>
+      ${img('tcannon', -98, 34, 50)}${img('tguardbear', 46, 8, 60)}${img('kingbear', -30, -10, 108)}`,
+    
+    caves: `<rect x="-100" y="-100" width="200" height="200" fill="#04090E"/>
+      <path d="M-100 -100 H100 V-62 L88 -40 L80 -62 L68 -26 L56 -60 L40 -46 L30 -68 L14 -32 L2 -64 L-14 -42 L-24 -66 L-40 -28 L-52 -60 L-64 -42 L-76 -64 L-88 -36 L-100 -58 Z" fill="#CFEFFF"/>
+      <path d="M-100 -56 L-80 -46 L-72 -20 L-84 100 L-100 100 Z M100 -56 L80 -44 L72 -16 L84 100 L100 100 Z" fill="#9ED8F0"/><path d="M-80 -46 L-72 -20 L-60 -36 Z M80 -44 L72 -16 L58 -34 Z" fill="#DDF4FF" opacity=".6"/>
+      <g transform="translate(-22 -22) scale(2.6)"><ellipse cx="-3.5" rx="2.6" ry="1.8" fill="#FFD84A"/><ellipse cx="3.5" rx="2.6" ry="1.8" fill="#FFD84A"/></g><g transform="translate(28 -40) scale(2.2)"><ellipse cx="-3" rx="2.2" ry="1.5" fill="#FFD84A"/><ellipse cx="3" rx="2.2" ry="1.5" fill="#FFD84A"/></g>
+      ${[-66, 66].map(x=>`<g transform="translate(${x} -2) scale(2.2)"><path d="M0 0 V14" stroke="#6B4A2A" stroke-width="2.4"/><circle cy="-2" r="9" fill="#FFB347" opacity=".35"/><path d="M-2.5 0 Q0 -8 2.5 0 Z" fill="#FFCF4A"/></g>`).join('')}
+      <path d="M-100 48 Q0 30 100 48 L100 100 L-100 100 Z" fill="#E6F6FF"/><path d="M-16 28 L16 28 L46 100 L-46 100 Z" fill="#8A5E36"/><path d="M-20 40 H20 M-26 54 H26 M-32 70 H32 M-38 86 H38" stroke="#5A3A1A" stroke-width="2.4"/>
+      <circle cx="4" cy="58" r="30" fill="#FFE27A" opacity=".22"/><g transform="translate(4 62) scale(2.6)"><path d="M-9 8 Q-11 -4 -4 -8 L4 -8 Q11 -4 9 8 Z" fill="#B07A44" stroke="#5A3A1A" stroke-width="1"/><path d="M-4 -8 L0 -12 L4 -8" stroke="#5A3A1A" stroke-width="1.4" fill="none"/><path d="M0 -3.4 L1 -.9 L3.6 -.9 L1.5 .7 L2.3 3.2 L0 1.7 L-2.3 3.2 L-1.5 .7 L-3.6 -.9 L-1 -.9 Z" fill="#FFE27A"/></g>`,
+    
+    sky: `${bands([[-100, 56, '#1B2A4A'], [-44, 54, '#6E93C4'], [10, 40, '#F2C9A0']])}${sun(-50, 22, 30, '#FFE3B0', 18, '#FFE3B0', .2)}
+      ${[[40, -70], [70, -50], [-30, -80]].map(([x, y])=>`<g transform="translate(${x} ${y})"><circle r="7" fill="#4A4A55"/><circle cx="5" cy="2" r="5" fill="#5E5E6A"/></g>`).join('')}${cloud(-120, 10, 80, '#FFFFFF')}${cloud(30, -20, 70, '#FFFFFF')}
+      ${img('skyfort', -92, -66, 170, 100)}${img('skyace', 30, -98, 46)}${img('skyfighter', -100, -80, 40)}
+      <path d="M-100 64 L-20 44 L100 60 L100 100 L-100 100 Z" fill="#7A3B2E"/><path d="M-100 76 L100 72 M-100 88 L100 86" stroke="#5E2A20" stroke-width="2.4"/>
+      <rect x="44" y="24" width="16" height="30" fill="#8A4A36"/>${[[52, 14, 6], [56, 2, 8], [50, -10, 6]].map(([x, y, r])=>`<circle cx="${x}" cy="${y}" r="${r}" fill="#D8D8E0" opacity=".8"/>`).join('')}
+      <path d="M-60 54 V18 M-80 22 H-40 M-74 30 H-46 M-68 38 H-52" stroke="#2A2030" stroke-width="2.8"/>`,
+    
+    moon: `${bands([[-100, 80, '#0E1A2E'], [-20, 34, '#1B3050'], [14, 26, '#24405F']])}${dots(22, 3, -100, 100, -100, -20, .5, 1.3, '#FFF6D0', .9)}
+      <circle cx="48" cy="-44" r="54" fill="#FFF6C8" opacity=".08"/><circle cx="48" cy="-44" r="44" fill="#FFF6C8" opacity=".1"/>${sun(48, -44, 34, '#FFF6D6', 0)}${img('wasp', 26, -78, 34)}
+      <path d="M-100 -28 Q-80 -48 -60 -32 Q-40 -52 -20 -32 Q0 -48 20 -28 L20 40 L-100 40 Z M60 -16 Q80 -32 100 -16 L100 40 L60 40 Z" fill="#163A26"/>
+      ${paint('moon', -18, -54, 84)}<rect x="-18" y="-54" width="84" height="84" fill="#0E1A2E" opacity=".3"/>${[[22, -30], [38, -14], [22, 2], [6, -14]].map(([x, y])=>`<circle cx="${x+8}" cy="${y}" r="7" fill="#FFD84A" opacity=".4"/>`).join('')}
+      <rect x="-100" y="40" width="200" height="60" fill="#21492C"/>${[[-24, 56], [-8, 70], [48, 80], [88, 60], [12, 88], [-60, 84]].map(([x, y])=>`<g transform="translate(${x} ${y})"><circle r="3.2" fill="#F6F6F0"/><circle cx="4" cy="2" r="2.8" fill="#F6F6F0"/><circle cx="2" cy="-2.8" r="2.8" fill="#F6F6F0"/></g>`).join('')}
+      ${img('toadstool', 52, 28, 40)}${img('toadstool', 74, 46, 26)}${img('gnome', -92, -28, 96)}
+      ${[[-40, -60], [-72, 8], [80, 12], [-16, 32], [32, -12], [60, -70]].map(([x, y])=>`<circle cx="${x}" cy="${y}" r="3" fill="#E8FF7A" opacity=".9"/>`).join('')}`,
+  };
+}
+function tpoArt(){ try{ const k=String(lg3Safe(()=>skyCorpsHex())||''); if(!TPO.art || TPO.k!==k){ const S={}, A={};   
+    for(const s of TPO_SPR){ const i=s.indexOf(':'), m=i<0? '' : s.slice(0,i), n=i<0? s : s.slice(i+1); S[s.replace(/^sky:/,'')]=lg3Spr(n, m==='tan'? TAN : m==='red'? OLV4.hex : m==='sky'? (k||null) : null); }
+    for(const tk of ['camp2','camp3','teddy','moon']) A[tk]=lg3Safe(()=>LG3_MENU[tk]())||'';
+    TPO.art=tpoScenes(S, A); TPO.k=k; }
+  return TPO.art; }catch(e){ try{ console.error('tpoArt', e); }catch(e2){} return {}; } }
+function tpoPic(id, vb, cls){ const sc=tpoArt()[id]; if(!sc) return ''; return '<svg class="'+(cls||'tpo-pic')+'" viewBox="'+(vb||'-100 -100 200 200')+'" preserveAspectRatio="xMidYMax slice" aria-hidden="true">'+TPO_DEFS+sc+TPO_OVER+'</svg>'; }   
+function tpoCoverHTML(id){ if(!TPO_IDS[id]) return ''; const p=tpoPic(id, '-100 -40 200 140'); return p? '<div class="tpo-cov">'+p+'</div>' : ''; }   
+function tpoLeftScene(c, scene){ try{ if(!c || c.tiers || c.place!=='' || !TPO_IDS[c.id]) return scene; return tpoPic(c.id, '-100 -70 200 170', 'lg-scene tpo-page')||scene; }catch(e){ return scene; } }   
+function tpoPosterSVG(id){ const c=lgCh(id); if(!c || !TPO_IDS[id]) return ''; const sc=tpoArt()[id]; if(!sc) return '';   
+  const nm=String(t(c.name)), tag=String(t(TPO_TAG[id]||'')), FF="'Futura-CondensedExtraBold','Futura Condensed ExtraBold',Impact,'Arial Black',sans-serif";
+  const tl=nm.length*13.2>176? ' textLength="176" lengthAdjust="spacingAndGlyphs"' : '', tt=tag.length*6.9>172? ' textLength="172" lengthAdjust="spacingAndGlyphs"' : '';
+  return '<svg class="tpo-poster" viewBox="0 0 200 300" aria-hidden="true">'+TPO_DEFS+'<rect width="200" height="300" fill="#F2E6C8"/><rect x="0" y="0" width="200" height="52" fill="'+(TPO_TOP[id]||'#1E1A12')+'"/>'
+    +'<svg x="0" y="52" width="200" height="200" viewBox="-100 -100 200 200">'+sc+TPO_OVER+'</svg>'
+    +'<text x="100" y="37" text-anchor="middle" font-family="'+FF+'" font-size="24" letter-spacing=".5" fill="#F6ECD2"'+tl+'>'+LG3_E(nm)+'</text>'
+    +'<text x="100" y="272" text-anchor="middle" font-family="'+FF+'" font-size="8.5" letter-spacing="2.2" fill="#1E1A12"'+tt+'>'+LG3_E(tag)+'</text>'
+    +'<path d="M70 282 H130" stroke="#1E1A12" stroke-width=".8" opacity=".6"/><text x="100" y="292" text-anchor="middle" font-family="'+FF+'" font-size="5.5" letter-spacing="1.6" fill="#1E1A12" opacity=".75">GREEN VS TAN</text>'
+    +'<rect x="5" y="5" width="190" height="290" fill="none" stroke="#1E1A12" stroke-width=".9" opacity=".55"/><rect x="0" y="0" width="200" height="300" filter="url(#tpogr)"/></svg>'; }
+function tpoRig(o){ if(o && typeof o==='object' && 'on' in o){ TPO.on=o.on? 1 : 0; try{ if(TPO.on) localStorage.setItem('gvt_tpo','1'); else localStorage.removeItem('gvt_tpo'); }catch(e){} }   
+  return { on:TPO.on, ids:Object.keys(TPO_IDS), tag:TPO_TAG, poster:id=>tpoPosterSVG(id), cover:id=>tpoCoverHTML(id), page:id=>tpoPic(id, '-100 -70 200 170', 'lg-scene tpo-page') }; }
 function lg3WhereSVG(p){   
   const id=p && p.id, T=LG3_TOK[id]||[412,182], cx=T[0], cy=T[1]+30, inner=lg3KingdomSVG().replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '');
   return '<svg class="ad-map" viewBox="0 0 824 364" preserveAspectRatio="xMidYMid slice"><defs><radialGradient id="adspot" cx="'+cx+'" cy="'+cy+'" r="300" gradientUnits="userSpaceOnUse"><stop offset="30%" stop-color="#1a1208" stop-opacity="0"/><stop offset="100%" stop-color="#1a1208" stop-opacity=".62"/></radialGradient></defs>'+inner
@@ -175780,6 +175898,7 @@ requestAnimationFrame(frame);
 
 
 window.GVT = {
+  tpo(o){ return tpoRig(o); },   
   hhb(){ const o={ cv:GVT_CV, ck:HHB.ck, book:{}, words:{}, base:{}, top:{}, card:{} }; for(const k of HEROES){ o.book[k]=HP_RANK100[k]; o.words[k]=hhbWords(k); o.base[k]=(BF_MOVE[k]&&BF_MOVE[k].hp)||3; o.top[k]=bfHpAt(k,RANK_MAX); o.card[k]=heroHP(k); } return o; },   
   trn(v){ v=v||{}; if(v.dials) Object.assign(TEX, v.dials); if(v.fg) Object.assign(TEX_FG, v.fg);   if(v.b3) Object.assign(TEX_END, v.b3);   if(v.go) texStart(v.go===true? {} : v.go); if(v.end) texEnd(); if(v.tap && S.tex) texTapAt({ x:+v.tap[0]-S.tex.cam.x, y:+v.tap[1] });   
     const X=S.tex; return { cv:GVT_CV, on:!!X, dials:Object.assign({},TEX), cars:TEX_CARS.map((c,i)=>({ k:c.k, x:Math.round(texCarX(i)), top:Math.round(texTop(i)) })), lands:TEX_LANDS.map(l=>({ id:l.id, name:l.name, word:t(l.name) })), worldW:Math.round(texWorldW()), VW, W, mode:S.mode,
