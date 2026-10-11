@@ -80125,7 +80125,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='20.17';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='20.18';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -127550,6 +127550,7 @@ const FTB_VB='-31 -23 62 51';   // ink incl. the -10° tilt and the floor shadow
 function footballSVG(){
   // the drag delta rides the OUTER wrapper, the park rides the id-carrier
   // group (the ducky's own v2.18 shape) — CSS only ever animates .ftbw inside
+  abtBallPaint('football');   // CARD-ABT4: the paint deals the football's land seat afresh (the toys out may have changed)
   return '<g id="ro-football"'+rpT('football')+'><g class="dec dec-ftb" id="decFtb" transform="translate(272,486)">'+footballArt()+'</g></g>';
 }
 // the soccer ball, v3.16 (Wyatt 8/11, card 0257 — "The soccer ball needs to
@@ -127568,6 +127569,7 @@ function soccerArt(){
 }
 const SOC_VB='-22 -22 44 47';
 function soccerSVG(){
+  abtBallPaint('soccer');   // CARD-ABT4: the paint deals the soccer ball's land seat afresh (after the football's: decorSVG paints it first)
   return '<g id="ro-soccer"'+rpT('soccer')+'><g class="dec dec-soc" id="decSoc" transform="translate(324,488)">'+soccerArt()+'</g></g>';
 }
 function decorSVG(){
@@ -132116,8 +132118,25 @@ let RDRAG=null;
 // 0330a: the arrangement is PER ROOM now — reads and writes go through the
 // current room's own map (created on write). META.roomPos is the pre-0330a
 // legacy orphan: dealt once at load, never read again here.
+// ═══ CARD-ABT4 THE BALLS FIND A FREE SPOT ON THE LANDS (design/android-ball-tap-1010/00-CARD-ABT.md §ROUND 4; P45 = PND-45; Wyatt 10/10/2026 21:02 EDT by Discord, verbatim: "Go with recommendations for all here" — the REC: fix): on the snow field
+// and WESTERN LAND the seat tables (CARD-TSEATS, 10/3: every toy dealt at once, the least shared ground) stand other toys on the soccer ball's and the football's seats (the snow field's soccer ball under the bass and the pufferfish, the West's under the fish tank, the bass,
+// the kennel, the golden man ...; the West's football under the bone fish ...), so a toy set down beside them HID the ball and took its taps: round 2's bedroom bug, on the lands. A ball the kid never placed on that land (no saved spot) now takes, at each paint, the FIRST of
+// its candidate seats (ABT4_CAND: the table seat first, then every seat that passes CARD-TSEATS' rules on today's census: whole on the opening glass, nothing that answers a tap under it, no label, no story scenery, the floor law; near the old seat first; the snow field's
+// football starts with the pond's four tees, BRW_TEES, so a displaced football stays teed for the field goal while a tee is free) whose box (grown 4) shares no ground with a toy actually standing on that floor (its DECOR_SPOTS box at its own seat; the soccer ball also
+// keeps off the football). Held from the ball's paint to its next (ABT4_LIVE), so it is drawn and picked at ONE seat; a kid's own drag keeps his spot (rpXY reads META.roomPosR first); the map's pictures (MAPPIN) keep the table. var, not const: rpXY may run at load before
+// this line. Zero save bytes, zero words. ═══
+var ABT4_CAND={winter:{football:[[632,384.5],[688,364.5],[576,362.5],[716,400.5],[632,304],[698,306],[826,354],[372,376],[824,296],[892,354],[890,296],[132,384],[66,408],[0,408]],soccer:[[920,296],[920,352],[872,342],[824,320],[738,320],[690,320],[642,320],[594,320],[486,320],[438,320],[390,352],[342,366],[150,356],[102,356],[150,412],[102,412],[54,398],[6,398]]},western:{football:[[98,238],[164,238],[230,232],[54,398],[296,232],[362,264],[266,366]],soccer:[[4,430],[52,430],[98,240],[266,378],[146,240],[194,240],[242,234],[290,234],[362,276],[338,220],[386,220]]}};
+var ABT4_LIVE={};   // ball -> { r: the land, s: the seat dealt at its last paint there }
+function abtBallSeat(k, r){   // rpXY's door for a ball with no saved spot on a land of ABT4_CAND: the seat held since its last paint, else dealt now
+  const L=ABT4_LIVE && ABT4_LIVE[k]; if(L && L.r===r) return L.s;
+  const sp=DECOR_SPOTS[k], C=ABT4_CAND && ABT4_CAND[r] && ABT4_CAND[r][k]; if(!sp || !C || !C.length) return null;
+  const occ=[]; for(const id of rdecList(r)){ if(id===k || (k==='football' && id==='soccer')) continue; const b=DECOR_SPOTS[id]; if(!b || typeof b.x!=='number' || !decorHome(id)) continue; const d=rpXY(id); occ.push([b.x+d[0], b.y+d[1], b.x+d[0]+b.w, b.y+d[1]+b.h]); }   // the football never reads the soccer ball (it is dealt first: no loop)
+  let s=C[0]; for(const c of C){ const x0=c[0]-4, y0=c[1]-4, x1=c[0]+sp.w+4, y1=c[1]+sp.h+4; let hit=false; for(const o of occ){ if(o[0]<x1 && o[2]>x0 && o[1]<y1 && o[3]>y0){ hit=true; break; } } if(!hit){ s=c; break; } }
+  if(ABT4_LIVE) ABT4_LIVE[k]={ r, s }; return s; }
+function abtBallPaint(k){ if(ABT4_LIVE) delete ABT4_LIVE[k]; }   // the ball's painter asks afresh (footballSVG / soccerSVG): the floor may have changed since its last paint
 function rpMap(){ const r=roomCur(); const m=META.roomPosR||(META.roomPosR={}); return m[r]||(m[r]={}); }
 function rpXY(k){ const r=roomCur(); const m=META.roomPosR && META.roomPosR[r]; const v=m && m[k]; if(v && v.length===2) return xrPull(k, v);   // CARD XR: a seat saved in a wider box's band is pulled to this box's band
+  if((k==='soccer' || k==='football') && !MAPPIN && ABT4_CAND && ABT4_CAND[r]){ const s9=abtBallSeat(k, r), b9=DECOR_SPOTS[k]; if(s9 && b9) return [s9[0]-b9.x, s9[1]-b9.y]; }   // CARD-ABT4 THE BALLS FIND A FREE SPOT ON THE LANDS: a ball the kid never placed on the snow field or the West stands on the first candidate seat no toy out covers (sec CARD-ABT4)
   const t=(r==='winter' && MAPPIN)? null : DECOR_SEAT_R[r], b=t && t[k], sp=b && DECOR_SPOTS[k]; return sp? [b[0]-sp.x, b[1]-sp.y] : [0,0]; }   // 0890 THE WINTER FIELD MAKEOVER: the winter table answers on the REAL field alone — under the map's pin THE TERRITORIES' district keeps every toy where it stood (the district byte-still)   // 0866b THE WESTERN LAND MAKEOVER (cell F, ⚑ Q12): the floor's BASE seat table answers only where the player has not arranged the toy — a veteran keeps his own arrangement, no double count, no jump
 function rpTf(k, dx, dy){   // 1129 THE BACK MOUNTAINS TAKE A MAN: THE ONE BUILDER of a room wrapper's transform — rpT (the paint) and rdragApply (every live move: the drag's step, the fall, the park, the dismount) read it. In the winter room a UNIT (wfFarMan) whose FEET (base.y+base.h+dy — the drop point, 56 above the finger) stand north of WF_NEAR paints scale(k) ABOUT HIS FEET (wfDepthK; the feet exactly where the finger set them; the shadow is in the sprite and rides); k = 1, any other object, any other room → the base's string byte for byte
   if(roomCur()==='winter' && wfFarMan(k)){ const b=wfManBase(k); if(b){ const feet=b.y+b.h, kk=wfDepthK(feet+dy); if(kk<1){ const fx=b.x+b.w/2; return 'translate('+(dx+fx*(1-kk)).toFixed(2)+','+(dy+feet*(1-kk)).toFixed(2)+') scale('+kk.toFixed(4)+')'; } } }
