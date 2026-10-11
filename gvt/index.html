@@ -75094,10 +75094,10 @@ setTimeout(()=>{ try{ if(typeof GVT==='object' && GVT) GVT.djs={ D:DJS, st:DJS_D
 
 
 
-const DSF={ beat:0.5, sway:0.05, n:7, rx:22, ry:31, hide:['pilotgloves','acegloves','duelglove','muskpads'] };
-const DSF_FR=[ { pt:'M59 74 L77 47', fg:'M77 47 L80.1 42.5' },     
-               { pt:'M58 75 L40 101', fg:'M40 101 L36.9 105.5' } ];   
-const DSF_HIP='M57 73 L45 81 L52 90';   
+const DSF={ beat:0.5, sway:0.05, n:6, rx:26, ry:34, hide:['pilotgloves','acegloves','duelglove','muskpads'] };
+const DSF_FR=[ { pt:'M59 74 L77 47' },     
+               { pt:'M58 75 L40 101' } ];   
+const DSF_HIP='M55 73 L40 84 L51 93 Z';   
 const DSF_IMG=new Map();   
 function dsfWears(u){ if(!u || u.type!=='sarge' || u.dead) return false;   
   const a=sargeWearU(u) || bfDressU(u); if(a) return a.indexOf('discosuit')>=0;
@@ -75113,10 +75113,11 @@ function dsfIn(u){ if(!dsfDance(u) || reducedMotion()) return false; const a=Mat
 function dsfArms(s,fr){ const F=DSF_FR[fr], A1='<path d="M60 72 L76 48" stroke-width="8"/>', A2='<path d="M58 76 L81 72" stroke-width="8"/>', T='<path d="M56 96 L58 68" stroke-width="16"/>',
     INK='<path d="M60 72 L76 48 M58 76 L81 72" stroke-width="10.6"/>', BAND='(<path d="[^"]*" fill="#(?:000|fff)" fill-opacity="[^"]*" stroke="none"/>)?', esc=x=>x.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
   if(s.split(A1).length!==2 || s.split(A2).length!==2 || s.split(T).length!==2 || s.split(INK).length>2) return null;
-  s=s.replace(INK, '<path d="'+DSF_HIP+' '+F.pt+'" stroke-width="10.6"/><path d="'+F.fg+'" stroke-width="5.4"/>');   
+  s=s.replace(INK, '<path d="'+DSF_HIP+' '+F.pt+'" stroke-width="10.6"/>');   
   s=s.replace(new RegExp(esc(A1)+BAND), '');   
-  s=s.replace(new RegExp(esc(A2)+BAND), '<path d="'+F.pt+'" stroke-width="8"/><path d="'+F.fg+'" stroke-width="2.8"/>');   
-  return s.replace(T, '<path d="'+DSF_HIP+'" stroke-width="8"/><path d="'+DSF_HIP+'" stroke="#000" stroke-opacity=".22" stroke-width="8"/>'+T); }   
+  s=s.replace(new RegExp(esc(A2)+BAND), '<path d="'+F.pt+'" stroke-width="8"/>');   
+  const hx=(/<g stroke="(#[0-9A-Fa-f]{3,8})" fill="none"/.exec(s)||[])[1]; if(!hx) return null;   
+  return s.replace(T, '<path d="'+DSF_HIP+'" fill="'+hx+'" stroke-width="8"/><g opacity=".22"><path d="'+DSF_HIP+'" fill="#000" stroke="#000" stroke-width="8"/></g>'+T); }   
 function dsfPics(im){ if(DSF_IMG.has(im)) return DSF_IMG.get(im); let P=null;
   try{ const src=im.src||'', i=src.indexOf('utf8,'); if(src.indexOf('data:image/svg+xml')===0 && i>0){ const s0=decodeURIComponent(src.slice(i+5)), a=dsfArms(s0,0), b=dsfArms(s0,1);
     if(a && b){ P=[null,null]; [a,b].forEach((x,k)=>{ const m=new Image(); m.onload=()=>{ P[k]=m; }; m.src=src.slice(0,i+5)+encodeURIComponent(x); }); } } }catch(e){ P=null; }
@@ -75129,7 +75130,7 @@ function dsfSpark(u){ if(!dsfWears(u) || u.toadT>0) return; const rm=reducedMoti
   cx.save();
   for(let i=0;i<DSF.n;i++){ const per=1.2+dsfR(h,i,-1)*0.9, ph=T/per+dsfR(h,i,-2), cy=Math.floor(ph), f=ph-cy;   
     const k= rm? 0.75 : Math.sin(Math.min(1,f*1.35)*Math.PI); if(k<0.06) continue;
-    const an=dsfR(h,i,cy)*6.2832, rr=0.62+0.38*dsfR(h,i+11,cy), sx=x0+Math.cos(an)*DSF.rx*rr, sy=y0+Math.sin(an)*DSF.ry*rr, z=(2.3+2.4*dsfR(h,i+23,cy))*k, col=DJS_COL[(i+cy)%6];
+    const an=(i+0.2+0.6*dsfR(h,i,cy))/DSF.n*6.2832, rr=0.82+0.18*dsfR(h,i+11,cy),     sx=x0+Math.cos(an)*DSF.rx*rr, sy=y0+Math.sin(an)*DSF.ry*rr, z=(2.3+2.4*dsfR(h,i+23,cy))*k, col=DJS_COL[(i+cy)%6];
     cx.globalAlpha=a0*0.35*k; cx.fillStyle=col; cx.beginPath(); cx.arc(sx,sy,z*1.05,0,7); cx.fill();   
     cx.globalAlpha=a0*Math.min(1,k*1.3); cx.fillStyle='#FFFFFF'; cx.save(); cx.translate(sx,sy); cx.rotate(rm? 0 : f*0.9);
     cx.beginPath(); cx.moveTo(0,-z*1.6); cx.quadraticCurveTo(0,0,z*1.6,0); cx.quadraticCurveTo(0,0,0,z*1.6); cx.quadraticCurveTo(0,0,-z*1.6,0); cx.quadraticCurveTo(0,0,0,-z*1.6); cx.fill();   
@@ -82383,7 +82384,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='20.92';        
+let GVT_CV='20.93';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
