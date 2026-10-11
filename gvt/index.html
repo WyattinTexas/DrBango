@@ -48075,15 +48075,11 @@ function fsqRamX(u){ return (S.bf && fsqJeep(u) && fsqIE(u))? FSQ.ieAtk : 1; }
 function fsqSoakX(f){ return (S.bf && tkrTank(f) && fsqIE(f))? FSQ.ieTake : 1; }       
 function fsqLatch(u){ if(u.fsqI) return; u.fsqI=1; if(!fsqIE(u)) return; u.def.moveSpd=Math.round((u.def.moveSpd||130)*FSQ.ieSpd); u.hpMax=Math.max(1,Math.round(u.hpMax*FSQ.ieHp)); u.hp=Math.min(u.hp,u.hpMax); u.fsqIE=1; }   
 function fsqRide(u,dt){ if(!u.fsq) u.fsq=[]; if(!S.bf.fsqN) S.bf.fsqN={ board:0, shot:0, box:0 };   
-  if(u.fsq.length<FSQ.cap) for(const o of S.units){
+  if(u.fsq.length<FSQ.cap && fsqSeatsHere(u)) for(const o of S.units){    
     if(u.fsq.length>=FSQ.cap) break;
     if(o===u || o.dead || o.type!=='rifleman' || o.side!==u.side || o.seat!==u.seat || o.dropT>0 || o.jetT>0 || o.falling || o.hlbAir || o.shv || (S.drag&&S.drag.unit===o) || rgOn(o)) continue;
     if(Math.hypot(o.x-u.x,o.y-u.y)>FSQ.grabR) continue;
-    const seat=FSQ_SEATS[u.fsq.length], hp=Math.max(0,o.hp!=null? o.hp : 0), mx=o.hpMax||hp;
-    u.fsq.push({ o:o, seat:seat, cd:0.4 }); o.dead=true; o.fsqIn=1;
-    if(seat!=='gunner'){ u.hpMax+=mx; u.hp+=hp; }   
-    S.fx.push({k:'ring',x:u.x,y:u.y-30,r:6,R:36,t:0,dur:0.3,col:'#BFE39A'}); bfSfx(SFX.thock,u.x,u.y);
-    S.bf.fsqN.board++; }
+    fsqSeat(u,o); fsqBoardSay(u,o); }    
   const g=u.fsq.find(r=>r.seat==='gunner'); if(g) fsqGun(u,g,dt); }
 function fsqGun(u,g,dt){ g.cd-=dt; if(g.cd>0) return; const d=g.o.def||UDEF.rifleman, bf=S.bf;   
   const reach=unitReach(g.o,d,null)+FSQ.rngAdd, fd=unitFaceW(u)? -1 : 1, mx=u.x-fd*16, my=u.y-40;
@@ -48177,6 +48173,37 @@ function fsqGem(u,kind){ if(!fsqMine(u) || S.mode!=='play') return;
   S.floats.push({x:u.x,y:u.y-100,txt:'+'+FSQ.gem,t:0,col:'#FFF3C4'}); S.floats.push({x:u.x,y:u.y-122,txt:'DOG TAG GEM!',t:0,col:'#FFD24A'});
   S.fx.push({k:'ring',x:u.x,y:u.y-40,r:8,R:60,t:0,dur:0.5,col:'#FFD24A'}); try{ SFX.gem(); locDuck(); }catch(e){}    
   const N=S.fsqGN||(S.fsqGN={}); N[kind]=(N[kind]|0)+1; }
+
+
+
+
+
+
+
+
+function fsqSeat(u,o){ const seat=FSQ_SEATS[u.fsq.length], hp=Math.max(0,o.hp!=null? o.hp : 0), mx=o.hpMax||hp;   
+  u.fsq.push({ o:o, seat:seat, cd:0.4 }); o.dead=true; o.fsqIn=1;
+  if(seat!=='gunner'){ u.hpMax+=mx; u.hp+=hp; }   
+  S.fx.push({k:'ring',x:u.x,y:u.y-30,r:6,R:36,t:0,dur:0.3,col:'#BFE39A'}); bfSfx(SFX.thock,u.x,u.y);
+  S.bf.fsqN.board++; }
+function fsqSeatsHere(u){ return !roomBattle() || u.seat===bfMySeat() || !owLive(u.seat); }   
+function fsqBoardSay(u,o){ if(!OW_ON || !S.bf || !roomBattle() || u.seat!==bfMySeat() || !owSpeak()) return; coopSend({ k:'fsb', id:owRid(o), n:owRid(u) }); if(S.bf.fsqN) S.bf.fsqN.said=(S.bf.fsqN.said|0)+1; }   
+function fsqHearBoard(cm){ const bf=S.bf; if(!OW_ON || !bf || bf.resolved || S.mode!=='play') return;   
+  const seat=parseInt(cm.p,10), rid=cm.id|0, jid=cm.n|0; if(!(seat>=0) || !bf.seats[seat] || seat===bfMySeat() || !bf.seats[seat].human || !(rid>0)) return;
+  const o=owFind(seat,rid), J=owFind(seat,jid); owTomb(seat,rid); if(!bf.fsqN) bf.fsqN={ board:0, shot:0, box:0 }; bf.fsqN.heard=(bf.fsqN.heard|0)+1;
+  if(!o || o.dead || o.type!=='rifleman') return;
+  if(J && !J.dead && fsqJeep(J)){ if(!J.fsq) J.fsq=[]; if(J.fsq.length<FSQ.cap && !J.fsq.some(r=>r.o===o)){ fsqSeat(J,o); return; } }
+  o.dead=true; o.fsqIn=1; }
+function laBfCatch(e,sh){ if(!S.bf || (sh.bounce|0)>=2 || ekoSarge(e)) return null;   
+  for(const c of S.units){ if(c.dead || c.side!==e.side || !cmdoCharged(c) || c.dropT>0 || (S.drag&&S.drag.unit===c) || !cmdoCovers(c,e.x,e.y,0,1)) continue;
+    c.cmdoRefN=1; bfSfx(SFX.laser,c.x,c.y); S.fx.push({k:'ring',x:c.x,y:c.y-24,r:6,R:40,t:0,dur:0.3,col:'#9FE0FF'}); S.floats.push({x:c.x,y:c.y-76,txt:'REFLECTED!',t:0,col:'#9FE0FF'}); return c; }   
+  if(e.tkDeflT>0 || tkTealRefl(e) || rfDomeIn(e,sh.src,'ray')){ tkDeflPop(e,sh.src); return e; }
+  return null; }
+function laBfThrow(e,C,sh){ fsqGem(C,'rayback');   
+  const o9=sh.src, live=!!(o9 && !o9.dead && S.units.indexOf(o9)>=0), ang=live? Math.atan2(o9.y-e.y, o9.x-e.x) : Math.atan2(-sh.uy,-sh.ux), ux=Math.cos(ang), uy=Math.sin(ang);
+  S.shots.push({k:'lightarrow', x0:e.x+ux*24, y0:e.y+uy*24, ux:ux, uy:uy, s:0, x:e.x+ux*24, y:e.y+uy*24, dir:(ux<0? -1 : 1), len:sh.len, spd:sh.spd, hw:sh.hw, side:e.side, la:1, bounce:(sh.bounce|0)+1, hit:{}, src:C, t:0, back:0, vol:{}, col:sh.col});
+  sh.gone=1; { const N9=S.bf.fsqN||(S.bf.fsqN={ board:0, shot:0, box:0 }); N9.caught=(N9.caught|0)+1; } tdLog(o9||e,'arrow-caught',[e.type, C.type]); }
+
 const DTP={ p:0.15, gap:0.07, dx:3, hex:'#2FD3B5' };   
 ENH_INFO.doubletap={ unit:'rifleman', name:'DOUBLE TAP', sub:'A HAIR TRIGGER · A QUICK SECOND SQUEEZE',   
   tag:'TWO ROUNDS FOR ONE PULL!',
@@ -81418,7 +81445,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='20.60';        
+let GVT_CV='20.61';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -91630,6 +91657,7 @@ function roomApply(cm){
   if(cm.k==='ox'){ owHearOx(cm); return; }   
   if(cm.k==='ol'){ owHearOl(cm); return; }   
   if(cm.k==='og'){ owHearOg(cm); return; }   
+  if(cm.k==='fsb'){ fsqHearBoard(cm); return; }   
   if(cm.k==='cen'){
     if(S.bf && S.mode==='play' && Array.isArray(cm.mo)){
       const s9=parseInt(cm.p,10);
@@ -113072,6 +113100,7 @@ function update(dt){
         else if(S.bf){
           for(let j=S.units.length-1;j>=0;j--){ const e=S.units[j]; if(!e || e.dead || e.side===sh.side || sh.hit[e.id] || !ekoCross(sh,s0,e,ekoTop(e))) continue; sh.hit[e.id]=1;   
             if(e.jetT>0) fsqGem(e,'dodge');     if(e.jetT>0 || e.dropT>0 || e.falling || (S.drag&&S.drag.unit===e)) continue;
+            { const C9=laBfCatch(e,sh); if(C9){ laBfThrow(e,C9,sh); break; } }    
             S.fx.push({k:'ring',x:e.x,y:e.y-24,r:6,R:44,t:0,dur:0.3,col:'#FFFFFF'}); S.fx.push({k:'puff',x:e.x,y:e.y-28,t:0,dur:0.4,R:18,col:'#ffffff'});
             if(ekoSarge(e)) ekoDown(e,sh,sx9); else if(e.boss) estHit(e,sh,sx9); else hurt(e, 9999, sx9); }   
         } else {
