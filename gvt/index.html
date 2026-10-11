@@ -47279,6 +47279,16 @@ const TSZ_TAGX=[FSQ_TAGX, 1.06, 1.03];   // a side of 1 x1.09 (FSQ_TAGX, byte-st
 function tszSide(){ return S.bf? Math.max(1, S.bf.team|0) : S.sq? Math.max(1, S.sq.p|0) : 1; }   // a battleground's chairs a side · the campaign's commanders at the table · 1 anywhere else
 function tszTagX(){ const n=tszSide(); return n<=TSZ_TAGX.length? TSZ_TAGX[n-1] : 1; }
 // ═══ /CARD-TSZ
+// ═══ CARD-GTX (Wyatt by phone 10/10/2026 18:49 EDT, dictated: "We're also getting too many dog tags, so if we can reduce that, especially when we're in a group, by about 5%,
+// I think we'll be in a better state.") = MY purse's income x0.95 while two or more real commanders share the fight (a party in the campaign, a park, a raid; a room battle):
+// the battleground's 10 s drip and the Desert / Tundra pour (a human chair: mine + the other humans' mirrors; a computer chair's purse byte-still), the campaign faucet, Mom's pour,
+// the pillow fields' pour, and every dog tag picked up off the rug (a kill's bounty, a dog's dig, the gold detector) as it lands. Solo byte-still (GTX-Q1). Byte-still too: the opening
+// purse, the gems, WAVE CLEAR, the outfits' pours. Record: design/group-tags-1010/00-BUILD-GTX.md.
+const GTX={ x:0.95 };   // "about 5%"
+function gtxGroup(){ return !!(S.coop && COOP) && coopHumans()>1; }   // two or more real commanders in this fight (a computer buddy is no commander)
+function gtxX(){ return gtxGroup()? GTX.x : 1; }
+function gtxTag(v){ return gtxGroup()? Math.round(v*GTX.x) : v; }   // a whole sum of tags, cut in a group
+// ═══ /CARD-GTX
 const FSQ_SEATS=['driver','passenger','gunner'];   // the first in drives, the second rides beside him, THE THIRD mans the gun in the back
 BF_BASEDMG.fsqshot=FSQ.box;   // the gunner's round on their toy box rides bfLeak's own door (the referee, the KO, the -n float) under its own key
 ENH_INFO.fullsquad={ unit:'bfjeep', name:'FULL SQUAD', sub:'THREE SEATS · A GUN IN THE BACK',   // CARD-FSQ: the lab's 61st id, the JEEP ROOM's first part (200 stars)
@@ -79798,7 +79808,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='20.03';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='20.04';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -94200,14 +94210,14 @@ function bfTick(dt){
     }
     st.tagT += dt*otm*boost[st.team]*(st.team==='foe'? inc*gasFoe*(bf.nem?bf.nem.eff:1)*(bf.hard?HARD_INC:1) : 1);   // v2.43: the director's drip — identity (gas 1) wherever dirGain is 0. v3.12: NEMESIS pity is ONE lever — his income (and opening purse) at eff; it COMPOSES with inc and the director's gas (the mercy law: multiply, never assign)
     if(st.tagT>=10){ st.tagT-=10;
-      const tick=Math.round(BF_TICK*bfTagX()*rtxTagX());   /* CARD-FSQ: the recurring tags +9 % · CARD-RTX: not in a raid · CARD-TSZ: by the chairs a side (S.bf.team) */   // 1003 THE DOG TAG BOOST: the drip × the mode × the map (a 1v1 on a regular map 30, a 2v2 there 25, a 1v1 on WESTERN LAND 35, the Desert 30) — every seat, the computers too (⚑ B-Q6); the float prints the boosted number
+      const tick=Math.round(BF_TICK*bfTagX()*rtxTagX()*(st.human? gtxX() : 1));   /* CARD-FSQ: the recurring tags +9 % · CARD-RTX: not in a raid · CARD-TSZ: by the chairs a side (S.bf.team) · CARD-GTX: a human chair x0.95 in a group */   // 1003 THE DOG TAG BOOST: the drip × the mode × the map (a 1v1 on a regular map 30, a 2v2 there 25, a 1v1 on WESTERN LAND 35, the Desert 30) — every seat, the computers too (⚑ B-Q6); the float prints the boosted number
       if(st.me){ S.plastic+=tick;
         S.floats.push({x:bf.base[bfMyTeam()].x+46,y:bf.base[bfMyTeam()].y-72,txt:'+'+tick,t:0,col:'#FFF3C4'}); }
       else st.purse+=tick;   // an allied commander's real purse lives on THEIR client
     }
     if(bf.bd && BD_POUR_T>0 && BD_POUR>0 && !S.evHold && !st.empty){   // 0902 2.6 THE POUR (Wyatt: "give all players 30 dog tags every 5 seconds once the battle begins, because it's a long map"): every FIELDED chair, from the bell to the whistle, on its OWN clock beside the drip (tagT's beat and rate byte-still); the DOUBLE TAGS window doubles it (⚑ Q3); computers included (⚑ Q2); nothing in the hold (bfTick never runs there — belt and braces)
       st.bdPourT=(st.bdPourT||0)+dt;
-      if(st.bdPourT>=BD_POUR_T){ st.bdPourT-=BD_POUR_T; const pour=Math.round(BD_POUR*otm*bfTagX()*rtxTagX());   /* CARD-FSQ: +9 % · CARD-RTX: RTX-Q1 */   // 1003 THE DOG TAG BOOST: the pour × the mode × the map (the Desert 6 a side on WESTERN LAND: 30 → 45; the DOUBLE TAGS window still doubles it)
+      if(st.bdPourT>=BD_POUR_T){ st.bdPourT-=BD_POUR_T; const pour=Math.round(BD_POUR*otm*bfTagX()*rtxTagX()*(st.human? gtxX() : 1));   /* CARD-FSQ: +9 % · CARD-RTX: RTX-Q1 · CARD-GTX: a human chair x0.95 in a group */   // 1003 THE DOG TAG BOOST: the pour × the mode × the map (the Desert 6 a side on WESTERN LAND: 30 → 45; the DOUBLE TAGS window still doubles it)
         if(st.me){ S.plastic+=pour; S.floats.push({x:bf.base[bfMyTeam()].x+46,y:bf.base[bfMyTeam()].y-72,txt:'+'+pour,t:0,col:'#FFF3C4'}); }   // the drip's own float grammar — one every five seconds reads as income, not spam
         else st.purse+=pour; }
     }
@@ -108572,7 +108582,7 @@ function update(dt){
   if(S.sq && S.mode==='play' && !S.bf){
     S.tagT+=dt;
     if(S.tagT>=CAMP_TICK_EVERY){ S.tagT-=CAMP_TICK_EVERY;   // v1.40: three pours where there was one — “about three times faster income”
-      const pour=Math.round(((S.raid && S.raid.t==='u')? EV_TICK_U : CAMP_TICK)*iceP3TagX()*momP3TagX()*bfTagX()*rtxTagX());   /* CARD-FSQ: the faucet +9 % · CARD-RTX: x1 in a raid · CARD-TSZ: by the commanders at the table (S.sq.p) */   // 1003 THE DOG TAG BOOST: ×bfTagX() the third door on the chain (identity here — the faucet is gated !S.bf) · 0842 THE FAUCET CUT (the ADDENDUM, Wyatt 9/5 ~9:57 pm: "okay- lets do it."): the ULTRA MEGA room pours EV_TICK_U 15 (0824-NIGHT poured CAMP_TICK+10 = 30); everywhere else the same 20 it always was · 0648 D2: the castle's third act pours ×ICE_P3_TAGX (30; the 'u' room 23, was 45) — this float prints the poured number · 0662: ×momP3TagX rides for the one-grammar law — her fight never pours (S.sq stays null at startMomRaid), so the mom factor is provably 1 wherever this line runs
+      const pour=Math.round(((S.raid && S.raid.t==='u')? EV_TICK_U : CAMP_TICK)*iceP3TagX()*momP3TagX()*bfTagX()*rtxTagX()*gtxX());   /* CARD-FSQ: the faucet +9 % · CARD-RTX: x1 in a raid · CARD-TSZ: by the commanders at the table (S.sq.p) · CARD-GTX: x0.95 in a group */   // 1003 THE DOG TAG BOOST: ×bfTagX() the third door on the chain (identity here — the faucet is gated !S.bf) · 0842 THE FAUCET CUT (the ADDENDUM, Wyatt 9/5 ~9:57 pm: "okay- lets do it."): the ULTRA MEGA room pours EV_TICK_U 15 (0824-NIGHT poured CAMP_TICK+10 = 30); everywhere else the same 20 it always was · 0648 D2: the castle's third act pours ×ICE_P3_TAGX (30; the 'u' room 23, was 45) — this float prints the poured number · 0662: ×momP3TagX rides for the one-grammar law — her fight never pours (S.sq stays null at startMomRaid), so the mom factor is provably 1 wherever this line runs
       S.plastic+=pour;
       S.floats.push({x:166, y:280, txt:'+'+pour, t:0, col:'#FFF3C4'});
     }
@@ -108590,13 +108600,13 @@ function update(dt){
   // there, so this is her fight's only drip), the faucet's float seat and colour; per-sim like the faucet; every rug without her byte-still.
   if(MOM_POUR>0 && MOM_POUR_T>0 && S.mode==='play' && !S.bf && momOnRug()){
     S.momPourT=(S.momPourT||0)+dt;
-    if(S.momPourT>=MOM_POUR_T){ S.momPourT-=MOM_POUR_T; S.plastic+=MOM_POUR; S.floats.push({x:166, y:280, txt:'+'+MOM_POUR, t:0, col:'#FFF3C4'}); }
+    if(S.momPourT>=MOM_POUR_T){ S.momPourT-=MOM_POUR_T; const m9=gtxTag(MOM_POUR); S.plastic+=m9; S.floats.push({x:166, y:280, txt:'+'+m9, t:0, col:'#FFF3C4'});   /* CARD-GTX */ }
   }
   // 0904 RE-LAND (0747-1) THE POUR: +KB_POUR every KB_POUR_T s of sim during THE PILLOW FIELDS raid (fieldsRaid — every tier, from the raid's first tick to the verdict, ⚑ P-Q1), ON TOP of what the raid pays
   // (the faucet above keeps its beat and rate), on its own clock S.kbPourT (reset() zeroes it; never S.tagT), the faucet's float seat and colour; per sim like the faucet; every other purse byte-still.
   if(KB_POUR>0 && KB_POUR_T>0 && S.mode==='play' && !S.bf && fieldsRaid()){
     S.kbPourT=(S.kbPourT||0)+dt;
-    if(S.kbPourT>=KB_POUR_T){ S.kbPourT-=KB_POUR_T; S.plastic+=KB_POUR; S.floats.push({x:166, y:280, txt:'+'+KB_POUR, t:0, col:'#FFF3C4'}); }
+    if(S.kbPourT>=KB_POUR_T){ S.kbPourT-=KB_POUR_T; const k9=gtxTag(KB_POUR); S.plastic+=k9; S.floats.push({x:166, y:280, txt:'+'+k9, t:0, col:'#FFF3C4'});   /* CARD-GTX */ }
   }
   if(S.raid) raidTick(dt); if(S.bf&&S.bf.fzt) fztTick(dt);   /* CARD-FZT: the Tundra's gun + capture (the bag on S.bf.fzt, never S.raid) */   // v3.39: the raid's own clocks — win door, capture, crush, turrets
   if(S.coop && !S.bf) evTick(dt);   // 0313a THE REFEREE'S WORD: pending words, the 6s valve, the honest wait
@@ -110301,8 +110311,8 @@ function update(dt){
   for(let i=S.blobs.length-1;i>=0;i--){
     const b=S.blobs[i]; b.t+=dt;
     if(b.t>0.8){
-      S.plastic+=b.v; META.stats.tags+=b.v; SFX.blip();
-      S.floats.push({x:b.x,y:b.y-14,txt:'+'+b.v,t:0,col:'#FFF3C4'});
+      const v9=gtxTag(b.v); S.plastic+=v9; META.stats.tags+=v9; SFX.blip();   /* CARD-GTX: a blob lands x0.95 in a group */
+      S.floats.push({x:b.x,y:b.y-14,txt:'+'+v9,t:0,col:'#FFF3C4'});
       S.blobs.splice(i,1);
     }
   }
@@ -169295,6 +169305,7 @@ window.GVT = {
       n:{ rifleman:pbkN('rifleman'), bazooka:pbkN('bazooka'), sarge:pbkN('sarge'), jane:pbkN('jane') }, book:{ own:decOwns('goldenbook'), seen:META.decorSeen.indexOf('goldenbook')>=0, home:decorHome('goldenbook'), dom:!!e, cls:e? String(e.className.baseVal||e.className||'') : null, spot:!!document.getElementById('dspot-goldenbook'), seat:Object.assign({}, DECOR_SPOTS.goldenbook), order:DECOR_EARN_ORDER.indexOf('goldenbook'), drag:RDRAG_DECOR.indexOf('goldenbook'), bedroomOnly:!!BEDROOM_ONLY.goldenbook } }; },
   rtx(){ return { cv:GVT_CV, raid:rtxRaid(), x:rtxTagX(), fsq:FSQ_TAGX, bd:RTX.bd, k:S.raid? S.raid.k : null, t:S.raid? S.raid.t : null, bf:!!S.bf, desert:!!(S.bf&&S.bf.bd) }; },   // CARD-RTX's rig door
   tsz(){ return { cv:GVT_CV, side:tszSide(), x:tszTagX(), door:rtxTagX(), ladder:TSZ_TAGX.slice(), raid:rtxRaid(), bf:!!S.bf, team:S.bf? S.bf.team : null, sq:S.sq? S.sq.p : null, desert:!!(S.bf&&S.bf.bd) }; },   // CARD-TSZ's rig door
+  gtx(){ return { cv:GVT_CV, group:gtxGroup(), x:gtxX(), cut:GTX.x, humans:coopHumans(), coop:!!S.coop, tag20:gtxTag(20) }; },   // CARD-GTX's rig door
   fjc(){ return { cv:GVT_CV, reach:FJC.reach, n:S.fjcN|0, last:S.fjcLast||null }; },   // CARD-FJC's rig door
   sql(v){ return sqlRig(v); },   // CARD-SQL's rig door: the level, the xp, the mates, the token, a unit's readings, the pick, the forks' doors
   rsa(k){ return rsaRig(k); },   // CARD-RSA's rig door: one sheet's numbers, his part, the grants and whether each lands
