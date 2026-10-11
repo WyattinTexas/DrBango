@@ -80116,7 +80116,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='20.14';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='20.15';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -168380,7 +168380,7 @@ const GMX={
   hh:{ hp:11000 /* CARD-HL6B (Wyatt 10/10: "please add 8,000 more health to the Headless Horseman"): 3,000 -> 11,000 */, w:150, draw:218, ride:210, charge:400, turn:3.0, orbitR:[420,170], legs:[2,3], prance:0.6, rest:0.7, wheel:0.25, past:120, ramR:50, ramCd:1.2, lob:3, lob0:2, lobT:0.95, lobR:70, men:1, foe:6, fireR:56, fireL:4, dps:2.5, back:3, xMin:150, yMin:150 },   // Q9 (yMin: his band starts this far under FOE_TOP, so the rider and his lantern stand below the two HUD plates)
   fly:{ spd:420, lane:110, frog:4, alt:120, top:176, w:96 },   // top: her picture never climbs over the HUD plates   // Q13
   stars:500,   // Q12
-  boost:{ frank:1000, gmummy:2000 }   // CARD-HL6B (Wyatt 10/10: "The final mummy boss needs to have about 2,000 more health. Give the second boss, the Frankenstein boss, 1,000 more health as well."): flat on top of the tier's hp, every tier
+  boost:{ frank:{ e:250, m:500, h:1000, g:1000 }, gmummy:{ e:500, m:1000, h:2000, g:2000 } }   // CARD-HL6B (Wyatt 10/10: "The final mummy boss needs to have about 2,000 more health. Give the second boss, the Frankenstein boss, 1,000 more health as well."): flat on top of the tier's hp; CARD-HL6B r4 (PND-47, Wyatt 10/10 21:02 "Go with recommendations for all here" on "REC EASY +500 · MEDIUM +1,000 · HARD/MEGA +2,000"): by the tier, Frankenstein at half (his 2:1). SOLO numbers: a party's health factor (CARD-BHP: solo hp x (1 + 0.9 (p - 1))) belongs on the boss's WHOLE solo health, this boost included
 };
 FDEF.gmyspider={ hp:GMX.spider.hp, spd:0, bounty:20, leak:2, w:56, gmyB:'spider', gmyP:1, name:'spider' };   // THE SPIDER UNIT (x the tier's hp at spawnFoe)
 FDEF.gmyhh={ hp:GMX.hh.hp, spd:0, bounty:300, leak:8, w:GMX.hh.w, boss:true, gmyB:'hh', gmyP:1, name:'THE HEADLESS HORSEMAN' };   // his hp written flat after the spawn (his number, no tier curve)
@@ -168398,7 +168398,7 @@ function gmxBlast(x,y,R,men,foe){ let n=0;   // everyone inside R: a pip on your
   for(const u of S.units.slice()){ if(u.dead || u.jetT>0 || u.dropT>0 || u.gmyAir) continue; if(Math.hypot(u.x-x,u.y-y)>R) continue; gmxPip(u,x,y,men); n++; }
   for(const f of S.foes.slice()){ if(f.dead || !(f.hp>0) || (f.def && (f.def.boss || f.def.gmyB==='bathit'))) continue; if(Math.hypot(f.x-x,f.y-y)>R) continue; hurt(f,foe,null,0); n++; }
   return n; }
-function gmxBoost(G){ const b=G && G.boss, n=b && !b.gmxBoost && !b.dead && !b.gmyHelp && GMX.boost[b.type]; if(!n) return; b.gmxBoost=n; b.hpMax=(b.hpMax>0? b.hpMax : b.hp)+n; b.hp+=n; gmyLog(G,b.type+' +'+n+' hp'); }   // CARD-HL6B: the stage boss once (the stage-3 helper Frankenstein keeps his own)
+function gmxBoost(G){ const b=G && G.boss, R=b && !b.gmxBoost && !b.dead && !b.gmyHelp && GMX.boost[b.type], n=R && (R[gmyTier()]||R.e); if(!n) return;   /* CARD-HL6B r4: the tier's row */ b.gmxBoost=n; b.hpMax=(b.hpMax>0? b.hpMax : b.hp)+n; b.hp+=n; gmyLog(G,b.type+' +'+n+' hp'); }   // CARD-HL6B: the stage boss once (the stage-3 helper Frankenstein keeps his own)
 function gmxFire(x,y,r,l,dps){ (S.fires||(S.fires=[])).push({ x:x, y:y, r:r, t:0, life:l, dps:dps, acc:0, tk:0, src:null, side:null, foe:true, hit:new Set() }); }   // the house's fire, lit by nobody on HIS side: it burns your men (tanHit) and, FS_FF, his own (hurt) — fsTick owns it
 // ---- THE DIRECTOR (gmyTick's door, every frame of the fight) ----
 function gmxTick(G,dt){ const rd=S.raid, tr=gmyTier(); gmxBoost(G); if(!gmxOnTier()) return; const X=G.X||(G.X=gmxNew()); if(!X.t) gmxMint(); X.t+=dt;
