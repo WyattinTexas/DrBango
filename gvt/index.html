@@ -46143,40 +46143,6 @@ function roomGrant(id){
 
 
 
-
-
-
-
-
-
-
-
-
-function backyardGift(door){
-  if(META.byGift) return false;                                          
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  if(door==='campaign'){ if(roomOwns('backyard')) return false; META.byGift=1; return roomGrant('backyard'); }   
-  if(roomOwns('backyard') || (META.rooms.own||[]).length) return false;   
-  META.byGift=1;                                                        
-  return roomGrant('backyard');
-}
-
-
-
-
-
-
 const ROOF_GONE=new Set();
 function roofGone(k){ return ROOF_GONE.has(k); }
 
@@ -49684,18 +49650,6 @@ function lensOwned(){ return !!META.lens; }
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 const LENS_FREE_LVL=0;     
 const LENS_FREE_CAMP=30;   
 const BY_FREE_LVL=3;       
@@ -49763,42 +49717,8 @@ function paceBusy(k){
 function paceTake(k){ if(META.paceAt!==paceStamp()){ META.paceAt=paceStamp(); META.paceK=k; } }   
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 const WIN_GIFT_LVL=8;      
-const ROOF_GIFT_LVL=18;    
-const ROOM_GIFT={ winter:WIN_GIFT_LVL, rooftop:ROOF_GIFT_LVL };   
-const ROOM_GIFT_ORDER=['winter','rooftop'];                        
-
-
-
-
-function roomGiftLvl(id){ return id==='winter'? (META.lvl|0) : (META.campaign|0); }   
-function roomGiftDue(id){ return !!ROOM_GIFT[id] && roomGiftLvl(id)>=ROOM_GIFT[id] && !roomOwns(id); }
-function roomGift(id){
-  if(!roomGiftDue(id)) return false;   
-  if(!META.mvDay) META.mvDay=id;       
-  return roomGrant(id);                
-}
-
-function roomGiftLine(id){ return id==='rooftop'? 'THE ROOFTOP IS YOURS. A whole new room! Your ship sails you there.' : 'THE WINTER FIELD IS YOURS. A whole new room! Your ship sails you there.'; }
+const MVDAY_ROOMS=['winter','rooftop'];   
 
 
 
@@ -66290,9 +66210,6 @@ function levelCfg(n){
   
   
   
-  
-  
-  
   if(n===18){ const g=(w,i)=>cfg.waves[w].groups[i];               
     g(1,0).n=6; g(1,1).n=5; g(2,0).n=21; g(3,0).n=24; g(4,0).n=24;
     g(5,1).n=21; g(6,1).n=31; }
@@ -81446,7 +81363,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='20.53';        
+let GVT_CV='20.54';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -110287,23 +110204,6 @@ function endBattle(win){
     
     if(coopHumans() > (META.stats.coopMost||0)) META.stats.coopMost = coopHumans();
   }
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
   
   
   let decorNew=[];
@@ -140915,51 +140815,6 @@ function travelPick(dest){
 
 
 
-
-
-
-
-
-function roomGiftSweep(){
-  const id=ROOM_GIFT_ORDER.find(roomGiftDue); if(!id) return false;   
-  const p=document.getElementById('milePop');
-  if(!p || !p.classList.contains('hidden')) return false;   
-  if(!roomGift(id)) return false;
-  roomGiftCard(id); return true;
-}
-function roomGiftCard(id){
-  const p=document.getElementById('milePop'); if(!p) return;
-  p.innerHTML='<div class="mb-card">'
-    +'<span class="mb-band">LEVEL '+(META.lvl|0)+'!</span>'   
-    +utBrow('place')+'<h2 class="mb-h">'+ROOM_INFO[id].name+'</h2>'
-    +'<span class="mb-win">'+MB_RAYS+'<svg viewBox="0 0 150 220" preserveAspectRatio="xMidYMid slice">'+roomCardArt(id)+'</svg></span>'   
-    +'<span class="mb-line">'+roomGiftLine(id)+'</span>'
-    +'<button type="button" class="mb-take gold" onclick="UI.mileTake()">OKAY</button>'
-    +'</div>';
-  p.classList.remove('hidden');
-  SFX.fanfare();
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 const MVDAY_BEAT=600;      
 const MVDAY_TICK=200;
 const MVDAY_HAND=560;      
@@ -141068,7 +140923,7 @@ function gfWatch(){ if(GFH.raf) return; const step=()=>{ GFH.raf=0; if(!GFH.hand
 let SHIP_DEST=null;        
 function mvDayDue(){
   const id=META.mvDay;
-  return (id && ROOM_GIFT[id] && roomOwns(id))? id : null;   
+  return (id && MVDAY_ROOMS.indexOf(id)>=0 && roomOwns(id))? id : null;   
 }
 function mvDayQuiet(){
   if(S.mode!=='menu' || SHIPTRV || shopIsOpen()) return false;   
@@ -173542,7 +173397,7 @@ window.GVT = {
   campCam(x,hold){ if(S.cCam && !S.bf){ S.cCam.x=clampCam(x); S.cCam.vx=0; S.cCam.vy=0; if(hold) S.camHold=9999; } return S.cCam&&S.cCam.x; },
   camOwn(v){ if(v!==undefined) S.camOwn=!!v; return !!S.camOwn; },   
   roomPos(){ return JSON.parse(JSON.stringify(META.roomPos||{})); },   
-  roomsState(){ return { cur:roomCur(), own:(META.rooms&&META.rooms.own||[]).slice(), gone:Array.from(ROOF_GONE), byGift:!!META.byGift, byLvl:BY_FREE_LVL, ship:decOwns('ship'), shipSeen:META.decorSeen.indexOf('ship')>=0, mvDay:META.mvDay||0, winLvl:WIN_GIFT_LVL, roofLvl:ROOF_GIFT_LVL }; },   
+  roomsState(){ return { cur:roomCur(), own:(META.rooms&&META.rooms.own||[]).slice(), gone:Array.from(ROOF_GONE), byGift:!!META.byGift, byLvl:BY_FREE_LVL, ship:decOwns('ship'), shipSeen:META.decorSeen.indexOf('ship')>=0, mvDay:META.mvDay||0, winLvl:WIN_GIFT_LVL, roofLvl:0   }; },   
   mvDayState(){ return { latch:META.mvDay||0, due:mvDayDue(), quiet:mvDayQuiet(), staged:!!MVDAY.tid, armed:MVDAY.armed|0, hand:MVDAY.hand? (MVDAY.geo||true) : false, glove:FHAND.ok, handEl:!!document.getElementById('mvHand'), dest:SHIP_DEST, trv:SHIPTRV, cur:roomCur(), ride:mvDayRide() }; },   
   paintState(){ return { owed:paintRiteOwed(), open:paintRiteIsOpen(), lvl:PAINT_GIFT_LVL, dyes:(META.dyes||[]).slice(), on:META.dyeOn||null, gift:META.dyeGift||null, price:dyePrice(), paid:dyePaid(), base:DYE_BASE, step:PAINT_ESCALATOR, sel:PAINTRITE.sel===undefined? null : PAINTRITE.sel }; },   
   rdecState(){ return JSON.parse(JSON.stringify({ cur:roomCur(), rooms:ownedRooms(), rdec:META.rdec, pos:META.roomPosR, seen:META.rdecSeen, ship:META.rdecShip, v:META.rdecV||0, trv:SHIPTRV })); },   
@@ -175187,7 +175042,7 @@ window.GVT = {
   pace(){ return { cv:GVT_CV, boot:PACE_BOOT, moment:dinoMoment(), out:!!META.parkDinoOut, at:META.parkDinoAt||0, paceAt:META.paceAt||0, paceK:META.paceK||null, busy:{ ship:!DECOR_EARN.ship.due(), lens:paceBusy('lens'), teddy:paceBusy('teddy') }, shipDue:DECOR_EARN.ship.due(), lensDue:lensDue(), teddyDue:DECOR_EARN.teddy.due(), lens:!!META.lens, lensAnn:!!META.lensAnn, teddy:decOwns('teddy'), teddySeen:META.decorSeen.indexOf('teddy')>=0, ship:decOwns('ship'), shipSeen:META.decorSeen.indexOf('ship')>=0, dino:!!META.parkDino, dinoBy:META.parkDinoBy||null, cur:roomCur(), scene:parkSceneOpen(), park:PARK_CUR, mode:S.mode, card:milePopUp(), head:(document.querySelector('#milePop .mb-h')||{}).textContent||'', band:(document.querySelector('#milePop .mb-band')||{}).textContent||'' }; },   
   dp(){ return { cv:GVT_CV, lvl:DINO_GIFT_LVL, winGift:WIN_GIFT_LVL, dino:!!META.parkDino, dinoSeen:!!META.parkDinoSeen, dinoBy:META.parkDinoBy||null, yeti:!!META.parkYeti, yetiSeen:!!META.parkYetiSeen, yetiBy:META.parkYetiBy||null, by:dinoBy()||null, cur:roomCur(), rawCur:(META.rooms&&META.rooms.cur)||null, own:(META.rooms&&META.rooms.own||[]).slice(), byGift:META.byGift|0, door:!!MB_TAKE, scene:parkSceneOpen(), park:PARK_CUR, mode:S.mode, flow:PGFLOW, card:milePopUp(), head:(document.querySelector('#milePop .mb-h')||{}).textContent||'', band:(document.querySelector('#milePop .mb-band')||{}).textContent||'', rumor:dinoRumorDue(), nudge:shipNudgeOn(), nudgeDue:shipNudgeDue(), glass:glassDue(), mvDay:META.mvDay||0, lens:!!META.lens }; },   
   flow(){ const g=id=>document.getElementById(id), vis=id=>{ const e=g(id); return !!e && !e.classList.contains('hidden'); }; const hb=g('winHqBtn'); return { cv:GVT_CV, top:CAMP_FLOW_TOP, home:CAMP_FLOW_HOME, on:PGFLOW, due:campFlowDue(), hq:!!hb && !hb.classList.contains('off'), hqRect:hb? (r=>[Math.round(r.left),Math.round(r.top),Math.round(r.right),Math.round(r.bottom)])(hb.getBoundingClientRect()) : null, hqText:hb? hb.textContent : null, mode:S.mode, levelN:S.levelN, camp:META.campaign|0, pend:META.pendingPicks|0, menu:vis('menu'), scene:vis('campscene'), picker:vis('picker'), win:vis('win'), lose:vis('lose'), card:milePopUp(), box:mboxUp(), dealt:MB_DEALT, end:MB_END, head:(document.querySelector('#milePop .mb-h')||{}).textContent||'' }; },   
-  winVerdict(){ const g=id=>document.getElementById(id), win=g('win'), mr=g('medalRow'), mt=g('medalText'); return { cv:GVT_CV, starGap:VD_STAR_GAP, artPx:VD_ART_PX, whisperFrom:VD_WHISPER_FROM, beats:[VD_MEDAL_AT,VD_MEDAL_STAG,VD_TILE_AT,VD_TILE_MS,VD_ROW_AT], sfx:VD_MEDAL_SFX, swords:VD_BOSS_SWORDS, foot:Object.assign({},VD_FOOT), camp:win.classList.contains('camp'), done:win.classList.contains('vdone'), running:!!VD, stars:mr.dataset.stars||null, v:mt.dataset.v||null, parts:[...mt.children].map(e=>({ k:e.className, t:e.innerText.replace(/\s+/g,' ').trim(), op:getComputedStyle(e).opacity })), medals:[...mr.querySelectorAll('.vm')].map(e=>({ g:e.textContent, on:e.classList.contains('on'), off:e.classList.contains('off'), op:getComputedStyle(e).opacity })), title:g('winTitle').innerText.replace(/\s+/g,' ').trim(), btn:g('againBtn').getBoundingClientRect().bottom, due:{ by:(META.lvl|0)>=BY_FREE_LVL && !META.byGift && !roomOwns('backyard'), winter:roomGiftDue('winter'), rooftop:roomGiftDue('rooftop'), bomber:bmbOwned() && !META.bomberSeen, cmd:cmdOwned() && !META.cmdSeen, blade:bladeOwned() && !META.bladeSeen, cmdo:cmdoOwned() && !META.cmdoSeen, soul:soulOwned() && !META.soulSeen, paint:paintRiteOwed(), lens:lensDue() && !lensOwned() }, whispered:[REX_WHISPERED, RANK_WHISPERED], mode:S.mode }; },   
+  winVerdict(){ const g=id=>document.getElementById(id), win=g('win'), mr=g('medalRow'), mt=g('medalText'); return { cv:GVT_CV, starGap:VD_STAR_GAP, artPx:VD_ART_PX, whisperFrom:VD_WHISPER_FROM, beats:[VD_MEDAL_AT,VD_MEDAL_STAG,VD_TILE_AT,VD_TILE_MS,VD_ROW_AT], sfx:VD_MEDAL_SFX, swords:VD_BOSS_SWORDS, foot:Object.assign({},VD_FOOT), camp:win.classList.contains('camp'), done:win.classList.contains('vdone'), running:!!VD, stars:mr.dataset.stars||null, v:mt.dataset.v||null, parts:[...mt.children].map(e=>({ k:e.className, t:e.innerText.replace(/\s+/g,' ').trim(), op:getComputedStyle(e).opacity })), medals:[...mr.querySelectorAll('.vm')].map(e=>({ g:e.textContent, on:e.classList.contains('on'), off:e.classList.contains('off'), op:getComputedStyle(e).opacity })), title:g('winTitle').innerText.replace(/\s+/g,' ').trim(), btn:g('againBtn').getBoundingClientRect().bottom, due:{ by:(META.lvl|0)>=BY_FREE_LVL && !META.byGift && !roomOwns('backyard'), winter:false, rooftop:false  , bomber:bmbOwned() && !META.bomberSeen, cmd:cmdOwned() && !META.cmdSeen, blade:bladeOwned() && !META.bladeSeen, cmdo:cmdoOwned() && !META.cmdoSeen, soul:soulOwned() && !META.soulSeen, paint:paintRiteOwed(), lens:lensDue() && !lensOwned() }, whispered:[REX_WHISPERED, RANK_WHISPERED], mode:S.mode }; },   
   
   nb(){ return { cv:GVT_CV, base:NB.base||null, stamp:NB.stamp||null, newer:NB.newer?1:0, checks:NB.checks, fails:NB.fails, last:NB.last, beats:NB.beats, busy:!!NB.busy, chip:NB.chip?1:0, card:!!document.getElementById('nbCard'), snoozeT:NB.snoozeT, went:NB.went, auto:nbAutoOK()?1:0, quiet:nbQuiet()?1:0, idle:+idleQuiet().toFixed(1), bellFar:nbBellFar()?1:0, every:NB_EVERY, snoozeMs:NB_SNOOZE_MS, autoS:NB_AUTO_S, guardS:NB_BELL_GUARD_S, path:location.pathname, proto:location.protocol }; },
   nbForce(stamp){ stamp=String(stamp||'forced'); if(!NB.base) NB.base='(rig)'; NB.stamp=stamp; NB.newer=(stamp!==NB.base); NB.last=Date.now(); nbTick(); return GVT.nb(); },
