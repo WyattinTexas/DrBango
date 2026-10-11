@@ -81363,7 +81363,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='20.55';        
+let GVT_CV='20.56';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -87080,10 +87080,11 @@ const SQC_POSE={ att:Object.assign({ fa:[48,99], na:[67,99] }, SQC_STAND), sal:O
 const SQC_WEP={ att:['na',62], sal:['fa',62], asleep:['na',84], w1:['na',40], w2:['na',70] };   
 function sqcPistol(fist, ang){ try{ const r=ang*Math.PI/180, c=Math.cos(r), s=Math.sin(r), pv=[fist[0]-2, fist[1]+2], kx=1.4*c+5.1*s, ky=1.4*s-5.1*c;   
   return coPistol(+pv[0].toFixed(2), +pv[1].toFixed(2), +ang.toFixed(2))+'<circle cx="'+(pv[0]+kx).toFixed(2)+'" cy="'+(pv[1]+ky).toFixed(2)+'" r="4.7" fill="currentColor"/>'; }catch(e){ return ''; } }
-function sqcFig(k, hex){ const P=SQC_POSE[k]||SQC_POSE.att, w=SQC_WEP[k]; try{ return WPM.sarge(P, { dye:hex, dress:null, wep:w? sqcPistol(P[w[0]]||[67,99], w[1]) : '' }); }catch(e){ return ''; } }   
+function sqcFig(k, hex, D){ const P=SQC_POSE[k]||SQC_POSE.att, w=SQC_WEP[k]; try{ return WPM.sarge(P, { dye:hex, dress:D||null, legsFit:!!D, wep:w? sqcPistol(P[w[0]]||[67,99], w[1]) : '' }); }catch(e){ return ''; } }   
+function sqcYouDress(){ try{ return WPM.dressBuild(((META.outfit && META.outfit.wear)||[]).filter(outfitOn)); }catch(e){ return null; } }   
 function sqcYouArt(hex){ try{ const k=sargeArtW(META.sargeWeapon||'pistol'), a=SARGE_ART[k]||SPRITES_SRC.sarge; if(typeof a!=='string') return ''; return ftxInk(outfitDress(a, k)).split('currentColor').join(hex||'#7FA35C').split('BLADEHEX').join(saberHex()); }catch(e){ return ''; } }   
-function sqcSprite(hex, asleep, you, m){ const cells=[asleep? 'asleep' : 'att', 'sal', 'w1', 'w2'], me=(you && !asleep)? sqcYouArt(hex) : (!you && m)? sqmArt(m, hex) : '';   
-  return 'data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="-10 -14 560 154">'+cells.map((k,i)=>'<g transform="translate('+(i*140)+' 0)">'+((i===0 && me)? me : sqcFig(k, hex))+'</g>').join('')+'</svg>'); }
+function sqcSprite(hex, asleep, you, m){ const cells=[asleep? 'asleep' : 'att', 'sal', 'w1', 'w2'], me=(you && !asleep)? sqcYouArt(hex) : (!you && m)? sqmArt(m, hex) : '', D=you? sqcYouDress() : null;   
+  return 'data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="-10 -14 560 154">'+cells.map((k,i)=>'<g transform="translate('+(i*140)+' 0)">'+((i===0 && me)? me : sqcFig(k, hex, D))+'</g>').join('')+'</svg>'); }
 function sqcLands(code, name){ const out=[]; try{ const nm=String(name||'').toUpperCase(); for(const cc in GL.map){ const r=GL.map[cc]; if(r && r.crew===code && String(r.who||'').toUpperCase()===nm) out.push(cc); } }catch(e){}
   out.sort((a,b)=>sqcName(a).localeCompare(sqcName(b))); return out; }   
 function sqcName(cc){ try{ return glName(cc); }catch(e){ return String(cc||''); } }
@@ -165469,13 +165470,17 @@ const legFam=P=> !near2(P.hip,[56,96])? null : (near2(P.ff,[40,122]) && near2(P.
 
 function torsoM(hip,n){ if(near2(hip,[56,96]) && near2(n,[58,68])) return ''; const ax=2, ay=-28, bx=n[0]-hip[0], by=n[1]-hip[1], d=ax*ax+ay*ay, c=(ax*bx+ay*by)/d, s=(ax*by-ay*bx)/d;
   return 'matrix('+f5(c)+' '+f5(s)+' '+f5(-s)+' '+f5(c)+' '+f5(hip[0]-(c*56-s*96))+' '+f5(hip[1]-(s*56+c*96))+')'; }
+function legsFit(L, P){ const hip=P.hip, one=(fA,hA,fP,hP,x0,x1,id)=>{ const ax=fA[0]-hA[0], ay=fA[1]-hA[1], px=fP[0]-hP[0], py=fP[1]-hP[1], la=Math.hypot(ax,ay), lp=Math.hypot(px,py); if(la<1 || lp<1) return '';
+    const ua=[ax/la, ay/la], na=[-ua[1], ua[0]], up=[px/lp, py/lp], np=[-up[1], up[0]], s=lp/la, col=e=>[s*(e[0]*ua[0]+e[1]*ua[1])*up[0]+(e[0]*na[0]+e[1]*na[1])*np[0], s*(e[0]*ua[0]+e[1]*ua[1])*up[1]+(e[0]*na[0]+e[1]*na[1])*np[1]], c1=col([1,0]), c2=col([0,1]);
+    return '<clipPath id="'+id+'"><rect x="'+x0+'" y="-40" width="'+(x1-x0)+'" height="220"/></clipPath><g transform="matrix('+f5(c1[0])+' '+f5(c1[1])+' '+f5(c2[0])+' '+f5(c2[1])+' '+f5(hP[0]-(c1[0]*hA[0]+c2[0]*hA[1]))+' '+f5(hP[1]-(c1[1]*hA[0]+c2[1]*hA[1]))+')"><g clip-path="url(#'+id+')">'+L+'</g></g>'; };
+  return one([40,122],[54,96],P.ff,[hip[0]-2,hip[1]],-40,56,'wpmLegF')+one([76,118],[58,96],P.nf,[hip[0]+2,hip[1]],56,160,'wpmLegN'); }   
 function sarge(P, o){ o=o||{}; P=Object.assign({}, POSE0, P);
   const n=P.n, hip=P.hip, sF=add(n,P.sf), sN=add(n,P.sn), hd=add(n,P.h), D=(o.dress===undefined)? DRESS : o.dress;
   const farLeg=amP('M'+pt(P.ff)+' L'+pt([hip[0]-2,hip[1]]),11), nearLeg=amP('M'+pt(P.nf)+' L'+pt([hip[0]+2,hip[1]]),11), torso=amP('M'+pt(hip)+' L'+pt(n),16),
     farArm=amP('M'+pt(sF)+(P.fe? ' L'+pt(P.fe) : '')+' L'+pt(P.fa),8), nearArm=amP('M'+pt(sN)+(P.ne? ' L'+pt(P.ne) : '')+' L'+pt(P.na),8);
   let body='', hat='', base=BASE;
   if(D){ base=D.base; const lf=legFam(P), tm=torsoM(hip,n);
-    if(D.legs.A){ if(lf) body+=D.legs[lf]; else D.off.legs=1; }   
+    if(D.legs.A){ if(lf) body+=D.legs[lf]; else if(o.legsFit) body+=legsFit(D.legs.A, P); else D.off.legs=1; }   
     if(D.torso) body+= tm? '<g transform="'+tm+'">'+D.torso+'</g>' : D.torso;
     if(D.gloves){ const gl=D.gloves(farArm,nearArm); if(gl) body+=gl; else D.off.hands=1; }
     if(D.head) hat='<g transform="translate('+f(hd[0])+','+f(hd[1])+')">'+D.head+'</g>'; }
@@ -166170,7 +166175,7 @@ function rig(cmd, a, b){ const C=(CUR && CUR.root.isConnected)? CUR : null;
     dress:(C && DRESS)? { ids:DRESS.ids.slice(), cls:JSON.parse(JSON.stringify(DRESS.cls)), miss:DRESS.miss.slice(), off:Object.assign({}, DRESS.off) } : null,
     mode:C? (C.st.mode||'') : null, crystal:C? (C.st.crystal||null) : null, cry:(C && C.crys)? { on:C.crys.classList.contains('on'), vials:[].slice.call(C.crys.querySelectorAll('.wpm-cry')).map(e=>({ hex:e.getAttribute('data-hex'), on:e.classList.contains('on'), label:e.textContent, r:R(e) })), eq2:(e=>e? { dis:!!e.disabled, label:e.textContent, r:R(e) } : null)(C.crys.querySelector('.wpm-eq2')) } : null,
     box:C? R(C.box) : null, safe:C? R(C.safe) : null, doors:C? [].slice.call(C.doors.querySelectorAll('button')).map(e=>({ cls:e.className, label:e.textContent, r:R(e) })) : null }; }
-return { M:M, open:open, skip:skip, cmd:cmd, heroKey:heroKey, rig:rig, cry:cry, sabHeld:sabHeld, sarge:sarge, hero:hero, dark:dark, GUARD:GUARD,
+return { M:M, open:open, skip:skip, cmd:cmd, heroKey:heroKey, rig:rig, cry:cry, sabHeld:sabHeld, sarge:sarge, dressBuild:dressBuild, hero:hero, dark:dark, GUARD:GUARD,
   K:{ W:W, H:H, FLOOR:FLOOR, HOR:HOR, SC:SC, FX0:FX0, f:f, lerp:lerp, clamp:clamp, EZ:EZ, tr:tr, seg:seg, hit:hit, mix:mix, mul:mul, rot:rot, add:add, m2s:m2s, pt:pt, WIDE:WIDE, star:star, muzzle:muzzle, brass:brass, fly:fly, smoke:smoke, motes:motes, crate:crate } };
 })();
 
