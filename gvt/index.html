@@ -52524,23 +52524,30 @@ const CMDO_DEF_CAP=5;
 
 
 
-const HP_RANK100={ rifleman:11, mgunner:28, bazooka:10, flame:21, minesweeper:10, radioman:10, spy:7, sarge:21, medic:7, grenadier:10, mortar:10, commando:24 };   
+const HP_RANK100={ rifleman:45, mgunner:55, bazooka:42, flame:50, minesweeper:42, radioman:42, spy:40, sarge:40, medic:40, grenadier:44, mortar:40, commando:52 };       
 
 
 
 
 
 const SARGE_WPN_HP={ pistol:2, shotgun:3, lightsaber:3, sniper:0, commander:8 };
-const SARGE_WPN_HP100={ pistol:7, shotgun:10, lightsaber:10, sniper:0, commander:28 };   
+const SARGE_WPN_HP100={ pistol:7, shotgun:10, lightsaber:10, sniper:0, commander:10 };       
 const RANK_U_SUMMIT=rankUnits(RANK_MAX);   
 
 
 
 function bfHpAt(t,r){ const top=HP_RANK100[t], base=(BF_MOVE[t]&&BF_MOVE[t].hp)||3;
-  return top? base+Math.round((top-base)*rankUnits(r)/RANK_U_SUMMIT) : base; }
+  if(!top) return base; const o=UHB_HPL[t];    
+  const cur=base+Math.round(((o!=null)? o-base : top-base)*rankUnits(r)/RANK_U_SUMMIT);
+  return (o==null || !(r>=UHB.rungFrom))? cur : Math.max(cur, uhbRung(uhbHplAt(t,UHB.rungFrom-1), top, r)); }
 
 
-function wpnPlateAt(w,r){ const b=SARGE_WPN_HP[w]||0, top=SARGE_WPN_HP100[w]; return top==null? b : b+Math.round((top-b)*rankUnits(Math.max(0,Math.min(RANK_MAX,r|0)))/RANK_U_SUMMIT); }
+function wpnPlateAt(w,r,rs){ const b=SARGE_WPN_HP[w]||0, top=SARGE_WPN_HP100[w]; if(top==null) return b;    
+  const rr=Math.max(0,Math.min(RANK_MAX,r|0)), o=UHB_PLATE_HPL[w], cur=b+Math.round(((o!=null)? o-b : top-b)*rankUnits(rr)/RANK_U_SUMMIT);
+  if(o==null || rr<UHB.rungFrom) return cur;    
+  let p=uhbRung(b+Math.round((o-b)*rankUnits(UHB.rungFrom-1)/RANK_U_SUMMIT), top, rr);    
+  if(rs!=null){ const s9=Math.max(0,Math.min(RANK_MAX,rs|0)); p=Math.max(p, cur-(bfHpAt('sarge',s9)-uhbHplAt('sarge',s9))); }    
+  return p; }
 
 
 
@@ -52548,6 +52555,24 @@ function wpnPlateAt(w,r){ const b=SARGE_WPN_HP[w]||0, top=SARGE_WPN_HP100[w]; re
 
 function bfHpRk(u){ if(!HP_RANK100[u.type]) return 0;
   return bfHpAt(u.type, perkRank(u)) - ((BF_MOVE[u.type]&&BF_MOVE[u.type].hp)||3); }
+
+
+
+
+
+
+
+
+
+
+const UHB={ rungFrom:10, standRk:10, n:0 };   
+const UHB_HPL={ rifleman:11, mgunner:28, bazooka:10, flame:21, minesweeper:10, radioman:10, spy:7, sarge:21, medic:7, grenadier:10, mortar:10, commando:24 };   
+const UHB_PLATE_HPL={ commander:28 };   
+function uhbHplAt(t,r){ const base=(BF_MOVE[t]&&BF_MOVE[t].hp)||3, o=UHB_HPL[t]; return (o==null)? base : base+Math.round((o-base)*rankUnits(r)/RANK_U_SUMMIT); }   
+function uhbRung(h9,top,r){ return Math.round(h9+(top-h9)*Math.floor(Math.max(0,Math.min(RANK_MAX,r|0))/10)/10); }   
+function uhbStand(f,dmg){ if(!S.bf || !f || !f.side || !(dmg>=f.hp) || !(f.hp>1) || UHB_HPL[f.type]==null || !(f.hpMax>0) || f.hp<f.hpMax-1e-6 || perkRank(f)<UHB.standRk) return dmg;
+  UHB.n++; return f.hp-1; }   
+
 const CMDO={
   beamW:26,     
   sweepT:0.5,   
@@ -80308,7 +80333,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='20.29';        
+let GVT_CV='20.30';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -92740,6 +92765,7 @@ function hurt(f,dmg,src,fire9){ if(f.trk && trkTurn(f)) return; dmg*=sqlArmX(f);
   if(!S.bf && (f.def.deck || f.hatch>0) && src && S.units.indexOf(src)>=0) dmg*=backX(f,src);   
   if(!S.bf && fire9 && f.cpGen>0){ f.cpBurn=1; if(dmg<f.hp) dmg=f.hp; }   
   dmg*=aglX(f,src);   
+  dmg=uhbStand(f,dmg);    
   f.hp-=dmg;
   if(f.hp<=0 && S.bf && f.side && chSpare(f)) f.hp=1;   
   if(f.type==='kingyeti') f.kyHitAt=S.t;   
@@ -95678,7 +95704,7 @@ function placeUnit(type,x,y,side,seat){
     
     
     
-    if(type==='sarge'){ const usw9=unitSargeStats(u), wf=wpnPlateAt(usw9.w, usw9.r|0)+(usw9.w==='pistol'? pistolMileHp(usw9.r|0) : 0); if(wf){ u.hpMax+=wf; u.hp=u.hpMax; } }   
+    if(type==='sarge'){ const usw9=unitSargeStats(u), wf=wpnPlateAt(usw9.w, usw9.r|0, perkRank(u))+(usw9.w==='pistol'? pistolMileHp(usw9.r|0) : 0); if(wf){ u.hpMax+=wf; u.hp=u.hpMax; } }   
     if(type==='sarge' && CMD.hpMul && unitSargeStats(u).w==='commander'){ u.hpMax=Math.round(u.hpMax*CMD.hpMul); u.hp=u.hpMax; }   
     
     
@@ -168454,7 +168480,7 @@ function hauRig(){ const m=document.querySelector('#roomModal .rmcard.hau'), cv=
 
 let US_BACK_K=null;   
 const US_MEN=['rifleman','mgunner','bazooka','mortar','minesweeper','flame','radioman','commando','spy','medic','grenadier'];
-const UNIT_SHEET_BANDS={ hp:[4,7,11,18]  , dmg:[0.5,1,2,4], rate:[15,30,90,300], move:[15,25,38,50], crit:[0.05,0.10,0.15,0.20] };   
+const UNIT_SHEET_BANDS={ hp:[4,10,30,48]    , dmg:[0.5,1,2,4], rate:[15,30,90,300], move:[15,25,38,50], crit:[0.05,0.10,0.15,0.20] };   
 function usPip(v,b,over){ if(!(v>0)) return 0; let p=1; for(const x of b){ if(over? v>x : v>=x) p++; else break; } return Math.min(5,p); }   
 function usRate(k){ const q=rsaRate(k); return (q>0)? Math.round(q*60) : 0; }       
 function usPerSec(k){ const q=rsaRate(k); return (q>0)? Math.round(q*10+1e-9)/10 : 0; }       
@@ -168474,7 +168500,7 @@ function usBfHP(k,r){ const rr=(r==null)? ((META.up[k]||0)|0) : Math.max(0,Math.
   hp+=pbkN(k);    
   return hp; }
 function sgBfHP(b,r){ const rr=(r==null)? ((META.up.sarge||0)|0) : Math.max(0,Math.min(RANK_MAX,r|0));
-  let hp=bfHpAt('sarge',rr)+wpnPlateAt(b.w, b.r|0)+(b.w==='pistol'? pistolMileHp(b.r|0) : 0);
+  let hp=bfHpAt('sarge',rr)+wpnPlateAt(b.w, b.r|0, rr)+(b.w==='pistol'? pistolMileHp(b.r|0) : 0);
   if(CMD.hpMul && b.w==='commander') hp=Math.round(hp*CMD.hpMul);
   if(soulIs('u','sarge')) hp*=SOUL_MUL;
   if(b.soul) hp*=SOUL_MUL;
