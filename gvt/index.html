@@ -81369,7 +81369,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='20.51';        
+let GVT_CV='20.52';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -97581,8 +97581,8 @@ function updateSaber(u,dt,sw){
       const vm=(u.vet?1.5:1)*lzDmgMul(u)*sandDmgMul(u), cr9=rollCrit(u), cm=(cr9 || u.sabCritAt>S.t)? critMult(u) : 1; u.sabCritAt=0;   
       if(cm>1) critFx(f);
       const uaD9=!ua9? sw.dmg*vm*cm : uaK9? ((f.hpMax>0)? Math.min(sw.dmg*UA_KICK_F*vm*cm, f.hpMax*UA_KICK_CAP) : sw.dmg*UA_KICK_F*vm*cm) : Math.max(sw.dmg*UA_PUNCH_F, UA_PUNCH_MIN)*vm*cm;   
-      hurt(f,bladeBossCap(f,uaD9),u);                     
-      for(const g of TGTC(u)){   if(g!==f && !g.burrow && !g.dead && (S.bf || g.x<=W-10) && bfCanTarget(u,g) && Math.hypot(g.x-u.x,g.y-u.y)<(ua9?UNARMED_CLEAVE:46)){ hurt(g,bladeBossCap(g,sw.dmg*uaF9*0.5*vm*cm),u); } }  
+      hurt(f,bladeBossCap(f,(uaK9 && f.hpMax>0)? Math.min(uaD9+mstSwGift(u), f.hpMax*UA_KICK_CAP) : uaD9+mstSwGift(u)),u);                         
+      for(const g of TGTC(u)){   if(g!==f && !g.burrow && !g.dead && (S.bf || g.x<=W-10) && bfCanTarget(u,g) && Math.hypot(g.x-u.x,g.y-u.y)<(ua9?UNARMED_CLEAVE:46)){ hurt(g,bladeBossCap(g,sw.dmg*uaF9*0.5*vm*cm+mstSwGift(u)),u);     } }  
       if(u.type==='sarge' && !u.coopBy && !u.coopSW && bfHumanU(u) && esOn() && !(ua9 && !uaK9) && Math.random()<ES_PCT){   
         ultReloadGo(u,1); S.ultCd=0;   
         if(!reducedMotion()) S.fx.push({k:'ring',x:u.x,y:u.y-24,r:6,R:44,t:0,dur:0.4,col:ES_HEX});   
@@ -97801,7 +97801,7 @@ function updateCmdDuel(u,dt,sw){
 function cmdDuelLand(u,sw){           
   const D=u.cmdDuel, f=cmdNearest(u,sw.rng);
   if(f){ const vm=(u.vet?1.5:1)*lzDmgMul(u)*sandDmgMul(u), cm=rollCrit(u)?critMult(u):1; if(cm>1) critFx(f);   
-    pndCut(u,()=>hurt(f,bladeBossCap(f,sw.dmg*vm*cm),u)); }             
+    pndCut(u,()=>hurt(f,bladeBossCap(f,sw.dmg*vm*cm+mstSwGift(u)),u)); }                 
   const c=CMD_DUEL_CUTS[D.n-1], fs=u.cmdFs, tb=-Math.max(0,0.145-D.el), hx=u.x+fs*8, hy=u.y-22, fb9=fbU(u,sw), ib9=!fb9 && ibU(u,sw);   
   if(f && fb9) fsIgnite(hx+fs*Math.cos(c.to)*(c.th?62:46)*0.5, u.y, u, FS_R, FS_LIFE);   
   S.fx.push({k:'ring',x:u.x,y:u.y-16,r:6,R:(c.th?44:34),t:tb,dur:0.24,col:fb9?'#FF8A3A':ib9?'#7FD4FF':'#C9D2D8'});   
@@ -97900,9 +97900,9 @@ function cmdCutLand(u,sw){
     hit.push(g); if(d<bd){ bd=d; best=g; } }
   if(!best) return;   
   const vm=(u.vet?1.5:1)*lzDmgMul(u)*sandDmgMul(u), cm=rollCrit(u)?critMult(u):1; if(cm>1) critFx(best);   
-  if(sw.aoe){ pndCut(u,()=>{ for(const g of hit) hurt(g,bladeBossCap(g,sw.dmg*vm*cm),u); }); }       
-  else pndCut(u,()=>{ hurt(best,bladeBossCap(best,sw.dmg*vm*cm),u);       
-    for(const g of hit){ if(g!==best) hurt(g,bladeBossCap(g,sw.dmg*CMD.cleaveF*vm*cm),u); } });       
+  if(sw.aoe){ pndCut(u,()=>{ for(const g of hit) hurt(g,bladeBossCap(g,sw.dmg*vm*cm+mstSwGift(u)),u); }); }           
+  else pndCut(u,()=>{ hurt(best,bladeBossCap(best,sw.dmg*vm*cm+mstSwGift(u)),u);           
+    for(const g of hit){ if(g!==best) hurt(g,bladeBossCap(g,sw.dmg*CMD.cleaveF*vm*cm+mstSwGift(u)),u); } });           
 }
 function cmdDashEnd(u){
   if(u.cmdDuel){ u.cmdDuel=null; if(!(u.cmdSwT>0)) u.cmdSwT=cmdDuelArm(u); }   
@@ -106042,7 +106042,7 @@ function jabAir(u,dt){
   unitAim(u,best);
   const fx=(best.x>=u.x)? 1 : -1, vm=(u.vet?1.5:1)*lzDmgMul(u)*sandDmgMul(u), cm=rollCrit(u)? critMult(u) : 1; if(cm>1) critFx(best);   
   const aX=jv3U(u)? JAB.airX : 1, hy=u.y-h;   
-  const land=(f,d)=>{ const now=bladeBossCap(f,d*aX); if(JAB.hits) JAB.hits.push({ w, who:f.type, was:+d.toFixed(3), now:+now.toFixed(3), lift:Math.round(h), bf:!!S.bf }); hurt(f,now,u); S.fx.push({k:'ring',x:f.x,y:jabBodyY(f)-6,r:3,R:16,t:0,dur:0.2,col:(w==='lightsaber')? saberHexU(u) : (w==='commander')? '#C9D2D8' : '#FFE0B8'}); };   
+  const land=(f,d)=>{ const now=bladeBossCap(f,d*aX+mstSwGift(u));     if(JAB.hits) JAB.hits.push({ w, who:f.type, was:+d.toFixed(3), now:+now.toFixed(3), lift:Math.round(h), bf:!!S.bf }); hurt(f,now,u); S.fx.push({k:'ring',x:f.x,y:jabBodyY(f)-6,r:3,R:16,t:0,dur:0.2,col:(w==='lightsaber')? saberHexU(u) : (w==='commander')? '#C9D2D8' : '#FFE0B8'}); };   
   if(w==='shotgun'){ const mx=u.x+16*fx, my=hy-30, ang=Math.atan2(jabBodyY(best)-my, best.x-mx), cone=sw.cone||0.682, base=sw.dmg*vm*cm*gsDmgMul(u);   
     bfSfx(SFX.buck,u.x,u.y); for(const f of L){ let a=Math.atan2(jabBodyY(f)-my,f.x-mx)-ang; a=Math.atan2(Math.sin(a),Math.cos(a)); if(Math.abs(a)>cone) continue; S.fx.push({k:'tracer',x1:mx,y1:my,x2:f.x,y2:jabBodyY(f),t:0,dur:0.1,col:'#FFE0B8',w:2}); land(f,base); }
     S.fx.push({k:'flash',x:mx,y:my,ang:ang,R:13,lw:2.2,t:0,dur:0.09}); }
@@ -106087,7 +106087,7 @@ function jv3AirGun(u,dt){
   const base=(sw.w==='pistol')? u.def.dmg*(u.coopUM!=null? u.coopUM : upMul('sarge'))*soulDmgMulU(u)*((sw.dgM)||1)*vm : sw.dmg*vm*gsDmgMul(u);   
   const cm=rollCrit(u)? critMult(u) : 1; if(cm>1) critFx(best);   
   const ang=Math.atan2((best.y-18)-my, best.x-mx);
-  const hit=f=>{ const was=base*cm, now=was*JV3.airX; if(JV3.hits) JV3.hits.push({ w:sw.w, who:f.type, was:+was.toFixed(3), now:+now.toFixed(3), lift:Math.round(h), bf:!!S.bf });
+  const hit=f=>{ const was=base*cm, now=was*JV3.airX+mstSwGift(u);     if(JV3.hits) JV3.hits.push({ w:sw.w, who:f.type, was:+was.toFixed(3), now:+now.toFixed(3), lift:Math.round(h), bf:!!S.bf });
     hurt(f, now, u); S.fx.push({k:'ring',x:f.x,y:f.y-18,r:3,R:14,t:0,dur:0.2,col:JV2_HEX}); };
   if(sw.w==='shotgun'){ bfSfx(SFX.buck,u.x,u.y); const cone=sw.cone||0.682;   
     for(const f of jv3Ground(u,reach)){ let a=Math.atan2((f.y-18)-my,f.x-mx)-ang; a=Math.atan2(Math.sin(a),Math.cos(a)); if(Math.abs(a)>cone) continue; S.fx.push({k:'tracer',x1:mx,y1:my,x2:f.x,y2:f.y-18,t:0,dur:0.1,col:'#FFE0B8',w:2}); hit(f); } }
@@ -112341,7 +112341,7 @@ function update(dt){
             
             
             if(da<=pcone){ const dkb=duckBlock(u.x+35*wdir,u.y-34,f.x,f.y-18);   
-              if(dkb) duckBlockFx(dkb); else { vict9.push(f); hurt(f,sw.dmg*vm*cm*shfX(u,f,d)*sgNearX(d)+scoutX(sw,d)+lbX(u,d),u); } } }       
+              if(dkb) duckBlockFx(dkb); else { vict9.push(f); hurt(f,sw.dmg*vm*cm*shfX(u,f,d)*sgNearX(d)+scoutX(sw,d)+lbX(u,d)+mstSwGift(u),u);     } } }       
           
           
           u.pumpT=PUMP_T; u.sgKickT=SG_KICK;   
@@ -112434,7 +112434,7 @@ function update(dt){
           S.fx.push({k:'flash',x:htx,y:hty,ang:ang+Math.PI,R:RM?12:20,lw:3,t:0,dur:0.14});
           S.fx.push({k:'ring',x:htx,y:hty,r:4, R:32,t:0,dur:0.22,col:'#FFFFFF'});
           S.fx.push({k:'ring',x:htx,y:hty,r:10,R:54,t:0,dur:0.34,col:'#FFD24A'});
-          if(dkb) duckBlockFx(dkb); else { hurt(best,sw.dmg*vm*cm*shfX(u,best,Math.hypot(best.x-u.x,best.y-u.y))+scoutX(sw,Math.hypot(best.x-u.x,best.y-u.y))+lbX(u,Math.hypot(best.x-u.x,best.y-u.y)),u);       
+          if(dkb) duckBlockFx(dkb); else { hurt(best,sw.dmg*vm*cm*shfX(u,best,Math.hypot(best.x-u.x,best.y-u.y))+scoutX(sw,Math.hypot(best.x-u.x,best.y-u.y))+lbX(u,Math.hypot(best.x-u.x,best.y-u.y))+mstSwGift(u),u);           
             if(fsRd){ u.fsN--; const tw9=enhU(u,'flamestrike2')?1:0; fsIgnite(best.x,best.y, mine? u : null, 0, 0, 0, tw9); if(tw9 && FS2_BOTH) fsIgnite(best.x,best.y, mine? u : null); } }   
         }
         continue;
@@ -143233,6 +143233,7 @@ function mstAdopt(list){
 function mstGiftDmg(u,card){   
   const M=META.master; if(!M || !u || !u.type) return 0; if(!card){ if(u.coopMods || u.coopBy) return 0; if(S.bf && !bfHumanU(u)) return 0; }
   let n=0; for(const c in M){ if(M[c] && M[c].unit===u.type) n++; } return n? n*(PICK_RAPID[u.type]? MST_DMG_RAPID : MST_DMG) : 0; }
+function mstSwGift(u){ return (u && u.type==='sarge')? mstGiftDmg(u) : 0; }   
 function mstUnitName(k){ return t(soulName('u:'+k)); }
 function mstChipSVG(c,size,lit){ const d=MST_ART[c]||''; return '<svg viewBox="-1 -4 38 38" width="'+size+'" height="'+size+'" aria-hidden="true"><path d="'+d+'" fill="#4A3010" opacity=".5" transform="translate(.9,1.1)"/><path d="'+d+'" fill="'+(lit? '#FFF0B8' : '#9A8D78')+'"/></svg>'; }
 function mstPlateG(c,i,nt,pulse){   
@@ -170344,7 +170345,7 @@ function hsSheetHTML(k){ const r=(META.up[k]||0)|0, own=unitOwned(k), f0=rsaMark
     +'<p class="us-back us-r3">'+(own? '<span class="mncmd">'+(k===heroSel()? '<span class="mnflag">IN COMMAND</span>' : '<button type="button" class="mbtn mn-take" onclick="UI.heroCmd(\''+k+'\')">TAKE COMMAND</button>')+'</span>' : '')+'<a href="#" style="color:#8b8f7a" onclick="UI.fort(\'heroes\');return false">HEROES</a></p>'; }   
 function sgStub(b){ const u=heroStub('sarge'); if(ROOKIE_SARGE_HP && (META.lvl|0)<ROOKIE_SARGE_LVL) u.rookieHp=ROOKIE_SARGE_HP; if(b) u.coopSW=b; return u; }   
 function sgFive(r){ const own=(r==null), b=own? sargeStats() : sargeStats(r), st=sgStub(own? null : b);   
-  const hp=+hitFmt(sgBfHP(b, own? null : (r|0)))  , dmg=(b.w==='pistol')? hitDmgNowAt('sarge', own? ((META.up.sarge||0)|0) : (r|0)) : ((b.dmg!=null)? b.dmg : 0), rate=(b.rate!=null)? b.rate : (b.cd>0? 1/b.cd : 0), move=(CAMP_SPD.sarge||40)*gearMoveMul(st), crit=critChance(st), rpm=Math.round(rate*60);
+  const hp=+hitFmt(sgBfHP(b, own? null : (r|0)))  , dmg=(b.w==='pistol')? hitDmgNowAt('sarge', own? ((META.up.sarge||0)|0) : (r|0)) : ((b.dmg!=null)? b.dmg+mstGiftDmg({type:'sarge'},1) : 0)  , rate=(b.rate!=null)? b.rate : (b.cd>0? 1/b.cd : 0), move=(CAMP_SPD.sarge||40)*gearMoveMul(st), crit=critChance(st), rpm=Math.round(rate*60);
   return { w:b.w, r:b.r, hp:hp, dmg:(dmg==null? 0 : dmg), rate:rpm, ps:Math.round(rate*10+1e-9)/10, move:move, crit:crit, multi:0,
     pips:[ usPip(hp, UNIT_SHEET_BANDS.hp), usPip((dmg==null? 0 : dmg), UNIT_SHEET_BANDS.dmg, true), usPip(rpm, UNIT_SHEET_BANDS.rate), usPip(move, UNIT_SHEET_BANDS.move), usPip(crit, UNIT_SHEET_BANDS.crit) ] }; }   
 function sgVals(f){ return rsaVals(f, [ String(f.hp), (f.dmg>0? hitFmt(f.dmg) : '0'), (f.rate>0? t(hitFmt(f.ps)+'/s') : '0'), t(hitFmt(Math.round(f.move/TK_M*10+1e-9)/10)+' m/s'), Math.round(f.crit*100)+'%' ], 1); }
