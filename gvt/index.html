@@ -56948,7 +56948,7 @@ const CAMP_PROPS={
 
 
 
-function campStageName(){ const g=S.cfg&&S.cfg.terrain&&S.cfg.terrain.ground;
+function campStageName(){ const g=S.cfg&&S.cfg.terrain&&S.cfg.terrain.ground; const cm9=(typeof cmxName==='function')? cmxName() : null; if(cm9) return cm9;   
   return g==='snow'?'THE WINTER FIELD' : g==='sand'?'WESTERN LAND'
        : g==='grass'?'THE BACKYARD' : g==='roof'?'THE ROOFTOP'
        : (S.gk>1)?'OPEN FIELD' : null; }
@@ -80596,6 +80596,7 @@ function campGrandArm(){
       if(D.train.preset==='ring'){ t.cring=campRing(); t.cring.kill=(D.train.kill!==false); }
       else t.ctrain=Object.assign({},D.train);
     }
+    if(D.make) D.make(t);   
   }
   
   
@@ -80606,8 +80607,9 @@ function campGrandArm(){
   
   
   
-  for(const j of (t.jax||[]))
+  for(const j of (t.jax||[])){
     S.mines.push({ owner:null, side:'jax', seat:null, x:j.x, y:j.y, armT:0, big:!!j.big, sl:false, jx:true });
+    if(j.lm) S.mines[S.mines.length-1].lm=1; }   
   
   
   
@@ -82739,7 +82741,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='21.03';        
+let GVT_CV='21.04';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -94510,12 +94512,15 @@ function hvilHome(G,gx,gy){
 }
 function hvilOff(u){ if(u.hvilO==null){ const h=((((u.id|0)+7)*2654435761)>>>0)%1000; u.hvilO=(h/1000-0.5)*2*HVIL.off; } return u.hvilO; }   
 function hvilAim(u,goal,gx,gy,dt){   
-  const G=S.cfg.terrain.streets, eb=S.bf.base[enemySide(u)]; if(!G || !HVIL.guide || !eb || (goal!==u.wp && goal!==eb)) return null;
+  const G=S.cfg.terrain.streets, eb=S.bf? S.bf.base[enemySide(u)] : S.tanBase; if(!G || !HVIL.guide || !eb || (goal!==u.wp && goal!==eb)) return null;   
+  return hvilPlan(u,G,eb.x,eb.y,dt);
+}
+function hvilPlan(u,G,ex,ey,dt){   
   u.hvilT=(u.hvilT||0)-(dt||0);
   if(u.hvilT>0 && u.hvilA!==undefined && (u.hvilA===null || Math.hypot(u.hvilA.x-u.x,u.hvilA.y-u.y)>HVIL.arrive)) return u.hvilA;   
   u.hvilT=HVIL.replan; HVIL.stats.plans++;
-  if(hvilClear(G,u.x,u.y,eb.x,eb.y)){ HVIL.stats.free++; return (u.hvilA=null); }   
-  const D=hvilHome(G,eb.x,eb.y); let best=null, bc=Infinity, bd=-1;
+  if(hvilClear(G,u.x,u.y,ex,ey)){ HVIL.stats.free++; return (u.hvilA=null); }   
+  const D=hvilHome(G,ex,ey); let best=null, bc=Infinity, bd=-1;
   for(let i=0;i<G.nodes.length;i++){ const n=G.nodes[i], h=D[i]; if(h===Infinity) continue;
     const d=Math.hypot(n.x-u.x,n.y-u.y), c=d+h;
     if(!(c<bc-0.5 || (c<=bc+0.5 && d>bd))) continue;   
@@ -94653,6 +94658,57 @@ function pbm5Rows(){
 }
 CAMP_EDITS.levels[PBM5.rung]={ terrain:{ river:{ x:859, w:60, bridgeY:PBM5.gates[0], bridgeY2:PBM5.gates[1], bw:80 }, rocks:[] } };   
 CAMP_DRESS[PBM5.rung]={ rocks:pbm5Rows(), props:[{ x:PBM5.siege, y:300, art:'pblook', r:40, side:'g', siege:1 }] };   
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const CMX={ l6:{ x:502, w:56, bridgeY:278, bw:76 }, cross:{ x:598, w:56, bridgeY:172, bridgeY2:428, bw:78 }, crossRocks:[[213,150],[213,452],[1027,150],[1027,452]], crossR:30, l9:{ x:473, w:56, bw:76 }, l9Y:0,
+  mines:[[430,250],[430,350],[810,250],[810,350]], name:{ 5:'THE HILL VILLAGE', 8:'THE CROSSING', 10:'GNOME PARK' }, stats:{ foe:0 } };   
+CMX.l9Y=(function(){ const cx9=CMX.l9.x+CMX.l9.w/2; for(let i=1;i<PATH_PTS.length;i++){ const a=PATH_PTS[i-1], b=PATH_PTS[i]; if((a.x-cx9)*(b.x-cx9)<=0 && a.x!==b.x) return Math.round(a.y+(b.y-a.y)*(cx9-a.x)/(b.x-a.x)); } return 400; })();   
+function cmxVillage(t){   
+  WORLD_W=W; MID=W/2;
+  t.rocks=t.rocks.concat(hvilRocks()); t.streets=hvilGraph(t.rocks); t.cmx=1;
+}
+function cmxGnome(t){ t.night=1; t.moon=1; }   
+function cmxRung(){ return (!S.bf && !S.park && !S.raid && !S.momRaid && S.cfg && (S.levelN|0)>0 && (S.cfg.n|0)===(S.levelN|0))? campBaseRung(S.levelN|0) : 0; }   
+function cmxName(){ return CMX.name[cmxRung()] || null; }   
+function cmxNoRun(){ return !!(!S.bf && S.cfg && S.cfg.terrain && S.cfg.terrain.cmx); }   
+function cmxFoeAim(f,dt){ const G=S.cfg.terrain.streets; if(!G || !HVIL.guide || S.bf) return null; CMX.stats.foe++; return hvilPlan(f,G,T.x,T.y,dt); }   
+function cmxMineDraw(mn){   
+  const x=mn.x, y=mn.y;
+  cx.fillStyle='rgba(0,0,0,0.32)'; cx.beginPath(); cx.ellipse(x+2,y+6,16,5.5,0,0,7); cx.fill();
+  cx.fillStyle='#3F4235'; cx.beginPath(); cx.ellipse(x,y,15,10,0,0,7); cx.fill();
+  cx.strokeStyle='#E4E8D2'; cx.lineWidth=2.4; cx.beginPath(); cx.ellipse(x,y,15,10,0,0,7); cx.stroke();
+  cx.fillStyle='#727860'; cx.beginPath(); cx.ellipse(x,y-2,8,5,0,0,7); cx.fill();
+  cx.strokeStyle='#23251D'; cx.lineWidth=1.4; cx.beginPath(); cx.ellipse(x,y-2,8,5,0,0,7); cx.stroke();
+  const p9=reducedMotion()? 0.5 : 0.5+0.5*Math.sin(S.t*5+x*0.07);   
+  cx.fillStyle='rgba(226,54,79,'+(0.18+0.3*p9).toFixed(3)+')'; cx.beginPath(); cx.arc(x,y-3,6,0,7); cx.fill();
+  cx.fillStyle='#FF4A5E'; cx.beginPath(); cx.arc(x,y-3,3,0,7); cx.fill();
+}
+CAMP_GRAND[5]=2; CAMP_STAGES[5]='grass';
+CAMP_EDITS.levels[5]={ terrain:{ river:null, rocks:[] } };
+CAMP_DRESS[5]={ make:cmxVillage };
+CAMP_EDITS.levels[6]={ terrain:{ river:CMX.l6, rocks:[] } };
+CAMP_STAGES[7]='snow';
+CAMP_STAGES[8]='grass';
+CAMP_EDITS.levels[8]={ terrain:{ river:CMX.cross, rocks:CMX.crossRocks.map(q=>({ x:q[0], y:q[1], r:CMX.crossR })) } };
+CAMP_DRESS[8]={ duck:1 };
+CAMP_EDITS.levels[9]={ terrain:{ river:{ x:CMX.l9.x, w:CMX.l9.w, bridgeY:CMX.l9Y, bw:CMX.l9.bw } } };
+CAMP_STAGES[10]='grass';
+CAMP_DRESS[10]={ jax:CMX.mines.map(q=>({ x:q[0], y:q[1], lm:1 })), make:cmxGnome };
+function cmxRig(o){ o=o||{}; const t=S.cfg&&S.cfg.terrain;
+  return { rung:cmxRung(), name:cmxName(), l9Y:CMX.l9Y, foe:CMX.stats.foe, hv:Object.assign({}, HVIL.stats), cmx:!!(t&&t.cmx), streets:!!(t&&t.streets), mines:S.mines.filter(m=>m.lm).map(m=>[m.x,m.y]), ground:t&&t.ground, night:t&&t.night, moon:t&&t.moon,
+    W:W, WH:WORLD_H, WW:WORLD_W, river:t&&t.river, duck:!!(t&&t.riverDuck), rocks:t? t.rocks.length : 0 }; }
 
 
 
@@ -95978,7 +96034,7 @@ function bfMarch(u,dt,goal){
   }
   else if(false && !S.bf && skyOn() && !(u.jetT>0) && S.cfg.terrain.pits && S.cfg.terrain.pits.length){ const d9=aiPitGoal(u.x,u.y,gx,gy,null); if(d9){ gx=d9.x; gy=d9.y; }   
   }
-  if(S.bf && S.cfg.terrain.streets && u.side && !(u.jetT>0)){ const g3=hvilAim(u,goal,gx,gy,dt); if(g3){ gx=g3.x; gy=g3.y; } }   
+  if(S.cfg.terrain.streets && (S.bf? u.side : S.cfg.terrain.cmx) && !(u.jetT>0)){ const g3=hvilAim(u,goal,gx,gy,dt);     if(g3){ gx=g3.x; gy=g3.y; } }   
   
   
   const dx=gx-u.x, dy=gy-u.y, d=Math.hypot(dx,dy)||1, sp=(u.def.moveSpd||36)*(u.gait||1)*bfGround(u)*emgMoveMul(u)*inspMoveMul(u)*inspCsMoveMul(u)*gearMoveMul(u)*fzWalk(u)*gnToadWalk(u)*petChillX(u)*petPoisonX(u);   
@@ -113278,6 +113334,7 @@ function update(dt){
       if(S.cfg.terrain.gaps && !f.boss && !f.def.swoop){
         const d6=aiGapGoal(f.x,f.y,g6.x,g6.y); if(d6) g6=d6;
       }
+      if(g6===T && S.cfg.terrain.cmx && !f.boss && !f.def.swoop){ const d7=cmxFoeAim(f,dt); if(d7) g6=d7; }   
       const d=Math.hypot(g6.x-f.x, g6.y-f.y);
       if(d>1){ const sp=f.def.spd*aura*(f.def.rush? teddyRushX(f) : 1)*teddyGunRoll(f)*clawPaceX(f)  , st=rockSteer(f.x,f.y,g6.x,g6.y,f.squeeze?3:ROCK_PAD_FOE,null,1);   
         f.x+=(st?st.x:(g6.x-f.x)/d)*sp*amv; f.y+=(st?st.y:(g6.y-f.y)/d)*sp*amv; }   
@@ -119172,6 +119229,7 @@ function drawCactus(rk){
 
 
 function drawJack(mn){
+  if(mn.lm){ cmxMineDraw(mn); return; }   
   const x=mn.x, y=mn.y;
   cx.fillStyle='rgba(0,0,0,0.22)'; cx.beginPath(); cx.ellipse(x+2,y+5,13,4.5,0,0,7); cx.fill();
   cx.lineCap='round';
@@ -119565,7 +119623,7 @@ for(let i=0;i<=CPS.n;i++) CPS_PTS.push({ x:CPS.x0+(CPS.x1-CPS.x0)*i/CPS.n, y:CPS
 CAMP_DRESS[CPS.rung]={ rocks:[226,374].flatMap(y=>[0,1,2,3,4,5,6,7,8,9].map(i=>i*26+503).map(x=>({ x, y, r:16, art:'bags', row:y<CPS.y? 'n' : 's' }))) };
 function cpsOn(){ return !!(!S.bf && !S.park && !S.raid && !S.momRaid && S.cfg && (S.levelN|0)>0 && (S.cfg.n|0)===(S.levelN|0) && campBaseRung(S.levelN|0)===CPS.rung); }   
 function cpsPath(){ return cpsOn()? CPS_PTS : PATH_PTS; }
-function pathStroke(){ const k=S.gk||1, P=cpsPath(); cx.beginPath(); cx.moveTo(P[0].x*k,P[0].y); for(let i=1;i<P.length;i+=3) cx.lineTo(P[i].x*k,P[i].y); cx.stroke(); }   
+function pathStroke(){ if(cmxNoRun()) return; const k=S.gk||1, P=cpsPath();     cx.beginPath(); cx.moveTo(P[0].x*k,P[0].y); for(let i=1;i<P.length;i+=3) cx.lineTo(P[i].x*k,P[i].y); cx.stroke(); }   
 
 
 function drawBase(side){
@@ -176632,7 +176690,8 @@ window.GVT = {
   huv(o){ return huvRig(o); },   
   rpd(o){ return rpdRig(o); },
   ypv(o){ return ypvRig(o); },
-  dpv(o){ return dpvRig(o); },   
+  dpv(o){ return dpvRig(o); },
+  cmx(o){ return cmxRig(o); },   
   
   ult(){ const js=jetSarge(), u9=ultMyU();
     return { on:ultOn(), wk:ultWk(), lvl:WPN_MILE.ultLvl, rank:ultRank(ultWk()), live:Object.keys(ULT_LIVE),
