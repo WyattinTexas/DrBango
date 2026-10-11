@@ -79670,6 +79670,7 @@ function cqPickEdge(u,fromId){ const edges=S.cfg.terrain.cq.E[fromId]||[];
   const hungry = !!(S.bf && S.bf.cqHolder!==u.side);
   const wt = e => e[1] + (hungry? (e[2]||0) : 0);
   let tot=0; for(const e of edges) tot+=wt(e);
+  { const e9=dfmDoor(u,fromId,edges,wt); if(e9) return e9; }   
   
   
   const h=(((u.id*2654435761)>>>0) ^ ((fromId.charCodeAt(0)*2246822519 + fromId.length*97)>>>0))>>>0;
@@ -80529,7 +80530,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='20.35';        
+let GVT_CV='20.36';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -94003,6 +94004,45 @@ function zigRoll(u){
   for(let i=0;i<5;i++){ s=(s+0x6D2B79F5)>>>0; let z=Math.imul(s^(s>>>15), 1|s); z=(z+Math.imul(z^(z>>>7), 61|z))^z; out.push(((z^(z>>>14))>>>0)/4294967296); }
   return out;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const DFM={ on:1, ring:44, turn:70, near:80, wob:10, cap:226, bank:30, tie:1 };
+const DFM_MEN={ rifleman:1, mgunner:1, bazooka:1, mortar:1, grenadier:1, minesweeper:1, flame:1, radioman:1, medic:1, commando:1, spy:1, sarge:1 };   
+function dfmWho(u){ return !!(DFM.on && u && u.laneY!=null && DFM_MEN[u.type] && !(u.def && u.def.vehicle)); }
+function dfmStamp(u){ if(u.fmLY!==u.laneY){ u.fmLY=u.laneY; u.fmX0=u.x; } }   
+function dfmWob(u){ const h=((u.zigS!=null)? u.zigS : u.id)>>>0; return ((h*37)%21-10)/10*DFM.wob; }
+function dfmPast(u,dir){ dfmStamp(u);
+  for(const rv of (S.cfg.terrain.rivers||[])){ const far=(dir>0)? rv.x+rv.w+DFM.bank : rv.x-DFM.bank, near=(dir>0)? rv.x : rv.x+rv.w;
+    if((u.fmX0-near)*dir<0 && (u.x-far)*dir<0) return false; }
+  return true; }
+function dfmZigY(u,y,dir){ return (dfmWho(u) && dfmPast(u,dir))? Math.max(84,Math.min(WORLD_H-104,u.laneY+dfmWob(u))) : y; }   
+function dfmY(u,b){ return b.y+Math.max(-DFM.cap,Math.min(DFM.cap,u.laneY-b.y)); }
+function dfmGoal(u,b,dir,fb){ if(!b || !dfmWho(u)) return fb; dfmStamp(u);   
+  if(Math.abs(b.x-u.x)>DFM.near) return { x:b.x-dir*DFM.turn, y:dfmY(u,b) };
+  const k=Math.max(-1,Math.min(1,(u.laneY-104)/(WORLD_H-230)*2-1)), th=k*1.25;   
+  return { x:b.x-dir*Math.cos(th)*DFM.ring, y:b.y+Math.sin(th)*DFM.ring }; }
+function dfmDoor(u,fromId,edges,wt){ if(!dfmWho(u)) return null;   
+  let best=1e9, tie=[];
+  for(const e of edges){ if(!(wt(e)>0)) continue; const d=Math.abs(cqNodePos(u,e[0]).y-u.laneY);
+    if(d<best-DFM.tie){ best=d; tie=[e]; } else if(d<=best+DFM.tie) tie.push(e); }
+  if(tie.length<2) return tie.length? tie[0][0] : null;
+  let tot=0; for(const e of tie) tot+=wt(e);
+  const h=(((u.id*2654435761)>>>0) ^ ((fromId.charCodeAt(0)*2246822519 + fromId.length*97)>>>0))>>>0;   
+  let r=h%tot; for(const e of tie){ r-=wt(e); if(r<0) return e[0]; }
+  return tie[0][0]; }
+
 function bfUnitStep(u,dt){
   if(u.dead) return false;
   if(u.side==='nem') return false;   
@@ -94084,7 +94124,7 @@ function bfUnitStep(u,dt){
     
     
     if(u.pauseT>0){ u.pauseT-=dt; return false; }        
-    if(Math.abs(b.x-u.x)<280){ u.wp=null; bfMarch(u,dt,b); }
+    if(Math.abs(b.x-u.x)<280){ u.wp=null; bfMarch(u,dt,dfmGoal(u,b,(u.side==='you')?1:-1,b)); }   
     else {
       u.wpT=(u.wpT||0)-dt;
       if(!u.wp || u.wpT<=0 || (Math.abs(u.wp.x-u.x)<14 && Math.abs(u.wp.y-u.y)<14)){
@@ -94092,6 +94132,7 @@ function bfUnitStep(u,dt){
         const zr=(S.coop && S.bf)? zigRoll(u) : null, R9=k=>(zr? zr[k] : Math.random());   
         u.wp={ x:u.x+dir*(90+R9(0)*110),
                y:Math.max(84,Math.min(WORLD_H-104,(lane+(R9(1)-0.5)*100)*0.6+u.y*0.4)) };
+        u.wp.y=dfmZigY(u,u.wp.y,dir);   
         u.wpT=1.0+R9(2)*1.3;
         if(R9(3)<0.10) u.pauseT=0.15+R9(4)*0.3;
       }
@@ -94895,13 +94936,14 @@ function campUnitStep(u,dt){
   let goal;
   const lane=(RP? RP.y : NF? NF.y : (u.laneY!=null?u.laneY:u.y));   
   const gx=RP? RP.x : NF? NF.x : (TB? TB.x : ((u.tkGhost&&u.cloakT>0)? W-30 : (HD? HD[0] : HM? CAVE_HOME_X : (JD? W+120 : campFrontX())))), gy=RP? RP.y : NF? NF.y : (TB? TB.y : lane);   
-  if(gx-u.x<200){ u.wp=null; goal={x:gx, y:gy}; }
+  if(gx-u.x<200){ u.wp=null; goal={x:gx, y:gy}; if(TB && !RP && !NF && !TG) goal=dfmGoal(u,TB,1,goal); }   
   else {
     u.wpT=(u.wpT||0)-dt;
     if(!u.wp || u.wpT<=0 || (Math.abs(u.wp.x-u.x)<14 && Math.abs(u.wp.y-u.y)<14)){
       const zr=(RBN_ZIG && rbnParty())? rbnZig(u) : null, R9=k=>(zr? zr[k] : Math.random());   
       u.wp={ x:u.x+90+R9(0)*110,
              y:Math.max(84,Math.min(WORLD_H-104,(lane+(R9(1)-0.5)*100)*0.6+u.y*0.4)) };   
+      if(!RP && !NF && !TG) u.wp.y=dfmZigY(u,u.wp.y,1);   
       u.wpT=1.0+R9(2)*1.3;
       if(R9(3)<0.10) u.pauseT=0.15+R9(4)*0.3;
     }
