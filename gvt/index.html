@@ -82164,7 +82164,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='20.85';        
+let GVT_CV='20.86';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -96035,6 +96035,7 @@ const SGA={ on:1, live:0.2, windT:0.16, snapT:0.05, hitT:0.11, backT:0.26, windX
 function sgaKind(u,d){   
   const t=u.type; if(t==='jane' || t==='aagun' || t==='dogfighter') return null;
   if(hbsOwn(u)) return null;   
+  if(rbaOwn(u)) return null;   
   if(t==='sarge'){ const sw=unitSargeStats(u), w=sw.w; if(w==='lightsaber') return unarmedU(u,sw)? 'ua' : 'sab'; if(w==='commander') return 'cmd'; }
   if((d||0)>LEAK_R+10) return t==='grenadier'? 'thr' : 'gun';   
   return 'jab'; }
@@ -96091,6 +96092,35 @@ function sgaPose(u){ const K=u.sgaK; if(!SGA.on || !K || S.bf) return null;
 function sgaIn(u){ const P=sgaPose(u); if(!P || (!P.dx && !P.lean)) return false; const fs=u.sgaFs||1;   
   cx.save(); cx.translate(u.x+fs*P.dx,u.y); cx.rotate(fs*P.lean); cx.translate(-u.x,-u.y); return true; }
 function sgaRig(){ return { cv:GVT_CV, dials:Object.assign({},SGA), men:S.units.filter(u=>!u.dead && u.sgaT!=null).map(u=>({ id:u.id, t:u.type, k:u.sgaK||null, n:u.sgaN|0, at:(u.sgaAt==null? null : +u.sgaAt.toFixed(3)), live:+(S.t-u.sgaT).toFixed(3), since:+sgaSince(u).toFixed(3), pre:+Math.min(99,sgaPre(u)).toFixed(3), fs:u.sgaFs||0, pose:sgaPose(u) })) }; }   
+
+
+
+
+
+
+
+
+const RBA={ on:1, rexT:0.65, ckN:4, ckFan:0.06, ckStag:0.05 };   
+function rbaOwn(u){ return !!(RBA.on && u && !S.bf && (u.type==='kingrex' || u.type==='kingyeti' || u.type==='princess' || isCroakU(u))); }   
+function rbaSmash(u,b,tx,ty){ if(!rbaOwn(u)) return false;   
+  const t=u.type;
+  if(t==='kingyeti'){ u.kyThAt=S.t; return false; }
+  if(t==='kingrex'){ bfSfx(SFX.jet, u.x, u.y);
+    u.brFc=(b.x>u.x)? 1 : -1; u.brTo=S.t+RBA.rexT;   
+    const fl=u.brFc, kx=u.x+34*fl, ky=u.y+rexHeroFireY(), rxM=rxFireMul(u);   
+    S.fx.push({k:'breath',x:kx,y:ky,ang:Math.atan2(ty-ky,tx-kx),rng:UDEF.kingrex.rng*rxM,sc:1.2*rxM,sp:0.26*rxM,t:0,dur:RBA.rexT,krg:1});   
+    return true; }
+  if(t==='princess'){ const m=phNext(u), hx=u.x+26*unitFaceX(u), hy=u.y-60;   
+    u.pcPluck=PCH_PLUCK; bfSfx(()=>PCV.shot(m), u.x, u.y); pcpShotFx(hx,hy,tx,ty,false); return true; }
+  if(isCroakU(u)){ const h=u.rbaH=u.rbaH? 0 : 1, hz=croakMz(u.x,u.y,unitW(u.type))[h], ang=Math.atan2(ty-hz.y,tx-hz.x), L=Math.hypot(tx-hz.x,ty-hz.y), N=RBA.ckN;   
+    const lzc=lzVisOf(u), lz=lzc? (lzc==='silver'? LZ_SILVER_ROW : lzc==='slug'? LZ_SLUG_ROW : ARMIES.find(ar=>ar.id===lzc)) : null;   
+    for(let i=0;i<N;i++){ const a=ang+(i-(N-1)/2)*RBA.ckFan, x2=hz.x+Math.cos(a)*L, y2=hz.y+Math.sin(a)*L, st=reducedMotion()? 0 : -i*RBA.ckStag;
+      if(lz && lzc==='slug') S.fx.push({k:'slugtr',x1:hz.x,y1:hz.y,x2,y2,t:st,dur:BRG_DUR});
+      else S.fx.push({k:'bolt',x1:hz.x,y1:hz.y,x2,y2,t:st,dur:BRG_DUR,col:lz? lz.hex : '#FFF3C4'}); }
+    S.fx.push({k:'flash',x:hz.x,y:hz.y,ang,R:reducedMotion()? 8 : 12,lw:2.6,t:0,dur:0.1});
+    u.rcAt=S.t; u.rcH=h; bfSfx(SFX.wshot, hz.x, hz.y); return true; }
+  return false; }
+function rbaRig(){ return { cv:GVT_CV, dials:Object.assign({},RBA), men:S.units.filter(u=>!u.dead && rbaOwn(u)).map(u=>({ id:u.id, t:u.type, x:+u.x.toFixed(1), y:+u.y.toFixed(1), sga:u.sgaK||null, brTo:u.brTo==null? null : +(u.brTo-S.t).toFixed(3), brFc:u.brFc||0, rc:u.rcAt==null? null : +(S.t-u.rcAt).toFixed(3), rcH:u.rcH==null? null : u.rcH, pluck:+(u.pcPluck||0).toFixed(3), th:u.kyThAt==null? null : +(S.t-u.kyThAt).toFixed(3) })) }; }   
 function campSmash(u,dist){
   const b=S.tanBase; if(!b||b.dead) return;
   
@@ -96121,7 +96151,7 @@ function campSmash(u,dist){
   if(u.type==='jane' && !(u.jInT!=null && S.t-u.jInT<JZ_ZIP+JZ_LAND)){ u.jkAt=S.t; u.jkH=u.jkH?0:1; }   
   if(u.type==='mgunner') u.mgRootT=MG_ROOT;   
   const tx=b.x-10+(Math.random()-0.5)*30, ty=b.y-42+(Math.random()-0.5)*26;
-  if(hbsSmash(u,dist,b)){   
+  if(hbsSmash(u,dist,b) || rbaSmash(u,b,tx,ty)){   
   } else if(arm==='lightsaber'){
     S.fx.push({k:'ring',x:tx,y:ty,r:5,R:42,t:0,dur:0.24,col:saberHexU(u)});
     bfSfx(SFX.laser, u.x, u.y);
