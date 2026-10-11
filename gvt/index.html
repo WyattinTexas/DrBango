@@ -61562,7 +61562,7 @@ const L75D={ wait:30, air:15 };
 
 function l75Air(d,dt){ const K=d.l75 || (d.l75={ t:0, sig:null, bursts:[], at:0, asig:null, home:[] }); if(d.fallT==null) return; let n=0, sig=''; for(const f of S.foes){ if(f.dead || !(f.hp>0)) continue; if(!f.l35d) { K.at=0; return; } n++; sig+=Math.round(f.hp*100)+','; } if(!n){ K.at=0; return; }
   if(sig!==K.asig){ K.asig=sig; K.at=0; return; } K.at+=dt; if(K.at<L75D.air) return; K.at=0; for(let i=S.foes.length-1;i>=0;i--){ const f=S.foes[i]; if(!f.l35d || f.dead || !(f.hp>0)) continue; S.fx.push({k:'puff',x:f.x,y:f.y-20,t:0,dur:0.5,R:22,col:'#d8d2c4'}); S.foes.splice(i,1); K.home.push([+S.t.toFixed(2), Math.round(f.x)]); } }   
-function l75Duel(d,dt){ if(!d) return; l75Air(d,dt); if(!d.sat || d.popT!=null || !olvUp(d.car) || !olvUp(d.sarge)) return; const K=d.l75 || (d.l75={ t:0, sig:null, bursts:[], at:0, asig:null, home:[] }), sig=Math.round(d.car.hp*100)+':'+Math.round(d.sarge.hp*100);
+function l75Duel(d,dt){ if(!d) return; l75Air(d,dt); if(d.popT!=null || !olvUp(d.car) || (olvUp(d.sarge) && !d.sat)) return; const K=d.l75 || (d.l75={ t:0, sig:null, bursts:[], at:0, asig:null, home:[] }); let sig=Math.round(d.car.hp*100)+':'+(olvUp(d.sarge)? Math.round(d.sarge.hp*100) : 'x'); for(const g of d.guards) sig+=':'+(olvUp(g)? Math.round(g.hp*100) : 'x');    
   if(sig!==K.sig){ K.sig=sig; K.t=0; return; } K.t+=dt; if(K.t<L75D.wait) return; K.t=0; K.bursts.push([+S.t.toFixed(2), Math.round(d.car.hp), Math.round(d.sarge.hp)]); d.car.hp=0; hitCheck(d.car,null); }   
 function ls10Props(L){ if(L.props) return L.props; const x=W+LS10.wreckX, y=foeBandY(LS10.wreckY), P={ wreck:{ x:x, y:y, w:Math.round(FDEF.cmdtank.w*LS10.wreckW) }, lar:{ x:x+LS10.larDx, y:foeBandY(y+LS10.larDy), on:1, offT:null, shot:{ st:'walk', cd:LS10.first, tgt:null, tx:0, ty:0, t:0 } }, tans:LS10.tanDx.map((dx,i)=>({ x:x+dx, y:foeBandY(y+LS10.tanDy[i]), cd:0.4+i*0.35 })) }; L.props=P; olvTanImg('larson'); olvTanImg('tanrifle'); olvTanImg('cmdtank'); olvB10Log(L,['props', +S.t.toFixed(2), Math.round(x), Math.round(y)]); return P; }
 function ls10Red(o){ return !!(o && o.def && !o.dead && o.hp>0 && !o.retreat && !o.tease && !o.gjAir && !o.burrow && !o.falling && S.foes.indexOf(o)>=0 && o.x<W-10 && o.x>-20); }   
@@ -81618,7 +81618,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='20.72';        
+let GVT_CV='20.73';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
