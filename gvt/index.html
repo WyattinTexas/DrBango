@@ -61512,7 +61512,7 @@ const LS10={ wreckX:-250, wreckY:300, wreckW:0.9, larDx:66, larDy:4, tanDx:[96,1
 const LN10={ rng:300, rate:0.3, dmg:3, grit:4, w:60 };   
 const LS10_SAY={ bark:"THEY'RE ALREADY BEHIND YOU.", nb:'Not bad, Sergeant.', hatch:"THE SUIT RUNS ON MY BATTERY. OPEN THE HATCH. I'LL TAKE THE SHOT." };   
 const SC10={ rise:1.0, nbHold:3.5, beat:1.0, hatchHold:8.5, tagDx:-18, tagDy:-92, end:2.0, read:17 };   
-function olvLoanDef(){ if(!UDEF.larsonloan) UDEF.larsonloan={ rng:LN10.rng, rate:LN10.rate, dmg:LN10.dmg, air:true, grit:LN10.grit, name:'LARSON', loan10:1 }; return UDEF.larsonloan; }   
+function olvLoanDef(){ if(!UDEF.larsonloan) UDEF.larsonloan={ rng:LN10.rng, rate:LN10.rate, dmg:LN10.dmg, air:true, grit:LN10.grit, name:'LARSON', loan10:1 }; return l75Def(UDEF.larsonloan); }       
 CAMP_GOAL_NOBOX[OLV_B10N.stand]='DEFEAT THEIR SARGE';   
 try{ NX_ART.laststand=NX_ART.glint; }catch(e){}   
 function olvLoanOn(){ const c=S.cfg; if(!(c && !S.bf && c.olv10==='stand' && S.mode==='play')) return false; olvLoanDef(); return true; }   
@@ -61521,6 +61521,39 @@ try{ Object.defineProperty(COSTS,'larsonloan',{ get(){ return olvLoanSpent()? 1e
 function olvLoanCard(t){ return t==='larsonloan' && olvLoanOn(); }   
 function olvLoanImg(){ return olvTanImg('larson'); }   
 function olvLoanU(){ for(const u of S.units){ if(u.type==='larsonloan' && !u.dead) return u; } return null; }
+
+
+
+
+
+
+
+
+
+
+
+const L75={ gritX:2, rateX:2, esFirst:6, esEvery:16, esRng:560, esLead:0.6, empty:4, orphan:1.5, lost:20 };   
+function l75L(L){ return L.l75 || (L.l75={ es:[], esN:0, calls:[], orphans:0, lost:0, face:0 }); }   
+function l75Def(d){ if(!d.l75){ d.l75=1; d.grit=LN10.grit*L75.gritX; d.rate=LN10.rate*L75.rateX; } try{ if(typeof UNIT_WEST==='object' && !UNIT_WEST.larsonloan) UNIT_WEST.larsonloan=1; }catch(e){} return d; }   
+function l75Face(u,x){ if(x==null || !u) return; u.faceX=(x>=u.x)? 1 : -1; u.faceAt=S.t; u.faceTo=S.t+0.6; }   
+function l75Es(L,u,dt){ const K=l75L(L), A=u.ln10 && u.ln10.shot; let E=u.l75; if(!E) E=u.l75={ st:'walk', cd:L75.esFirst, tgt:null, hold:null };
+  if(L.scene){ if(E.st==='plant'){ u.laT=0; E.st='walk'; } E.cd=Math.max(E.cd,1); return; }   
+  if(E.st==='walk'){ E.cd-=dt; if(E.cd>0 || (A && A.st!=='walk') || (A && A.cd<LA_PLANT+L75.esLead) || u.laT>0 || u.jetT>0 || u.dropT>0 || u.falling || (S.drag && S.drag.unit===u)) return;   
+    const o=ls10Mark(u.x,u.y,L75.esRng); if(!o){ E.cd=1; return; }   
+    E.st='plant'; E.tgt=o; E.hold={ x:u.x, y:u.y }; u.laT=LA_PLANT; u.laN=(u.laN|0)+1; laFace(u,(o.x>=u.x)? 1 : -1); u.estTg=null; u.estPt=[o.x, o.y-EST_DY];   
+    try{ bfSfx(SFX.harpRise,u.x,u.y); }catch(e){} S.fx.push({k:'ring',x:u.x,y:u.y-24,r:6,R:40,t:0,dur:0.32,col:'#FFD36B'}); S.fx.push({k:'lagather',u,pr:0,t:0,dur:LA_PLANT,col:null}); S.floats.push({x:u.x,y:u.y-76,txt:'ENERGY SHOT!',t:0,col:'#FFD36B'});
+    K.es.push([+S.t.toFixed(2), 'plant', o.type, Math.round(o.x), Math.round(o.y)]); if(K.es.length>40) K.es.shift(); return; }
+  if(E.st==='plant'){ const o=E.tgt; if(ls10Red(o)){ u.estTg=null; u.estPt=[o.x, o.y-EST_DY]; laFace(u,(o.x>=u.x)? 1 : -1); }   
+    if(E.hold){ u.x=E.hold.x; u.y=E.hold.y; } u.marching=false; u.cd=Math.max(u.cd||0,0.2); if(A && A.st==='walk') A.cd=Math.max(A.cd,(u.laT||0)+L75.esLead);   
+    if(u.laT>0) return; E.st='walk'; E.cd=L75.esEvery; E.tgt=null; E.hold=null; K.esN++; K.es.push([+S.t.toFixed(2), 'bolts', o? o.type : null]); if(K.es.length>40) K.es.shift(); } }
+function l75Rug(L,dt){ const K=l75L(L), sq=S.sq; if(!sq || S.mode!=='play') return;
+  { const el=document.getElementById('comms'); if(COMM.brief && !(el && /\bbrief\b/.test(el.className) && el.firstChild)){ K.orT=(K.orT||0)+dt; if(K.orT>=L75.orphan){ K.orT=0; K.orphans++; olvB10Log(L,['l75 orphan brief', +S.t.toFixed(2), COMM.brief.kind||null]); commClear(); } } else K.orT=0; }   
+  if(L.hold && !L.scene && L.sargeOn!=null && L.sargeFell==null && !(L.sarge && !L.sarge.dead && S.foes.indexOf(L.sarge)>=0)){ K.loT=(K.loT||0)+dt; if(K.loT>=L75.lost){ K.loT=0; K.lost++; olvB10Log(L,['l75 lost sentinel', +S.t.toFixed(2)]); olvHold10(L,0); } } else K.loT=0;   
+  if(!sqRef() || COMM.brief || !(S.wave>=1) || S.wave>=S.cfg.waves.length || sq.nextT-sq.t<=L75.empty) return;   
+  for(const o of S.foes){ if(o && !o.dead && o.hp>0 && !o.tease) return; } for(const q of S.queue){ if(!q.hold10 && !q.ls10trk) return; }
+  sq.nextT=sq.t+L75.empty; K.calls.push([+S.t.toFixed(2), S.wave|0]); if(K.calls.length>20) K.calls.shift(); olvB10Log(L,['l75 empty rug', +S.t.toFixed(2), S.wave|0]); }
+function l75Pass(L,dt){ l75Rug(L,dt); const u=olvLoanU(); if(!u || !u.ln10) return; l75Def(u.def); const A=u.ln10.shot; if(A && A.st==='tell' && A.tgt) l75Face(u,A.tx);   
+  l75Es(L,u,dt); }
 function ls10Props(L){ if(L.props) return L.props; const x=W+LS10.wreckX, y=foeBandY(LS10.wreckY), P={ wreck:{ x:x, y:y, w:Math.round(FDEF.cmdtank.w*LS10.wreckW) }, lar:{ x:x+LS10.larDx, y:foeBandY(y+LS10.larDy), on:1, offT:null, shot:{ st:'walk', cd:LS10.first, tgt:null, tx:0, ty:0, t:0 } }, tans:LS10.tanDx.map((dx,i)=>({ x:x+dx, y:foeBandY(y+LS10.tanDy[i]), cd:0.4+i*0.35 })) }; L.props=P; olvTanImg('larson'); olvTanImg('tanrifle'); olvTanImg('cmdtank'); olvB10Log(L,['props', +S.t.toFixed(2), Math.round(x), Math.round(y)]); return P; }
 function ls10Red(o){ return !!(o && o.def && !o.dead && o.hp>0 && !o.retreat && !o.tease && !o.gjAir && !o.burrow && !o.falling && S.foes.indexOf(o)>=0 && o.x<W-10 && o.x>-20); }   
 function ls10Mark(sx,sy,R){ let b=null, bs=1e9; for(const o of S.foes){ if(!ls10Red(o)) continue; const d=Math.hypot(o.x-sx,o.y-sy); if(d>R) continue; const sc=(o.type==='tansarge'? 0 : o.boss? 1 : 2)*1e5+d; if(sc<bs){ bs=sc; b=o; } } return b; }   
@@ -61530,7 +61563,7 @@ function olvShot10(L,A,sx,sy,dt,who,src){ if(A.st==='walk'){ A.cd-=dt; if(A.cd>0
   if(hit){ if(o.type==='tansarge'){ how='sarge'; o.hp=0; hitCheck(o,(src && !src.dead && S.units.indexOf(src)>=0)? src : null); } else { how='hit'; hurt(o,LS10.pips,(src && !src.dead && S.units.indexOf(src)>=0)? src : null); } }   
   else S.fx.push({k:'puff',x:A.tx,y:A.ty+24,t:0,dur:0.35,R:12});
   S.floats.push({x:sx,y:sy-96,txt:t('OVERCHARGED!'),t:0,col:'#FF6A4A'}); L.shots.push([+S.t.toFixed(2), who, how, o? o.type : null, +far.toFixed(1)]); if(L.shots.length>40) L.shots.shift(); olvB10Log(L,['shot', +S.t.toFixed(2), who, how]); A.st='walk'; A.cd=LS10.every; A.tgt=null; }
-function olvLoanPass(L,dt){ const u=olvLoanU(); if(u && !u.ln10){ u.ln10={ t0:S.t, shot:{ st:'walk', cd:LS10.first, tgt:null, tx:0, ty:0, t:0 } }; u.floopIm=olvLoanImg(); L.loan.placed++; L.loan.placedT=+S.t.toFixed(2); L.loan.id=u.id; olvB10Log(L,['loan', L.loan.placedT, Math.round(u.x), Math.round(u.y)]);   
+function olvLoanPass(L,dt){ l75Pass(L,dt);     const u=olvLoanU(); if(u && !u.ln10){ u.ln10={ t0:S.t, shot:{ st:'walk', cd:LS10.first, tgt:null, tx:0, ty:0, t:0 } }; u.floopIm=olvLoanImg(); L.loan.placed++; L.loan.placedT=+S.t.toFixed(2); L.loan.id=u.id; olvB10Log(L,['loan', L.loan.placedT, Math.round(u.x), Math.round(u.y)]);   
     const P=ls10Props(L); if(P.lar.on){ P.lar.on=0; P.lar.offT=S.t; }   
     let n=0, far=0, R0=0; for(const q of S.units){ if(q.dead || q===u || q.falling || (q.dropT>0)) continue; n++; const d=Math.abs(q.x-u.x); R0=Math.max(R0,d); if(d>LS10.fbR) far++; } L.loan.fb={ t0:S.t, until:S.t+LS10.fbDur, n:n, far:far, R0:Math.round(R0) }; S.floats.push({x:u.x,y:u.y-110,txt:'FALL IN!',t:0,col:'#FFD34D'}); try{ SFX.whistle(); }catch(e){} }   
   if(u && L.loan.fb && !L.loan.fbDone){ if(S.t<L.loan.fb.until){ for(const q of S.units){ if(q.dead || q===u || q.falling || (q.dropT>0) || (q.jetT>0) || (S.drag && S.drag.unit===q) || q.type==='aagun') continue; const dx=u.x-q.x, d=Math.abs(dx); if(d<=LS10.fbR) continue; q.x+=Math.sign(dx)*Math.min(d-LS10.fbR,LS10.fbV*dt); } }   
@@ -81575,7 +81608,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='20.66';        
+let GVT_CV='20.67';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
