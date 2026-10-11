@@ -81363,7 +81363,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='20.54';        
+let GVT_CV='20.55';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -133625,6 +133625,23 @@ function patrolSVG(){
 
 
 
+let PT_SYNC=0;
+function patrolLift(){ if(roomCur()!=='bedroom') return; const top=dogTopEl(), d=document.querySelectorAll('#roomStage > svg:not(.dogtop) .patrol > .ptdrop'); if(!top || !d.length) return;
+  const g=document.createElementNS('http://www.w3.org/2000/svg','g'); g.setAttribute('class','patrol ptup'); d.forEach(n=>g.appendChild(n)); top.insertBefore(g, top.firstChild);
+  if(!PT_SYNC){ PT_SYNC=1; document.addEventListener('animationstart', patrolSync, { passive:true }); } }
+function patrolSync(e){ if(!e || e.animationName!=='ptwalk' || !e.target || !e.target.closest) return; const w=e.target, i=[...document.querySelectorAll('#roomStage > svg:not(.dogtop) .ptwalkers > .ptfig')].indexOf(w), d=document.querySelectorAll('#dogTop > .ptup > .ptdrop')[i]; if(i<0 || !d) return;
+  try{ const a=w.getAnimations().find(q=>q.animationName==='ptwalk'), ct=a? +a.currentTime : NaN; if(!isFinite(ct)) return; const held=MFP.A.has(a), T=MFP.tm.get(a);
+    for(const b of d.getAnimations({ subtree:true })){ if(held){ b.pause(); b.currentTime=ct; MFP.A.add(b); if(T) MFP.tm.set(b, T); } else { b.currentTime=ct; if(MFP.A.has(b)){ MFP.A.delete(b); b.play(); } } } }catch(err){} }   
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -146304,6 +146321,7 @@ function renderMenu(){
     
     + '<div class="roomcr" data-notr>© 2026 Corkscrew Games</div>'
     + '</div>';
+  patrolLift();   
   roomWingsPaint();   
   
   
