@@ -45936,7 +45936,8 @@ function crossDuck(t){
 
 
 
-function duckBlock(x1,y1,x2,y2){
+function duckBlock(x1,y1,x2,y2){ return pbmDuckCover(x1,y1,x2,y2, duckBlockDuck(x1,y1,x2,y2)); }   
+function duckBlockDuck(x1,y1,x2,y2){   
   const d=S.bf? S.bf.duck : S.cduck; if(!d) return null;   
 
   const ex=d.x, ey=d.y-12, dx=x2-x1, dy=y2-y1, fx=x1-ex, fy=y1-ey;
@@ -45953,6 +45954,7 @@ function duckBlock(x1,y1,x2,y2){
 
 
 function duckBlockFx(p){
+  if(p.pbCover){ pbmDuckFx(p); return; }   
   const st=S.bf||S;   
   S.fx.push({k:'puff',x:p.x,y:p.y+4,t:0,dur:0.3,R:9});
   if(S.t-(st.duckFxT||-9)<0.09) return;
@@ -78035,7 +78037,7 @@ function campGrandArm(){
   const D=CAMP_DRESS[campBaseRung(S.levelN)];   
   if(D){
     if(D.rocks)  t.rocks=t.rocks.concat(D.rocks.map(r=>Object.assign({},r)));
-    if(D.trench) t.trench={ w:D.trench.w, pts:D.trench.pts };
+    if(D.trench){ t.trench={ w:D.trench.w, pts:D.trench.pts }; if(D.trench.multi) t.trench.multi=D.trench.multi; if(D.trench.crawl) t.trench.crawl=1; }   
     if(D.balls)  t.balls=D.balls.map(b=>Object.assign({},b,{y:b.y0,dir:1,roll:0}));
     if(D.props)  t.props=(t.props||[]).concat(D.props.map(p=>Object.assign({},p)));
     
@@ -80200,7 +80202,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='20.20';        
+let GVT_CV='20.21';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -91540,6 +91542,69 @@ function PRIO(u,f){ return S.bf ? Math.hypot(u.x-f.x,u.y-f.y) : Math.hypot(T.x-f
 
 
 
+const PBM={ hug:34, crawl:0.55, foot:0.94, feet:18, look:34, dirty:0, stats:{ blocked:0, eaten:0, tower:0, crawl:0 } };   
+const PBM_ART=Object.create(null);    
+const PBM_PROP=Object.assign(Object.create(null), { pblook:pbmDrawLookout });   
+function pbmSegCircle(x1,y1,x2,y2,ex,ey,r){   
+  const dx=x2-x1, dy=y2-y1, fx=x1-ex, fy=y1-ey, a=dx*dx+dy*dy; if(a<1e-9) return null;
+  const c=fx*fx+fy*fy-r*r; if(c<0) return null;
+  const b=2*(fx*dx+fy*dy); let q=b*b-4*a*c; if(q<0) return null;
+  q=Math.sqrt(q); const t=(-b-q)/(2*a); if(t<0||t>1) return null;
+  return { x:x1+dx*t, y:y1+dy*t, t:t };
+}
+let pbmCovT=null, pbmCovN=-1, pbmCovL=[];   
+function pbmCovers(){ const T=S.cfg && S.cfg.terrain; if(!T || !T.rocks){ pbmCovL=[]; return pbmCovL; } if(T!==pbmCovT || T.rocks.length!==pbmCovN || PBM.dirty){ pbmCovT=T; pbmCovN=T.rocks.length; pbmCovL=T.rocks.filter(rk=>rk.cov); pbmTwT=null; PBM.dirty=0; } return pbmCovL; }
+let pbmTwT=null, pbmTwN=-1, pbmTwL=[];   
+function pbmTowers(){ const T=S.cfg && S.cfg.terrain; if(!T || !T.props){ pbmTwL=[]; return pbmTwL; } if(T!==pbmTwT || T.props.length!==pbmTwN || PBM.dirty){ pbmTwT=T; pbmTwN=T.props.length; pbmTwL=T.props.filter(p=>p.art==='pblook'); pbmCovT=null; PBM.dirty=0; } return pbmTwL; }
+function pbmTowerAt(x,y){ const L=pbmTowers(); for(let i=0;i<L.length;i++){ const p=L[i]; if(Math.hypot(x-p.x,y-p.y)<(p.r||PBM.look)) return p; } return null; }
+function pbmTall(o){ return !!(o && (o.boss || (o.def && (o.def.boss || o.def.vehicle || o.def.fly)) || o.skyDrop)); }   
+function pbmBetween(x1,y1,x2,y2,hx,hy){   
+  const L=pbmCovers(); let best=null;
+  for(let i=0;i<L.length;i++){ const rk=L[i];
+    if(hx!=null && !rk.grp && Math.hypot(hx-rk.x,hy-rk.y)<rk.r+PBM.hug && Math.hypot(x2-rk.x,y2-rk.y)>=rk.r+PBM.hug) continue;
+    const h=pbmSegCircle(x1,y1,x2,y2,rk.x,rk.y,rk.r*PBM.foot);
+    if(h && (!best || h.t<best.t)){ h.rk=rk; best=h; }
+  }
+  return best;
+}
+function pbmCovered(u,o){   
+  if(!pbmCovers().length || TRENCH_EXEMPT[u.type] || pbmTall(o) || pbmTall(u)) return false;
+  const c=pbmBetween(u.x,u.y,o.x,o.y,u.x,u.y); if(c) PBM.stats.blocked++;
+  return !!c;
+}
+function pbmDuckCover(x1,y1,x2,y2,d){   
+  if(!pbmCovers().length) return d;
+  const c=pbmBetween(x1,y1+PBM.feet,x2,y2+PBM.feet,x1,y1+PBM.feet); if(!c) return d;
+  if(d && Math.hypot(d.x-x1,d.y-y1)<=Math.hypot(c.x-x1,c.y-PBM.feet-y1)) return d;
+  return { x:c.x, y:c.y-PBM.feet, pbCover:1, rk:c.rk, dx:x2-x1 };
+}
+function pbmDuckFx(p){   
+  PBM.stats.eaten++;
+  S.fx.push({k:'puff',x:p.x,y:p.y+4,t:0,dur:0.28,R:7});
+  const rk=p.rk; if(rk){ if(!rk.pbPaint) rk.pbPaint=[]; rk.pbPaint.push({ a:Math.atan2(p.y+PBM.feet-rk.y,p.x-rk.x), g:p.dx>0?1:0, s:0.7+(((p.x*7+p.y*13)|0)&15)/25 }); if(rk.pbPaint.length>9) rk.pbPaint.shift(); }
+}
+function pbmMultiDist(x,y,t){ let d=1e9; for(let i=0;i<t.multi.length;i++) d=Math.min(d, trailDist(x,y,t.multi[i])); return d; }   
+function pbmDrawLookout(p){   
+  const x=p.x, y=p.y, r=p.r||PBM.look, s=r*1.15, col=p.side==='t'? TAN : GREEN;
+  cx.save();
+  cx.fillStyle='rgba(0,0,0,0.25)'; cx.fillRect(x-s+10,y-s+12,s*2,s*2);
+  cx.fillStyle=p.siege? '#8C6A43' : '#9B7A50'; cx.fillRect(x-s,y-s,s*2,s*2);
+  cx.strokeStyle='rgba(60,40,20,0.55)'; cx.lineWidth=2; for(let yy=y-s+9;yy<y+s;yy+=9){ cx.beginPath(); cx.moveTo(x-s+2,yy); cx.lineTo(x+s-2,yy); cx.stroke(); }
+  cx.fillStyle='#5A3F25'; for(const q of [[-1,-1],[1,-1],[-1,1],[1,1]]) cx.fillRect(x+q[0]*(s-5)-5,y+q[1]*(s-5)-5,10,10);
+  if(p.siege){ cx.fillStyle='#5A3F25'; for(const dy of [-1,1]){ cx.beginPath(); cx.arc(x-s*0.6,y+dy*(s+6),8,0,7); cx.arc(x+s*0.6,y+dy*(s+6),8,0,7); cx.fill(); } }
+  cx.strokeStyle='#3E2B18'; cx.lineWidth=3; cx.strokeRect(x-s,y-s,s*2,s*2);
+  cx.strokeStyle='#2E2216'; cx.lineWidth=3; const fx=x+s-6, fy=y-s+6; cx.beginPath(); cx.moveTo(fx,fy); cx.lineTo(fx,fy-38); cx.stroke();
+  const wv=Math.sin((S.t||0)*5+x)*4; cx.fillStyle=col; cx.beginPath(); cx.moveTo(fx,fy-38); cx.quadraticCurveTo(fx+15,fy-34+wv,fx+28,fy-28); cx.lineTo(fx,fy-20); cx.closePath(); cx.fill();
+  cx.restore();
+}
+
+
+
+
+
+
+
+
 
 
 
@@ -91609,6 +91674,8 @@ function bfCanTarget(u,o){
       if(!cv) return false;
     }
   }
+  if(u && o && pbmTowerAt(u.x,u.y)){ PBM.stats.tower++; return true; }   
+  if(u && o && pbmCovered(u,o)) return false;   
   if(!S.cfg.terrain.trench) return true;            
   if(!inTrench(o)) return true;                     
   if(TRENCH_EXEMPT[u.type]) return true;   
@@ -92742,6 +92809,7 @@ function segDist(px,py,ax,ay,bx,by){
   return Math.hypot(px-(ax+t*vx), py-(ay+t*vy));
 }
 function trailDist(x,y,t){
+  if(t.multi) return pbmMultiDist(x,y,t);   
   let d=1e9;
   for(let i=0;i<t.pts.length-1;i++)
     d=Math.min(d, segDist(x,y,t.pts[i][0],t.pts[i][1],t.pts[i+1][0],t.pts[i+1][1]));
@@ -92784,6 +92852,7 @@ function bfGround(u){
         break; }
     }
   }
+  const tr9=T.trench; if(tr9 && tr9.crawl && fx && trenchAt(u.x,u.y)){ m*=PBM.crawl; PBM.stats.crawl++; }   
   u.wet=wet; u.onIce=onIce;
   return m;
 }
@@ -114625,6 +114694,7 @@ function drawRug(){
     if(rk.art==='pillow'){ drawPillowRock(rk); continue; }  
     if(rk.art==='plush'){ drawPlushRock(rk); continue; }   
     if(rk.art==='book') continue;                        
+    if(PBM_ART[rk.art]){ PBM_ART[rk.art](rk); continue; }   
     cx.fillStyle='rgba(0,0,0,0.25)'; cx.beginPath(); cx.ellipse(rk.x+4,rk.y+rk.r*0.55,rk.r*1.05,rk.r*0.4,0,0,7); cx.fill();
     cx.fillStyle='#8B8578'; cx.beginPath();
     cx.ellipse(rk.x,rk.y,rk.r,rk.r*0.8,0.2,0,7); cx.fill();
@@ -114636,6 +114706,7 @@ function drawRug(){
   
   for(const pr of (S.cfg.terrain.props||[])){
     if(pr.x>WD-70) continue;
+    if(PBM_PROP[pr.art]){ PBM_PROP[pr.art](pr); continue; }   
     if(pr.art==='cactus') drawCactus(pr);
     else if(pr.art==='clod') drawSnowClod(pr);
     else if(pr.art==='chimney') drawChimney(pr,true);   
@@ -114794,6 +114865,7 @@ const TRENCH_PAL={
 };
 function trenchPal(){ return TRENCH_PAL[S.cfg.terrain.ground]||TRENCH_PAL.carpet; }
 function drawTrenchCut(tr,pal){
+  if(tr.multi){ for(let i=0;i<tr.multi.length;i++) drawTrenchCut(tr.multi[i],pal); return; }   
   const P=tr.pts;
   cx.lineJoin='round'; cx.lineCap='round';
   cx.strokeStyle=pal.lip; cx.lineWidth=TRENCH_W+8; pathPts(P); cx.stroke();   
