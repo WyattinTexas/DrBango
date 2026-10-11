@@ -53468,7 +53468,8 @@ const CMDO_DEF_CAP=5;
 
 
 
-const HP_RANK100={ rifleman:45, mgunner:55, bazooka:42, flame:50, minesweeper:42, radioman:42, spy:40, sarge:40, medic:40, grenadier:44, mortar:40, commando:52 };       
+const HP_RANK100={ rifleman:45, mgunner:55, bazooka:42, flame:50, minesweeper:42, radioman:42, spy:40, sarge:40, medic:40, grenadier:44, mortar:40, commando:52,
+  kingbear:270, kingrex:260, kingyeti:250, jane:150, kingcroak:140, princess:130   };       
 
 
 
@@ -53480,7 +53481,7 @@ const RANK_U_SUMMIT=rankUnits(RANK_MAX);
 
 
 
-function bfHpAt(t,r){ const top=HP_RANK100[t], base=(BF_MOVE[t]&&BF_MOVE[t].hp)||3;
+function bfHpAt(t,r){ const base=(BF_MOVE[t]&&BF_MOVE[t].hp)||3, top=(HP_RANK100[t] && HEROES.indexOf(t)>=0)? Math.max(base, HP_RANK100[t]-hhbWords(t)) : HP_RANK100[t];    
   if(!top) return base; const o=UHB_HPL[t];    
   const cur=base+Math.round(((o!=null)? o-base : top-base)*rankUnits(r)/RANK_U_SUMMIT);
   return (o==null || !(r>=UHB.rungFrom))? cur : Math.max(cur, uhbRung(uhbHplAt(t,UHB.rungFrom-1), top, r)); }
@@ -67487,7 +67488,7 @@ const UDEF = {
 
 
 const HERO_BF_HP_X=0.6;   
-for(const k of HEROES){ BF_MOVE[k]={ moveSpd:Math.round((CAMP_SPD[k]||26)*BF_PACE), hp:Math.round(UDEF[k].grit*HERO_BF_HP_X) }; HP_RANK100[k]=Math.round((UDEF[k].grit+HERO_GRIT_CAP)*HERO_BF_HP_X); BF_BOUNTY[k]=Math.ceil(COSTS[k]/2); }
+for(const k of HEROES){ BF_MOVE[k]={ moveSpd:Math.round((CAMP_SPD[k]||26)*BF_PACE), hp:Math.round(UDEF[k].grit*HERO_BF_HP_X) }; BF_BOUNTY[k]=Math.ceil(COSTS[k]/2); }    
 for(const k of ['kingcroaklil','wlady','cksnake']) BF_MOVE[k]={ moveSpd:Math.round((CAMP_SPD[k]||26)*BF_PACE), hp:Math.round(UDEF[k].grit*HERO_BF_HP_X) };   
 for(const k of ['kbguard','kbcannon','kbcavalry']) BF_MOVE[k]={ moveSpd:Math.round((CAMP_SPD[k]||26)*BF_PACE), hp:Math.round(UDEF[k].grit*HERO_BF_HP_X) };   
 for(const k of ['pfrogally','fairyally','gknightally','frogpally']) BF_MOVE[k]={ moveSpd:Math.round((CAMP_SPD[k]||26)*BF_PACE), hp:Math.round(UDEF[k].grit*HERO_BF_HP_X) };   
@@ -81740,7 +81741,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='20.78';        
+let GVT_CV='20.79';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -99137,6 +99138,18 @@ function rxHeroStomp(u){
 
 
 
+
+
+
+const HHB={ ck:10 };   
+function hhbBare(k){ const st=heroStub(k,RANK_MAX,1); st.coopHM={ pk:[] }; return st; }   
+function hhbWords(k){ if(HEROES.indexOf(k)<0) return 0; const st=hhbBare(k); return Math.round((heroMileHP(st)+hhpHp(st))*HERO_BF_HP_X)+hlvHp(st); }   
+function hhbCkDmg(u){ return (u && u.type==='kingcroak' && HHB.ck)? HHB.ck : 0; }   
+
+
+
+
+
 const HLV={ hp:6, every:10 };   
 function hlvHp(u){ if(!u || !HLV.hp || HEROES.indexOf(u.type)<0) return 0; return Math.floor(Math.max(0,Math.min(RANK_MAX,perkRank(u)|0))/HLV.every)*HLV.hp; }   
 
@@ -113155,7 +113168,7 @@ function update(dt){
       const ckM=ckStormMul(u);   
       const kcAim=rpScan(u, rng*rngMul);   
       if(!kcAim){ u.cd=0.25; continue; }   
-      u.rpT=RP_PLANT+BRG_WAVES*BRG_GAP; u.rpSt=0; u.rpAim=kcAim.ang; u.rpDmg=dmg; u.rpR=def.rng*rngMul*ckM; u.rpHalf=CROAK_FAN_HALF*ckM; u.rpKC=1;   
+      u.rpT=RP_PLANT+BRG_WAVES*BRG_GAP; u.rpSt=0; u.rpAim=kcAim.ang; u.rpDmg=dmg+hhbCkDmg(u)  ; u.rpR=def.rng*rngMul*ckM; u.rpHalf=CROAK_FAN_HALF*ckM; u.rpKC=1;   
       bfSfx(SFX.thock, u.x, u.y);
       continue;
     }
@@ -170799,7 +170812,7 @@ function hitWhole(v){ return String(Math.round(v)); }
 function heroStub(k,r,mir){ const u={ type:k, def:UDEF[k] }; const r0=(META.up[k]||0)|0; if(mir || (r!=null && (r|0)!==r0)) u.nrk=Math.max(0,Math.min(RANK_MAX,(r==null? r0 : r)|0)); return u; }   
 function hitDmgNowAt(k,r){ const st=heroStub(k,r), v=rsaBaseHit(k,r,st); if(v==null) return null;     let m=(k!=='sarge' && soulIs('u',k))? SOUL_MUL : 1; if(k==='kingbear') m*=kbSwordMul(st);
   const fav=(k==='kingyeti' || k==='kingbear')? 0 : (pickDmg(st)+toothDmg(st))*hitMul(k,r);       
-  return (v+fav)*m*(k==='kingrex'? KRS_FIRE_X : 1)+mstGiftDmg(st,1); }   
+  return (v+fav)*m*(k==='kingrex'? KRS_FIRE_X : 1)+mstGiftDmg(st,1)+hhbCkDmg(st); }   
 
 
 
@@ -173877,6 +173890,7 @@ requestAnimationFrame(frame);
 
 
 window.GVT = {
+  hhb(){ const o={ cv:GVT_CV, ck:HHB.ck, book:{}, words:{}, base:{}, top:{}, card:{} }; for(const k of HEROES){ o.book[k]=HP_RANK100[k]; o.words[k]=hhbWords(k); o.base[k]=(BF_MOVE[k]&&BF_MOVE[k].hp)||3; o.top[k]=bfHpAt(k,RANK_MAX); o.card[k]=heroHP(k); } return o; },   
   trn(v){ v=v||{}; if(v.dials) Object.assign(TEX, v.dials); if(v.fg) Object.assign(TEX_FG, v.fg);   if(v.b3) Object.assign(TEX_END, v.b3);   if(v.go) texStart(v.go===true? {} : v.go); if(v.end) texEnd(); if(v.tap && S.tex) texTapAt({ x:+v.tap[0]-S.tex.cam.x, y:+v.tap[1] });   
     const X=S.tex; return { cv:GVT_CV, on:!!X, dials:Object.assign({},TEX), cars:TEX_CARS.map((c,i)=>({ k:c.k, x:Math.round(texCarX(i)), top:Math.round(texTop(i)) })), lands:TEX_LANDS.map(l=>({ id:l.id, name:l.name, word:t(l.name) })), worldW:Math.round(texWorldW()), VW, W, mode:S.mode,
       st:X? { t:+X.t.toFixed(2), car:X.car, land:X.land, landT:+X.landT.toFixed(2), tun:X.tun? { t:+X.tun.t.toFixed(2), ph:+(X.tun.t/TEX.tun).toFixed(3), to:X.tun.to, dark:X.tun.dark|0 } : null, hop:!!X.hop, goal:X.goal==null? null : Math.round(X.goal), next:X.next==null? null : Math.round(X.next), cam:Math.round(X.cam.x), name:X.name, nameT:+X.nameT.toFixed(2), lands:X.lands.slice(), key:X.key, bw:Math.round(X.bw), bh:Math.round(X.bh), q:+X.q.toFixed(3),
