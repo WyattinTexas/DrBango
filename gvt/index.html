@@ -4705,11 +4705,7 @@
   #sdnFilm .sdn-play svg { width:100%; height:100%; display:block; }
   #sdnFilm.paused .sdn-play { display:block; }
   #sdnFilm .sdn-end { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:max(8px, calc(var(--sdn-w) * .012)); opacity:0; pointer-events:none; padding:0 16px; text-align:center; cursor:default; }
-  #sdnFilm .sdn-end b { font:700 max(30px, calc(var(--sdn-w) * .058))/1 var(--sdn-f); letter-spacing:.24em; color:#f3e6cf; }
-  #sdnFilm .sdn-end p { margin:0; font:500 max(12px, calc(var(--sdn-w) * .0135))/1.3 var(--sdn-f); letter-spacing:.3em; color:#bfa98a; }
-  #sdnFilm .sdn-end p.sdn-cr { font-size:max(9px, calc(var(--sdn-w) * .0095)); letter-spacing:.14em; color:#8f7b60; }
-  #sdnFilm .sdn-again { margin-top:max(6px, calc(var(--sdn-w) * .01)); font:700 15px/1 var(--sdn-f); letter-spacing:.12em; padding:11px 20px; border-radius:999px; border:2px solid #1E1A12; background:#e9c27a; color:#1a120a; cursor:pointer; -webkit-tap-highlight-color:transparent; touch-action:manipulation; }
-  #sdnFilm .sdn-again:active { transform:translateY(1px); }
+  #sdnFilm .sdn-end b { font:italic 400 max(56px, calc(var(--sdn-w) * .1))/1.1 'Baskerville','Georgia','Times New Roman',serif; letter-spacing:.02em; color:#f3e6cf; text-shadow:0 2px 22px rgba(243,230,207,.2); }   /**/
   #sdnFilm .sdn-dead { position:absolute; left:0; right:0; bottom:10%; display:none; justify-content:center; pointer-events:none; }
   #sdnFilm.dead .sdn-dead { display:flex; }
   #sdnFilm .sdn-dead span { max-width:80%; text-align:center; padding:10px 16px; border-radius:10px; background:rgba(0,0,0,.66); color:#fff3d6; font:500 max(14px, calc(var(--sdn-w) * .018))/1.3 var(--sdn-f); letter-spacing:.04em; }
@@ -82030,7 +82026,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='20.80';        
+let GVT_CV='20.81';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -141280,6 +141276,8 @@ function crlTap(i){ const bk=document.querySelector('#travelMap .lg-book'); cons
 
 
 
+
+
 const SDN_SEAT={ x:752, y:264, w:84, h:40 };   
 const SDN_SLOW={ s0:11.9, s1:14.9, k:0.45 };   
 const SDN_LINES=[   
@@ -141292,8 +141290,8 @@ const SDN_LINES=[
   [14.6, 16.4, 'RED TANK · ON THE RADIO', 'ARMOR ROLLING! HOLD ON, KID!', 'red'],
   [18.3, 19.7, 'GREEN RIFLEMAN', 'HIS TAGS!', 'green']];
 const SDN_ENDS=[23.2, 24.1];   
-const SDN_CREDIT='MUSIC: "EXCITING TRAILER" · KEVIN MACLEOD (INCOMPETECH.COM) · CC BY 4.0';   
-const SDNP={ up:0, raf:0, dead:0, ended:0, played:0, opens:0, li:-2, rej:0, alt:0 };   
+const SDN_FIN={ hold:1.2, out:0.6 };   
+const SDNP={ up:0, raf:0, dead:0, ended:0, played:0, opens:0, li:-2, rej:0, alt:0, endAt:0, auto:0 };   
 function sdnUp(){ return !!SDNP.up; }
 function sdnFilmT(S){ const a=SDN_SLOW.s0, b=a+(SDN_SLOW.s1-a)*SDN_SLOW.k; return S<a? S : S<b? a+(S-a)/SDN_SLOW.k : S+(SDN_SLOW.s1-a)*(1-SDN_SLOW.k); }
 function sdnSpan(x, a, b){ return x<=a? 0 : x>=b? 1 : (x-a)/(b-a); }
@@ -141316,7 +141314,7 @@ function sdnFilmHTML(){ const T=s=>escH(t(s));
     +'<source src="'+bdPromoSrc('sarge-down.webm')+'" type="video/webm"><source src="'+bdPromoSrc('sarge-down.mp4')+'" type="video/mp4" onerror="sdnDead()"></video>'
     +'<div class="sdn-cap"><small class="sdn-who"></small><span class="sdn-say"></span></div>'
     +'<div class="sdn-play" aria-hidden="true"><svg viewBox="0 0 40 40"><path d="M14 10 L31 20 L14 30 Z" fill="#fff3d6"/></svg></div>'
-    +'<div class="sdn-end"><b>'+T('END SCENE')+'</b><p>'+T('SARGE IS DOWN')+'</p><p class="sdn-cr">'+escH(SDN_CREDIT)+'</p><button type="button" class="sdn-again" onclick="sdnAgain(event)">↺ '+T('PLAY AGAIN')+'</button></div>'
+    +'<div class="sdn-end"><b>Fin</b></div>'   
     +'<div class="sdn-dead"><span>'+T('The film did not load. Try again later.')+'</span></div></div>'
     +'<button type="button" class="sh-x sdn-x" aria-label="close" onclick="sdnClose(event)">✕</button>'; }
 function sdnFit(){ const el=document.getElementById('sdnFilm'); if(!el) return; const W=el.clientWidth||innerWidth, H=el.clientHeight||innerHeight; let w=W, h=W*9/16; if(h>H){ h=H; w=H*16/9; }
@@ -141326,11 +141324,11 @@ function sdnPlay(v){ try{ const r=v.play(); if(r && r.catch) r.catch(()=>{ if(!S
 function sdnKey(e){ if(!SDNP.up) return; if(e.key==='Escape'){ e.preventDefault(); e.stopImmediatePropagation(); sdnClose(); } else if(e.key===' '){ e.preventDefault(); e.stopImmediatePropagation(); sdnToggle(); } }
 function sdnHide(){ if(SDNP.up && document.hidden){ const v=document.querySelector('#sdnFilm .sdn-v'); if(v) try{ v.pause(); }catch(e){} } }   
 function sdnOpen(){ if(SDNP.up || document.getElementById('sdnFilm')) return false; try{ if(Date.now()<LG_PF.until) return false; }catch(e){}   
-  SDNP.up=1; SDNP.opens++; SDNP.dead=0; SDNP.alt=0; SDNP.ended=0; SDNP.played=0; SDNP.li=-2;
+  SDNP.up=1; SDNP.opens++; SDNP.dead=0; SDNP.alt=0; SDNP.ended=0; SDNP.endAt=0; SDNP.played=0; SDNP.li=-2;
   if(!META.sdnSeen){ META.sdnSeen=true; try{ saveMeta(); }catch(e){} } document.querySelectorAll('#travelMap .sdn-door').forEach(d=>d.classList.add('seen'));   
   const el=document.createElement('div'); el.id='sdnFilm'; el.setAttribute('data-notr', ''); el.innerHTML=sdnFilmHTML(); document.body.appendChild(el); sdnFit();
   const v=el.querySelector('.sdn-v'); v.muted=!soundOn; v.defaultMuted=!soundOn;
-  v.addEventListener('ended', ()=>{ SDNP.ended=1; }); v.addEventListener('error', ()=>sdnErr(v)); v.addEventListener('playing', ()=>{ SDNP.played=1; SDNP.ended=0; });
+  v.addEventListener('ended', sdnEnded); v.addEventListener('error', ()=>sdnErr(v)); v.addEventListener('playing', ()=>{ SDNP.played=1; SDNP.ended=0; });
   el.querySelector('.sdn-box').addEventListener('click', sdnToggle);
   sdnPlay(v);   
   window.addEventListener('resize', sdnFit); window.addEventListener('keydown', sdnKey, true); document.addEventListener('visibilitychange', sdnHide);
@@ -141339,16 +141337,19 @@ function sdnOpen(){ if(SDNP.up || document.getElementById('sdnFilm')) return fal
 function sdnErr(v){ if(!SDNP.up || SDNP.dead || !v) return; const src=String(v.currentSrc||'');   
   if(/\.webm(\?|$)/.test(src) && !SDNP.alt){ SDNP.alt=1; const at=v.currentTime||0; v.querySelectorAll('source').forEach(x=>x.remove()); v.src=bdPromoSrc('sarge-down.mp4'); v.addEventListener('loadedmetadata', ()=>{ try{ if(at>0.2) v.currentTime=at; }catch(e){} sdnPlay(v); }, { once:true }); try{ v.load(); }catch(e){} return; }
   sdnDead(); }
-function sdnToggle(e){ if(e && e.target && e.target.closest && e.target.closest('.sdn-again')) return; const v=document.querySelector('#sdnFilm .sdn-v'); if(!v || SDNP.dead || SDNP.ended) return;
+function sdnToggle(){ const v=document.querySelector('#sdnFilm .sdn-v'); if(!v || SDNP.dead || SDNP.ended) return;
   if(v.paused) sdnPlay(v); else try{ v.pause(); }catch(x){} }
-function sdnAgain(e){ if(e) e.stopPropagation(); const v=document.querySelector('#sdnFilm .sdn-v'); if(!v || SDNP.dead) return; SDNP.ended=0; try{ v.currentTime=0; }catch(x){} sdnPlay(v); }
+function sdnEnded(){ if(!SDNP.up || SDNP.ended || SDNP.dead) return; SDNP.ended=1; SDNP.endAt=performance.now(); }   
 function sdnDead(){ const el=document.getElementById('sdnFilm'); if(!el) return; SDNP.dead=1; el.classList.add('dead'); const b=el.querySelector('.sdn-box'), v=el.querySelector('.sdn-v'); if(v){ try{ v.pause(); }catch(e){} }
   if(b && !b.querySelector('.sdn-ps')){ const i=document.createElement('img'); i.className='sdn-ps'; i.alt=''; i.onerror=()=>i.remove(); i.src=bdPromoSrc('sarge-down.jpg'); b.insertBefore(i, b.firstChild); } }   
 function sdnTick(){ SDNP.raf=0; const el=document.getElementById('sdnFilm'); if(!SDNP.up || !el) return; const v=el.querySelector('.sdn-v'), ct=v? v.currentTime||0 : 0;
   let li=-1, op=0; for(let i=0;i<SDN_LINES.length;i++){ const L=SDN_LINES[i], a=sdnFilmT(L[0]), b=sdnFilmT(L[1]); if(ct>=a && ct<b){ li=i; op=Math.min(sdnSpan(ct, a, a+0.15), 1-sdnSpan(ct, b-0.2, b)); break; } }
   const cap=el.querySelector('.sdn-cap'); if(li!==SDNP.li){ SDNP.li=li; if(li>=0){ const L=SDN_LINES[li]; cap.className='sdn-cap '+L[4]; cap.querySelector('.sdn-who').textContent=t(L[2]); cap.querySelector('.sdn-say').textContent=t(L[3]); } }
   cap.style.opacity=(SDNP.dead? 0 : op).toFixed(2);
-  let eo=SDNP.ended? 1 : sdnSpan(ct, sdnFilmT(SDN_ENDS[0]), sdnFilmT(SDN_ENDS[1])); eo=eo*eo*(3-2*eo); if(SDNP.dead) eo=0; const en=el.querySelector('.sdn-end'); en.style.opacity=eo.toFixed(3); en.style.pointerEvents=eo>0.5? 'auto' : 'none';
+  if(v && v.ended) sdnEnded();   
+  let eo=SDNP.ended? 1 : sdnSpan(ct, sdnFilmT(SDN_ENDS[0]), sdnFilmT(SDN_ENDS[1])); eo=eo*eo*(3-2*eo);
+  if(SDNP.ended && !SDNP.dead){ const q=(performance.now()-SDNP.endAt)/1000; if(q>=SDN_FIN.hold+SDN_FIN.out){ SDNP.auto++; sdnClose(); return; } eo*=1-sdnSpan(q, SDN_FIN.hold, SDN_FIN.hold+SDN_FIN.out); }   
+  if(SDNP.dead) eo=0; const en=el.querySelector('.sdn-end'); en.style.opacity=eo.toFixed(3);
   el.classList.toggle('paused', !!(v && v.paused && SDNP.played && !SDNP.ended && !SDNP.dead && eo<0.5));
   SDNP.raf=requestAnimationFrame(sdnTick); }
 function sdnClose(e){ if(e) e.stopPropagation(); const el=document.getElementById('sdnFilm'); if(SDNP.raf) cancelAnimationFrame(SDNP.raf); SDNP.raf=0;
