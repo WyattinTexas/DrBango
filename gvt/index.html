@@ -80308,7 +80308,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='20.28';        
+let GVT_CV='20.29';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -91688,6 +91688,7 @@ function pbmCovered(u,o){
 }
 function pbmDuckCover(x1,y1,x2,y2,d){   
   if(!pbmCovers().length) return d;
+  if(pbm5Deck(x1,y1+PBM.feet)) return d;   
   const c=pbmBetween(x1,y1+PBM.feet,x2,y2+PBM.feet,x1,y1+PBM.feet); if(!c) return d;
   if(d && Math.hypot(d.x-x1,d.y-y1)<=Math.hypot(c.x-x1,c.y-PBM.feet-y1)) return d;
   return { x:c.x, y:c.y-PBM.feet, pbCover:1, rk:c.rk, dx:x2-x1 };
@@ -92117,6 +92118,81 @@ function hvilDraw(rk){
   HVIL.stats.frames++;
 }
 PBM_ART.hvilhit=hvilDraw;
+
+
+
+
+
+
+
+
+
+
+const PBM5={ rung:95, wx:1450, wr:19, gates:[200,400], north:72, south:572, court:[1470,92,1920,552], siege:1265, muz:30 };   
+function pbm5Splat(rk){   
+  const L=rk.pbPaint; if(!L || !L.length) return;
+  for(let i=0;i<L.length;i++){ const p=L[i], x=rk.x+Math.cos(p.a)*rk.r*0.78, y=rk.y+Math.sin(p.a)*rk.r*0.7, s=4.2*p.s;
+    cx.fillStyle=p.g? 'rgba(98,140,62,0.92)' : 'rgba(214,180,120,0.95)';
+    cx.beginPath(); cx.arc(x,y,s,0,7); cx.fill();
+    cx.beginPath(); cx.arc(x+Math.cos(p.a+1.7)*s*1.2,y+Math.sin(p.a+1.7)*s*1.2,s*0.45,0,7); cx.fill();
+    cx.beginPath(); cx.arc(x+Math.cos(p.a-1.4)*s*1.35,y+Math.sin(p.a-1.4)*s*1.35,s*0.32,0,7); cx.fill(); }
+}
+function pbm5RR(x,y,w,h,r){ cx.beginPath(); cx.moveTo(x+r,y); cx.lineTo(x+w-r,y); cx.quadraticCurveTo(x+w,y,x+w,y+r); cx.lineTo(x+w,y+h-r); cx.quadraticCurveTo(x+w,y+h,x+w-r,y+h); cx.lineTo(x+r,y+h); cx.quadraticCurveTo(x,y+h,x,y+h-r); cx.lineTo(x,y+r); cx.quadraticCurveTo(x,y,x+r,y); cx.closePath(); }
+function pbm5Court(){   
+  const c=PBM5.court, x0=c[0], y0=c[1], x1=c[2], y1=c[3];
+  cx.fillStyle='#8E887C'; cx.fillRect(x0,y0,x1-x0,y1-y0);
+  cx.strokeStyle='rgba(64,60,52,0.45)'; cx.lineWidth=1.6;
+  for(let y=y0;y<y1;y+=34){ cx.beginPath(); cx.moveTo(x0,y); cx.lineTo(x1,y); cx.stroke(); for(let x=x0+((y/34)%2)*22;x<x1;x+=44){ cx.beginPath(); cx.moveTo(x,y); cx.lineTo(x,Math.min(y1,y+34)); cx.stroke(); } }
+  cx.fillStyle='rgba(255,255,255,0.06)'; for(let i=0;i<40;i++) cx.fillRect(x0+10+(i*97)%(x1-x0-20),y0+8+(i*61)%(y1-y0-14),18,10);
+}
+function pbm5Wall(rk){   
+  cx.save();
+  if(rk.court) pbm5Court();
+  if(rk.lead){ const x0=rk.wx0, y0=rk.wy0, L=Math.hypot(rk.wx1-x0,rk.wy1-y0), wd=rk.r*2+4;
+    cx.translate(x0,y0); cx.rotate(Math.atan2(rk.wy1-y0,rk.wx1-x0));
+    cx.fillStyle='rgba(0,0,0,0.28)'; cx.fillRect(-wd/2+7,-wd/2+9,L+wd,wd);
+    cx.fillStyle='#7F796D'; pbm5RR(-wd/2,-wd/2,L+wd,wd,6); cx.fill();
+    cx.fillStyle='#A8A296'; pbm5RR(-wd/2+2,-wd/2+2,L+wd-4,wd-8,5); cx.fill();
+    cx.strokeStyle='rgba(60,55,48,0.45)'; cx.lineWidth=1.5;
+    for(let s=-wd/2+14;s<L+wd/2-6;s+=18){ cx.beginPath(); cx.moveTo(s,-wd/2+2); cx.lineTo(s,wd/2-6); cx.stroke(); }
+    cx.beginPath(); cx.moveTo(-wd/2+2,-1); cx.lineTo(L+wd/2-2,-1); cx.stroke();
+    cx.fillStyle='#C3BDB0'; for(let s=-wd/2+6;s<L+wd/2-10;s+=18) cx.fillRect(s,-wd/2+4,9,7);
+    cx.strokeStyle='#5A554C'; cx.lineWidth=2.5; pbm5RR(-wd/2,-wd/2,L+wd,wd,6); cx.stroke(); }
+  cx.restore();
+  pbm5Splat(rk);
+}
+function pbm5Tower(rk){   
+  const x=rk.x, y=rk.y, r=rk.r;
+  cx.save();
+  cx.fillStyle='rgba(0,0,0,0.3)'; cx.beginPath(); cx.ellipse(x+8,y+10,r*1.05,r*0.9,0,0,7); cx.fill();
+  cx.fillStyle='#777166'; cx.beginPath(); cx.arc(x,y+3,r,0,7); cx.fill();
+  cx.fillStyle='#A9A397'; cx.beginPath(); cx.arc(x,y,r*0.96,0,7); cx.fill();
+  cx.fillStyle='#5E594F'; cx.beginPath(); cx.arc(x,y,r*0.66,0,7); cx.fill();
+  cx.fillStyle='#C6C0B3'; for(let i=0;i<12;i++){ const a=i*Math.PI/6; cx.save(); cx.translate(x+Math.cos(a)*r*0.82,y+Math.sin(a)*r*0.82); cx.rotate(a); cx.fillRect(-5,-6,10,12); cx.restore(); }
+  cx.strokeStyle='#4F4A41'; cx.lineWidth=2.5; cx.beginPath(); cx.arc(x,y+1,r,0,7); cx.stroke();
+  if(!rk.small){ cx.strokeStyle='#3B3226'; cx.lineWidth=3; cx.beginPath(); cx.moveTo(x,y); cx.lineTo(x,y-r*1.25); cx.stroke();
+    const wv=Math.sin((S.t||0)*5+x)*4; cx.fillStyle=TAN; cx.beginPath(); cx.moveTo(x,y-r*1.25); cx.quadraticCurveTo(x+16,y-r*1.2+wv,x+30,y-r*1.12); cx.lineTo(x,y-r*0.95); cx.closePath(); cx.fill(); }
+  cx.restore();
+  pbm5Splat(rk);
+}
+PBM_ART.pbwall=pbm5Wall; PBM_ART.pbtower=pbm5Tower;
+function pbm5Deck(x,y){ const L=pbmTowers(); for(let i=0;i<L.length;i++){ const p=L[i]; if(Math.hypot(x-p.x,y-p.y)<(p.r||PBM.look)+PBM5.muz) return p; } return null; }   
+function pbm5Run(x0,y0,x1,y1,step,grp){   
+  const n=Math.max(1,Math.round(Math.hypot(x1-x0,y1-y0)/step)), out=[];
+  for(let i=0;i<=n;i++) out.push({ x:Math.round(x0+(x1-x0)*i/n), y:Math.round(y0+(y1-y0)*i/n), r:PBM5.wr, art:'pbwall', cov:1, grp:grp, lead:i===0?1:0, wx0:x0, wy0:y0, wx1:x1, wy1:y1 });
+  return out;
+}
+function pbm5Rows(){   
+  const X=PBM5.wx, rows=[].concat(
+    pbm5Run(X,PBM5.north,X,140,30,'W1'), pbm5Run(X,260,X,340,27,'W2'), pbm5Run(X,460,X,PBM5.south,30,'W3'),   
+    pbm5Run(X+34,PBM5.north,1910,PBM5.north,30,'WN'), pbm5Run(X+34,PBM5.south,1910,PBM5.south,30,'WS'),       
+    [{ x:X, y:PBM5.north, r:40, art:'pbtower', cov:1 }, { x:X, y:PBM5.south, r:40, art:'pbtower', cov:1 }, { x:X, y:300, r:34, art:'pbtower', cov:1, small:1 }],
+    [[470,170,28],[470,430,28],[720,300,30],[960,160,28],[960,440,28]].map(q=>({ x:q[0], y:q[1], r:q[2], art:'crate', cov:1 })));
+  rows[0].court=1;
+  return rows;
+}
+CAMP_EDITS.levels[PBM5.rung]={ terrain:{ river:{ x:859, w:60, bridgeY:PBM5.gates[0], bridgeY2:PBM5.gates[1], bw:80 }, rocks:[] } };   
+CAMP_DRESS[PBM5.rung]={ rocks:pbm5Rows(), props:[{ x:PBM5.siege, y:300, art:'pblook', r:40, side:'g', siege:1 }] };   
 
 
 
