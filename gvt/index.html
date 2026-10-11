@@ -63166,7 +63166,7 @@ function hrtS4Rig(){ const R=skyOn() && S.raid.sky, A=R && R.air; return { on:!!
 
 
 const HRT_S5=1;
-function hrtS5Own(f){ const T9=SKY_T[skyTier()]||SKY_T.e; return HRT_S5? Math.min(f.hpMax,T9.hp) : f.hpMax; }   
+function hrtS5Own(f){ const T9=SKY_T[skyTier()]||SKY_T.e; return HRT_S5? Math.min(f.hpMax,T9.hp*bhpNow()) : f.hpMax; }       
 function hrtS5Bar(f){ return Math.max(1,Math.round(hrtS5Own(f)*hrtS3Dial().bar)); }   
 function hrtS5Rig(){ const B=S.foes.find(f=>f.type==='skyfort'), M=B && B.sky && B.sky.s3, fly=B? (M? M.hp0 : B.hpMax) : null, T9=SKY_T[skyTier()]||SKY_T.e, c=hrtS3Dial().bar; return { on:!!HRT_S5, tier:skyTier(), price:skyPrice(skyTier()), cell:c, hp:T9.hp, fly, wreck:(B && M)? B.hpMax : null, own:Math.max(1,Math.round(T9.hp*c)), rode:(fly!=null)? Math.max(1,Math.round(fly*c)) : null }; }
 
@@ -63508,7 +63508,7 @@ function cavesCfg(tier){ const C9=cavesCount(cavesN());
     { f:'spout', t:'lyeti', n:Math.min(2,SY_LIVE[tier]||1), pts:[H9[1],H9[4]].slice(0,Math.min(2,SY_LIVE[tier]||1)), at:SY_AT, quiet:1, pin:1 },   
     { f:'spout', t:'hyeti', n:Math.min(2,HY_LIVE[tier]||1), pts:[H9[0],H9[2]].slice(0,Math.min(2,HY_LIVE[tier]||1)), at:HY_AT, quiet:1, pin:1 },   
     { f:'spout', t:'dyeti', n:Math.min(2,DY_PREMIERE[tier]||1), pts:[H9[1],H9[4]].slice(0,Math.min(2,DY_PREMIERE[tier]||1)), at:DY_AT, quiet:1, pin:1 },   
-    { f:'spout', t:'fyeti', n:1, pts:[CAVE_MOUTH], at:FY_ARRIVE, hpX:+((CAVES_HPX[tier]||1)*C9.hpX).toFixed(3), pin:1 } ] });   
+    { f:'spout', t:'fyeti', n:1, pts:[CAVE_MOUTH], at:FY_ARRIVE, hpX:+(CAVES_HPX[tier]||1).toFixed(3), pin:1 } ] });       
   return cfg; }
 function cyRnd(f,k){ const s=(((f.id|0)*9301+(f.cyTrips|0)*49297+(k|0)*7919+(S.wave|0)*233)%233280+233280)%233280; return s/233280; }   
 function cyHoleNear(x,y){ let b=CAVE_HOLES[0], bd=1e9; for(const h of CAVE_HOLES){ const d=Math.hypot(h[0]-x,h[1]-y); if(d<bd){ bd=d; b=h; } } return b; }
@@ -80308,7 +80308,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='20.27';        
+let GVT_CV='20.28';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -82349,8 +82349,9 @@ function coopStartBattle(){
     
     const evb=!!(COOP.ev && (pp.id==='ice'||pp.id==='bone') && (pp.n|0)===EV_BAND && S.raid.t==='u');   
     const preal=evb? EV_PIN_P : Math.max(1,Math.min(SQ_MAX,COOP.pc|0));
-    sqScaleCfg(S.cfg, preal, evb);    
-    S.sq={ p:preal, t:0, nextT:sqGrace() };
+    const bpq=Math.max(1,Math.min(SQ_MAX,COOP.pc|0));    
+    sqScaleCfg(S.cfg, preal, evb, bpq);    
+    S.sq={ p:preal, bp:bpq, t:0, nextT:sqGrace() };    
     if(evb){ S.sq.ev={ bell:COOP.ev.bell, ring:evRingOf(COOP.ev), wk:COOP.ev.wk, rk:COOP.ev.rk||'ice' }; S.evHold=(!COOP.ev.rung && evNow()<evRingOf(COOP.ev))? { bell:COOP.ev.bell, ring:evRingOf(COOP.ev) } : null;   
       if(S.evHold && (COOP.members||[]).length>1) coopSend({k:'wava'}); }   
     coopSeatColours();
@@ -82616,28 +82617,35 @@ function noteCoopLevel(n){
 
 
 
-function sqScaleCfg(cfg,p,pin){    
-  const s=sqTroopMul(p,pin), bs=Math.max(1,Math.round(Math.pow(Math.max(1,p),SQ_BOSS_EXP)));    
+function sqScaleCfg(cfg,p,pin,bp){        
+  const s=sqTroopMul(p,pin), bk=bhpX(bp!=null? bp : p);        
   for(const w of cfg.waves){
-    
-    
-    
-    
-    let bossGroups=0; for(const g of w.groups) if(g.f==='boss') bossGroups++;
     for(const g of w.groups){
+      if(bhpIs(g)){ bhpRow(g,bk); if(g.tease) g.n=1; if(!g.pin && g.f!=='boss' && g.escort) g.escort=Math.max(1,Math.round(g.escort*s)); continue; }   
       
       
       if(g.pin) continue;   
       if(g.f==='spout' && g.pts){ g.per=Math.max(1,Math.round((g.per||1)*s)); continue; }   
       if(g.tease){ g.n=1; continue; }
-      if(g.f==='boss' && (cfg.sd200 || cfg.l201 || cfg.r205 || cfg.claw || cfg.oneB9)){             const k9=Math.min(bs,2); if(k9>1){ g.hpX=+((g.hpX||1)*k9).toFixed(3); if(g.hpAdd) g.hpAdd=Math.round(g.hpAdd*k9); } g.n=1; continue; }   
-      if(g.f==='boss'){ g.n=cfg.oneBoss? (g.n||1) : ((w.piece||bossGroups>1)? Math.min(bs,2) : bs); continue; }   
       g.n=Math.max(1,Math.round((g.n||1)*s));
       if(g.escort) g.escort=Math.max(1,Math.round(g.escort*s));
     }
   }
   return cfg;
 }
+
+
+
+
+
+
+const BHP_K=0.9;   
+let BHP_BARE=0;    
+function bhpX(p){ p=Math.max(1,Math.min(SQ_MAX,(p|0)||1)); return p>1? +(1+BHP_K*(p-1)).toFixed(3) : 1; }   
+function bhpNow(){ const q=S.sq; return (q && !S.bf)? bhpX(q.bp||q.p) : 1; }   
+function bhpIs(g){ return g.f==='boss' || !!g.bossBar || !!(FDEF[g.t] && FDEF[g.t].boss); }   
+function bhpRow(g,bk){ if(g.f==='boss') g.n=g.n||1; if(bk>1){ if(!(FDEF[g.t] && FDEF[g.t].boss)) g.hpX=+((g.hpX||1)*bk).toFixed(3); if(g.hpAdd) g.hpAdd=Math.round(g.hpAdd*bk); } return g; }   
+function bhpBare(fn){ BHP_BARE=1; try{ return fn(); } finally{ BHP_BARE=0; } }
 
 
 
@@ -106096,7 +106104,7 @@ function spawnFoe(type,x,y,form,gu){
   
   
   
-  const hpm = (d.boss ? (1+(S.cfg.hpMul-1)*(S.cfg.bossF!=null?S.cfg.bossF:0.5)) : S.cfg.hpMul)*(S.cfg.hpX||1);   
+  const hpm = (d.boss ? (1+(S.cfg.hpMul-1)*(S.cfg.bossF!=null?S.cfg.bossF:0.5)) : S.cfg.hpMul)*(S.cfg.hpX||1)*((d.boss && !BHP_BARE)? bhpNow() : 1);       
   const hpq=d.hp*hpm*(m.hp||1)*((type==='tanrifle' && S.cfg.rifleHpX>0)? S.cfg.rifleHpX : 1);   
   const f={ id:idc++, type, def:d, hp:Math.round(hpq), hpMax:Math.round(hpq),
     x, y, vx:0, vy:0, wob:Math.random()*6.28,
@@ -169396,7 +169404,7 @@ function gmxBlast(x,y,R,men,foe){ let n=0;
   for(const u of S.units.slice()){ if(u.dead || u.jetT>0 || u.dropT>0 || u.gmyAir) continue; if(Math.hypot(u.x-x,u.y-y)>R) continue; gmxPip(u,x,y,men); n++; }
   for(const f of S.foes.slice()){ if(f.dead || !(f.hp>0) || (f.def && (f.def.boss || f.def.gmyB==='bathit'))) continue; if(Math.hypot(f.x-x,f.y-y)>R) continue; hurt(f,foe,null,0); n++; }
   return n; }
-function gmxBoost(G){ const b=G && G.boss, R=b && !b.gmxBoost && !b.dead && !b.gmyHelp && GMX.boost[b.type], n=R && (R[gmyTier()]||R.e); if(!n) return;     b.gmxBoost=n; b.hpMax=(b.hpMax>0? b.hpMax : b.hp)+n; b.hp+=n; gmyLog(G,b.type+' +'+n+' hp'); }   
+function gmxBoost(G){ const b=G && G.boss, R=b && !b.gmxBoost && !b.dead && !b.gmyHelp && GMX.boost[b.type], n=R && (R[gmyTier()]||R.e); if(!n) return;     const n9=Math.round(n*bhpNow()); b.gmxBoost=n9; b.hpMax=(b.hpMax>0? b.hpMax : b.hp)+n9; b.hp+=n9; gmyLog(G,b.type+' +'+n9+' hp'); }       
 function gmxFire(x,y,r,l,dps){ (S.fires||(S.fires=[])).push({ x:x, y:y, r:r, t:0, life:l, dps:dps, acc:0, tk:0, src:null, side:null, foe:true, hit:new Set() }); }   
 
 function gmxTick(G,dt){ const rd=S.raid, tr=gmyTier(); gmxBoost(G); if(!gmxOnTier()) return; const X=G.X||(G.X=gmxNew()); if(!X.t) gmxMint(); X.t+=dt;
@@ -169497,7 +169505,7 @@ function gmxPumpRoll(G,X,dt){ const D=GMX.pk;
   X.pks=X.pks.filter(p=>!p.done); }
 
 function gmxHhIn(G,X,why){ if(X.hhIn) return; X.hhIn=1; const D=GMX.hh, f=spawnFoe('gmyhh', W+90, Math.max(FOE_TOP+D.yMin,foeBandY(WORLD_H/2+60)), null, false); if(!f) return;
-  f.hp=f.hpMax=D.hp; f.barOff=1; f.gmyFace=-1; X.hh=f; f.gmx={ st:'enter', T:0, leg:0, next:2, way:null, h:Math.PI, mv:1, lob:D.lob0, ram:{}, pr:0, rest:0, oa:0 };
+  f.hp=f.hpMax=Math.max(1,Math.round(D.hp*bhpNow())); f.barOff=1; f.gmyFace=-1; X.hh=f;     f.gmx={ st:'enter', T:0, leg:0, next:2, way:null, h:Math.PI, mv:1, lob:D.lob0, ram:{}, pr:0, rest:0, oa:0 };
   SFX.horn(); bfSfx(SFX.gmxNeigh,W-60,f.y); setTimeout(()=>{ try{ SFX.gmxLaugh(); }catch(e){} }, 700); gmyLog(G,'horseman in ('+why+')'); }
 function gmxHhPick(f,m){ const D=GMX.hh; m.leg++; m.legT=0;
   if(m.leg>=m.next){ const men=gmyMen().filter(u=>!(u.def && u.def.vehicle)).sort((a,b)=>a.x-b.x).slice(0,D.back);   
@@ -169758,7 +169766,7 @@ function gmyWaveTick(G,dt){ const D=GMY.wave3; G.waveT-=dt; if(G.waveT>0) return
   if(S.foes.filter(f=>f.type==='mumrifle' && !f.dead).length+n>n*D.full){ G.waveT=D.retry; return; }
   G.waveT=D.every; G.waveN=(G.waveN|0)+1; spawnGroup({ f:'solo', t:'mumrifle', n:n, e:'right' }); gmyLog(G,'wave '+G.waveN+' x'+n);
   if(G.waveN===D.frankAt) gmyFrankHelp(G); }
-function gmyFrankHelp(G){ const f=spawnFoe('frank', W+10, foeBandY(WORLD_H/2), null, false); if(!f) return; f.boss=false; f.barOff=1; f.gmyHelp=1; gmyLog(G,'frank helps'); gmySay(G,'frank'); }
+function gmyFrankHelp(G){ const f=bhpBare(()=>spawnFoe('frank', W+10, foeBandY(WORLD_H/2), null, false)); if(!f) return;     f.boss=false; f.barOff=1; f.gmyHelp=1; gmyLog(G,'frank helps'); gmySay(G,'frank'); }
 function gmyBatRule(G){ return (G && G.st===2 && gmyTier()==='g')? GMY.bat3g : GMY.bat; }   
 
 function gmyDir(f,gx,gy){ const dx=gx-f.x, dy=gy-f.y, d=Math.hypot(dx,dy)||1, st=rockSteer(f.x,f.y,gx,gy,ROCK_PAD_FOE+f.def.w*0.2,null,1); return st? { x:st.x, y:st.y } : { x:dx/d, y:dy/d }; }   
