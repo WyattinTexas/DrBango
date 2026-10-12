@@ -83357,7 +83357,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='21.36';        
+let GVT_CV='21.37';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -100639,7 +100639,7 @@ function foeLeapTick(f,dt){
     return;
   }
   f.plCd-=dt;
-  if(f.plCd<=0){   
+  if(f.plCd<=0 && !f.kyTk && !(f.kySwing>0)){       
     const m=foeLeapPick(f);
     if(!m){ f.plCd=2.5; return; }
     f.plAim=m; f.plWind=L.wind;
@@ -101429,7 +101429,8 @@ function gsnowTick(f,dt){
     }
     return;
   }
-  if(f.shot>=f.def.fireCd*tkSlowMul(f)+(f.cdAdd||0)){   
+  if(f.gsNow && f.x<W-10){ f.gsNow=0; const m9=kyuFirstPick(f); if(m9){ const dx9=m9.x-f.x, dy9=m9.y-f.y, d9=Math.hypot(dx9,dy9)||1; f.gsDir={x:dx9/d9,y:dy9/d9}; f.gsWind=sb.wind; foeAim(f,m9); return; } }    
+  if(f.shot>=(f.def.fireCd*tkSlowMul(f)+(f.cdAdd||0))*(f.cdX||1)){       
     const m=tanPick(f);
     if(m){ const dx=m.x-f.x, dy=m.y-f.y, d=Math.hypot(dx,dy)||1;
       f.gsDir={x:dx/d,y:dy/d}; f.gsWind=sb.wind; foeAim(f,m); }   
@@ -109867,6 +109868,9 @@ function spawnGroup9(g){
       if(f && g.sbn)  f.sbn=Math.max(1,g.sbn|0);
       if(f && g.cdAdd) f.cdAdd=+g.cdAdd||0;   
       if(f && g.hopOn) f.hopOn=1;             
+      if(f && g.cdX) f.cdX=+g.cdX||1;    
+      if(f && g.gsNow) f.gsNow=1;    
+      if(f && g.leap) f.def=Object.assign({}, f.def, { leap:g.leap });    
       if(f && g.runAdd) f.runAdd=+g.runAdd||0;   
       if(f && g.ret!=null) f.retFloor=+g.ret;
       
@@ -109910,6 +109914,7 @@ function spawnGroup9(g){
       
       
       if(g.hpAdd) f.hp=f.hpMax=Math.max(1,f.hpMax+(g.hpAdd|0));
+      if(g.hpAddP && kyuCmd()>=(g.hpAddN||1)) f.hp=f.hpMax=Math.max(1,f.hpMax+(g.hpAddP|0));    
       
       
       
@@ -113612,7 +113617,7 @@ function update(dt){
   if(S.sq && S.mode==='play' && !S.bf){
     S.tagT+=dt;
     if(S.tagT>=CAMP_TICK_EVERY){ S.tagT-=CAMP_TICK_EVERY;   
-      const pour=Math.round(((S.raid && S.raid.t==='u')? EV_TICK_U : CAMP_TICK)*iceP3TagX()*momP3TagX()*bfTagX()*rtxTagX()*gtxX());       
+      const pour=Math.round(((S.raid && S.raid.t==='u')? EV_TICK_U : CAMP_TICK)*iceP3TagX()*kyuTagX()*momP3TagX()*bfTagX()*rtxTagX()*gtxX());           
       S.plastic+=pour;
       S.floats.push({x:166, y:280, txt:'+'+pour, t:0, col:'#FFF3C4'});
     }
@@ -117496,7 +117501,7 @@ function foeFell(f,u){
       
       
       if(!(u&&u.side==='jax') && !FS_NOBLOB && !f.def.bubbleOf && !f.def.mine)
-        S.blobs.push({x:f.x,y:f.y-8,v:Math.round(f.def.bounty*(f.bountyMul||1)*iceP3TagX()*momP3TagX()*bfTagX()),t:0});   
+        S.blobs.push({x:f.x,y:f.y-8,v:Math.round(f.def.bounty*(f.bountyMul||1)*iceP3TagX()*kyuTagX()*momP3TagX()*bfTagX()),t:0});       
       if(f.type==='crawler'){ META.stats.crawlerKills++; }
       if(f.boss){
         
@@ -153971,6 +153976,7 @@ function raidCfg(tier,rk){
       
       
       for(const w of cfg.waves) for(const g of w.groups){ if(g.f==='boss' && g.t==='sgtsnow'){ g.cdAdd=EV_SNOW_CD_ADD; g.hopOn=1; g.runAdd=EV_SNOW_RUN_ADD; } }
+      kyuStamp(cfg);    
       
       
       
@@ -154237,6 +154243,25 @@ function raidCapSet(i,o,crush,remote){
   }
   if(!remote && sqRef() && S.coop) coopSend({k:'cap', n:i|0, t:o, x:crush?1:0});
 }
+
+
+
+
+
+
+
+const KYU={ on:1, tagX:0.85, tagN:3, snowCdX:0.8, snowNow:1, kingHpAdd:3000, kingHpN:3, leapFirst:2.5, leapCd:LEAP_CD_SGT };
+function kyuRoom(){ const rd=S.raid; return !!(rd && rd.k==='ice' && rd.t==='u' && rd.cfg===S.cfg); }   
+function kyuCmd(){ const q=S.sq; return q? Math.max(1,(q.bp||q.p)|0) : 1; }   
+function kyuTagX(){ return (KYU.on && kyuRoom() && kyuCmd()>=KYU.tagN)? KYU.tagX : 1; }   
+function kyuLeapBag(){ return { cd:KYU.leapCd, first:KYU.leapFirst, wind:LEAP_WIND, t:LEAP_T, h:LEAP_H, minD:LEAP_MIN_D, mega:1 }; }   
+function kyuFirstPick(f){ let b=null, bd=1e9; for(const u of S.units){ if(u.dead || u.jetT>0 || u.dropT>0 || u.falling || u.cloakT>0 || (S.drag && S.drag.unit===u)) continue; const d=Math.hypot(u.x-f.x,u.y-f.y); if(d<(f.def.minRng||0)) continue; if(d<bd){ bd=d; b=u; } } return b; }   
+function kyuStamp(cfg){ if(!KYU.on) return; for(const w of cfg.waves) for(const g of w.groups){ if(g.f!=='boss') continue; if(g.t==='sgtsnow'){ g.cdX=KYU.snowCdX; if(KYU.snowNow) g.gsNow=1; } else if(g.t==='kingyeti'){ g.leap=kyuLeapBag(); g.hpAddP=KYU.kingHpAdd; g.hpAddN=KYU.kingHpN; } } }   
+setTimeout(()=>{ try{ GVT.kyu=function(){ const k=S.foes.find(f=>f.type==='kingyeti' && !f.dead)||null, sg=S.foes.find(f=>f.type==='sgtsnow' && !f.dead)||null;   
+  return { cv:GVT_CV, dial:Object.assign({},KYU), room:kyuRoom()?1:0, cmd:kyuCmd(), tagX:kyuTagX(), p3:!!(S.raid&&S.raid.p3), wave:S.wave, leapC:{ cd:LEAP_CD_SGT, first:LEAP_FIRST, wind:LEAP_WIND, t:LEAP_T, h:LEAP_H, minD:LEAP_MIN_D },
+    king:k? { hp:Math.round(k.hp), hpMax:Math.round(k.hpMax), x:Math.round(k.x), y:Math.round(k.y), leap:k.def.leap? Object.assign({},k.def.leap) : null, plCd:(k.plCd==null)? null : +k.plCd.toFixed(2), plWind:+(k.plWind||0).toFixed(2), plT:+(k.plT||0).toFixed(2), airB:+(k.airB||0).toFixed(1), tk:!!k.kyTk, swing:+(k.kySwing||0).toFixed(2) } : null,
+    sgt:sg? { x:Math.round(sg.x), y:Math.round(sg.y), shot:+(sg.shot||0).toFixed(2), cdX:sg.cdX||null, gsNow:sg.gsNow|0, cdAdd:sg.cdAdd||0, wind:+(sg.gsWind||0).toFixed(2), gate:+((sg.def.fireCd*tkSlowMul(sg)+(sg.cdAdd||0))*(sg.cdX||1)).toFixed(2), balls:(S.gboul||[]).filter(b=>b.src===sg).length } : null }; }; }catch(e){} },0);
+
 
 
 
