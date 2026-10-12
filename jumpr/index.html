@@ -725,6 +725,8 @@ async function boot() {
   // phone is already linked to (someone else's link must not hijack the pad).
   const m = location.hash.match(/[#&]k=([a-f0-9]{16,64})/i);
   const gm = location.hash.match(/[#&]g=([^&]{1,40})/);        // 9/27: a guest link names its guest
+  const pm = location.hash.match(/[#&]p=([a-z]{2,12})/);        // 10/12 CARD-DCG: a guest link may name its first project (Cameron → Nation)
+  const pseed = pm ? DEFAULT_PROJECTS.filter(p => p.id === pm[1]) : [];
   let gname = "";
   if (gm) { try { gname = decodeURIComponent(gm[1]); } catch (e) { gname = gm[1]; }
             gname = gname.replace(/[^\w .'’-]/g, "").trim().slice(0, 24); }
@@ -733,14 +735,14 @@ async function boot() {
     if (!KEYSTR || incoming === KEYSTR) {
       KEYSTR = incoming; localStorage.setItem(LS.key, KEYSTR);
       setGuest(gname);
-      if (!localStorage.getItem(LS.projmeta)) projects = guest ? GUEST_PROJECTS : DEFAULT_PROJECTS;
+      if (!localStorage.getItem(LS.projmeta)) projects = guest ? (pseed.length ? pseed : GUEST_PROJECTS) : DEFAULT_PROJECTS;
     } else if (confirm("This link is for a DIFFERENT jumpr channel (" + incoming.slice(0,4) +
                        "…). Unlink this phone from its current jumpr and switch?")) {
       KEYSTR = incoming; localStorage.setItem(LS.key, KEYSTR);
       outbox = []; setJ(LS.outbox, outbox);
       imgMax = 0; localStorage.removeItem(LS.imgmax);   // 9/30: the new Mac says for itself whether it takes screenshots
       setGuest(gname);
-      projects = guest ? GUEST_PROJECTS : DEFAULT_PROJECTS; localStorage.removeItem(LS.projmeta);
+      projects = guest ? (pseed.length ? pseed : GUEST_PROJECTS) : DEFAULT_PROJECTS; localStorage.removeItem(LS.projmeta);
       proj = projects[0].id; localStorage.setItem(LS.proj, proj);
     }
     history.replaceState(null,"",location.pathname);
