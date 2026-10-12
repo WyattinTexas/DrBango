@@ -83090,7 +83090,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='21.26';        
+let GVT_CV='21.27';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -86730,35 +86730,37 @@ function bdName(){ return (bdKind()==='tundra')? 'THE BATTLE OF THE FROZEN TUNDR
 function bdTeamMin(){ return fztOn()? FZT_MIN : BD_TEAM_MIN; }   
 function bdPromoKey(){ return (bdKind()==='tundra')? 'tundra' : 'bd'; }   
 function fztTitleKey(n){ return fztOn()? (n===1? '⚔ THE BATTLE OF THE FROZEN TUNDRA · %1 REAL COMMANDER · YOU: %2' : '⚔ THE BATTLE OF THE FROZEN TUNDRA · %1 REAL COMMANDERS · YOU: %2') : (n===1? '⚔ THE BATTLE OF THE DESERT · %1 REAL COMMANDER · YOU: %2' : '⚔ THE BATTLE OF THE DESERT · %1 REAL COMMANDERS · YOU: %2'); }   
-function fztBag(){ return { posts:FZT_POSTS.map(p=>({ x:p.x, y:p.y, o:0, pr:0, prs:0, tur:0 })), t:'h', k:'ice', hold:[0,0], shots:0, flips:[] }; }   
+function fztBag(){ return { posts:FZT_POSTS.map(p=>({ x:p.x, y:p.y, o:0, pr:0, prs:0, tur:0, dead:0, tk:[null,null,null] })),     t:'h', k:'ice', hold:[0,0], shots:0, flips:[] }; }   
 function fztPostCol(o){ return o===1? ((S.bf&&S.bf.hex&&S.bf.hex.you)||'#BFE39A') : o===2? ((S.bf&&S.bf.hex&&S.bf.hex.foe)||'#9CC0D8') : '#C9D4E2'; }   
 function fztStanding(u){ return !(u.dead || u.down || u.dropT>0 || u.jetT>0 || u.cloakT>0 || u.falling) && u.hp>0; }   
 function fztTeamOf(u){ return (u.side==='foe')? 2 : 1; }   
 function fztCapSet(i,o,remote){   
-  const bg=S.bf&&S.bf.fzt; if(!bg || S.mode!=='play') return; const P=bg.posts[i|0]; if(!P) return; o=Math.max(0,Math.min(2,o|0));
+  const bg=S.bf&&S.bf.fzt; if(!bg || S.mode!=='play') return; const P=bg.posts[i|0]; if(!P) return; if((o|0)===3 && FZT5.on){ fzt5Wreck(bg,i|0,remote); return; } if(P.dead) return; o=Math.max(0,Math.min(2,o|0));    
   if(P.o===o){ P.pr=0; P.prs=0; return; }
-  P.o=o; P.pr=0; P.prs=0; P.tur=0; bg.flips.push({ t:+S.t.toFixed(2), i:i|0, o:o });
+  const prev9=P.o; P.o=o; P.pr=0; P.prs=0; P.tur=0; bg.flips.push({ t:+S.t.toFixed(2), i:i|0, o:o });
   S.fx.push({k:'ring',x:P.x,y:P.y,r:8,R:RAID_CAP_R,t:0,dur:0.45,col:fztPostCol(o)});
-  if(o){ const mine=(bfMyTeam()==='foe')? 2 : 1; if(o===mine) SFX.trumpet(); else SFX.clack(); }    
+  if(o){ const mine=(bfMyTeam()==='foe')? 2 : 1; if(o===mine) SFX.trumpet(); else SFX.clack(); } else if(FZT5.on && prev9===((bfMyTeam()==='foe')? 2 : 1)) SFX.clack();        
   if(!remote && sqRef() && S.coop) coopSend({k:'cap', n:i|0, t:o, x:0});
 }
 function fztTick(dt){   
   const bg=S.bf&&S.bf.fzt; if(!bg || S.mode!=='play' || S.evHold) return;
   fzt2Tick(bg,dt);    
   for(let i=0;i<bg.posts.length;i++){ const P=bg.posts[i];
+    if(P.dead){ fzt5Smoke(P,dt); continue; }    
     P.tur=(P.tur||0)-dt; P.turHotCd=(P.turHotCd||0)-dt;
     let best=null,bd=FZT2.rng; const enemy=(P.o===1)? 2 : 1;    
     if(P.o){ for(const u of S.units){ if(fztTeamOf(u)!==enemy || !fztStanding(u)) continue; const d=Math.hypot(u.x-P.x,u.y-P.y); if(d<FZT2.dead) continue; if(d<bd){ bd=d; best=u; } } }    
     const was9=!!P.turHot; P.turHot=!!best;
     if(best){ const ga=Math.atan2((best.y-14)-(P.y-18.5), best.x-P.x); let d9=ga-(P.aim||0); while(d9>Math.PI) d9-=Math.PI*2; while(d9<-Math.PI) d9+=Math.PI*2; P.aim=(P.aim||0)+d9*Math.min(1,dt*TUR_TRACK); if(!was9 && P.turHotCd<=0){ bfSfx(SFX.clack,P.x,P.y); P.turHotCd=2; } }
     if(P.tur>0 || !best) continue;
-    P.tur=FZT2.cd;       
-    const marks=[best]; hurt(best,FZT2.dmg,null); if(best.hp<=0) P._killT=S.t;    
+    P.tur=FZT5.on? FZT5.cd : FZT2.cd;           
+    const dmg9=FZT5.on? FZT5.dmg : FZT2.dmg;     const marks=[best]; hurt(best,dmg9,null); if(best.hp<=0) P._killT=S.t;    
     for(let r=1;r<FZT2.rounds;r++){ let m=null,md=FZT2.rng; for(const u of S.units){ if(fztTeamOf(u)!==enemy || !fztStanding(u) || marks.indexOf(u)>=0) continue; const d=Math.hypot(u.x-P.x,u.y-P.y); if(d<FZT2.dead) continue; if(d<md){ md=d; m=u; } }
-      if(!m) m=marks.find(u=>fztStanding(u)); if(!m) break; marks.push(m); hurt(m,FZT2.dmg,null); if(m.hp<=0) P._killT=S.t; }
-    raidTurBurst(P,marks); bg.shots++;
+      if(!m) m=marks.find(u=>fztStanding(u)); if(!m) break; marks.push(m); hurt(m,dmg9,null); if(m.hp<=0) P._killT=S.t; }
+    if(FZT5.on) fzt5Round(P,marks); else raidTurBurst(P,marks); bg.shots++;    
   }
   if(!sqRef()) return;   
+  if(FZT5.on){ fzt5Ref(bg,dt); return; }    
   for(let i=0;i<bg.posts.length;i++){ const P=bg.posts[i]; let g1=0,g2=0;
     for(const u of S.units){ if(!fztStanding(u)) continue; if(Math.hypot(u.x-P.x,u.y-P.y)<=RAID_CAP_R){ if(fztTeamOf(u)===2) g2=1; else g1=1; if(g1&&g2) break; } }
     const side=(g1&&!g2)? 1 : (g2&&!g1)? 2 : 0;   
@@ -86768,13 +86770,15 @@ function fztTick(dt){
   }
 }
 function fztStamp(u,y){   
-  const bg=S.bf&&S.bf.fzt; u.fzPost=null; if(!bg || u.def.vehicle || u.def.mine || u.type==='spy') return;
+  const bg=S.bf&&S.bf.fzt; u.fzPost=null; u.fzRam=null; if(bg && FZT5.on && u.def.vehicle && !u.def.air && !u.def.mine) fzt5Aim(bg,u,y);     if(!bg || u.def.vehicle || u.def.mine || u.type==='spy') return;
   const i=fzt2Band(bg,y); if(i<0) return;    
   const P=bg.posts[i]; if(!P || P.o===fztTeamOf(u)) return;
+  if(FZT5.on){ fzt5Order(bg,i,P,u); return; }    
   u.fzPost=i; u.laneY=P.y+FZT_SPREAD[(u.zigS>>>0)%FZT_SPREAD.length];
 }
-function fztHold(u){   
-  const bg=S.bf&&S.bf.fzt; if(!bg || u.fzPost==null) return false;
+function fztHold(u,dt){       
+  const bg=S.bf&&S.bf.fzt; if(!bg || (u.fzPost==null && u.fzRam==null)) return false;    
+  if(FZT5.on) return fzt5Hold(u,dt);    
   const P=bg.posts[u.fzPost]; if(!P || P.o===fztTeamOf(u)){ u.fzPost=null; return false; }
   return Math.hypot(u.x-P.x,u.y-P.y)<=RAID_CAP_R-14;
 }
@@ -86813,6 +86817,7 @@ function fzt2Pips(a9){
   cx.save(); cx.globalAlpha=al; cx.lineCap='round'; cx.lineJoin='round';
   for(let i=0;i<n;i++){ const P=bg.posts[i], x=x0+i*gap;
     cx.fillStyle='rgba(16,22,30,0.66)'; cx.beginPath(); cx.arc(x,y,16.5,0,7); cx.fill();
+    if(P.dead){ fzt5Pip(x,y); continue; }    
     if(P.o){ cx.fillStyle='#FFFFFF'; cx.beginPath(); cx.arc(x,y,13.5,0,7); cx.fill(); cx.fillStyle=fztPostCol(P.o); cx.beginPath(); cx.arc(x,y,11.5,0,7); cx.fill(); }   
     else { cx.strokeStyle='rgba(201,212,226,0.85)'; cx.lineWidth=2; cx.setLineDash([3,3]); cx.beginPath(); cx.arc(x,y,11.5,0,7); cx.stroke(); cx.setLineDash([]); }   
     if(P.pr>0 && P.prs){ cx.strokeStyle=fztPostCol(P.prs); cx.lineWidth=3.4; cx.beginPath(); cx.arc(x,y,15,-Math.PI/2,-Math.PI/2+P.pr*Math.PI*2); cx.stroke(); }
@@ -86832,6 +86837,102 @@ function fzt2Pips(a9){
 
 const FZT4={ open:4 };   
 function fzt4Hush(){ const bg=S.bf&&S.bf.fzt; return !!(bg && bg.even && S.mode==='play' && !S.evHold && (S.t-(bg.bellT||0))>=FZT4.open && !S.bf.whistled && !S.bf.resolved); }   
+
+
+
+
+
+
+
+
+
+const FZT5={   
+  on:1,        
+  cd:0.2,      
+  dmg:1.5,     
+  seatDx:16,   
+  seatDy:6,    
+  seatR:14,    
+  gunR:34,     
+  pull:110,    
+  fallT:0.5,   
+  crushR:34,   
+  ramLane:60,  
+  ramLaneAI:130, 
+  ramIn:300,   
+  blast:4,     
+  blastR:70,   
+  sfxT:0.45,   
+  smoke:12 };  
+function fzt5Live(u){ return !!(u && !u.dead && u.hp>0); }
+function fzt5Seat(P,tm){ return { x:P.x+FZT5.seatDx*(tm===2? 1 : -1), y:P.y+FZT5.seatDy }; }   
+function fzt5SeatMan(P,tm){   
+  const tk=P.tk? P.tk[tm] : null; if(tk && fztStanding(tk) && tk.fzPost!=null && Math.hypot(tk.x-P.x,tk.y-P.y)<=FZT5.gunR) return tk;
+  let b=null,bd=FZT5.gunR; for(const u of S.units){ if(fztTeamOf(u)!==tm || !fztStanding(u) || u.def.vehicle || u.def.mine) continue; const d=Math.hypot(u.x-P.x,u.y-P.y); if(d<bd){ bd=d; b=u; } } return b; }
+function fztGunner(P){ return (P.o && !P.dead)? fzt5SeatMan(P,P.o) : null; }   
+function fzt5Order(bg,i,P,u){   
+  if(P.dead) return;   
+  const tm=fztTeamOf(u); const tk=P.tk? P.tk[tm] : null; if(tk && tk!==u && fzt5Live(tk) && tk.fzPost===i) return;   
+  if(!P.tk) P.tk=[null,null,null]; P.tk[tm]=u; u.fzPost=i; u.laneY=P.y+FZT5.seatDy; }   
+function fzt5Aim(bg,u,y){ u.fzRam=null; const i=fzt2Band(bg,y); const P=bg.posts[i]; if(!P || P.dead || P.o===fztTeamOf(u) || Math.abs(y-P.y)>(fzt5Human(u)? FZT5.ramLane : FZT5.ramLaneAI)) return; u.fzRam=i; }   
+function fzt5Human(u){ const st=S.bf && S.bf.seats && S.bf.seats[u.seat]; return !!(st && st.human); }   
+function fzt5Hold(u,dt){   
+  const bg=S.bf&&S.bf.fzt; if(!bg) return 0;
+  if(u.fzRam!=null){ const R=bg.posts[u.fzRam], tm=fztTeamOf(u); if(!R || R.dead || R.o===tm){ u.fzRam=null; return 0; } const dx=R.x-u.x; if(Math.abs(dx)>FZT5.ramIn || (tm===1? dx<-20 : dx>20)) return 0; bfMarch(u,dt||0,{ x:R.x, y:R.y }); u.marching=true; return 2; }   
+  if(u.fzPost==null) return 0; const P=bg.posts[u.fzPost]; if(!P || P.dead){ u.fzPost=null; return 0; }   
+  const tm=fztTeamOf(u); if(P.o===tm){ const g=fztGunner(P); if(g && g!==u){ u.fzPost=null; return 0; } }   
+  const s=fzt5Seat(P,tm), d=Math.hypot(u.x-s.x,u.y-s.y);
+  if(d<=FZT5.seatR) return 1;
+  if(d<=FZT5.pull){ bfMarch(u,dt||0,s); u.marching=true; return 2; }   
+  return 0; }
+function fzt5Ref(bg,dt){   
+  for(let i=0;i<bg.posts.length;i++){ const P=bg.posts[i]; if(P.dead) continue;
+    let v=null; for(const u of S.units){ if(!u.def.vehicle || u.def.air || u.def.mine || u.dead || !(u.hp>0) || u.dropT>0) continue; if(P.o && P.o===fztTeamOf(u)) continue; if(Math.hypot(u.x-P.x,u.y-P.y)<=Math.max(FZT5.crushR,u.def.ramR||0)){ v=u; break; } }   
+    if(v){ fztCapSet(i,3,false); continue; }
+    if(P.o){ if(fztGunner(P)) P.noMan=0; else { P.noMan=(P.noMan||0)+dt; if(P.noMan>=FZT5.fallT){ P.noMan=0; fztCapSet(i,0,false); continue; } } P.pr=0; P.prs=0; }   
+    else { const m1=fzt5SeatMan(P,1), m2=fzt5SeatMan(P,2); const side=(m1&&!m2)? 1 : (m2&&!m1)? 2 : 0;   
+      if(side){ if(P.prs!==side){ P.prs=side; P.pr=0; } P.pr=Math.min(1,P.pr+dt/RAID_CAP_T); if(P.pr>=1) fztCapSet(i,side,false); }
+      else P.pr=Math.max(0,P.pr-dt/RAID_CAP_T); }
+    if(P.o) bg.hold[P.o-1]+=dt; } }
+function fzt5Wreck(bg,i,remote){   
+  const P=bg.posts[i]; if(!P || P.dead) return;
+  P.dead=1; P.deadT=S.t; P.o=0; P.pr=0; P.prs=0; P.tur=0; P.turHot=false; P.noMan=0; P.tk=[null,null,null]; bg.flips.push({ t:+S.t.toFixed(2), i:i, o:0, w:1 }); bg.wrecks=(bg.wrecks||0)+1;
+  const RM=reducedMotion();
+  S.shake=Math.max(S.shake||0,0.7); SFX.rumble(); bfSfx(SFX.boom,P.x,P.y);
+  for(let k2=0;k2<(RM? 2 : 6);k2++) S.fx.push({k:'smoke',x:P.x+(Math.random()-0.5)*90,y:P.y+(Math.random()-0.5)*60,t:0,dur:0.7});
+  S.fx.push({k:'ring',x:P.x,y:P.y,r:10,R:RAID_CAP_R,t:0,dur:0.5,col:'#EAF3FA'});
+  S.fx.push({k:'puff',x:P.x,y:P.y-14,t:0,dur:0.5,R:RM? 24 : 40}); S.fx.push({k:'ring',x:P.x,y:P.y-10,r:6,R:FZT5.blastR,t:0,dur:0.35,col:'#FF9A3D'}); S.fx.push({k:'flash',x:P.x,y:P.y-12,ang:0,R:RM? 10 : 22,lw:3,t:0,dur:0.12});
+  if(FZT5.blast>0){ for(const u of S.units){ if(u.dead || !(u.hp>0) || u.dropT>0) continue; if(Math.hypot(u.x-P.x,u.y-P.y)<=FZT5.blastR) hurt(u,FZT5.blast,null); } }   
+  if(!remote && sqRef() && S.coop) coopSend({k:'cap', n:i, t:3, x:1}); }
+function fzt5Smoke(P,dt){ if(!(S.t-(P.deadT||0)<FZT5.smoke) || reducedMotion()) return; P.smkT=(P.smkT||0)-dt; if(P.smkT>0) return; P.smkT=0.5; S.fx.push({k:'smoke',x:P.x+(Math.random()-0.5)*16,y:P.y-18-Math.random()*8,t:0,dur:1.1}); }   
+function fzt5Round(P,marks){   
+  const m0=marks[0]; if(!m0) return;
+  P.aim=Math.atan2((m0.y-14)-(P.y-12), m0.x-P.x); P.turKick=S.t; P.rn=(P.rn||0)+1;
+  const RM=reducedMotion(), a=P.aim, hx=P.x, hy=P.y-12, mx=hx+Math.cos(a)*20, my=hy+Math.sin(a)*20, tx=m0.x, ty=m0.y-14;
+  S.fx.push({k:'tracer',x1:mx,y1:my,x2:tx,y2:ty,t:0,dur:0.1,col:LZ_SILVER_ROW.hex,w:2.6});
+  S.fx.push({k:'slug',x1:mx,y1:my,x2:tx,y2:ty,t:0,dur:0.12,col:'#F4F8FC',colH:'#ffffff'});
+  S.fx.push({k:'flash',x:mx,y:my,ang:a,R:RM? 6 : 11,lw:RM? 2 : 2.6,t:0,dur:0.08});
+  S.fx.push({k:'puff',x:tx+((P.rn%3)-1)*4,y:ty-2,t:0.1,dur:0.26,R:RM? 7 : 10,col:'#F4F8FC'});
+  if(P.rn%3===0){ S.fx.push({k:'ring',x:tx,y:ty,r:3,R:14,t:0.1,dur:0.2,col:LZ_SILVER_ROW.hex}); if(!RM) S.fx.push({k:'puff',x:hx-Math.cos(a)*2-Math.sin(a)*7,y:hy-Math.sin(a)*2+Math.cos(a)*7,t:0,dur:0.3,R:4,col:'#F4F8FC'}); }
+  if(S.t-(P.sfxT!=null? P.sfxT : -9)>=FZT5.sfxT){ P.sfxT=S.t; bfSfx(SFX.laser,P.x,P.y); } }
+function fzt5DrawWreck(P){   
+  const x=P.x, y=P.y, TAU=Math.PI*2, fr=Math.min(1,(S.t-(P.deadT||0))/0.5);
+  cx.save();
+  cx.globalAlpha=0.32*fr; cx.fillStyle='#2A2A2E'; cx.beginPath(); cx.ellipse(x,y+4,34,14,0,0,TAU); cx.fill();
+  cx.globalAlpha=1; cx.strokeStyle='#3A4350'; cx.lineWidth=2.2; cx.lineCap='round';
+  cx.beginPath(); cx.moveTo(x-6,y+2); cx.lineTo(x-26,y+10); cx.moveTo(x-2,y+4); cx.lineTo(x+18,y+13); cx.moveTo(x+4,y-2); cx.lineTo(x+22,y-8); cx.stroke(); cx.lineCap='butt';
+  cx.save(); cx.translate(x+2,y-4); cx.rotate(-0.55); cx.fillStyle='#4A5461'; cx.strokeStyle='#2A3038'; cx.lineWidth=1.6; cx.beginPath(); cx.roundRect(-13,-5.5,26,11,4); cx.fill(); cx.stroke();
+  cx.beginPath(); for(let i=0;i<3;i++){ cx.moveTo(-9+i*8,-5); cx.lineTo(-9+i*8,5); } cx.stroke(); cx.fillStyle='#1E2228'; cx.beginPath(); cx.arc(13,0,4,0,TAU); cx.fill(); cx.restore();
+  cx.fillStyle='#8E9BAA'; cx.strokeStyle='#3A4350'; cx.lineWidth=1.4; cx.beginPath(); cx.moveTo(x-24,y-14); cx.lineTo(x-13,y-16); cx.lineTo(x-12,y-7); cx.lineTo(x-20,y-5); cx.closePath(); cx.fill(); cx.stroke();
+  cx.strokeStyle='#5A4634'; cx.lineWidth=2; cx.beginPath(); cx.moveTo(x+17,y+6); cx.lineTo(x+44,y-10); cx.stroke(); cx.fillStyle='#D9A544'; cx.beginPath(); cx.arc(x+45,y-11,1.6,0,TAU); cx.fill();
+  cx.fillStyle='#1E2228'; for(const [dx,dy,r] of [[-30,-2,1.6],[28,8,1.4],[10,16,1.2],[-14,18,1.5],[36,2,1.1]]){ cx.beginPath(); cx.arc(x+dx,y+dy,r,0,TAU); cx.fill(); }
+  cx.restore(); }
+function fzt5Pip(x,y){   
+  cx.strokeStyle='rgba(201,212,226,0.5)'; cx.lineWidth=2; cx.setLineDash([3,3]); cx.beginPath(); cx.arc(x,y,11.5,0,7); cx.stroke(); cx.setLineDash([]);
+  cx.strokeStyle='#C9D4E2'; cx.lineWidth=3; cx.lineCap='round'; cx.beginPath(); cx.moveTo(x-6,y-6); cx.lineTo(x+6,y+6); cx.moveTo(x+6,y-6); cx.lineTo(x-6,y+6); cx.stroke(); cx.lineCap='butt'; }
+function fzt5Probe(){ const bg=S.bf&&S.bf.fzt; if(!bg) return { on:!!FZT5.on, bag:false };   
+  return { on:!!FZT5.on, bag:true, dials:Object.assign({},FZT5), wrecks:bg.wrecks||0, posts:bg.posts.map((P,i)=>{ const g=fztGunner(P); return { i, o:P.o, dead:P.dead|0, pr:+(P.pr||0).toFixed(3), prs:P.prs|0, gunner:g? { id:g.id, type:g.type, x:Math.round(g.x), y:Math.round(g.y) } : null, tk:(P.tk||[]).map(u=>u? u.id : null) }; }),
+    rams:S.units.filter(u=>u.fzRam!=null && !u.dead).map(u=>({ id:u.id, type:u.type, side:u.side, post:u.fzRam, x:Math.round(u.x), y:Math.round(u.y) })), ordered:S.units.filter(u=>u.fzPost!=null && !u.dead).map(u=>({ id:u.id, type:u.type, side:u.side, post:u.fzPost, x:Math.round(u.x), y:Math.round(u.y), m:u.marching|0 })), flips:bg.flips.slice() }; }
 
 
 
@@ -96724,7 +96825,7 @@ function bfUnitStep(u,dt){
   if(u.saberState && u.saberState!=='idle') return true;   
   if(u.sgDash) return true;                                
   if(u.cmdDash) return true;                               
-  if(u.fzPost!=null && fztHold(u)){ u.marching=false; return true; }   
+  if(u.fzPost!=null || u.fzRam!=null){ const h9=fztHold(u,dt); if(h9===2) return false; if(h9){ u.marching=false; return true; } }       
   { const n9=owTwinStep(u,dt);   
     if(n9===1) return false;   
     if(n9===2){ u.marching=false; if(u.sdT>0 && u.type!=='sarge') return false;    
@@ -154208,6 +154309,7 @@ function raidTick(dt){
 function drawRaidPosts(){
   const rd=(S.bf&&S.bf.fzt)||S.raid; if(!rd) return; const RM=reducedMotion(), t=S.t, TAU=Math.PI*2, SIL=LZ_SILVER_ROW.hex;   
   for(const P of rd.posts){
+    if(P.dead && fztOn()){ fzt5DrawWreck(P); continue; }    
     if(P._o!==P.o){ if(P._o!==undefined) P._flipT=t; P._o=P.o; }
     const col=fztOn()? fztPostCol(P.o) : (P.o===1?'#BFE39A':P.o===2?'#9CC0D8':'#C9D4E2'), x=P.x, y=P.y, ours=P.o===1, ice=P.o===2, held=!!P.o;   
     const contested=P.pr>0, pc=fztOn()? fztPostCol(P.prs) : (P.prs===1?'#BFE39A':'#9CC0D8');
