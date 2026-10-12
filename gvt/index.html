@@ -83550,7 +83550,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='21.41';        
+let GVT_CV='21.42';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -105681,6 +105681,29 @@ function breathHitsU(b,u){
 const BR_TICK=FS_TICK;   
 const BREATH_TELL=1;   
 function breathTell(u){ if(!BREATH_TELL) return; S.floats.push({x:u.x,y:u.y-52,txt:'',flame:1,t:0,col:'#FF9A3D'}); S.fx.push({k:'ring',x:u.x,y:u.y-18,r:4,R:18,t:0,dur:0.22,col:'#FF9A3D'}); }
+
+
+
+
+
+
+const RFF={ on:1, hero:1, trail:1, self:1 };   
+function rffTrail(p){ return !p.ftEn || !!(RFF.on && RFF.trail); }   
+function rffSelf(p,e){ return !!(p.ftEn && e===p.src && RFF.self); }   
+function rffOwn(b){   
+  if(!(RFF.on && RFF.hero)) return; const k=b.src; if(!k) return;
+  for(const e of (S.bf? S.units.filter(o=>o.side===k.side) : S.units)){
+    if(e===k||e.dead||e.jetT>0||e.dropT>0||e.falling||e.burrow||(S.drag&&S.drag.unit===e)) continue;   
+    const nb=b.hit.get(e); if(nb!=null && b.t<nb) continue;   
+    if(!breathHitsU(b,e)) continue;
+    b.hit.set(e,b.t+BR_TICK);
+    if(S.bf) hurt(e,b.dmg,null,1); else tanHit(e,b.x,b.y,null,1);   
+    breathTell(e);
+  }
+}
+function rffRig(o){ o=o||{}; if(o.on!=null) RFF.on=o.on|0; if(o.hero!=null) RFF.hero=o.hero|0; if(o.trail!=null) RFF.trail=o.trail|0; if(o.self!=null) RFF.self=o.self|0; return { cv:GVT_CV, dial:Object.assign({},RFF), ff:FS_FF, tick:BR_TICK, body:BR_BODY }; }   
+setTimeout(()=>{ try{ if(typeof GVT==='object' && GVT) GVT.rff=rffRig; }catch(e){} }, 0);   
+
 function breathBurn(b){
   if(b.lane==='nem'){                            
     for(const u of S.units){
@@ -105713,6 +105736,7 @@ function breathBurn(b){
       if(!breathHitsU(b,f)) continue;
       b.hit.set(f,b.t+BR_TICK); hurt(f,b.dmg,k,1); breathTell(f);   
     }
+    rffOwn(b);    
     return;
   }
   for(const u of S.units){
@@ -107920,9 +107944,9 @@ function fsTick(dt){
       
       
       
-      if(FS_FF && !p.ftEn){   
+      if(FS_FF && rffTrail(p)){       
         for(const e of (S.bf? S.units.filter(o=>o.side===p.side) : S.units)){
-          if(e.dead||e.jetT>0||e.dropT>0||e.falling||e.burrow||(S.drag&&S.drag.unit===e)) continue;
+          if(e.dead||e.jetT>0||e.dropT>0||e.falling||e.burrow||(S.drag&&S.drag.unit===e)||rffSelf(p,e)) continue;    
           if(Math.hypot(e.x-p.x,e.y-p.y)>p.r) continue;
           if(!p.hit.has(e)){ p.hit.add(e); S.floats.push({x:e.x,y:e.y-52,txt:'',flame:1,t:0,col:'#FF9A3D'}); }
           if(S.bf) hurt(e, (p.dps||FS_DPS)*FS_TICK, null, 1); else tanHit(e, p.x, p.y, null, 1);   
