@@ -1638,6 +1638,18 @@
   #fortBg[data-motion="1"] svg.fhero #fhRecord .rcp-body.rcp-tap { animation:rcpTap .26s ease-out; }
   @keyframes rcpSpin { to { transform:rotate(360deg); } }
   @keyframes rcpTap { 0% { transform:scale(1,1); } 40% { transform:scale(1.06,.92); } 100% { transform:scale(1,1); } }
+  /**/
+  [data-mbh] .rcp-disc { transform-box:fill-box; transform-origin:50% 50%; }
+  [data-mbh].rcp-live .rcp-disc { animation:rcpSpin 1.8s linear infinite; }
+  [data-mbh] .rcp-body { transform-box:fill-box; transform-origin:50% 100%; }
+  [data-mbh] .rcp-body.rcp-tap { animation:rcpTap .26s ease-out; }
+  [data-mbh] .mbh-n { opacity:0; transform-box:fill-box; transform-origin:50% 50%; }
+  [data-mbh].rcp-live .mbh-n { animation:mbhRise 2.4s linear infinite both; }
+  [data-mbh].rcp-live .mbh-n1 { animation-delay:.8s; }
+  [data-mbh].rcp-live .mbh-n2 { animation-delay:1.6s; }
+  @keyframes mbhRise { 0% { opacity:0; transform:translate(0,0) scale(.6); } 15% { opacity:1; transform:translate(-2px,-4px) scale(1); } 70% { opacity:1; } 100% { opacity:0; transform:translate(-16px,-24px) scale(1.05); } }
+  [data-mbh].mbh-still .rcp-disc, [data-mbh].mbh-still .mbh-n { animation:none; }
+  [data-mbh].mbh-still.rcp-live .mbh-n0 { opacity:1; transform:translate(-4px,-8px); }
   /*
 
 
@@ -83280,7 +83292,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='21.34';        
+let GVT_CV='21.35';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -136777,7 +136789,7 @@ SIGN_CX.board=SEV.cup; SIGN_CX.tv=SEV.tv; SIGN_LANE.board=100; SIGN_LANE.tv=94;
 function shelfRowSVG(){
   flxShelfSync();   
   return ''
-  +shelfSVG()+gmyBookSVG()   
+  +shelfSVG()+gmyBookSVG()+mbhShelfSVG()       
   
   +mmWrap('piggy', piggySignSVG()+'<g id="ro-piggy"><g transform="translate('+PIG_SEAT.x+','+PIG_SEAT.y+') scale('+PIG_SEAT.s+')">'
   +bankSVG()
@@ -165981,7 +165993,7 @@ function fortHeroSVG(){
   
   v+=fhWallArt(hex,ink,dye,picks);
   v+='<g data-afq="flag" transform="translate('+AFQ.flag[0]+' '+AFQ.flag[1]+') scale('+AFQ.flag[2]+')">'+fhFlag(1074,34,270,hex,ink) +'<ellipse cx="1074" cy="304" rx="12" ry="3.5" fill="#000" opacity=".2"/><rect x="1067" y="294" width="14" height="10" rx="2" fill="#5A4634" stroke="#26261f" stroke-width="1.2"/></g>';   
-  v+=fhRecordArt();   
+  v+=(MBH.on? '' : fhRecordArt());   
   v+=afqTentArt(hex,ink);   
   v+='<g data-afq="rackoff" display="none">'+fhRackArt();   
   v+=fhStandsArt()+'</g>';   
@@ -167458,7 +167470,7 @@ function renderFortScene(){
     +'<button type="button" class="fh-train-hot" id="fhTrain" onclick="UI.fortTrain()" aria-label="THE TRAINING RANGE"></button>'   
     +SARGE_ORDER.filter(wkOwned).map(wk=>'<button type="button" class="fh-iron-hot" id="fhIron-'+wk+'" data-k="'+wk+'" data-own="1" onclick="UI.fortIron(\''+wk+'\')" aria-label="'+wk+'"></button>').join('')   
     +HEROES.filter(k=>unitOwned(k) && k!==capStandK()).map(k=>'<button type="button" class="fh-king-hot" id="fhKh-'+k+'" data-k="'+k+'" onclick="UI.fortKing(\''+k+'\')" aria-label="'+k+'">'+(k===heroSel()? fhKingPlateHTML(k) : '')+'</button>').join('')
-    +Object.keys(FH_PET_PAINT).map(k=>'<button type="button" class="fh-pet-hot" id="fhPh-'+k+'" data-k="'+k+'" aria-label="'+k+'"></button>').join('')+''+trcDoorHTML()+'<button type="button" class="fh-rec-hot" id="fhRec" onclick="UI.fortRecord()" aria-label="THE RECORD PLAYER"></button><div class="fh-notes" id="fhNotes" aria-hidden="true"></div>'+flxHotHTML()+'</div>'   
+    +Object.keys(FH_PET_PAINT).map(k=>'<button type="button" class="fh-pet-hot" id="fhPh-'+k+'" data-k="'+k+'" aria-label="'+k+'"></button>').join('')+''+trcDoorHTML()+(MBH.on? '' : '<button type="button" class="fh-rec-hot" id="fhRec" onclick="UI.fortRecord()" aria-label="THE RECORD PLAYER"></button><div class="fh-notes" id="fhNotes" aria-hidden="true"></div>')+flxHotHTML()+'</div>'   
     +'<div class="wt-top"><div class="fh-namecol"><button type="button" class="wt-wordmark fh-name" data-notr onclick="UI.fortName()">'+escH(fortName())+FH_PENCIL+'</button>'+(FH_HINT_ON? '<span class="fh-hint">TAP THE NAME TO RENAME YOUR FORT</span>' : '')+'</div><div class="wt-spacer"></div>'+fmatBtnHTML()+'<button type="button" class="wt-x" onclick="UI.fortClose()">✕</button></div>';   
   fhSetDress(); fmatApply(); fhLifeWrap(); fhStationsWrap(); fhKingsWrap(); fhPetsWrap(); fortSceneLayout(); FD.start(); fhPuffStart(); fhRecStart(); fhSwipeArm(); fhCarryArm(); fhPlateFadeArm();   
 }
@@ -174259,6 +174271,34 @@ function dchHz(ts){ if(reducedMotion()) return 0; if(DCH.pin>=0) return DCH.pin;
 function dchFresh(ts){ DCH.at=-1e9; return dchHz(ts)>0; }   
 function mfpStart(){ if(MFP.raf || typeof requestAnimationFrame!=='function') return; MFP.prev=0; MFP.last=performance.now(); MFP.raf=requestAnimationFrame(mfpFrame); }
 mfpStart();
+
+
+
+
+
+const MBH={ on:1, x:228, y:282, k:1.15, pad:[8,10,8,6], tid:0 };   
+function mbhOn(){ return !!MBH.on && roomCur()==='bedroom'; }
+function mbhBox(){ const w=FH_REC.w*MBH.k, h=FH_REC.h*MBH.k; return [MBH.x, MBH.y-h, w, h]; }   
+function mbhNotesSVG(){ const n=[[24,20,0,0],[30,18,1,1],[26,21,0,2]];   
+  return '<g class="mbh-notes" pointer-events="none">'+n.map(q=>'<g transform="translate('+q[0]+' '+q[1]+')"><g class="mbh-n mbh-n'+q[3]+'">'+fhNoteArt(q[2], FH_NOTES.COLS[q[3]%2]).replace('<svg ','<svg x="-9" y="-9" width="18" height="18" ')+'</g></g>').join('')+'</g>'; }
+function mbhShelfSVG(){ if(!mbhOn()) return ''; const b=mbhBox();
+  return fhRecordArt().replace(/^<g id="fhRecord" data-fh="record" transform="[^"]*">/, '<g id="mbhRecord" data-mbh="record" class="'+(rcpLive()? 'rcp-live' : '')+(reducedMotion()? ' mbh-still' : '')+'" pointer-events="none" transform="translate('+b[0].toFixed(1)+' '+b[1].toFixed(1)+') scale('+MBH.k+')">').replace(/<\/g><\/g>$/, '</g>'+mbhNotesSVG()+'</g>'); }   
+function mbhSync(){ const gs=document.querySelectorAll('[data-mbh="record"]'); if(!gs.length) return false; const on=rcpLive(), row=rcpRow(rcpOn())||RCP_SONGS[0], up=!!rcpUpId(row.id);
+  for(const g of gs){ if(g.classList.contains('rcp-live')!==on) g.classList.toggle('rcp-live', on);
+    const lab=g.querySelector('.rcp-lab'); if(lab && lab.getAttribute('fill')!==row.col) lab.setAttribute('fill', row.col);
+    const arm=g.querySelector('.rcp-arm'); if(arm && up!==arm.hasAttribute('transform')){ if(up) arm.setAttribute('transform','rotate(40 48.6 22.6)'); else arm.removeAttribute('transform'); } }   
+  const l=document.querySelector('#roomModal .rcp-list'); if(l && l.classList.contains('rcp-live')!==on) l.classList.toggle('rcp-live', on);
+  if(on && dlgBeat()){ const u=dlgFind('mbhRecord'); if(u && !u.__life && dlgHoldU(u, 1500)) dlgLayers(dlgAwake()); }   
+  return on; }   
+function mbhTap(){ audio(); SFX.blip(); const b=document.querySelector('#mbhRecord .rcp-body'); if(b){ b.classList.remove('rcp-tap'); void b.getBoundingClientRect(); b.classList.add('rcp-tap'); }
+  roomModal(rcpHTML(), 'medalhall fortcard rcpcard'); mbhSync(); return true; }   
+MBH.tid=setInterval(()=>{ if(MBH.on) mbhSync(); }, 600);
+ROOM_SPOTS.push({ id:'mbhrec', x:MBH.x-MBH.pad[0], y:MBH.y-FH_REC.h*MBH.k-MBH.pad[1], w:FH_REC.w*MBH.k+MBH.pad[0]+MBH.pad[2], h:FH_REC.h*MBH.k+MBH.pad[1]+MBH.pad[3], z:3, due:()=>mbhOn(), act:()=>{ mbhTap(); } });   
+setTimeout(()=>{ GVT.mbh=(o)=>{ o=o||{}; if(o.on!=null){ MBH.on=o.on? 1 : 0; if(S.mode==='menu') renderMenu(); } if(o.tap) mbhTap();
+  const g=document.getElementById('mbhRecord'), f=document.getElementById('fhRecord'), h=document.getElementById('fhRec'), R=el=>{ if(!el) return null; const r=el.getBoundingClientRect(); return [Math.round(r.left*10)/10, Math.round(r.top*10)/10, Math.round(r.width*10)/10, Math.round(r.height*10)/10]; };
+  const sp=ROOM_SPOTS.find(q=>q.id==='mbhrec'), hot=document.querySelector('#roomStage > div[onclick="UI.room(\'mbhrec\')"]');
+  return { on:MBH.on, room:roomCur(), shelf:!!g, box:mbhBox(), art:R(g), live:!!g && g.classList.contains('rcp-live'), still:!!g && g.classList.contains('mbh-still'), lab:g && (g.querySelector('.rcp-lab')||{getAttribute:()=>null}).getAttribute('fill'), arm:g && !!(g.querySelector('.rcp-arm')||{hasAttribute:()=>false}).hasAttribute('transform'), notes:g? g.querySelectorAll('.mbh-n').length : 0,
+    spot:sp? [sp.x, sp.y, sp.w, sp.h] : null, hot:R(hot), fort:{ art:!!f, hot:!!h, notes:!!document.getElementById('fhNotes') }, sheet:!!document.querySelector('#roomModal .rcpcard'), song:rcpOn(), rcpLive:rcpLive() }; }; }, 0);   
 
 
 
