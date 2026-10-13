@@ -71538,6 +71538,50 @@ SPRITES_SRC.kingcroakfire='<ellipse cx="71" cy="131" rx="36" ry="7" fill="#000" 
 
 
 
+
+
+
+
+
+const CK_AIM_STEP=15, CK_AIM_N=9;   
+const CK_AIM_HOLD=2.6;              
+const CK_ARMS_T='<path d="M58 74 Q44 70 36 62" stroke="#4E9E4A" stroke-width="5.5" fill="none" stroke-linecap="round"/>'
+ +'<path d="M84 74 Q98 70 106 62" stroke="#4E9E4A" stroke-width="5.5" fill="none" stroke-linecap="round"/>'
+ +'<circle cx="36" cy="62" r="3.6" fill="#4E9E4A"/><circle cx="106" cy="62" r="3.6" fill="#4E9E4A"/>'
+ +'<rect x="18" y="57" width="15" height="5.5" rx="2" fill="#B8B8C0"/><rect x="30" y="62" width="4.5" height="8" rx="2" fill="#3a3630"/>'
+ +'<rect x="109" y="57" width="15" height="5.5" rx="2" fill="#B8B8C0"/><rect x="107.5" y="62" width="4.5" height="8" rx="2" fill="#3a3630"/>';   
+function ckAimHands(deg){   
+  const r=deg*Math.PI/180, c=Math.cos(r), sn=Math.sin(r), H=(ax,ay)=>[84+ax*c-ay*sn, 74+ax*sn+ay*c];
+  return [H(26,-2), H(4,12)]; }
+function ckAimArms(deg){   
+  const r=deg*Math.PI/180, c=Math.cos(r), sn=Math.sin(r), hs=ckAimHands(deg), n=hs[0], h=hs[1], f2=v=>String(+v.toFixed(2));
+  const gun=p=>'<g transform="translate('+f2(p[0])+' '+f2(p[1])+') rotate('+f2(deg)+')"><rect x="3" y="-5" width="15" height="5.5" rx="2" fill="#B8B8C0"/><rect x="1.5" y="0" width="4.5" height="8" rx="2" fill="#3a3630"/></g>';
+  return '<path d="M58 74 Q'+f2((58+h[0])/2)+' '+f2((74+h[1])/2+4)+' '+f2(h[0])+' '+f2(h[1])+'" stroke="#4E9E4A" stroke-width="5.5" fill="none" stroke-linecap="round"/>'
+   +'<path d="M84 74 Q'+f2((84+n[0])/2+3*sn)+' '+f2((74+n[1])/2-3*c)+' '+f2(n[0])+' '+f2(n[1])+'" stroke="#4E9E4A" stroke-width="5.5" fill="none" stroke-linecap="round"/>'
+   +'<circle cx="'+f2(h[0])+'" cy="'+f2(h[1])+'" r="3.6" fill="#4E9E4A"/><circle cx="'+f2(n[0])+'" cy="'+f2(n[1])+'" r="3.6" fill="#4E9E4A"/>'
+   +gun(h)+gun(n); }
+for(let i9=0;i9<CK_AIM_N;i9++) SPRITES_SRC['kingcroakaim'+i9]=SPRITES_SRC.kingcroakfire.replace(CK_ARMS_T, ckAimArms((i9-(CK_AIM_N-1)/2)*CK_AIM_STEP));   
+function ckAimPose(ang){   
+  const c=Math.cos(ang), lim=(CK_AIM_N-1)/2*CK_AIM_STEP; let deg=Math.atan2(Math.sin(ang), Math.abs(c))*180/Math.PI; if(deg>lim) deg=lim; if(deg<-lim) deg=-lim;
+  const i=Math.round(deg/CK_AIM_STEP)+(CK_AIM_N-1)/2; return { i:i, fl:c<0, deg:(i-(CK_AIM_N-1)/2)*CK_AIM_STEP }; }
+function ckAimKey(ang){ return 'kingcroakaim'+ckAimPose(ang).i; }
+function ckAimW(o){ return (o.def && o.def.w)? o.def.w : unitW(o.type); }   
+function ckAimStamp(o,ang,tg,hold){ o.ckAimA=ang; o.ckAimTg=tg||null; o.ckAimTo=S.t+(hold||CK_AIM_HOLD); }   
+function ckAimAng(e){   
+  if(e.rpKC && e.rpT>0) return e.rpAim;
+  const D=e.duel; if(D && (D.st==='plant'||D.st==='fan')) return D.aimAt;
+  if(e.ckAimTo!=null && S.t<e.ckAimTo){ const m=e.ckAimTg; if(m && !m.dead && !m.falling && !m.burrow && !(m.jetT>0)) return Math.atan2((m.y-18)-(e.y-0.39*ckAimW(e)), m.x-e.x); return e.ckAimA; }
+  return null; }
+function crAimFl(e,fl){ const a=ckAimAng(e); return a==null? fl : ckAimPose(a).fl; }   
+function croakMzAim(x,y,w,ang){   
+  if(ang==null) return croakMz(x,y,w);
+  const p=ckAimPose(ang), r=p.deg*Math.PI/180, c=Math.cos(r), sn=Math.sin(r), s=w/140, fx=p.fl? -1 : 1, hs=ckAimHands(p.deg);
+  const tip=h=>({ x:x+((h[0]+18*c+2.25*sn)-70)*s*fx, y:y+((h[1]+18*sn-2.25*c)-128.8)*s });
+  return [tip(hs[0]), tip(hs[1])]; }
+
+
+
+
 SPRITES_SRC.wlady='<ellipse cx="60" cy="131" rx="26" ry="6" fill="#000" opacity="0.28"/>'
  +'<path d="M44 128 Q40 112 48 96 L72 96 Q80 112 76 128 z" fill="#E679D2" stroke="#7A3168" stroke-width="2" stroke-linejoin="round"/>'
  +'<path d="M46 122 L74 122 M48 114 L74 114" stroke="#8E4C82" stroke-width="1.6" opacity="0.7"/>'
@@ -84229,7 +84273,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='21.79';        
+let GVT_CV='21.80';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -98331,7 +98375,7 @@ function rbaSmash(u,b,tx,ty){ if(!rbaOwn(u)) return false;
     return true; }
   if(t==='princess'){ const m=phNext(u), hx=u.x+26*unitFaceX(u), hy=u.y-60;   
     u.pcPluck=PCH_PLUCK; bfSfx(()=>PCV.shot(m), u.x, u.y); pcpShotFx(hx,hy,tx,ty,false); return true; }
-  if(isCroakU(u)){ const h=u.rbaH=u.rbaH? 0 : 1, hz=croakMz(u.x,u.y,unitW(u.type))[h], ang=Math.atan2(ty-hz.y,tx-hz.x), L=Math.hypot(tx-hz.x,ty-hz.y), N=RBA.ckN;   
+  if(isCroakU(u)){ ckAimStamp(u, Math.atan2(ty-(u.y-0.39*unitW(u.type)), tx-u.x), null);   const h=u.rbaH=u.rbaH? 0 : 1, hz=croakMzAim(u.x,u.y,unitW(u.type),u.ckAimA)[h], ang=Math.atan2(ty-hz.y,tx-hz.x), L=Math.hypot(tx-hz.x,ty-hz.y), N=RBA.ckN;   
     const lzc=lzVisOf(u), lz=lzc? (lzc==='silver'? LZ_SILVER_ROW : lzc==='slug'? LZ_SLUG_ROW : ARMIES.find(ar=>ar.id===lzc)) : null;   
     for(let i=0;i<N;i++){ const a=ang+(i-(N-1)/2)*RBA.ckFan, x2=hz.x+Math.cos(a)*L, y2=hz.y+Math.sin(a)*L, st=reducedMotion()? 0 : -i*RBA.ckStag;
       if(lz && lzc==='slug') S.fx.push({k:'slugtr',x1:hz.x,y1:hz.y,x2,y2,t:st,dur:BRG_DUR});
@@ -103344,7 +103388,7 @@ function updateFoeCroak(f,dt){
     if(D.shotCd<=0){
       const m=tanPick(f);
       if(m){ D.shotCd=(1.2+Math.random()*1.2)/(f.rev?SON_REV_AS:1);   
-        D.shotN=(D.shotN|0)+1; const hz9=croakMz(f.x,f.y,f.def.w)[(D.shotN-1)&1];   
+        D.shotN=(D.shotN|0)+1; ckAimStamp(f, Math.atan2((m.y-18)-(f.y-0.39*f.def.w), m.x-f.x), m); const hz9=croakMzAim(f.x,f.y,f.def.w,f.ckAimA)[(D.shotN-1)&1];       
         SFX.tpew(); S.fx.push({k:'flash',x:hz9.x,y:hz9.y,ang:Math.atan2((m.y-18)-hz9.y,m.x-hz9.x),R:12,lw:2.4,t:0,dur:0.1});
         S.fx.push({k:'tracer',x1:hz9.x,y1:hz9.y,x2:m.x,y2:m.y-18,t:0,dur:0.1,col:'#9be89b'});
         f.pipN=CROAK_SHOT_PIPS; tanHit(m,f.x,f.y,f); f.pipN=0;
@@ -103379,8 +103423,8 @@ function updateFoeCroak(f,dt){
   }
   if(D.st==='fan'){ D.wt-=dt;   
     if(D.wt<=0 && D.wn<BRG_WAVES){ D.wt+=BRG_GAP; const hd=D.wn&1; D.wn++;   
-      brgWave({ own:f, x:f.x, y:f.y, mz:croakMz(f.x,f.y,f.def.w), hand:hd, aim:D.aimAt, R:fanR, green:false, lz:LZ_SLUG_ROW, lzc:'slug',   
-        kick:(h)=>{ f.rcAt=S.t; f.rcH=h; },   
+      brgWave({ own:f, x:f.x, y:f.y, mz:croakMzAim(f.x,f.y,f.def.w,D.aimAt)  , hand:hd, aim:D.aimAt, R:fanR, green:false, lz:LZ_SLUG_ROW, lzc:'slug',   
+        kick:(h)=>{ f.rcAt=S.t; f.rcH=h; ckAimStamp(f,D.aimAt,null,CK_FIRE_TAIL); },       
         deal:(u)=>{ f.pipN=CROAK_FAN_PIPS/BRG_WAVES; tanHit(u,f.x,f.y,f); f.pipN=0; } });   
     }
     if(D.wn>=BRG_WAVES){
@@ -109391,7 +109435,7 @@ function rpStep(u,dt){
   
   const mzl=unitFaceX(u);   
   const jk=Math.max(0,Math.min(1,1-(u.jetT||0)/(u.jetAir||(u.jbHop? JB_T : JET_AIR)))), jl=!(u.jetT>0)? 0 : u.jbHop? JB_H*4*jk*(1-jk) : (u.tkJump||u.kyLeap)? JET_H*4*jk*(1-jk) : u.jv2H? JV2_H*Math.min(1,(u.jv2El||0)/JV2_RISE) : u.jv2Fall? JV2_H*(1-jk)*(1-jk) : JET_H*(u.jv2Arc? JV2_BOOST_AIR : 1)*4*jk*(1-jk);   
-  const mz=u.rpKC? croakMz(u.x,u.y,unitW(u.type)) : [{x:u.x+17.5*mzl,y:u.y-41.5-jl},{x:u.x+18*mzl,y:u.y-31-jl}];   
+  const mz=u.rpKC? croakMzAim(u.x,u.y,unitW(u.type),u.rpAim)   : [{x:u.x+17.5*mzl,y:u.y-41.5-jl},{x:u.x+18*mzl,y:u.y-31-jl}];   
   if(u.rpSt===0){
     if(u.rpT<=BSTX){ u.rpSt=1; u.rpWt=GAPX; u.rpWn=0; if(!u.rpKC && aimLive(u)) u.faceTo=Math.max(u.faceTo,S.t+BSTX+AIM_HOLD); }   
     return;
@@ -109403,7 +109447,7 @@ function rpStep(u,dt){
     const lz=(lzc && !(S.bf&&!bfHumanU(u)&&!awayU(u)))? (lzc==='silver'? LZ_SILVER_ROW : lzc==='slug'? LZ_SLUG_ROW : ARMIES.find(ar=>ar.id===lzc)) : null;   
     const hv=ultHvOn(u);   
     brgWave({ own:u, x:u.x, y:u.y, mz:mz, hand:hd, aim:u.rpAim, R:R, half:(u.rpKC&&u.rpHalf)||undefined, n:(u.rpKC? undefined : RP_ROUNDS), green:true, lz:lz, lzc:lzc, hv:hv, stag:(u.rpKC? BRG_STAG : RP_STAG),   
-      kick:u.rpKC? (h)=>{ u.rcAt=S.t; u.rcH=h; } : (h)=>{ if(h) u.pist2T=PISTOL_KICK; else u.pistT=PISTOL_KICK; },   
+      kick:u.rpKC? (h)=>{ u.rcAt=S.t; u.rcH=h; ckAimStamp(u,u.rpAim,null,CK_FIRE_TAIL); }   : (h)=>{ if(h) u.pist2T=PISTOL_KICK; else u.pistT=PISTOL_KICK; },   
       deal:(f)=>{ if(hv) HV_RD=true; hurt(f, u.rpDmg/WAVX + (hv? ULT_PI_DMG*BRG_WAVES/WAVX : 0), u); HV_RD=false; } });   
   }
   if(u.rpWn>=WAVX){
@@ -124889,6 +124933,7 @@ function crFlinch(e){ return (e.crHitAt!=null && S.t-e.crHitAt<CR_HURT_T && IMG.
 
 const CK_FIRE_TAIL=0.30;   
 function crFire(e){ if(!isCroakU(e) || !IMG.kingcroakfire) return null;
+  { const a9=ckAimAng(e); if(a9!=null){ const im9=IMG[ckAimKey(a9)]; if(im9 && im9.width>0) return im9; } }   
   const D=e.duel;   
   return ((e.rpKC && e.rpT>0) || (D && (D.st==='plant'||D.st==='fan')) || (e.rcAt!=null && S.t-e.rcAt<CK_FIRE_TAIL))? IMG.kingcroakfire : null; }
 
@@ -125061,7 +125106,7 @@ function drawUnit(u){
   const dsf=dsfIn(u);   
   if(u.type==='jane') drawJane(u,kyl);   
   else if(u.type==='kingyeti') drawKing(u,u.x,u.y-kyl,w,unitWob(u),false,unitFl(u));   
-  else if(isCroakU(u) && (crFire(u)||crFlinch(u))) drawSprite(u.type,u.x,u.y-kyl,w,cmdoRecoil(u)+croakRc(u),(u.kySwing>0? -0.14 : unitWob(u)),crFire(u)||crFlinch(u),unitFl(u));   
+  else if(isCroakU(u) && (crFire(u)||crFlinch(u))) drawSprite(u.type,u.x,u.y-kyl,w,cmdoRecoil(u)+croakRc(u),(u.kySwing>0? -0.14 : unitWob(u)),crFire(u)||crFlinch(u),crAimFl(u,unitFl(u)));       
   else if(u.type==='kingbear' && u.kbMount) drawKbSteed(u,w,kyl);   
   else if(u.type==='kbcavalry') drawKbCav(u,w,kyl);   
   else if(u.type==='cksnake') drawCkSnake(u,w,im,kyl);   
@@ -125849,7 +125894,7 @@ function drawFoe(f){
         cx.beginPath(); cx.ellipse(f.x,f.y-1,f.def.w*0.30,8,0,0,7); cx.fill(); }
       if(f.ckdT>0){ cx.fillStyle='rgba(0,0,0,0.22)'; cx.beginPath(); cx.ellipse(f.x,f.y+3,f.def.w*0.16,f.def.w*0.045,0,0,7); cx.fill(); }   
       const cl9=foeCmdLeanIn(f), fl9=foeCmdFl(f,wbk);   
-      const fySq9=f.def.fy? fySquash(f) : null, fyZ9=f.y-((f.ckdT>0 || f.lrRide || f.def.fy)? (f.hopZ||0) : 0); if(fySq9){ cx.save(); cx.translate(f.x,fyZ9); cx.scale(fySq9[0],fySq9[1]); cx.translate(-f.x,-fyZ9); } drawSprite(f.type,f.x,fyZ9,f.def.w*(f.big?2:1),0,Math.sin(S.t*3.4+f.wob)*0.028+croakRc(f)+((f.ckdW>0)? 0.12 : (f.ckdT>0)? -0.08 : 0),crFire(f)||crFlinch(f)||foeCmdImg(f),fl9); if(fySq9) cx.restore();     
+      const fySq9=f.def.fy? fySquash(f) : null, fyZ9=f.y-((f.ckdT>0 || f.lrRide || f.def.fy)? (f.hopZ||0) : 0); if(fySq9){ cx.save(); cx.translate(f.x,fyZ9); cx.scale(fySq9[0],fySq9[1]); cx.translate(-f.x,-fyZ9); } drawSprite(f.type,f.x,fyZ9,f.def.w*(f.big?2:1),0,Math.sin(S.t*3.4+f.wob)*0.028+croakRc(f)+((f.ckdW>0)? 0.12 : (f.ckdT>0)? -0.08 : 0),crFire(f)||crFlinch(f)||foeCmdImg(f),crAimFl(f,fl9)); if(fySq9) cx.restore();       
       if(f.def.cmd && !f.def.gun) drawFoeCmdSword(f,fl9);   
       if(cl9) cx.restore();
     }
@@ -125995,7 +126040,7 @@ function drawFoe(f){
     if(f.aimT>0 && !f.def.pellet){ const g9=breathGeo(f); cx.globalAlpha=0.5+0.4*Math.sin(S.t*18); cx.fillStyle='#FFD24A';
       cx.beginPath(); cx.arc(g9.x,g9.y,6+2.5*Math.sin(S.t*14),0,7); cx.fill(); cx.globalAlpha=1; }
   } else
-  drawSprite(f.type,f.x,f.y-(f.hopZ||0),f.def.w,0,wob+croakRc(f)+gadRot(f),crFire(f)||crFlinch(f)||foeImg(f.type),wbk);   
+  drawSprite(f.type,f.x,f.y-(f.hopZ||0),f.def.w,0,wob+croakRc(f)+gadRot(f),crFire(f)||crFlinch(f)||foeImg(f.type),crAimFl(f,wbk));       
   drawFz(f,f.x,f.y,f.def.w,foeImg(f.type),(f.hopZ||0)+(f.airB||0));   
   if(f.kit) drawFoeKit(f,wbk);   
   if(f.def.gad){ gadDraw(f,wbk); oc8Draw(f,wbk); }   
@@ -175000,7 +175045,7 @@ document.addEventListener('pointerdown',e=>{ const st=e.target && e.target.close
 
 function hauBfPose(u,im,flip){
   if(u.type==='kingyeti' && im===IMG.kingyeti){ const pk=kyPoseK(u), pi=IMG[pk]; if(pk!=='kingyeti' && pi && pi.width>0) return { im:pi, fl:KY_AIMED[pk]? !flip : flip }; }
-  else if(isCroakU(u) && im===IMG[u.type]){ const f=crFire(u)||crFlinch(u); if(f && f.width>0) return { im:f, fl:flip }; }
+  else if(isCroakU(u) && im===IMG[u.type]){ const f=crFire(u)||crFlinch(u); if(f && f.width>0) return { im:f, fl:crAimFl(u,flip) }; }    
   return { im:im, fl:flip }; }
 function hauBfRc(u){ return isCroakU(u)? croakRc(u) : 0; }   
 function hauRig(){ const m=document.querySelector('#roomModal .rmcard.hau'), cv=m && m.querySelector('canvas.hau-cv'), r=q=>{ const e=m && m.querySelector(q); if(!e) return null; const b=e.getBoundingClientRect(); return [Math.round(b.left),Math.round(b.top),Math.round(b.width),Math.round(b.height)]; };   
@@ -179629,6 +179674,7 @@ window.GVT = {
       pick:t9? { type:t9.type, id:t9.id, hp:t9.hp, hpMax:t9.hpMax, x:Math.round(t9.x), y:Math.round(t9.y), boss:t9.boss?1:0 } : null,
       staked:(S.bf? S.units : S.foes).filter(o=>o.stkT>0).map(o=>({ type:o.type, id:o.id, t:+o.stkT.toFixed(3), x:+o.x.toFixed(2), y:+o.y.toFixed(2), form:o.form?1:0 })), cost:ENH_COST.stakeshot, rival:ENH_RIVAL.stakeshot, arm:LAB_ARM.stakeshot, order:ENH_ORDER.length, curve:LAB_CURVE.length }; },
   stkGo(){ return stkActivate(); },
+  cka(id){ const o=(id!=null? (S.units.find(q=>q.id===id)||S.foes.find(q=>q.id===id)) : (S.foes.find(q=>isCroakU(q)&&!q.dead)||S.units.find(q=>isCroakU(q)&&!q.dead)))||null; const imgs=[]; for(let i=0;i<CK_AIM_N;i++) imgs.push(!!(IMG['kingcroakaim'+i]&&IMG['kingcroakaim'+i].width>0)); const base9={ imgs:imgs, n:CK_AIM_N, hold:CK_AIM_HOLD, step:CK_AIM_STEP, fireSrc:IMG.kingcroakfire? IMG.kingcroakfire.src.length : 0, aimSrc:imgs.map((_,i)=>IMG['kingcroakaim'+i]? IMG['kingcroakaim'+i].src.length : 0) }; if(!o) return base9; const a=ckAimAng(o), w=ckAimW(o); return Object.assign(base9, { id:o.id, type:o.type, w:w, x:+o.x.toFixed(2), y:+o.y.toFixed(2), aim:a==null? null : +a.toFixed(4), pose:a==null? null : ckAimPose(a), key:a==null? null : ckAimKey(a), fl:crAimFl(o,false), to:o.ckAimTo==null? null : +(o.ckAimTo-S.t).toFixed(3), tg:o.ckAimTg? (o.ckAimTg.id!=null? o.ckAimTg.id : 1) : null, mz:croakMzAim(o.x,o.y,w,a).map(p=>[+p.x.toFixed(2),+p.y.toFixed(2)]), mzT:croakMz(o.x,o.y,w).map(p=>[+p.x.toFixed(2),+p.y.toFixed(2)]), fire:!!crFire(o), fireKey:(()=>{ const im=crFire(o); if(!im) return null; for(const k in IMG) if(IMG[k]===im) return k; return '?'; })() }); },   
   stk2(){ return { holds:1, staked:(S.bf? S.units : S.foes).filter(o=>o.stkT>0).map(o=>({ id:o.id, type:o.type, can:ggCanShove(o)?1:0, shv:o.shv?1:0, slip:+Math.hypot(o.x-o.stkX,o.y-o.stkY).toFixed(3), t:+o.stkT.toFixed(3) })) }; },   
   snpBtn(){ return { rect:btnRects.snp? btnRects.snp.slice():null, on:snpOn()?1:0, cd:+(S.snpCd||0).toFixed(1), tk:btnRects.tk? btnRects.tk.slice():null, bmb:btnRects.bmb? btnRects.bmb.slice():null }; },
   csBtn(){ const u9=csCardU(), b9=u9? window.csBtn(u9) : null, c29=u9? cs2N(u9) : 0, b29=(u9&&c29)? window.csBtn(u9,false,c29) : null;   
