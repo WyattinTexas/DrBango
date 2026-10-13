@@ -84536,7 +84536,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='22.00';        
+let GVT_CV='22.01';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -123308,6 +123308,16 @@ function drawPanHand(){
   drawFinger(fx,y,press,PAN_ROT);   
 }
 
+const TBU={ on:(function(){ try{ const q=/[?&]tbu=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_tbu','0'); else localStorage.removeItem('gvt_tbu'); } return localStorage.getItem('gvt_tbu')==='0'? 0 : 1; }catch(e){ return 1; } })(), mid:22, gap:12, edge:32, min:150, ww:innerWidth };   
+addEventListener('resize', ()=>{ TBU.ww=innerWidth; });
+function tbuOn(){ try{ return !!TBU.on; }catch(e){ return false; } }
+function tbuSeat(bw){   
+  if(tbuOn()){ const pill=Math.max(0,(TBU.ww-VW*scale)/2)/scale, r=Math.min(VW-16, VW+pill-TBU.edge/scale-8), w=Math.min(bw, r-(VW/2+240+58+TBU.gap+8));   
+    if(w>=TBU.min) return { x:r-w, y:TBU.mid-7, w }; }
+  return { x:VW-16-bw, y:54, w:bw };   
+}
+
+
 function drawBaseBar(bx,by,bw,k,label,col){
   cx.fillStyle='rgba(20,16,12,0.9)'; rr(bx-8,by-7,bw+16,28,9); cx.fill();
   cx.fillStyle='rgba(0,0,0,0.5)'; cx.fillRect(bx,by,bw,14);
@@ -126445,8 +126455,8 @@ function drawHUD(){
     
     
     if(S.tanBase){
-      const bw=Math.min(240,(VW-40)*0.27), k=S.tanBase.hp/S.tanBase.hpMax;
-      drawBaseBar(VW-16-bw, 54, bw, k, teddyFortUp()? tf('THEIR PILLOW FORT') : tf(jbxOn()? 'THE JUNCTION BOX %1' : 'THEIR TOY BOX %1', Math.max(0,Math.ceil(S.tanBase.hp))), k>(campBoxAlarmBand()? BOX_ALARM : 0.35)?'#C0473A':'#8a2f26');   
+      const bw=Math.min(240,(VW-40)*0.27), k=S.tanBase.hp/S.tanBase.hpMax, tb=tbuSeat(bw);   
+      drawBaseBar(tb.x, tb.y, tb.w, k, teddyFortUp()? tf('THEIR PILLOW FORT') : tf(jbxOn()? 'THE JUNCTION BOX %1' : 'THEIR TOY BOX %1', Math.max(0,Math.ceil(S.tanBase.hp))), k>(campBoxAlarmBand()? BOX_ALARM : 0.35)?'#C0473A':'#8a2f26');   
     }
     if(!S.training){ const bw9=Math.min(240,(VW-40)*0.27), k9=Math.max(0,Math.min(1,(S.lives|0)/10)); const px9=16+((cavesOn()||skyOn())? cvPlateShake() : 0); drawBaseBar(px9, 54, bw9, k9, tf('YOUR TOY BOX %1', Math.max(0,S.lives|0)), k9>0.35? '#5E7F44' : '#E8705A'); if(cavesOn()||skyOn()) cvPlatePaint(px9, 54, bw9); }   
   }
