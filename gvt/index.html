@@ -84273,7 +84273,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='21.82';        
+let GVT_CV='21.83';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -129771,7 +129771,7 @@ function bySkySVG(nt){
   let s='<rect width="960" height="290" fill="url(#bySky)"/>';
   if(nt) s+='<circle cx="52" cy="88" r="40" fill="#F5F1E6" opacity=".08"/><circle cx="52" cy="88" r="26" fill="#F5F1E6"/><circle cx="44" cy="82" r="7" fill="#DCD7C6" opacity=".7"/><circle cx="60" cy="96" r="4.5" fill="#DCD7C6" opacity=".6"/><g fill="#fff"><circle cx="100" cy="60" r="1.5"/><circle cx="150" cy="110" r="1.2"/><circle cx="760" cy="60" r="1.6"/><circle cx="900" cy="80" r="1.3"/><circle cx="820" cy="130" r="1.1"/><circle cx="60" cy="150" r="1.2"/></g>';
   else s+='<rect y="46" width="960" height="64" fill="#DDF0FF" opacity=".5"/><circle cx="40" cy="76" r="20" fill="#FFF3C4" opacity=".9"/><circle cx="40" cy="76" r="13" fill="#FFD24A"/>'
-    +'<g fill="#fff" opacity=".9" class="by-cloud"><ellipse cx="868" cy="68" rx="38" ry="11"/><ellipse cx="890" cy="60" rx="24" ry="10"/></g><g fill="#fff" opacity=".85" class="by-cloud2"><ellipse cx="120" cy="150" rx="26" ry="8"/><ellipse cx="136" cy="144" rx="16" ry="7"/></g>';
+    +bcsCloudsSVG();    
   return s;
 }
 
@@ -129817,8 +129817,7 @@ function byHouseSVG(nt){
   
   s+='<g transform="translate(266,288)"><rect x="0" y="4" width="16" height="12" rx="2" fill="#8C8478" stroke="#6b6660" stroke-width="1"/><path d="M0 8 l-6 -4 M16 8 q6 -4 8 -8" stroke="#8C8478" stroke-width="2.5" fill="none" stroke-linecap="round"/><path d="M3 4 q5 -6 10 0" stroke="#B8B4A4" stroke-width="1.6" fill="none"/></g>';
   
-  const shrub=(x,y,r)=>'<g><ellipse cx="'+x+'" cy="'+(y+r*0.9)+'" rx="'+(r*1.2)+'" ry="'+(r*0.35)+'" fill="rgba(0,0,0,.18)"/><circle cx="'+(x-r*0.55)+'" cy="'+(y+r*0.35)+'" r="'+(r*0.75)+'" fill="'+L.tall+'"/><circle cx="'+(x+r*0.5)+'" cy="'+(y+r*0.3)+'" r="'+(r*0.7)+'" fill="'+L.tall+'"/><circle cx="'+x+'" cy="'+y+'" r="'+r+'" fill="'+L.tuft+'"/><circle cx="'+(x-r*0.3)+'" cy="'+(y-r*0.35)+'" r="'+(r*0.42)+'" fill="#5E9A4A"/></g>';
-  s+=BYV.on? byvShrubs(nt) : shrub(214,280,18)+shrub(262,283,15)+shrub(420,281,19)+shrub(470,284,16)+shrub(520,282,20)+shrub(610,286,14)+shrub(690,282,18);    
+  s+=BYV.on? byvShrubs(nt) : bcsShrubsSVG();    
   
   s+=TMAP_ART.tree(871,270,2.0)+TMAP_ART.tree(932,552,1.1)+byWillowSVG(nt);           
   
@@ -163095,6 +163094,42 @@ function iclSweep(){ const p=document.getElementById('milePop'); if(!p) return f
   return true; }
 function iclProbe(){ const pin=AM_PINS.find(q=>q.id==='caves'); let lk=null; try{ lk=pin && pin.lock? pin.lock() : null; }catch(e){ lk={ line:'ERR '+String(e).slice(0,80) }; }   
   return { won:iclKeyWon(), key:raidDoorKey('caves'), ann:(typeof META.iclAnn==='number')? META.iclAnn : null, e:raidTierOpenFor('caves','e'), m:raidTierOpenFor('caves','m'), ice:Object.assign({}, META.ice||{}), art:!!document.querySelector('#ro-icecaves .icl-lock'), pin:lk? String(lk.line||'') : null, pinGo:lk? !!lk.go : null }; }
+
+
+const BCS_P={ cloud:['#FFFFFF','#E4F1FA','#C6DFF0'], bush:['#B5DC66','#8FC553','#6AA443','#4F8A38'], leaf:'#6FAF4D', bloom:['#F7B5CD','#FFE28A','#DCEBFF'], blade:'#3F7F49', stalk:'#5E9A4A', head:['#8A55B5','#B07BD9','#D9B4F2','#EBD6FA'] };   
+const bcsF=v=>(Math.round(v*10)/10).toString();
+
+function bcsLobes(y,L){ const C=L.map(l=>[l[0], y-l[1]*0.5, l[1]]), X=(c,sg)=>c[0]+sg*Math.sqrt(Math.max(0,c[2]*c[2]-(y-c[1])*(y-c[1])));
+  const J=(a,b)=>{ const dx=b[0]-a[0], dy=b[1]-a[1], d=Math.hypot(dx,dy), k=(a[2]*a[2]-b[2]*b[2]+d*d)/(2*d), h=Math.sqrt(Math.max(0,a[2]*a[2]-k*k)); return [a[0]+k*dx/d+h*dy/d, a[1]+k*dy/d-h*dx/d]; };   
+  let p=[X(C[0],-1), y], d='M'+bcsF(p[0])+' '+bcsF(p[1]);
+  for(let i=0;i<C.length;i++){ const c=C[i], q=(i<C.length-1)? J(c,C[i+1]) : [X(c,1), y]; let sp=Math.atan2(q[1]-c[1],q[0]-c[0])-Math.atan2(p[1]-c[1],p[0]-c[0]); while(sp<0) sp+=6.2832; d+=' A'+bcsF(c[2])+' '+bcsF(c[2])+' 0 '+(sp>3.1416? 1 : 0)+' 1 '+bcsF(q[0])+' '+bcsF(q[1]); p=q; }
+  return d+' Z'; }
+
+const BCS_CLOUDS=[ ['by-cloud', [[128,[[800,20],[828,30],[862,36],[898,28],[924,18]]], [152,[[662,13],[682,19],[706,21],[730,14]]]]], ['by-cloud2', [[176,[[62,16],[86,24],[116,28],[148,20],[170,13]]], [258,[[742,10],[758,15],[778,13],[794,8]]]]] ];
+function bcsCloudsSVG(){ const P=BCS_P.cloud;
+  return '<defs><linearGradient id="bcsCloudG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="'+P[0]+'"/><stop offset=".7" stop-color="'+P[0]+'"/><stop offset="1" stop-color="'+P[1]+'"/></linearGradient></defs>'
+    +BCS_CLOUDS.map(g=>'<g class="'+g[0]+'" fill="url(#bcsCloudG)" stroke="'+P[2]+'" stroke-width="1.6" stroke-linejoin="round" opacity=".96">'+g[1].map(c=>'<path class="bcs-cloud" d="'+bcsLobes(c[0],c[1])+'"/>').join('')+'</g>').join(''); }
+
+function bcsBush(x,yb,w,sd){ const B=BCS_P.bush, h=w*0.54, r=n=>Math.sin(sd*97.3+n*41.7)*0.5+0.5, LB=[[-w*0.27,w*0.3],[w*0.02,w*0.36],[w*0.29,w*0.27]], body=bcsLobes(yb,LB.map(l=>[x+l[0],l[1]])), xl=x-w*0.27-w*0.3*0.866, xr=x+w*0.29+w*0.27*0.866;
+  let s='<g class="bcs-bush"><ellipse cx="'+bcsF(x+2)+'" cy="'+bcsF(yb+1)+'" rx="'+bcsF(w*0.52)+'" ry="'+bcsF(w*0.09)+'" fill="#000" opacity=".16"/>'
+    +'<path d="'+body+'" fill="'+B[1]+'"/><path d="M'+bcsF(xl)+' '+bcsF(yb)+' Q'+bcsF(x)+' '+bcsF(yb-h*0.5)+' '+bcsF(xr)+' '+bcsF(yb)+' Z" fill="'+B[2]+'"/><path d="'+body+'" fill="none" stroke="'+B[3]+'" stroke-width="1.1" opacity=".55"/>'
+    +'<g transform="translate('+bcsF(x-w*0.06)+' '+bcsF(yb-h*0.12)+') scale(.72)"><path d="'+bcsLobes(0,LB)+'" fill="'+B[0]+'" opacity=".85"/></g>';
+  for(let i=0;i<5;i++) s+='<circle cx="'+bcsF(x+(r(i)-0.5)*w*0.7)+'" cy="'+bcsF(yb-h*(0.25+r(i+9)*0.5))+'" r="'+bcsF(w*0.035)+'" fill="'+BCS_P.leaf+'" opacity=".9"/>';
+  for(let i=0;i<3;i++){ const fx=x+(r(i+3)-0.5)*w*0.52, fy=yb-h*(0.4+r(i+6)*0.36), pr=w*0.04, pd=pr*1.4; s+='<g fill="#FFFFFF"><circle cx="'+bcsF(fx-pd)+'" cy="'+bcsF(fy)+'" r="'+bcsF(pr)+'"/><circle cx="'+bcsF(fx+pd)+'" cy="'+bcsF(fy)+'" r="'+bcsF(pr)+'"/><circle cx="'+bcsF(fx)+'" cy="'+bcsF(fy-pd)+'" r="'+bcsF(pr)+'"/><circle cx="'+bcsF(fx)+'" cy="'+bcsF(fy+pd)+'" r="'+bcsF(pr)+'"/></g><circle cx="'+bcsF(fx)+'" cy="'+bcsF(fy)+'" r="'+bcsF(pr*0.8)+'" fill="'+BCS_P.bloom[(sd+i)%3]+'"/>'; }
+  return s+'</g>'; }
+
+function bcsAllium(x,yb,h,sd){ const P=BCS_P, r=n=>Math.sin(sd*57.1+n*23.9)*0.5+0.5, ST=[[-5,1.0,-2],[1.5,0.86,1],[6,0.7,2.5]];
+  let s='<g class="bcs-allium"><ellipse cx="'+bcsF(x+1)+'" cy="'+bcsF(yb+1)+'" rx="'+bcsF(h*0.42)+'" ry="'+bcsF(h*0.07)+'" fill="#000" opacity=".14"/>', bl='';
+  for(let i=0;i<6;i++){ const sg=(i%2? 1 : -1), dx=sg*(4+i*2.2+r(i)*3), ly=h*(0.3+r(i+6)*0.28); bl+='M'+bcsF(x+sg*1.2)+' '+bcsF(yb)+' Q'+bcsF(x+dx*0.45)+' '+bcsF(yb-ly*0.75)+' '+bcsF(x+dx)+' '+bcsF(yb-ly)+' '; }
+  s+='<path d="'+bl+'" fill="none" stroke="'+P.blade+'" stroke-width="2.6" stroke-linecap="round"/>';
+  s+=ST.map(t=>'<path d="M'+bcsF(x+t[0])+' '+bcsF(yb-3)+' Q'+bcsF(x+t[0]+t[2]*0.4)+' '+bcsF(yb-h*t[1]*0.55)+' '+bcsF(x+t[0]+t[2])+' '+bcsF(yb-h*t[1]+2)+'" fill="none" stroke="'+P.stalk+'" stroke-width="1.4" stroke-linecap="round"/>').join('');
+  s+=ST.map((t,i)=>{ const hx=x+t[0]+t[2], hy=yb-h*t[1], hr=h*(0.19-i*0.02); let d='<circle cx="'+bcsF(hx+hr*0.22)+'" cy="'+bcsF(hy+hr*0.22)+'" r="'+bcsF(hr)+'" fill="'+P.head[0]+'"/><circle cx="'+bcsF(hx)+'" cy="'+bcsF(hy)+'" r="'+bcsF(hr)+'" fill="'+P.head[1]+'"/>';
+    for(let k=0;k<5;k++){ const an=r(i*7+k)*6.28, dd=hr*(0.25+r(i*7+k+3)*0.5); d+='<circle cx="'+bcsF(hx+Math.cos(an)*dd)+'" cy="'+bcsF(hy+Math.sin(an)*dd)+'" r="'+bcsF(hr*0.2)+'" fill="'+P.head[2]+'"/>'; }
+    return d+'<circle cx="'+bcsF(hx-hr*0.35)+'" cy="'+bcsF(hy-hr*0.35)+'" r="'+bcsF(hr*0.26)+'" fill="'+P.head[3]+'" opacity=".9"/>'; }).join('');
+  return s+'</g>'; }
+
+const BCS_ROW=[[214,'b',38,1],[252,'a',30,2],[414,'b',40,3],[462,'a',32,4],[516,'b',42,5],[556,'a',30,6],[610,'b',32,7],[652,'a',26,8],[690,'b',38,9]];
+function bcsShrubsSVG(){ return '<g class="bcs-shrubs">'+BCS_ROW.map(k=>k[1]==='b'? bcsBush(k[0],293,k[2],k[3]) : bcsAllium(k[0],293,k[2],k[3])).join('')+'</g>'; }
 
 
 
