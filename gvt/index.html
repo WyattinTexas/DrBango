@@ -1246,6 +1246,11 @@
   @keyframes sigPop { from { transform:scale(0.4); opacity:0; } to { transform:scale(1); opacity:1; } }
   @media (prefers-reduced-motion: reduce){ #sigChip.mini { animation:none; } }
   .wt-door .wt-troph { font-size:clamp(16px,3.4vh,26px); line-height:1; }
+  #wartable .wt-door.psb-door { border-color:rgba(255,210,74,0.55); }   /**/
+  #wartable .wt-door.psb-door .psb-star { font-size:clamp(16px,3.4vh,26px); line-height:1; color:#FFD24A; }
+  #wartable .wt-door.psb-door .dlab { color:#FFE9A8; }
+  #wartable .wt-door.psb-door.psb-tight { padding-left:clamp(8px,1vw,12px); padding-right:clamp(8px,1vw,12px); gap:6px; }   /**/
+  #wartable .wt-door.psb-door.psb-tight .dlab { letter-spacing:0.05em; }
   /*
 
 
@@ -83932,7 +83937,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='21.57';        
+let GVT_CV='21.58';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -147097,8 +147102,8 @@ function mgpPlateHTML(c){ const r=mstRow(c), on=!!r, owed=!!(r && !r.unit);
 function mgpRowHTML(){ return MASTERS.map(m=>mgpPlateHTML(m[0])).join(''); }
 function mgpSync(){ const el=document.getElementById('glMgp'); if(!el) return false; const sl=el.scrollLeft; el.innerHTML=mgpRowHTML(); el.scrollLeft=sl; return true; }   
 const MGP={ park:0, sel:null, mo:null };   
-function mgpPark(){ const el=document.getElementById('glScr'); if(!el || !GL.open) return false; MGP.park=1; MGP.sel=GL.sel; el.classList.add('hidden'); GL.open=false; if(GL.raf) cancelAnimationFrame(GL.raf); GL.raf=0; GL.lastT=0; return true; }   
-function mgpResume(){ if(!MGP.park) return false; if(mstRiteIsOpen() || document.querySelector('#roomModal .rmback')) return false; MGP.park=0; if(GL.ok!==true || S.mode!=='menu' || S.bf) return false;
+function mgpPark(){ const el=document.getElementById('glScr'); if(!el || !GL.open) return false; MGP.park=1; MGP.sel=GL.sel; el.classList.add('hidden'); GL.open=false; if(GL.raf) cancelAnimationFrame(GL.raf); GL.raf=0; GL.lastT=0; psbWtPark(); return true; }   
+function mgpResume(){ if(!MGP.park) return false; if(mstRiteIsOpen() || document.querySelector('#roomModal .rmback')) return false; MGP.park=0; psbWtBack(); if(GL.ok!==true || S.mode!=='menu' || S.bf) return false;   
   const el=glScrEl(); el.classList.remove('hidden'); GL.open=true; GL.sel=MGP.sel; glFit(); glCenter(GL.sel); glSide(); glDraw(); glLoop(); glSoon(60); mgpSync(); return true; }   
 function mgpWatch(){ if(MGP.mo) return; const m=document.getElementById('roomModal'); if(!m || typeof MutationObserver!=='function') return; MGP.mo=new MutationObserver(()=>{ if(MGP.park) mgpResume(); }); MGP.mo.observe(m, { childList:true }); }   
 function mgpTap(c){ if(!MASTERS.some(m=>m[0]===c)) return; audio(); SFX.blip(); mgpWatch(); mgpPark(); mstCard(c); if(!document.querySelector('#roomModal .rmback')) mgpResume(); }   
@@ -150870,7 +150875,7 @@ function featDone(){ return !!(META.featDays && META.featDays[todayStr()]); }
 
 
 
-const WSV={ on:1 };
+const WSV={ on:0 };   
 function wsvTileHTML(){ wsvCss(); const P=hsvPark(), M=hrdMine();
   const small=P? tf('CONTINUE · WAVE %1', P.n|0) : (M.w|0)>0? tf('YOUR BEST: WAVE %1', M.w|0) : t('HOW LONG CAN YOUR FORT HOLD?');
   return '<button type="button" class="wt-m2 wt-feat wsv-tile" onclick="wsvTileGo()"><span class="n" data-notr>★ '+escH(t('SURVIVAL MODE'))+'</span><small data-notr>'+escH(small)+'</small></button>'; }
@@ -150881,6 +150886,25 @@ function wsvCss(){ if(document.getElementById('wsvCss')) return; const st=docume
   st.textContent='.wsv-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:clamp(8px,1.4vw,14px);align-items:stretch;width:max-content;max-width:100%}'   
     +'.wsv-row>.wt-feat{min-width:0;justify-content:center}';
   document.head.appendChild(st); }
+
+
+
+
+
+
+
+const PSB={ wt:0, fitT:0, fitT2:0, fitN:0, rs:0 };   
+function psbWtPark(){ const w=document.getElementById('wartable'); if(!w || w.classList.contains('hidden')) return false; PSB.wt=1; w.classList.add('hidden'); try{ grpBtnSync(); }catch(e){} return true; }   
+function psbWtBack(){ if(!PSB.wt) return false; PSB.wt=0; const w=document.getElementById('wartable'); if(!w || S.mode!=='menu' || S.bf) return false; w.classList.remove('hidden'); try{ grpBtnSync(); }catch(e){} return true; }   
+function psbDoorHTML(){ const P=hsvPark(); psbFitSoon(); return '<button type="button" class="wt-door psb-door" title="'+escH(t('SURVIVAL MODE'))+'" onclick="wsvTileGo()"><span class="wt-troph psb-star" data-notr>★</span><span class="dlab">SURVIVAL MODE</span>'+(P? '<i class="wt-new" data-notr>'+escH(tf('WAVE %1', P.n|0))+'</i>' : '')+'</button>'; }   
+function psbFitSoon(){ clearTimeout(PSB.fitT); clearTimeout(PSB.fitT2); PSB.fitT=setTimeout(()=>{ PSB.fitT=0; psbFootFit(); }, 0); PSB.fitT2=setTimeout(()=>{ PSB.fitT2=0; psbFootFit(); }, 160); if(!PSB.rs){ PSB.rs=1; addEventListener('resize', ()=>psbFitSoon()); } }   
+function psbFootFit(){ const f=document.querySelector('#wartable .wt-foot2'), d=f && f.querySelector('.psb-door'); if(!f || !d) return false; const lab=d.querySelector('.dlab'); d.classList.remove('psb-tight'); d.style.display=''; if(lab){ lab.style.fontSize=''; lab.style.display=''; } PSB.fitN++;
+  const over=()=>{ const r=d.getBoundingClientRect(); if(!(r.width>0)) return false; let lim=f.getBoundingClientRect().right; const g=f.querySelector('.gb-seat'); if(g){ const gr=g.getBoundingClientRect(); if(gr.width>0) lim=Math.min(lim, gr.left); } const gb=document.getElementById('grpBtn'); if(gb){ const br=gb.getBoundingClientRect(); if(br.width>0 && br.height>0 && br.top<r.bottom && br.bottom>r.top && getComputedStyle(gb).visibility!=='hidden') lim=Math.min(lim, br.left); } return f.scrollWidth>f.clientWidth+1 || r.right>lim-4; };   
+  if(!over()) return true; d.classList.add('psb-tight'); if(!over()) return true;   
+  if(lab){ for(const px of [12,11,10]){ lab.style.fontSize=px+'px'; if(!over()) return true; } lab.style.display='none'; }   
+  if(over()) d.style.display='none';   
+  return d.style.display!=='none'; }   
+
 function renderWarTable(){
   const riv=todaysRival();
   const pLock=partyLocked(), pLead=partyLeader();   
@@ -150945,6 +150969,7 @@ function renderWarTable(){
       
       +'<button type="button" class="wt-door" onclick="UI.wtMore()"><span class="wt-crate" data-notr></span>'
       +'<span class="dlab">MORE BATTLES</span></button>'
+      +psbDoorHTML()   
       +'<div class="wt-door gb-seat" aria-hidden="true" data-notr><span class="dlab">'+escH(t('GROUP'))+'</span></div>'+'</div>'
     
     
@@ -177659,6 +177684,7 @@ requestAnimationFrame(frame);
 
 
 window.GVT = {
+  psb(){ const w=document.getElementById('wartable'), g=document.getElementById('glScr'), d=document.querySelector('#wartable .psb-door'), f=document.querySelector('#wartable .wt-foot2'), R=e=>{ if(!e) return null; const b=e.getBoundingClientRect(); return [+b.left.toFixed(1), +b.top.toFixed(1), +b.width.toFixed(1), +b.height.toFixed(1)]; }; return { cv:GVT_CV, wt:PSB.wt, fitN:PSB.fitN, hidden:!!(d && d.style.display==='none'), tight:!!(d && d.classList.contains('psb-tight')), park:MGP.park, wsv:WSV.on, wtShown:!!w && !w.classList.contains('hidden'), glOpen:!!GL.open, glShown:!!g && !g.classList.contains('hidden'), sel:GL.sel, card:!!document.querySelector('#roomModal .rmback'), stage:!!document.querySelector('#roomModal .msa-body'), tile:!!document.querySelector('#wartable .wsv-tile'), row:!!document.querySelector('#wartable .wsv-row'), door:R(d), doorLab:d? (d.querySelector('.dlab')||{}).textContent : null, badge:d? ((d.querySelector('.wt-new')||{}).textContent||null) : null, prev:d && d.previousElementSibling? (d.previousElementSibling.querySelector('.dlab')||{}).textContent : null, foot:R(f), footScroll:f? [f.scrollWidth, f.clientWidth] : null, ghost:R(document.querySelector('#wartable .gb-seat')), grp:R(document.getElementById('grpBtn')) }; },   
   dsb(){ const T=S.cfg&&S.cfg.terrain, R=(T&&T.rocks)||[]; return { cv:GVT_CV, on:DSB.on, gate:dsbOn(), bd:!!(S.bf&&S.bf.bd), plc:COOP? COOP.plc : null, map:S.bf? S.bf.mapId : null, W:S.bf? WORLD_W : 0, H:S.bf? WORLD_H : 0, mid:MID, buffer:MID_BUFFER, trkBan:TRK_BAN, trenchW:TRENCH_W, works:DSB.WORKS.map(w=>[w.dx,w.y]), bags:R.filter(r=>r.dsb).map(r=>[r.x,r.y,r.r]), rocks:R.map(r=>[r.x,r.y,r.r,r.art||'']), trench:(T&&T.trench)? T.trench.pts : null, rail:(T&&T.rail)? T.rail.ban.map(p=>p.pts) : null, jax:(T&&T.jax)? T.jax.map(j=>[j.x,j.y]) : null, bases:S.bf? [[S.bf.base.you.x,S.bf.base.you.y],[S.bf.base.foe.x,S.bf.base.foe.y]] : null }; },   
   tpo(o){ return tpoRig(o); },   
   hhb(){ const o={ cv:GVT_CV, ck:HHB.ck, book:{}, words:{}, base:{}, top:{}, card:{} }; for(const k of HEROES){ o.book[k]=HP_RANK100[k]; o.words[k]=hhbWords(k); o.base[k]=(BF_MOVE[k]&&BF_MOVE[k].hp)||3; o.top[k]=bfHpAt(k,RANK_MAX); o.card[k]=heroHP(k); } return o; },   
