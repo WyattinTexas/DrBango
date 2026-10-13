@@ -51116,7 +51116,9 @@ function wkRead(){ const now=Date.now(); if(now-WK_C.at<1000) return WK_C; const
   WK_C={ at:now, v:(wd===0||wd===6), key:key }; return WK_C; }
 function isWeekend(){ if(WK_FORCE!=null) return !!WK_FORCE; return wkRead().v; }   
 function wkKey(){ if(WK_FORCE!=null) return WK_FORCE? (evTZDay(evNow())||'forced') : ''; return wkRead().key; }   
-function starX(n){ return isWeekend()? Math.round(n*STAR_WK_X) : n; }   
+const STAR_ECON=2;             
+function starEcon(n){ return (STAR_ECON>1 && n>0)? Math.max(1, Math.round(n/STAR_ECON)) : n; }   
+function starX(n){ return starEcon(isWeekend()? Math.round(n*STAR_WK_X) : n); }   
 function wkGlyph(){ return isWeekend()? '<i class="wkx" data-notr>×2</i>' : ''; }   
 function wkBandHTML(){ return isWeekend()? '<span class="mb-band wk">DOUBLE STAR WEEKEND</span><span class="mb-line wksub">EVERY STAR YOU EARN COUNTS TWICE UNTIL MONDAY</span>' : ''; }   
 function wkAnnDue(){ return STAR_WK_X!==1 && isWeekend() && String(META.wkSeen||'')!==wkKey() && !spcOn(); }   
@@ -55749,7 +55751,7 @@ function rivalDayWin(id){
   
   
   
-  { const c=(after>before)? tf('PIGGY TURNED %1 · +%2★ A DAY', t(PIG_COLORS[after].name), pigPayout())
+  { const c=(after>before)? tf('PIGGY TURNED %1 · +%2★ A DAY', t(PIG_COLORS[after].name), starX(pigPayout()))
                           : tf('PIGGY SAVED · DAY %1', META.piggy.streak);
     parts.push(c); }
   return { stars:5, parts, first:true };   
@@ -55766,7 +55768,7 @@ function pigPanelLine(){
   if(!p.streak) s+=tf('beat the invaders every day to keep it safe. Five days in a row paints it %1 — and a painted piggy pays free stars every day.', TXT(PIG_COLORS[1].name));
   else {
     s+=tf(p.streak===1?'%1 · %2 day safe':'%1 · %2 days safe', TXT(PIG_COLORS[t].name), p.streak);
-    if(pigPayout()>0) s+=' · '+tf('pays +%1★ a day — tap it!', pigPayout());
+    if(pigPayout()>0) s+=' · '+tf('pays +%1★ a day — tap it!', starX(pigPayout()));
     if(t<9){ const need=pigNeed();
       s+=' · '+tf(need===1?'%1 more day → %2 (+%3★ a day)':'%1 more days → %2 (+%3★ a day)', need, TXT(PIG_COLORS[t+1].name), pigNextPays()); }
     else s+=' · '+TXT('THE RAINBOW PIGGY — as painted as they come.');
@@ -55785,7 +55787,7 @@ function pigPanelLine(){
     +' '+tf('%1 is %2★ at SARGE\'S SURPLUS.', TXT(BANK_TIERS[0].name), BANK_TIERS[0].cost)+'</p>';
   
   
-  if(momAllow()) s+='<p style="font-size:1.02rem"><b>THE ALLOWANCE</b> — Mom gave up fair and square. She adds <b>+'+MOM_ALLOW+'★ a day</b> to the piggy, forever.</p>';   
+  if(momAllow()) s+='<p style="font-size:1.02rem"><b>THE ALLOWANCE</b> — Mom gave up fair and square. She adds <b>+'+starX(MOM_ALLOW)+'★ a day</b> to the piggy, forever.</p>';   
   return s;
 }
 
@@ -83930,7 +83932,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='21.56';        
+let GVT_CV='21.57';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -87179,7 +87181,7 @@ function hallCard(h){
     +'<span class="mb-band" data-notr>'+escH(t(bone? 'THE ERUPTION' : 'THE INVASION')+' · '+evDaysLine(bone? 'bone' : 'ice'))+'</span>'   
     +'<h2 class="mb-h">'+(bone? 'ULTRA MEGA KING REX DEFEATED' : 'ULTRA MEGA KING YETI DEFEATED')+'</h2>'
     +'<div class="mb-stage">'+st+'</div>'
-    +'<span class="mb-name" data-notr>'+escH(t('+'+((h.stars|0)||HALL_STARS)+'★ FOR EVERY COMMANDER'))+'</span>'   
+    +'<span class="mb-name" data-notr>'+escH(t('+'+((h.stars|0)||starX(HALL_STARS))+'★ FOR EVERY COMMANDER'))+'</span>'   
     +'<button type="button" class="mb-take gold" data-notr onclick="UI.mileTake()">'+escH(t('OKAY'))+'</button>'
     +'</div>';
   p.classList.remove('hidden');
@@ -97037,7 +97039,7 @@ function gbkTap(){
   setTimeout(()=>{ if(S.mode==='menu' && !TMAP.kind) advMapOpen(); }, reducedMotion()? 0 : 420);
 }
 function gbkPay(){   
-  if(pbkLed().p) return false; pbkLed().p=1; META.starBank=(META.starBank|0)+PBK.gold; META.starsLifetime=(META.starsLifetime|0)+PBK.gold; checkAch(); saveMeta();
+  if(pbkLed().p) return false; pbkLed().p=1; { const w9=starEcon(PBK.gold); META.starBank=(META.starBank|0)+w9; META.starsLifetime=(META.starsLifetime|0)+w9; }     checkAch(); saveMeta();
   if(S.mode==='menu') renderMenu();
   gbkCardOpen(); return true; }
 function gbkCardOpen(){ const p=document.getElementById('milePop'); if(!p) return;
@@ -97045,7 +97047,7 @@ function gbkCardOpen(){ const p=document.getElementById('milePop'); if(!p) retur
     +'<span class="mb-band" data-notr>'+escH(t('A GIFT FROM HQ'))+'</span>'
     +'<h2 class="mb-h" data-notr>'+escH(t('THE GOLDEN BOOK'))+'</h2>'
     +'<span class="mb-win">'+MB_RAYS+decShopArt('goldenbook')+'</span>'
-    +'<span class="mb-line" data-notr>'+escH(tf("+%1 STARS! From now on, THE GOLDEN BOOK opens your Captain's Log.", PBK.gold.toLocaleString('en-US')))+'</span>'
+    +'<span class="mb-line" data-notr>'+escH(tf("+%1 STARS! From now on, THE GOLDEN BOOK opens your Captain's Log.", starEcon(PBK.gold).toLocaleString('en-US')))+'</span>'
     +'<span class="mb-line pbk-gen" data-notr>'+escH(t("THE GENESIS OF NEMESIS is unlocked. Its story is coming soon."))+'</span>'    
     +'<button type="button" class="mb-take gold" data-notr onclick="UI.mileTake()">'+escH(t('OKAY'))+'</button>'
     +'</div>';
@@ -112645,7 +112647,7 @@ function endBattle(win){
     META.mom.done=1;
     const r=rivalDayWin('mom');
     stars=r.stars;
-    if(momFirst) say('c', tf('ALLOWANCE +%1★ A DAY', MOM_ALLOW));   
+    if(momFirst) say('c', tf('ALLOWANCE +%1★ A DAY', starX(MOM_ALLOW)));   
     if(r.first) for(const c of r.parts) say('c', c);   
     
     
@@ -130367,7 +130369,7 @@ function xjrNS(tag, at, par){ const e=document.createElementNS('http://www.w3.or
 function xjrTxt(el, s){ if(!el) return; s=String(s); if(el.firstChild) el.firstChild.nodeValue=s; else el.appendChild(document.createTextNode(s)); }   
 function xjrFit(el, maxW, size){ try{ el.style.fontSize=size+'px'; const L=el.getComputedTextLength(); if(L>maxW) el.style.fontSize=(size*maxW/L).toFixed(1)+'px'; }catch(e){} }   
 function xjrLater(ms, fn){ const X=XJR; if(!X) return; X.tm.push(setTimeout(()=>{ if(XJR===X) fn(); }, ms)); }
-function xjrPurse(n){ META.starBank+=n; META.starsLifetime+=n; const b=document.querySelector('#rhPig b'); if(b) xjrTxt(b, META.starBank+'★'); }   
+function xjrPurse(n){ n=starEcon(n);   META.starBank+=n; META.starsLifetime+=n; const b=document.querySelector('#rhPig b'); if(b) xjrTxt(b, META.starBank+'★'); }   
 function xjrSargeURI(){ return capStandURI() || menuSargeURI(dyeHex() || '#4A6B35'); }   
 function xjrMount(){   
   xjrEnd();
@@ -130449,15 +130451,15 @@ function xjrTap(ev){ const X=XJR; if(!X) return; try{ ev.preventDefault(); ev.st
   if((X.mode==='play' || X.mode==='ready') && now-X.hop0>XJR_HOP+40) X.hop0=now; }   
 function xjrJump(){ const X=XJR, st=xjrSt(), n=++X.count, ten=(n%10===0); xjrSay(String(n), '', n>=XJR_DAY_AT && ten); SFX.blip();
   if(n===XJR_DAY_AT){   
-    if(st.d!==todayStr()){ xjrPurse(XJR_DAY_STARS); xjrPut({ d:todayStr(), best:Math.max(st.best, n) }); xjrFloat(tf('+%1★ TODAY!', XJR_DAY_STARS), 404); SFX.jingle(); }
-    else if(!X.told){ X.told=1; xjrFloat(tf('COME BACK TOMORROW FOR %1★ MORE', XJR_DAY_STARS), 410, 28); } }
-  else if(n===XJR_CAP_AT && !st.c){ xjrPurse(XJR_CAP_STARS); xjrPut({ c:1, best:Math.max(st.best, n) }); X.paid=1; xjrFloat(n+'! +'+XJR_CAP_STARS+'★', 404); SFX.fanfare(); X.pspin=performance.now(); }   
+    if(st.d!==todayStr()){ xjrPurse(XJR_DAY_STARS); xjrPut({ d:todayStr(), best:Math.max(st.best, n) }); xjrFloat(tf('+%1★ TODAY!', starEcon(XJR_DAY_STARS)), 404); SFX.jingle(); }
+    else if(!X.told){ X.told=1; xjrFloat(tf('COME BACK TOMORROW FOR %1★ MORE', starEcon(XJR_DAY_STARS)), 410, 28); } }
+  else if(n===XJR_CAP_AT && !st.c){ xjrPurse(XJR_CAP_STARS); xjrPut({ c:1, best:Math.max(st.best, n) }); X.paid=1; xjrFloat(n+'! +'+starEcon(XJR_CAP_STARS)+'★', 404); SFX.fanfare(); X.pspin=performance.now(); }   
   else if(ten) SFX.coin();
   if(ten){ X.ph0=performance.now(); X.T=Math.max(XJR_FLOOR, X.T*XJR_RAMP); for(const a of X.A){ try{ a.playbackRate=XJR_T0/X.T; }catch(e){} } } }   
 function xjrMiss(cyc){ const X=XJR; X.mode='miss'; SFX.thump(); X.tumble=performance.now(); X.park={ at:cyc*XJR_P+XJR_PARK*XJR_P, by:performance.now()+1500 };   
   const st=xjrSt(), best=Math.max(st.best, X.count); if(best>st.best) xjrPut({ best:best });
   xjrSay(X.count===1? t('1 JUMP!') : tf('%1 JUMPS!', X.count), tf('BEST %1', best));
-  xjrLater(900, ()=>{ if(X.mode!=='miss') return; X.mode='over'; xjrTxt(X.sub, tf('BEST %1', best)+' · '+t('TAP TO GO AGAIN')); xjrFit(X.sub, 760, 30); xjrDone(true); if(X.paid){ X.paid=0; xjrCard(XJR_CAP_STARS); } }); }
+  xjrLater(900, ()=>{ if(X.mode!=='miss') return; X.mode='over'; xjrTxt(X.sub, tf('BEST %1', best)+' · '+t('TAP TO GO AGAIN')); xjrFit(X.sub, 760, 30); xjrDone(true); if(X.paid){ X.paid=0; xjrCard(starEcon(XJR_CAP_STARS)); } }); }
 function xjrBack(){ const X=XJR; if(!X || X.mode!=='over') return;   
   xjrDone(false); xjrPad(false); X.mode='walk'; X.arr=0; X.park=null; X.parked=0; X.tumble=0; xjrSay('', ''); X.sHop.removeAttribute('transform'); X.sSh.removeAttribute('transform');
   xjrRun(X.ref? (+X.ref.currentTime||0) : 0, 1); X.yetis.classList.remove('xjr-on');
@@ -130527,7 +130529,7 @@ function xmasGrant(row, n){ let stars=0;
     if(!outfitOwns('santahat')) META.outfit.own.push('santahat'); if(META.outfitSeen.indexOf('santahat')<0) META.outfitSeen.push('santahat'); }
   else if(XM_BY[row.id] && !decOwns(row.id)){ if(!META.decor || !Array.isArray(META.decor.own)) META.decor={ own:[], off:[] }; META.decor.own.push(row.id); if(META.decorSeen.indexOf(row.id)<0) META.decorSeen.push(row.id); if(!META.rdec) META.rdec={}; cinStow(row.id); }    
   else stars=XM_STAND_STARS;   
-  if(stars){ META.starBank+=stars; META.starsLifetime+=stars; }
+  if(stars){ stars=starEcon(stars);   META.starBank+=stars; META.starsLifetime+=stars; }
   return stars; }
 function xmasOpen(k){ if(!xmasDue()) return false; k=k|0; const n=(k>=1 && k<=25 && xmasTest() && !xmasHas(k))? k : xmasDoorToday(), row=XM_ROSTER[n-1];   
   const g=document.querySelector('#raidBg #xm-wall .xm-d'+n); if(g) g.classList.add('fold');
@@ -138422,7 +138424,7 @@ function roofBurp(n){
   if(!reducedMotion()){ st.classList.remove('roofquake'); void st.getBoundingClientRect(); st.classList.add('roofquake');
     setTimeout(()=>{ try{ st.classList.remove('roofquake'); }catch(e){} }, 700); }
   const f=document.createElement('div');
-  f.className='starfloat big'; f.textContent='+'+(n||ROOF_BURP_STARS)+'★';
+  f.className='starfloat big'; f.textContent='+'+(n||starX(ROOF_BURP_STARS))+'★';
   f.style.left='420px'; f.style.top='300px';
   st.appendChild(f); setTimeout(()=>{ try{ f.remove(); }catch(e){} }, 1120);
   setTimeout(()=>{ if(S.mode!=='menu') return;
@@ -142330,20 +142332,20 @@ const AM_PINS=[
   { id:'camp',   room:'bedroom',  x:96,  y:280, name:'THE CAMPAIGN',           plc:'c',      art:['spr','rifleman',GREEN], line:()=>t('THE TAN ARMY MARCHES ON YOUR ROOM. HOLD THE LINE, LEVEL BY LEVEL.'), fight:['tanrifle:TAN','tanmg:TAN','officer:TAN','tank:TAN'], pays:()=>{ const n=trNext(); return { star:n? tf('NEXT UP AT LEVEL %1: %2', n.lvl, trName(n.id)) : '' }; }, lock:null, go:()=>openCampScene(), who:'adv' },
   { id:'bf',     room:'bedroom',  x:212, y:280, name:'THE BATTLEFIELD',        plc:'bf',     art:['spr','mgunner',null],   line:()=>t('REAL COMMANDERS. ONE ON ONE, TWO ON TWO, OR YOUR WHOLE SQUAD.'), fight:['rifleman:TAN','mgunner:TAN','bazooka:TAN'], pays:()=>({ star:t(WR_REWARD.bf1) }), lock:null, go:()=>openWarTable(), who:'rat' },
   { id:'torch',  room:'bedroom',  x:328, y:280, name:'THE GAUNTLET',           plc:null,     art:['svg','torch'],          line:()=>tf('+%1★ AN HOUR WHILE YOU HOLD IT', GA_STARS), fight:['tansarge:TAN','rifleman:TAN'], pays:()=>({ star:'+'+GA_STARS+'★' }), lock:null, go:()=>{ openWarTable(); UI.wtMore(); }, who:'torch', waits:'torch' },
-  { id:'teddy',  room:'bedroom',  x:92,  y:352, name:'BEAR PARK',              plc:'teddy',  art:['svg','bearfort'],       line:()=>t('THE BEARS HOLD THE PARK. TWENTY RUNGS TO THE PLUSH KEY.'), fight:['rifleman:TAN','mgunner:TAN','bazooka:TAN'], pays:()=>({ pet:'patch', key:'THE PLUSH KEY', star:'+'+PARK_PURSE+'★' }), lock:()=>parkDoorOpen('teddy')? null : { line:t('PAY THE DEED'), go:true }, go:()=>openParkScene('teddy'), who:'adv', waits:'bear' },
+  { id:'teddy',  room:'bedroom',  x:92,  y:352, name:'BEAR PARK',              plc:'teddy',  art:['svg','bearfort'],       line:()=>t('THE BEARS HOLD THE PARK. TWENTY RUNGS TO THE PLUSH KEY.'), fight:['rifleman:TAN','mgunner:TAN','bazooka:TAN'], pays:()=>({ pet:'patch', key:'THE PLUSH KEY', star:'+'+starX(PARK_PURSE)+'★' }), lock:()=>parkDoorOpen('teddy')? null : { line:t('PAY THE DEED'), go:true }, go:()=>openParkScene('teddy'), who:'adv', waits:'bear' },
   { id:'fort',   room:'bedroom',  x:206, y:352, name:'FORT',                   plc:null,     art:['spr','sarge',null],     line:()=>t("SARGE'S ACADEMY: PROMOTIONS, MEDALS, THE ARMOR AND YOUR MEN."), fight:null, pays:()=>({}), lock:null, go:()=>UI.fort(), who:null },
-  { id:'fields', room:'bedroom',  x:372, y:352, name:'THE PILLOW FIELDS',      plc:'fields', art:['face','bear'],          line:()=>t('EMPEROR BEAR WAITS PAST THE PLUSH KEY. TEN COMMANDERS, ONE KING.'), fight:['rifleman:TAN','bazooka:TAN'], pays:()=>({ star:'+'+PARK_PURSE+'★' }), lock:()=>raidDoorKey('fields')? null : { line:t('THE PLUSH KEY'), go:false }, go:()=>openRaidScene('fields'), who:'bear', waits:'bear' },
-  { id:'dino',   room:'backyard', x:502, y:314, name:'DINO PARK',              plc:'dino',   art:['svg','dinopark'],       line:()=>t('DINOS ON THE LAWN. TWENTY RUNGS TO THE BRONZE KEY.'), fight:['sdino','sdino','rifleman:TAN'], pays:()=>({ pet:'flappy', key:'THE BRONZE KEY', star:'+'+PARK_PURSE+'★' }), lock:()=>parkDoorOpen('dino')? null : { line:t('DINO PARK'), go:false }, go:()=>openParkScene('dino'), who:'adv', waits:'rex' },
-  { id:'bone',   room:'backyard', x:614, y:314, name:"KING REX'S LAIR",        plc:'lair',   art:['face','rex'],           line:()=>(evKing()==='bone' && EV.bell>0)? evAnnLine() : t('KING REX WAITS UNDER THE VOLCANO. TEN COMMANDERS, ONE KING.'), fight:['sdino','sdino','bomber:TAN'], pays:()=>({ pet:'puff', star:'+'+PARK_PURSE+'★' }), lock:()=>(amNight('bone') || raidDoorKey('bone'))? null : { line:t('THE BRONZE KEY'), go:false }, go:()=>{ if(amNight('bone')) UI.evJoin(); else openRaidScene('bone'); }, who:'rex', waits:'rex', night:'ev' },
-  { id:'moon',   room:'backyard', x:726, y:314, name:'GNOME PARK',             plc:'moon',   art:['spr','gnome',null],     line:()=>t("GNOMES, WASPS AND FAIRIES IN THE MOON GARDEN. THE HEDGE DOOR'S TUNE OPENS IT."), fight:['gnome','gslinger','gsage','gknight'], pays:()=>({ pet:'merlin', star:'+'+PARK_PURSE+'★' }), lock:()=>parkDoorOpen('moon')? null : { line:t("PLAY THE HEDGE DOOR'S TUNE"), go:true }, go:()=>hedgeGate(), who:'adv', waits:'princess' },
-  { id:'palace', room:'backyard', x:512, y:396, name:"PRINCESS CROAK'S PALACE", plc:'palace', art:['face','princess'],      line:()=>t('PRINCESS CROAK HOLDS COURT PAST THE GARDEN. TEN COMMANDERS, ONE PRINCESS.'), fight:['pfrog','wasp','hornet','fairy'], pays:()=>({ star:'+'+PARK_PURSE+'★' }), lock:()=>raidDoorKey('palace')? null : { line:t('GNOME PARK')+' · '+tf('LEVEL %1', PARK_KEY_RUNG), go:false }, go:()=>openRaidScene('palace'), who:'princess', waits:'princess' },
-  { id:'yeti',   room:'winter',   x:520, y:106, name:'YETI PARK',              plc:'yeti',   art:['svg','icecastle'],      line:()=>t('YETIS AND SNOWBALLS. TWENTY RUNGS TO THE SILVER KEY.'), fight:['yeti','yeti','rifleman:TAN'], pays:()=>({ pet:'slush', key:'THE SILVER KEY', star:'+'+PARK_PURSE+'★' }), lock:()=>parkDoorOpen('yeti')? null : { line:t('YETI PARK'), go:false }, go:()=>openParkScene('yeti'), who:'adv', waits:'yeti' },
-  { id:'ice',    room:'winter',   x:640, y:106, name:'THE ICE CASTLE',         plc:'ice',    art:['face','yeti'],          line:()=>(evKing()==='ice' && EV.bell>0)? evAnnLine() : t('KING YETI WAITS IN THE ICE CASTLE. TEN COMMANDERS, ONE KING.'), fight:['yeti','yeti','mgunner:TAN'], pays:()=>({ star:'+'+PARK_PURSE+'★' }), lock:()=>(amNight('ice') || raidDoorKey('ice'))? null : { line:t('THE SILVER KEY'), go:false }, go:()=>{ if(amNight('ice')) UI.evJoin(); else openRaidScene('ice'); }, who:'yeti', waits:'yeti', night:'ev' },
-  { id:'caves',  room:'winter',   x:760, y:106, name:'THE ICE CAVES',          plc:'caves',  art:['spr','fyeti',null,'0 0 140 140'], line:()=>t("THE FEROCIOUS YETI'S CAVES. FOUR TIERS, FOUR EYES IN THE DARK."), fight:['fyeti','crawler:TAN','rifleman:TAN'], pays:()=>({ pet:'tiny', star:'+'+PARK_PURSE+'★' }), lock:()=>raidDoorKey('caves')? null : { line:t('YETI PARK'), go:false }, go:()=>openRaidScene('caves'), who:'adv', waits:'fyeti' },
-  { id:'sky',    room:'rooftop',  x:236, y:112, name:'THE SKY FORTRESS',       plc:'sky',    art:['spr','skyfort',null,SKY_BOX.skyfort], line:()=>t('THE TAN AIR CORPS OVER YOUR ROOF. ONLY GUNS REACH THE SKY.'), fight:['skyfighter','skyace','tanrifle:SKY'], pays:()=>({ star:'+'+PARK_PURSE+'★' }), lock:()=>raidDoorKey('sky')? null : { line:t('THE SECRET WORD'), go:false }, go:()=>openRaidScene('sky'), who:'adv' },   
-  { id:'lake',   room:'winter',   x:566, y:194, name:'THE FROZEN LAKE',        plc:null,     art:['svg','pole'],           line:()=>tf('THE FROZEN LAKE PAYS %1★ ONCE A DAY. BRING THE POLE.', LAKE_AGAIN_STARS), fight:null, pays:()=>({ star:'+'+LAKE_AGAIN_STARS+'★' }), lock:()=>!roomOwns('winter')? { line:t('FOR SALE'), go:true } : lakeOpen()? null : { line:t('THE CAMPAIGN')+' · '+tf('LEVEL %1', 120), go:false }, go:()=>{ if(!roomOwns('winter')){ openShop(); return; } if(roomCur()!=='winter') roomSwitch('winter'); }, who:null },
-  { id:'west',   room:'western',  x:968, y:170, name:'OUTLAW TOWN',            plc:'west',   art:['spr','wbandit',null],   line:()=>t('OUTLAWS HOLD THE TOWN. TWENTY RUNGS TO THE HIDEOUT.'), fight:['wbandit:TAN','wbandit:TAN','rifleman:TAN'], pays:()=>({ pet:'tiptoe', star:'+'+PARK_PURSE+'★' }), lock:null, go:()=>openParkScene('western'), who:'adv', waits:'croak' },
-  { id:'croak',  room:'western',  x:1108, y:170, name:"KING CROAK'S HIDEOUT",  plc:'hide',   art:['face','croak'],         line:()=>t('KING CROAK WAITS IN HIS HIDEOUT. TEN COMMANDERS, ONE KING.'), fight:['wbandit:TAN','wbandit:TAN','spy:TAN'], pays:()=>({ star:'+'+PARK_PURSE+'★' }), lock:()=>raidDoorKey('croak')? null : { line:t('OUTLAW TOWN')+' · '+tf('LEVEL %1', PARK_KEY_RUNG), go:false }, go:()=>openRaidScene('croak'), who:'croak', waits:'croak' },
+  { id:'fields', room:'bedroom',  x:372, y:352, name:'THE PILLOW FIELDS',      plc:'fields', art:['face','bear'],          line:()=>t('EMPEROR BEAR WAITS PAST THE PLUSH KEY. TEN COMMANDERS, ONE KING.'), fight:['rifleman:TAN','bazooka:TAN'], pays:()=>({ star:'+'+starX(PARK_PURSE)+'★' }), lock:()=>raidDoorKey('fields')? null : { line:t('THE PLUSH KEY'), go:false }, go:()=>openRaidScene('fields'), who:'bear', waits:'bear' },
+  { id:'dino',   room:'backyard', x:502, y:314, name:'DINO PARK',              plc:'dino',   art:['svg','dinopark'],       line:()=>t('DINOS ON THE LAWN. TWENTY RUNGS TO THE BRONZE KEY.'), fight:['sdino','sdino','rifleman:TAN'], pays:()=>({ pet:'flappy', key:'THE BRONZE KEY', star:'+'+starX(PARK_PURSE)+'★' }), lock:()=>parkDoorOpen('dino')? null : { line:t('DINO PARK'), go:false }, go:()=>openParkScene('dino'), who:'adv', waits:'rex' },
+  { id:'bone',   room:'backyard', x:614, y:314, name:"KING REX'S LAIR",        plc:'lair',   art:['face','rex'],           line:()=>(evKing()==='bone' && EV.bell>0)? evAnnLine() : t('KING REX WAITS UNDER THE VOLCANO. TEN COMMANDERS, ONE KING.'), fight:['sdino','sdino','bomber:TAN'], pays:()=>({ pet:'puff', star:'+'+starX(PARK_PURSE)+'★' }), lock:()=>(amNight('bone') || raidDoorKey('bone'))? null : { line:t('THE BRONZE KEY'), go:false }, go:()=>{ if(amNight('bone')) UI.evJoin(); else openRaidScene('bone'); }, who:'rex', waits:'rex', night:'ev' },
+  { id:'moon',   room:'backyard', x:726, y:314, name:'GNOME PARK',             plc:'moon',   art:['spr','gnome',null],     line:()=>t("GNOMES, WASPS AND FAIRIES IN THE MOON GARDEN. THE HEDGE DOOR'S TUNE OPENS IT."), fight:['gnome','gslinger','gsage','gknight'], pays:()=>({ pet:'merlin', star:'+'+starX(PARK_PURSE)+'★' }), lock:()=>parkDoorOpen('moon')? null : { line:t("PLAY THE HEDGE DOOR'S TUNE"), go:true }, go:()=>hedgeGate(), who:'adv', waits:'princess' },
+  { id:'palace', room:'backyard', x:512, y:396, name:"PRINCESS CROAK'S PALACE", plc:'palace', art:['face','princess'],      line:()=>t('PRINCESS CROAK HOLDS COURT PAST THE GARDEN. TEN COMMANDERS, ONE PRINCESS.'), fight:['pfrog','wasp','hornet','fairy'], pays:()=>({ star:'+'+starX(PARK_PURSE)+'★' }), lock:()=>raidDoorKey('palace')? null : { line:t('GNOME PARK')+' · '+tf('LEVEL %1', PARK_KEY_RUNG), go:false }, go:()=>openRaidScene('palace'), who:'princess', waits:'princess' },
+  { id:'yeti',   room:'winter',   x:520, y:106, name:'YETI PARK',              plc:'yeti',   art:['svg','icecastle'],      line:()=>t('YETIS AND SNOWBALLS. TWENTY RUNGS TO THE SILVER KEY.'), fight:['yeti','yeti','rifleman:TAN'], pays:()=>({ pet:'slush', key:'THE SILVER KEY', star:'+'+starX(PARK_PURSE)+'★' }), lock:()=>parkDoorOpen('yeti')? null : { line:t('YETI PARK'), go:false }, go:()=>openParkScene('yeti'), who:'adv', waits:'yeti' },
+  { id:'ice',    room:'winter',   x:640, y:106, name:'THE ICE CASTLE',         plc:'ice',    art:['face','yeti'],          line:()=>(evKing()==='ice' && EV.bell>0)? evAnnLine() : t('KING YETI WAITS IN THE ICE CASTLE. TEN COMMANDERS, ONE KING.'), fight:['yeti','yeti','mgunner:TAN'], pays:()=>({ star:'+'+starX(PARK_PURSE)+'★' }), lock:()=>(amNight('ice') || raidDoorKey('ice'))? null : { line:t('THE SILVER KEY'), go:false }, go:()=>{ if(amNight('ice')) UI.evJoin(); else openRaidScene('ice'); }, who:'yeti', waits:'yeti', night:'ev' },
+  { id:'caves',  room:'winter',   x:760, y:106, name:'THE ICE CAVES',          plc:'caves',  art:['spr','fyeti',null,'0 0 140 140'], line:()=>t("THE FEROCIOUS YETI'S CAVES. FOUR TIERS, FOUR EYES IN THE DARK."), fight:['fyeti','crawler:TAN','rifleman:TAN'], pays:()=>({ pet:'tiny', star:'+'+starX(PARK_PURSE)+'★' }), lock:()=>raidDoorKey('caves')? null : { line:t('YETI PARK'), go:false }, go:()=>openRaidScene('caves'), who:'adv', waits:'fyeti' },
+  { id:'sky',    room:'rooftop',  x:236, y:112, name:'THE SKY FORTRESS',       plc:'sky',    art:['spr','skyfort',null,SKY_BOX.skyfort], line:()=>t('THE TAN AIR CORPS OVER YOUR ROOF. ONLY GUNS REACH THE SKY.'), fight:['skyfighter','skyace','tanrifle:SKY'], pays:()=>({ star:'+'+starX(PARK_PURSE)+'★' }), lock:()=>raidDoorKey('sky')? null : { line:t('THE SECRET WORD'), go:false }, go:()=>openRaidScene('sky'), who:'adv' },   
+  { id:'lake',   room:'winter',   x:566, y:194, name:'THE FROZEN LAKE',        plc:null,     art:['svg','pole'],           line:()=>tf('THE FROZEN LAKE PAYS %1★ ONCE A DAY. BRING THE POLE.', starX(LAKE_AGAIN_STARS)), fight:null, pays:()=>({ star:'+'+starX(LAKE_AGAIN_STARS)+'★' }), lock:()=>!roomOwns('winter')? { line:t('FOR SALE'), go:true } : lakeOpen()? null : { line:t('THE CAMPAIGN')+' · '+tf('LEVEL %1', 120), go:false }, go:()=>{ if(!roomOwns('winter')){ openShop(); return; } if(roomCur()!=='winter') roomSwitch('winter'); }, who:null },
+  { id:'west',   room:'western',  x:968, y:170, name:'OUTLAW TOWN',            plc:'west',   art:['spr','wbandit',null],   line:()=>t('OUTLAWS HOLD THE TOWN. TWENTY RUNGS TO THE HIDEOUT.'), fight:['wbandit:TAN','wbandit:TAN','rifleman:TAN'], pays:()=>({ pet:'tiptoe', star:'+'+starX(PARK_PURSE)+'★' }), lock:null, go:()=>openParkScene('western'), who:'adv', waits:'croak' },
+  { id:'croak',  room:'western',  x:1108, y:170, name:"KING CROAK'S HIDEOUT",  plc:'hide',   art:['face','croak'],         line:()=>t('KING CROAK WAITS IN HIS HIDEOUT. TEN COMMANDERS, ONE KING.'), fight:['wbandit:TAN','wbandit:TAN','spy:TAN'], pays:()=>({ star:'+'+starX(PARK_PURSE)+'★' }), lock:()=>raidDoorKey('croak')? null : { line:t('OUTLAW TOWN')+' · '+tf('LEVEL %1', PARK_KEY_RUNG), go:false }, go:()=>openRaidScene('croak'), who:'croak', waits:'croak' },
   { id:'bd',     room:'western',  x:1050, y:296, get name(){ return bdName(); }  , plc:null,  art:['spr','tanrifle',TAN],   line:()=>(BD.bell>0)? bdAnnLine() : t('TWO ARMIES, ONE DESERT. SIX ON SIX, EVERY NIGHT.'), fight:['tanrifle:TAN','tanmg:TAN','tank:TAN'], pays:()=>({ star:'★ + XP' }), lock:()=>nightGateOpen()? null : { line:tf('COMMANDER LEVEL %1', NIGHT_MIN_LVL), go:false }, go:()=>{ const st=bdDoorState(); if(st==='live' || (st==='quiet' && bdSaidIn()<=1800)) UI.bdJoin(); else if(roomCur()!=='western') roomSwitch('western'); }, who:'rat', night:'bd' },   
   { id:'tex',    room:'bedroom',  x:212, y:424, name:'THE TOY EXPRESS',        plc:null,     art:['svg','train'],          line:()=>t('THE TAN HAVE TAKEN THE TRAIN. CABOOSE TO ENGINE, SQUAD. MOVE!'), fight:['tanrifle:TAN','tanmg:TAN','tansarge:TAN'], pays:()=>({}), lock:()=>(TEX.on && TEX_END.on)? null : { line:t('THE TOY EXPRESS'), go:false }, go:()=>texPinGo(), who:'adv' },   
 ];
@@ -150578,7 +150580,7 @@ function adAskShow(){
   if(document.getElementById('adAsk')) return;
   const el=document.createElement('div'); el.id='adAsk';
   el.innerHTML='<div class="aap">'
-    +'<p>A REAL AD FROM OUR SPONSORS. WATCH IT ALL AND THE SET PAYS '+TV_STARS+'★.</p>'
+    +'<p>A REAL AD FROM OUR SPONSORS. WATCH IT ALL AND THE SET PAYS '+starX(TV_STARS)+'★.</p>'
     +'<button type="button" class="agok" onclick="UI.adRoll()">ROLL IT!</button>'
     +'<button type="button" class="agx" onclick="UI.adAskX()">✕</button></div>';
   document.body.appendChild(el);
@@ -162331,7 +162333,7 @@ function labDueTake(){ const L=META.lab; if(!L || !L.job || Date.now()<L.due) re
   if(labBoomNext()){ L.boom=2; return true; }   
   labLand(L.job); return true; }   
 function labBoomPay(){ LAB_BOOM_T=0; const L=META.lab; if(!L || L.boom!==2 || !L.job) return false;   
-  const id=L.job; L.boom=id; META.starBank+=FL_BOOM_STARS; SHOP.labPaid=Date.now();   
+  const id=L.job; L.boom=id; META.starBank+=starEcon(FL_BOOM_STARS);   SHOP.labPaid=Date.now();   
   L.due=Date.now()+(L.span>0? L.span : labTutSpan())*3600000;   
   saveMeta(); if(S.mode==='menu') renderMenu();
   if(shopIsOpen() && SHOP.store==='lab'){ const st=document.getElementById('shStars'); if(st) st.textContent=META.starBank+'★'; SFX.coin(); shopRefresh(); }
@@ -162373,7 +162375,7 @@ function labSceneHTML(S){ requestAnimationFrame(labBpFit);
     +(job? '<span class="fs-big" id="fsBig" data-id="'+job+'">'+P(job)+SP+'</span>'+(boom? '<i class="fs-bfire"></i><i class="fs-bsmoke s1"></i><i class="fs-bsmoke s2"></i><i class="fs-bsmoke s3"></i><b class="fs-tag big" id="fsBoomTag">DID NOT WORK</b>' : '<div class="fs-tape" id="fsTape"><b class="fs-name">'+NM(job)+'</b><b class="fs-digits" id="fsClock" data-notr>'+labClockDigits()+'</b><span class="fs-bar"><i></i></span></div>') : all? '<span class="fs-party">'+SP+SP+SP+'</span>' : '<b class="fs-zzz" data-notr>z z z</b>')+'</div>'   
     +'<div class="fs-counter" id="fsCounter"><i class="fs-plank"></i>'+(ready? '<i class="fs-lamp"></i><i class="fs-light"></i><button type="button" class="fs-rpart" id="fsTake" data-id="'+ready+'" onclick="UI.labTake(\''+ready+'\')">'+P(ready)+'<b class="fs-ready">TAKE</b></button>' : '<i class="fs-lamp off"></i>')+'</div>'   
     +(wreck? '<div class="fs-wreck" id="fsWreck" data-id="'+wreck+'"><i class="fs-scorch"></i><span class="fs-wpart">'+P(wreck)+'</span><i class="fs-flame"></i><i class="fs-smoke s1"></i><i class="fs-smoke s2"></i><i class="fs-smoke s3"></i><b class="fs-tag">DID NOT WORK</b></div>' : '')   
-    +(paid? '<b class="fs-paid" id="fsPaid" data-notr>+'+FL_BOOM_STARS+'★</b>' : '')
+    +(paid? '<b class="fs-paid" id="fsPaid" data-notr>+'+starEcon(FL_BOOM_STARS)+'★</b>' : '')
     +'<button type="button" class="fs-door" id="fsDoor" onclick="UI.labCat(1)"><i></i><b>ALL UPGRADES</b></button></div>'; }   
 function labCatBarHTML(){ return '<div class="fs-catbar"><button type="button" class="fs-back" id="fsBack" onclick="UI.labCat(0)">✕</button><b>ALL UPGRADES</b></div>'; }   
 function labSceneRead(d){ const sc=d && d.querySelector('#flScene'); if(!sc) return null; const cs=e=>getComputedStyle(e), R=e=>{ if(!e) return null; const r=e.getBoundingClientRect(); return [Math.round(r.left),Math.round(r.top),Math.round(r.width),Math.round(r.height)]; }, Q=q=>sc.querySelector(q), TX=e=>e? e.textContent.replace(/\s+/g,' ').trim() : null;   
@@ -170986,7 +170988,7 @@ function hwSweep(){
   const p=document.getElementById('milePop'); if(!p || !p.classList.contains('hidden')) return false;   
   const id=hwNext(); let stars=0;
   if(id==='pumpkin'){   
-    if(outfitOwns('pumpkin')){ stars=HW_CAP_STARS; META.starBank+=stars; META.starsLifetime+=stars; }   
+    if(outfitOwns('pumpkin')){ stars=starEcon(HW_CAP_STARS);   META.starBank+=stars; META.starsLifetime+=stars; }   
     else { META.outfit.own.push('pumpkin'); if(META.outfitSeen.indexOf('pumpkin')<0) META.outfitSeen.push('pumpkin'); }   
     META.hw.cap=1;
   } else {
@@ -178159,6 +178161,7 @@ window.GVT = {
   fp(){ const g=document.getElementById('fhPet-puff'), w=g && g.querySelector('.fp-firew'); return { puff:{ on:FH_PUFF.on, n:FH_PUFF.n, skips:FH_PUFF.skips, since:FH_PUFF.last? Math.round(performance.now()-FH_PUFF.last) : null, gap:FH_PUFF.GAP.slice(), first:FH_PUFF.FIRST.slice(), ms:FH_PUFF.MS, len:FH_PUFF.LEN, w:FH_PUFF.W, fire:!!(g && g.classList.contains('fp-fire')), op:w? +getComputedStyle(w).opacity : null, can:g? fhPuffCan(g) : null }, sab:{ paw:KB_SAB_PAW.slice(), grip:KB_SAB_GRIP.slice(), tip:KB_SAB_TIP, img:!!IMG.kbsabre, box:TEDDY_BOX.kbsabre||null, foot:TEDDY_BOX.kingbear||null } }; },   
   wk(v){ WK_FORCE=(v==null)? null : !!v; WK_C={ at:0, v:false, key:'' }; const e=evNow(); return { force:WK_FORCE, weekend:isWeekend(), key:wkKey(), x:STAR_WK_X, seen:META.wkSeen||null, now:+e.toFixed(3), wd:evBellWD(e), tzDay:evTZDay(e) }; },   
   starX(n){ return starX(+n||0); },   
+  sem(){ return { x:STAR_ECON, wk:STAR_WK_X, weekend:isWeekend(), ex:[1,2,5,10,25,50,100,300].map(n=>[n, starEcon(n), starX(n)]) }; },   
   vflag(){ const v=S.vflag; return v? {x:v.x,t:+v.t.toFixed(2),dur:v.dur,burst:v.burst,pending:!!v.done,hex:v.hex,old:v.old,foeWin:!!v.foeWin} : null; },
   
   quiet(){ return { cv:GVT_CV, on:QT_ON, freeze:QT_FREEZE, resumeMax:QT_RESUME_MAX, held:qtHeld(), wait:!!QT.wait, freezes:qtFreezes(), skip:QT.skip, n:QT.n, rel:QT.rel, had:QT.had, sus:QT.sus, out:QT.out.length,
