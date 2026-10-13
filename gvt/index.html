@@ -10161,6 +10161,21 @@
   @keyframes wws-hop { 0%{transform:translateY(0px)} 35%{transform:translateY(-12px)} 70%{transform:translateY(0px)} 85%{transform:translateY(-4px)} 100%{transform:translateY(0px)} }
   #roomStage .rg-zoom #wws-eng *, #roomStage .rg-zoom #wws-furn * { animation:none; }
   #roomStage > #dlgTop > *, #roomStage > #dlgBelt > * { pointer-events:auto; }   /**/
+  /**/
+  #roomStage .wws-rays { animation:wws-rays 60s linear infinite; }
+  @keyframes wws-rays { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+  #roomStage .wws-glow { animation:wws-glow 4s ease-in-out infinite alternate; }
+  @keyframes wws-glow { from{opacity:.2} to{opacity:.36} }
+  #roomStage .wws-tw { animation:wws-twinkle 2.4s ease-in-out infinite alternate; }
+  @keyframes wws-twinkle { from{opacity:.3} to{opacity:1} }
+  #roomStage .wws-eg { animation:wws-egfly 44s linear infinite; }
+  @keyframes wws-egfly { 0%{transform:translate(-80px,142px); opacity:0} 4%{opacity:1} 50%{transform:translate(500px,118px); opacity:1} 96%{opacity:1} 100%{transform:translate(1060px,146px); opacity:0} }
+  #roomStage .wws-egb { animation:wws-egbob 3.1s ease-in-out infinite alternate; }
+  @keyframes wws-egbob { from{transform:translateY(-4px)} to{transform:translateY(4px)} }
+  #roomStage .wws-egw { transform-box:fill-box; transform-origin:50% 50%; animation:wws-egbeat 2.2s ease-in-out infinite alternate; }
+  @keyframes wws-egbeat { from{transform:scaleY(1)} to{transform:scaleY(.86)} }
+  #roomStage .rg-zoom #wws-sky *, #roomStage .rg-zoom #wws-eagle * { animation:none; }
+  @media (prefers-reduced-motion:reduce){ #roomStage .wws-rays, #roomStage .wws-glow, #roomStage .wws-tw, #roomStage .wws-eg, #roomStage .wws-egb, #roomStage .wws-egw { animation:none !important; } }
   @media (prefers-reduced-motion:reduce){ #roomStage .wws-f, #roomStage .wws-face, #roomStage .wws-e, #roomStage .wws-arm, #roomStage .wws-flag, #roomStage .wws-hop { animation:none !important; } }   /**/
   /*
 
@@ -84444,7 +84459,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='21.93';        
+let GVT_CV='21.94';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -130942,6 +130957,39 @@ function wwsTrainSVG(){
       +'<g transform="scale('+sc+') translate(0,-2)">'+art+'</g></g>'; };
   return '<defs><path id="wl-mpath" d="'+AR.polyD(all)+'Z"/></defs><g id="wl-train">'+car(A.boose,0)+car(A.coal,1)+car(A.loco,2)+'</g>';
 }
+
+
+
+
+
+
+
+function wwsMoonPhase(d){ const SYN=29.530588853, E=Date.UTC(2000,0,6,18,14); const p=(((d||new Date()).getTime()-E)/864e5/SYN)%1; return +((p<0? p+1 : p).toFixed(4)); }   
+function wwsMoonSVG(x,y,R,p){ const c=Math.cos(2*Math.PI*p), rx=+(Math.abs(c)*R).toFixed(2), sweep=c>0? 0 : 1, mirror=p>0.5;   
+  return '<g id="wws-moon" data-phase="'+p+'" transform="translate('+x+','+y+')"><circle r="'+(R*1.9)+'" fill="#F4F1E6" opacity=".09"/><circle r="'+(R*1.35)+'" fill="#F4F1E6" opacity=".1"/><circle r="'+R+'" fill="#F4F1E6" stroke="#D9D4C0" stroke-width="1.2"/>'
+    +'<g fill="#DED9C4" opacity=".9"><circle cx="'+(-R*0.35)+'" cy="'+(-R*0.2)+'" r="'+(R*0.16)+'"/><circle cx="'+(R*0.25)+'" cy="'+(R*0.3)+'" r="'+(R*0.12)+'"/><circle cx="'+(R*0.1)+'" cy="'+(-R*0.45)+'" r="'+(R*0.09)+'"/></g>'
+    +(p>0.49 && p<0.51? '' : '<path class="wws-mdark" transform="'+(mirror? 'scale(-1,1)' : '')+'" d="M0 '+(-R)+' A'+R+' '+R+' 0 0 0 0 '+R+' A'+rx+' '+R+' 0 0 '+sweep+' 0 '+(-R)+'Z" fill="#0A1230" opacity=".88"/>')+'</g>'; }
+function wwsSkySVG(){ const night=roomNight(); let s='<g id="wws-sky" data-night="'+(night?1:0)+'"><defs><linearGradient id="wws-skyg" x1="0" y1="0" x2="0" y2="1">'
+    +(night? '<stop offset="0" stop-color="#070E26"/><stop offset=".6" stop-color="#16244F"/><stop offset="1" stop-color="#3B2E52"/>' : '<stop offset="0" stop-color="#2F6FB6"/><stop offset=".55" stop-color="#7FB8E6"/><stop offset="1" stop-color="#EAD8B0"/>')
+    +'</linearGradient></defs><rect x="0" y="0" width="960" height="214" fill="url(#wws-skyg)"/>';
+  if(night){ const R=wwsRng(7); let st='<g id="wws-stars">'; for(let i=0;i<64;i++){ const x=+(R()*960).toFixed(1), y=+(4+R()*150).toFixed(1), r=+(0.7+R()*1.2).toFixed(2), o=+(0.55+R()*0.45).toFixed(2), tw=i%3===0; st+='<circle cx="'+x+'" cy="'+y+'" r="'+r+'" fill="#FFFFFF" opacity="'+o+'"'+(tw? ' class="wws-tw" style="animation-delay:-'+(R()*2.4).toFixed(2)+'s"' : '')+'/>'; }
+    for(const [x,y] of [[120,42],[560,30],[700,96]]) st+='<path d="M'+x+' '+(y-4)+' v8 M'+(x-4)+' '+y+' h8" stroke="#FFFFFF" stroke-width="1.1" stroke-linecap="round" opacity=".85"/>'; s+=st+'</g>'+wwsMoonSVG(860,124,20,wwsMoonPhase()); }
+  else { const cloud=(x,y,k)=>'<g transform="translate('+x+','+y+') scale('+k+')" fill="#FFFFFF" opacity=".82"><ellipse cx="0" cy="0" rx="34" ry="11"/><ellipse cx="-14" cy="-6" rx="16" ry="10"/><ellipse cx="10" cy="-8" rx="20" ry="12"/><ellipse cx="26" cy="-2" rx="14" ry="8"/></g>';
+    s+=cloud(160,78,0.9)+cloud(470,58,1.1)+cloud(690,90,0.8)
+      +'<g id="wws-sun" transform="translate(860,124)"><circle class="wws-glow" r="44" fill="#FFE28A" opacity=".26"/><g class="wws-rays" stroke="#FFD64A" stroke-width="3" stroke-linecap="round">'+[0,45,90,135,180,225,270,315].map(a=>'<path transform="rotate('+a+')" d="M0 -30 v-9"/>').join('')+'</g><circle r="22" fill="#FFD64A" stroke="#E8A92B" stroke-width="2"/></g>'; }
+  return s+'</g>'; }
+function wwsRocksSVG(){ const strata=(x,y0,y1,w)=>{ let r=''; for(let y=y0;y<y1;y+=11) r+='<path d="M'+(x-w/2+2)+' '+y+' h'+(w-4)+'" stroke="#7A3320" stroke-width="1.2" opacity=".55"/>'; return r; };   
+  return '<g id="wws-rocks">'
+    +'<ellipse cx="150" cy="156" rx="118" ry="7" fill="#000" opacity=".16"/>'
+    +'<path d="M44 154 L48 92 Q52 62 60 48 Q68 62 72 92 L78 154 Z" fill="#B4522F" stroke="#7A3320" stroke-width="1.6" stroke-linejoin="round"/><path d="M60 50 Q66 64 70 92 L76 150 L62 150 Z" fill="#8E3C22" opacity=".55"/>'+strata(61,70,146,30)
+    +'<path d="M100 156 L106 96 Q110 84 124 82 L180 80 Q194 82 196 94 L204 156 Z" fill="#C25A36" stroke="#7A3320" stroke-width="1.6" stroke-linejoin="round"/><path d="M160 82 L182 80 Q194 82 196 94 L204 156 L166 156 Z" fill="#8E3C22" opacity=".5"/><path d="M110 92 L124 86 L180 84" fill="none" stroke="#D0714A" stroke-width="2" opacity=".7"/>'+strata(152,100,150,96)
+    +'<path d="M222 160 L225 112 Q228 94 232 90 Q236 94 239 112 L242 160 Z" fill="#B4522F" stroke="#7A3320" stroke-width="1.4" stroke-linejoin="round"/><path d="M232 92 Q236 96 239 112 L242 158 L233 158 Z" fill="#8E3C22" opacity=".55"/>'
+    +'<path d="M30 156 Q90 150 150 154 Q210 158 250 160" fill="none" stroke="#A85A32" stroke-width="3" opacity=".6"/></g>'; }
+
+function eagleArt(){ return '<g class="wws-egw"><path d="M-6 0 L-14 -6 Q-30 -14 -46 -12 L-54 -16 L-50 -9 L-58 -11 L-50 -5 L-57 -4 L-48 0 L-52 4 L-42 2 Q-28 6 -14 4 L-6 3 Z" fill="#3B2A1A"/><path d="M6 0 L14 -6 Q30 -14 46 -12 L54 -16 L50 -9 L58 -11 L50 -5 L57 -4 L48 0 L52 4 L42 2 Q28 6 14 4 L6 3 Z" fill="#3B2A1A"/><path d="M-12 1 Q-28 3 -40 1 M12 1 Q28 3 40 1" stroke="#5A4330" stroke-width="1.2" fill="none" opacity=".8"/></g>'
+    +'<ellipse cx="0" cy="2" rx="6" ry="10" fill="#3B2A1A"/><path d="M-7 8 L7 8 L9 16 L-9 16 Z" fill="#F2F0E8" stroke="#C9C3B2" stroke-width=".8"/><path d="M-4 12 L0 16 L4 12" stroke="#C9C3B2" stroke-width=".8" fill="none"/>'
+    +'<circle cx="0" cy="-7" r="4.2" fill="#F2F0E8"/><path d="M0 -11.5 L1.6 -14.5 L3.2 -11 Z" fill="#E8B030"/><circle cx="-1.4" cy="-8" r=".8" fill="#2a2a2a"/><path d="M-3 9 l-2 3 M3 9 l2 3" stroke="#E8B030" stroke-width="1.4" stroke-linecap="round"/>'; }
+function wwsEagleSVG(){ return '<g id="wws-eagle"><g class="wws-eg" transform="translate(300,124)" style="animation-delay:-'+((performance.now()/1000)%44).toFixed(2)+'s"><g class="wws-egb"><g transform="rotate(90) scale(0.62)">'+eagleArt()+'</g></g></g></g>'; }   
 function wwsFloorSVG(){
   wwsArm(); const paper=!!MAPPIN, T=WWS.town, Bk=WWS.bank, S=paper? null : wwsSched();
   const tw=inner=>'<g class="wws-town" transform="translate('+T.tx+','+T.ty+') scale('+T.s+')">'+inner+'</g>';
@@ -130951,8 +130999,9 @@ function wwsFloorSVG(){
       +'<path d="M84 210 q30 -10 62 0 M120 470 q26 -9 54 0 M420 550 q30 -10 62 0"/>'
       +'<path d="M540 200 q26 -9 54 0 M700 330 q30 -10 60 0 M850 520 q26 -9 52 0"/>'
       +'<path d="M260 320 q24 -8 50 0 M626 460 q24 -8 50 0 M880 260 q22 -8 46 0"/></g>'
-    +(paper? '' : wlSandSVG())
+    +(paper? '' : wwsSkySVG())   
     +wlRidgeSVG()
+    +wwsRocksSVG()   
     +tw(wrTownGroundSVG())
     +(paper? '' : wwsPondSVG()+'<g id="wl-track">'+railroadPath(WWS.track)+'</g>')
     +wwsDeckSVG()
@@ -130975,7 +131024,7 @@ function wwsFloorSVG(){
     +'<g id="wws-wheel" transform="translate('+WWS.wheel[0]+','+WWS.wheel[1]+')"><circle r="16" fill="none" stroke="#8C6B3A" stroke-width="2.5"/><circle r="9" fill="none" stroke="#8C6B3A" stroke-width="2"/>'
       +'<path d="M-14 -7 L14 7 M-14 7 L14 -7 M0 -16 V16" stroke="#8C6B3A" stroke-width="1.6" opacity="0.8"/></g>'
     +wwsCactusSVG(C[0][0],C[0][1],C[0][2],0)+wwsCactusSVG(C[1][0],C[1][1],C[1][2],1)+wwsCactusSVG(C[3][0],C[3][1],C[3][2],3)
-    +(paper? '' : wrSkySVG());
+    +(paper? '' : wrSkySVG()+wwsEagleSVG());   
 }
 function wwsTap(e){ try{ e.stopPropagation(); }catch(e2){} const g=document.getElementById('wws-eng'); if(!g) return; try{ SFX.whistle(); }catch(e3){} g.classList.add('wave'); clearTimeout(WWS.wave); WWS.wave=setTimeout(()=>{ try{ g.classList.remove('wave'); }catch(e4){} }, 1400); }   
 
@@ -146826,7 +146875,7 @@ let ROOM_WING_SHADE=0.5; const ROOM_WING_FADE=260;
 const ROOM_WING_CUT={   
   winter:['#ro-sled','#ro-secret','#ro-fishers','#ro-lake','#ro-icecaves'],   
   backyard:['g[transform="translate(100,300)"]','#by-birdbath','#by-dinodoor','circle[cx="40"][cy="76"]','circle[cx="52"][cy="88"]','circle[cx="44"][cy="82"]','circle[cx="60"][cy="96"]','circle[fill="url(#byMoonPool)"]'],       
-  western:['#wl-creek','#wl-train','#wr-town','#wr-townnear','#wr-gate','#wr-folk','#wr-posse','g[transform="translate(192,302)"]','g[transform="translate(142,274) scale(0.8)"]','g[transform="translate(60,580)"]','#wl-weed','#wl-weed2','#wr-barrel','#wws-bank','#wws-deck','#wws-sign','#wws-furn','#wws-eng','#wws-pond','#wws-weeds','#wws-skull','#wws-wheel'],       
+  western:['#wl-creek','#wl-train','#wr-town','#wr-townnear','#wr-gate','#wr-folk','#wr-posse','g[transform="translate(192,302)"]','g[transform="translate(142,274) scale(0.8)"]','g[transform="translate(60,580)"]','#wl-weed','#wl-weed2','#wr-barrel','#wws-bank','#wws-deck','#wws-sign','#wws-furn','#wws-eng','#wws-pond','#wws-weeds','#wws-skull','#wws-wheel','#wws-sun','#wws-moon','#wws-eagle','#wws-rocks'],       
   rooftop:['#rf-slope','#rf-ridge','#rf-moon','#rf-void > rect[rx="3"]','#rf-swallow'],   
   attic:['*'],   
   bedroom:[] };   
@@ -178758,7 +178807,7 @@ window.GVT = {
   scc(v, a){ return sccRig(v, a); },   
   prf(){ const P=S.mode==='play', B=P? prfBox() : null; return { cv:GVT_CV, on:PRF.on, m:PRF.m, R0:PRF.R0, R:prfR(), tkM:TK_M, box:B? [B.x,B.y] : null, mine:P? prfMine() : null, map:P? prfMap() : null, W:S.bf? WORLD_W : W, H:WORLD_H, mid:MID, strip:MID_BUFFER, line:(!S.bf && P)? campDeployX() : null }; },   
   prs(){ const P=S.mode==='play'; return { cv:GVT_CV, holds:1, half:P? tapHalf() : null, east:!!(S.bf && bfMyTeam()==='foe') }; },   
-  wws(){ const S9=wwsOn()? wwsSched() : null; return { cv:GVT_CV, on:WWS.on, armed:WWS.armed, track:wwsOn()? WWS.track : WL_TRACK, shells:wwsShells().map(a=>a.slice()), stop0:+wwsStop0().toFixed(3), stopX:WWS.stopX, x0:WWS.x0, engS:WWS.engS, plane:(WP_SEAT_D.western||[]).slice(), dur:WWS.dur, hold:WWS.hold, gap:WWS.gap, speed:WWS.speed, loop:WWS.loop, deck:Object.assign({},WWS.deck), sign:Object.assign({},WWS.sign), desk:WWS.desk.slice(), bench:WWS.bench.slice(), door:WWS.door.slice(), cross:WWS.cross.slice(), spots:{ bank:Object.assign({},wwsSpot('bank')), wpark:Object.assign({},wwsSpot('wpark')) }, big:ROOM_BIG.western.slice(), edge:ROOM_EDGE_CLIP.western.slice(), pond:{ cx:WL_POND.cx, cy:WL_POND.cy }, pool:Object.assign({},BFISH_POOL), pail:Object.assign({},BFISH_PAIL), rod:Object.assign({},BFISH_ROD), wrd:{ py:WRD.py, lane:WRD.lane.slice(), lapMs:WRD.lapMs }, seats:Object.fromEntries(Object.keys(WWS.seats).map(k=>[k, (DECOR_SEAT_R.western[k]||[]).slice()])), sched:S9? { li:S9.li, st0:S9.st0, stops:S9.stops.slice(), trips:S9.trips.map(t=>t.slice()), greet:S9.greet? Object.assign({},S9.greet) : null, punches:S9.punches.slice(), walkers:S9.walkers.map(w=>({ k:w.k, n:w.pts.length, pts:w.pts.map(p=>p.slice()) })), eng:S9.eng.map(p=>p.slice()) } : null }; },   
+  wws(){ const S9=wwsOn()? wwsSched() : null; return { cv:GVT_CV, on:WWS.on, armed:WWS.armed, track:wwsOn()? WWS.track : WL_TRACK, shells:wwsShells().map(a=>a.slice()), stop0:+wwsStop0().toFixed(3), stopX:WWS.stopX, x0:WWS.x0, engS:WWS.engS, plane:(WP_SEAT_D.western||[]).slice(), sky:{ night:roomNight(), phase:wwsMoonPhase(), sun:[860,124], window:NW_NIGHT.slice(), pin:NW_PIN }, dur:WWS.dur, hold:WWS.hold, gap:WWS.gap, speed:WWS.speed, loop:WWS.loop, deck:Object.assign({},WWS.deck), sign:Object.assign({},WWS.sign), desk:WWS.desk.slice(), bench:WWS.bench.slice(), door:WWS.door.slice(), cross:WWS.cross.slice(), spots:{ bank:Object.assign({},wwsSpot('bank')), wpark:Object.assign({},wwsSpot('wpark')) }, big:ROOM_BIG.western.slice(), edge:ROOM_EDGE_CLIP.western.slice(), pond:{ cx:WL_POND.cx, cy:WL_POND.cy }, pool:Object.assign({},BFISH_POOL), pail:Object.assign({},BFISH_PAIL), rod:Object.assign({},BFISH_ROD), wrd:{ py:WRD.py, lane:WRD.lane.slice(), lapMs:WRD.lapMs }, seats:Object.fromEntries(Object.keys(WWS.seats).map(k=>[k, (DECOR_SEAT_R.western[k]||[]).slice()])), sched:S9? { li:S9.li, st0:S9.st0, stops:S9.stops.slice(), trips:S9.trips.map(t=>t.slice()), greet:S9.greet? Object.assign({},S9.greet) : null, punches:S9.punches.slice(), walkers:S9.walkers.map(w=>({ k:w.k, n:w.pts.length, pts:w.pts.map(p=>p.slice()) })), eng:S9.eng.map(p=>p.slice()) } : null }; },   
   psb(){ const w=document.getElementById('wartable'), g=document.getElementById('glScr'), d=document.querySelector('#wartable .psb-door'), f=document.querySelector('#wartable .wt-foot2'), R=e=>{ if(!e) return null; const b=e.getBoundingClientRect(); return [+b.left.toFixed(1), +b.top.toFixed(1), +b.width.toFixed(1), +b.height.toFixed(1)]; }; return { cv:GVT_CV, wt:PSB.wt, fitN:PSB.fitN, hidden:!!(d && d.style.display==='none'), tight:!!(d && d.classList.contains('psb-tight')), park:MGP.park, wsv:WSV.on, wtShown:!!w && !w.classList.contains('hidden'), glOpen:!!GL.open, glShown:!!g && !g.classList.contains('hidden'), sel:GL.sel, card:!!document.querySelector('#roomModal .rmback'), stage:!!document.querySelector('#roomModal .msa-body'), tile:!!document.querySelector('#wartable .wsv-tile'), row:!!document.querySelector('#wartable .wsv-row'), door:R(d), doorLab:d? (d.querySelector('.dlab')||{}).textContent : null, badge:d? ((d.querySelector('.wt-new')||{}).textContent||null) : null, prev:d && d.previousElementSibling? (d.previousElementSibling.querySelector('.dlab')||{}).textContent : null, foot:R(f), footScroll:f? [f.scrollWidth, f.clientWidth] : null, ghost:R(document.querySelector('#wartable .gb-seat')), grp:R(document.getElementById('grpBtn')) }; },   
   dsb(){ const T=S.cfg&&S.cfg.terrain, R=(T&&T.rocks)||[]; return { cv:GVT_CV, on:DSB.on, gate:dsbOn(), bd:!!(S.bf&&S.bf.bd), plc:COOP? COOP.plc : null, map:S.bf? S.bf.mapId : null, W:S.bf? WORLD_W : 0, H:S.bf? WORLD_H : 0, mid:MID, buffer:MID_BUFFER, trkBan:TRK_BAN, trenchW:TRENCH_W, works:DSB.WORKS.map(w=>[w.dx,w.y]), bags:R.filter(r=>r.dsb).map(r=>[r.x,r.y,r.r]), rocks:R.map(r=>[r.x,r.y,r.r,r.art||'']), trench:(T&&T.trench)? T.trench.pts : null, rail:(T&&T.rail)? T.rail.ban.map(p=>p.pts) : null, jax:(T&&T.jax)? T.jax.map(j=>[j.x,j.y]) : null, bases:S.bf? [[S.bf.base.you.x,S.bf.base.you.y],[S.bf.base.foe.x,S.bf.base.foe.y]] : null }; },   
   tpo(o){ return tpoRig(o); },   
