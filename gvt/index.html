@@ -84059,7 +84059,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='21.67';        
+let GVT_CV='21.68';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -106746,6 +106746,7 @@ function fzThrow(sh,C){
 function ggCanShove(f){
   if(!f || f.dead || (f.hp!=null&&f.hp<=0)) return false;
   if(f.jetT>0 || f.burrow || f.falling) return false;   
+  if(f.stkT>0) return false;   
   if(f.def && (f.def.vehicle || f.def.boss)) return false;
   if(f.boss || f.type==='mom' || f.type==='yeti') return false;
   return true;
@@ -108009,7 +108010,7 @@ function stkMark(u,mt,mx,my){
   return stkTarget(u);
 }
 function stkStake(tg,u){   
-  tg.stkT=STK_ROOT; tg.stkT0=STK_ROOT; tg.stkX=tg.x; tg.stkY=tg.y; tg.stkPopT=0; tg.vx=0; tg.vy=0;
+  tg.stkT=STK_ROOT; tg.stkT0=STK_ROOT; tg.stkX=tg.x; tg.stkY=tg.y; tg.stkPopT=0; tg.vx=0; tg.vy=0; tg.shv=null;   
   tg.stkDir=(u && tg.x<u.x)? -1 : 1;   
   const fo=tg.form; if(fo){ const i9=fo.members? fo.members.indexOf(tg) : -1; if(i9>=0) fo.members.splice(i9,1); tg.form=null; }   
   const RM=reducedMotion(), w9=(tg.def && tg.def.w)||54;
@@ -108050,8 +108051,8 @@ function stkPass(dt){
     if(o.stkPopT>0) o.stkPopT=Math.max(0,o.stkPopT-dt);
     if(!(o.stkT>0)) continue;
     if(o.dead || !(o.hp>0)){ o.stkT=0; continue; }
-    if(o.falling || o.shv){ o.stkX=o.x; o.stkY=o.y; }   
-    else { o.x=o.stkX; o.y=o.stkY; o.vx=0; o.vy=0; }   
+    if(o.falling){ o.stkX=o.x; o.stkY=o.y; }   
+    else { o.x=o.stkX; o.y=o.stkY; o.vx=0; o.vy=0; if(o.shv) o.shv=null; }   
     o.stkT-=dt; if(o.stkT<=1e-9) stkPop(o);   
   }
 }
@@ -116403,7 +116404,7 @@ function petDressStart(p,u){
   if(!best) return false; p.phase='dress'; p.dressU=best; p.t=0; return true;
 }
 function foeHalted(f,dt){ if(!(f.haltT>0)) return false; f.haltT-=dt; return true; }   
-function petShoveKing(f,mx,my,src,dist){ const dx=f.x-mx, dy=(f.y-18)-my, d=Math.hypot(dx,dy)||1; f.shv={ t:GG_T, dur:GG_T, x:dx/d, y:dy/d, src:src, p:dist||0 }; S.fx.push({k:'ring',x:f.x,y:f.y-16,r:4,R:26,t:0,dur:0.22,col:'#CDE6FF'}); }   
+function petShoveKing(f,mx,my,src,dist){ if(f.stkT>0) return;     const dx=f.x-mx, dy=(f.y-18)-my, d=Math.hypot(dx,dy)||1; f.shv={ t:GG_T, dur:GG_T, x:dx/d, y:dy/d, src:src, p:dist||0 }; S.fx.push({k:'ring',x:f.x,y:f.y-16,r:4,R:26,t:0,dur:0.22,col:'#CDE6FF'}); }   
 function petScreech(p,u){ for(const f of TGT(u)){ if(!petFlLive(f) || !petTgtOk(u,f) || f.boss || (f.def && (f.def.vehicle || f.def.boss))) continue; if(Math.hypot(f.x-p.x,f.y-p.y)<=FL_SCREECH_R) f.haltT=Math.max(f.haltT||0, FL_SCREECH_T); } }   
 function petFlBite(p,u,f){   
   if(f.def && f.def.vehicle && !petHas(p,'machine')) return;   
@@ -179395,6 +179396,7 @@ window.GVT = {
       pick:t9? { type:t9.type, id:t9.id, hp:t9.hp, hpMax:t9.hpMax, x:Math.round(t9.x), y:Math.round(t9.y), boss:t9.boss?1:0 } : null,
       staked:(S.bf? S.units : S.foes).filter(o=>o.stkT>0).map(o=>({ type:o.type, id:o.id, t:+o.stkT.toFixed(3), x:+o.x.toFixed(2), y:+o.y.toFixed(2), form:o.form?1:0 })), cost:ENH_COST.stakeshot, rival:ENH_RIVAL.stakeshot, arm:LAB_ARM.stakeshot, order:ENH_ORDER.length, curve:LAB_CURVE.length }; },
   stkGo(){ return stkActivate(); },
+  stk2(){ return { holds:1, staked:(S.bf? S.units : S.foes).filter(o=>o.stkT>0).map(o=>({ id:o.id, type:o.type, can:ggCanShove(o)?1:0, shv:o.shv?1:0, slip:+Math.hypot(o.x-o.stkX,o.y-o.stkY).toFixed(3), t:+o.stkT.toFixed(3) })) }; },   
   snpBtn(){ return { rect:btnRects.snp? btnRects.snp.slice():null, on:snpOn()?1:0, cd:+(S.snpCd||0).toFixed(1), tk:btnRects.tk? btnRects.tk.slice():null, bmb:btnRects.bmb? btnRects.bmb.slice():null }; },
   csBtn(){ const u9=csCardU(), b9=u9? window.csBtn(u9) : null, c29=u9? cs2N(u9) : 0, b29=(u9&&c29)? window.csBtn(u9,false,c29) : null;   
     return { rect:btnRects.cs? btnRects.cs.slice():null, on:csOn()?1:0, cs:b9? b9.cs : 0, can:b9? (b9.can?1:0) : 0, cd:b9? +b9.cd.toFixed(2) : 0, cdMax:b9? b9.cdMax : 0, chan:b9? +b9.chan.toFixed(2) : 0, chanMax:b9? b9.chanMax : 0, flash:+(S.csFlash||0).toFixed(2),
