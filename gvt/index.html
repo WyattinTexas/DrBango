@@ -84273,7 +84273,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='21.81';        
+let GVT_CV='21.82';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -144685,17 +144685,38 @@ function tpoArt(){ try{ const k=String(lg3Safe(()=>skyCorpsHex())||''); if(!TPO.
 function tpoPic(id, vb, cls){ const sc=tpoArt()[id]; if(!sc) return ''; return '<svg class="'+(cls||'tpo-pic')+'" viewBox="'+(vb||'-100 -100 200 200')+'" preserveAspectRatio="xMidYMax slice" aria-hidden="true">'+TPO_DEFS+sc+TPO_OVER+'</svg>'; }   
 function tpoCoverHTML(id){ if(!TPO_IDS[id]) return ''; const p=tpoPic(id, '-100 -40 200 140'); return p? '<div class="tpo-cov">'+p+'</div>' : ''; }   
 function tpoLeftScene(c, scene){ try{ if(!c || c.tiers || c.place!=='' || !TPO_IDS[c.id]) return scene; return tpoPic(c.id, '-100 -70 200 170', 'lg-scene tpo-page')||scene; }catch(e){ return scene; } }   
-function tpoPosterSVG(id){ const c=lgCh(id); if(!c || !TPO_IDS[id]) return ''; const sc=tpoArt()[id]; if(!sc) return '';   
-  const nm=String(t(c.name)), tag=String(t(TPO_TAG[id]||'')), FF="'Futura-CondensedExtraBold','Futura Condensed ExtraBold',Impact,'Arial Black',sans-serif";
-  const tl=nm.length*13.2>176? ' textLength="176" lengthAdjust="spacingAndGlyphs"' : '', tt=tag.length*6.9>172? ' textLength="172" lengthAdjust="spacingAndGlyphs"' : '';
-  return '<svg class="tpo-poster" viewBox="0 0 200 300" aria-hidden="true">'+TPO_DEFS+'<rect width="200" height="300" fill="#F2E6C8"/><rect x="0" y="0" width="200" height="52" fill="'+(TPO_TOP[id]||'#1E1A12')+'"/>'
-    +'<svg x="0" y="52" width="200" height="200" viewBox="-100 -100 200 200">'+sc+TPO_OVER+'</svg>'
-    +'<text x="100" y="37" text-anchor="middle" font-family="'+FF+'" font-size="24" letter-spacing=".5" fill="#F6ECD2"'+tl+'>'+LG3_E(nm)+'</text>'
-    +'<text x="100" y="272" text-anchor="middle" font-family="'+FF+'" font-size="8.5" letter-spacing="2.2" fill="#1E1A12"'+tt+'>'+LG3_E(tag)+'</text>'
-    +'<path d="M70 282 H130" stroke="#1E1A12" stroke-width=".8" opacity=".6"/><text x="100" y="292" text-anchor="middle" font-family="'+FF+'" font-size="5.5" letter-spacing="1.6" fill="#1E1A12" opacity=".75">GREEN VS TAN</text>'
-    +'<rect x="5" y="5" width="190" height="290" fill="none" stroke="#1E1A12" stroke-width=".9" opacity=".55"/><rect x="0" y="0" width="200" height="300" filter="url(#tpogr)"/></svg>'; }
+
+
+const TPO_FONT={   
+  camp:["'Futura-CondensedExtraBold','Futura Condensed ExtraBold','Avenir Next Condensed',sans-serif", .5, 26, 'up', 900],   
+  elite:["'AvenirNextCondensed-Heavy','Avenir Next Condensed','Futura-CondensedExtraBold',sans-serif", .5, 28, 'up', 900],   
+  over:["'GillSans-UltraBold','Gill Sans Ultra Bold','Gill Sans','Arial Black',sans-serif", .68, 24, 'up', 900],   
+  dino:["'Rockwell-Bold','Rockwell','Roboto Slab','Georgia',serif", .62, 24, 'up', 700],   
+  yeti:["'SnellRoundhand-Bold','Snell Roundhand','Savoye LET','Dancing Script',cursive", .5, 32, 'title', 700],   
+  west:["'Copperplate-Bold','Copperplate','Georgia',serif", .74, 22, 'up', 700],   
+  teddy:["'ArialRoundedMTBold','Arial Rounded MT Bold','Helvetica Neue',sans-serif", .62, 24, 'up', 700],   
+  caves:["'Chalkduster','Chalkboard SE','Marker Felt',fantasy", .62, 24, 'up', 400],   
+  sky:["'AmericanTypewriter-Bold','American Typewriter','Courier New',monospace", .62, 24, 'up', 700],   
+  moon:["'Noteworthy-Bold','Noteworthy','Bradley Hand','Comic Sans MS',cursive", .58, 26, 'up', 700] };   
+let TPO_MW={};
+function tpoMeasure(txt, fam, wt, fs, ls){ const k=[txt, fam, wt, fs, ls].join('|'); if(TPO_MW[k]!==undefined) return TPO_MW[k]; try{ const sv=document.createElementNS('http://www.w3.org/2000/svg','svg'); sv.setAttribute('style','position:absolute;left:-9999px;top:0;width:400px;height:100px;visibility:hidden;pointer-events:none'); sv.setAttribute('aria-hidden','true'); const t9=document.createElementNS('http://www.w3.org/2000/svg','text'); t9.setAttribute('font-family', fam); t9.setAttribute('font-weight', wt); t9.setAttribute('font-size', fs); t9.setAttribute('letter-spacing', ls); t9.textContent=txt; sv.appendChild(t9); document.body.appendChild(sv); const w=t9.getComputedTextLength(); sv.remove(); TPO_MW[k]=w; return w; }catch(e){ return String(txt).length*fs*.62; } }   
+function tpoLines(id){ const c=lgCh(id); if(!c) return null; const ch=(typeof LG3_CH!=='undefined' && LG3_CH[id])||null; const cap=(ch && ch.cap) || c.cap || TPO_TAG[id] || ''; return { name:String(t(c.name)), place:c.place? String(t(c.place)) : '', cap:String(t(cap)) }; }   
+function tpoTitleCase(s){ return String(s).toLowerCase().replace(/(^|[\s\-])(\S)/g, (m, a, b)=>a+b.toUpperCase()); }
+function tpoCapLines(cap){ const parts=String(cap||'').split('. ').map((p, i, a)=>i<a.length-1? p+'.' : p).filter(Boolean); const L=[]; let cur=''; for(const p of parts){ if(cur && (cur+' '+p).length>30){ L.push(cur); cur=p; } else cur=cur? cur+' '+p : p; } if(cur) L.push(cur); return L.slice(0, 3); }   
+function tpoPosterSVG(id){ const c=lgCh(id); if(!c || !TPO_IDS[id]) return ''; const sc=tpoArt()[id]; if(!sc) return ''; const Ln=tpoLines(id)||{ name:'', place:'', cap:'' };   
+  const F=TPO_FONT[id]||TPO_FONT.camp, STN="'Futura-CondensedExtraBold','Futura Condensed ExtraBold',Impact,'Arial Black',sans-serif", INK='#1E1A12';
+  const nm=F[3]==='title'? tpoTitleCase(Ln.name) : Ln.name, tls=F[3]==='title'? 0 : .4; let fs=F[2]; const tw=tpoMeasure(nm, F[0], F[4], fs, tls); if(tw>182) fs=+Math.max(12, fs*182/tw).toFixed(1); const ty=F[3]==='title'? 38 : 36;
+  const title='<g font-family="'+F[0]+'" font-weight="'+F[4]+'" font-size="'+fs+'" text-anchor="middle" letter-spacing="'+tls+'"><text x="102.5" y="'+(ty+2.5)+'" fill="'+INK+'">'+LG3_E(nm)+'</text><text x="100" y="'+ty+'" fill="#FFFFFF" stroke="'+INK+'" stroke-width="1.3" stroke-linejoin="round" paint-order="stroke">'+LG3_E(nm)+'</text></g>';
+  let slab=''; if(Ln.place){ const w=Math.min(176, Math.round(tpoMeasure(Ln.place, STN, 400, 8, .5)+11)); slab='<g transform="translate(10 60) rotate(-2)"><rect x="2" y="2" width="'+w+'" height="13" fill="'+INK+'"/><rect width="'+w+'" height="13" fill="#FFD23F" stroke="'+INK+'" stroke-width="1.2"/><text x="'+(w/2).toFixed(1)+'" y="9.6" text-anchor="middle" font-family="'+STN+'" font-size="8" letter-spacing=".5" fill="'+INK+'">'+LG3_E(Ln.place)+'</text></g>'; }
+  const lines=tpoCapLines(Ln.cap), n=lines.length||1, y0=n===1? 272 : n===2? 268 : 264, gy=n===1? 290 : n===2? 293 : 296; let capT='';
+  lines.forEach((l, i)=>{ capT+='<text x="100" y="'+(y0+i*11)+'" text-anchor="middle" font-family="'+STN+'" font-size="8.4" letter-spacing=".6" fill="#FFD23F"'+(tpoMeasure(l, STN, 400, 8.4, .6)>184? ' textLength="184" lengthAdjust="spacingAndGlyphs"' : '')+'>'+LG3_E(l)+'</text>'; });
+  return '<svg class="tpo-poster" viewBox="0 0 200 300" aria-hidden="true">'+TPO_DEFS+'<rect width="200" height="300" fill="#F2E6C8"/><rect x="0" y="0" width="200" height="52" fill="'+(TPO_TOP[id]||INK)+'"/>'
+    +'<svg x="0" y="52" width="200" height="200" viewBox="-100 -100 200 200">'+sc+TPO_OVER+'</svg>'+slab+title
+    +'<rect x="0" y="252" width="200" height="48" fill="#15100A" opacity=".9"/><path d="M0 252 H200" stroke="'+INK+'" stroke-width="1.6"/>'+capT
+    +'<text x="100" y="'+gy+'" text-anchor="middle" font-family="'+STN+'" font-size="5.2" letter-spacing="1.6" fill="#F2E6C8" opacity=".8">GREEN VS TAN</text>'
+    +'<rect x="5" y="5" width="190" height="290" fill="none" stroke="'+INK+'" stroke-width=".9" opacity=".55"/><rect x="0" y="0" width="200" height="300" filter="url(#tpogr)"/></svg>'; }
 function tpoRig(o){ if(o && typeof o==='object' && 'on' in o){ TPO.on=o.on? 1 : 0; try{ if(TPO.on) localStorage.setItem('gvt_tpo','1'); else localStorage.removeItem('gvt_tpo'); }catch(e){} }   
-  return { on:TPO.on, ids:Object.keys(TPO_IDS), tag:TPO_TAG, poster:id=>tpoPosterSVG(id), cover:id=>tpoCoverHTML(id), page:id=>tpoPic(id, '-100 -70 200 170', 'lg-scene tpo-page') }; }
+  return { on:TPO.on, ids:Object.keys(TPO_IDS), tag:TPO_TAG, lines:id=>tpoLines(id), fonts:TPO_FONT, poster:id=>tpoPosterSVG(id), cover:id=>tpoCoverHTML(id), page:id=>tpoPic(id, '-100 -70 200 170', 'lg-scene tpo-page') }; }
 function lg3WhereSVG(p){   
   const id=p && p.id, T=LG3_TOK[id]||[412,182], cx=T[0], cy=T[1]+30, inner=lg3KingdomSVG().replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '');
   return '<svg class="ad-map" viewBox="0 0 824 364" preserveAspectRatio="xMidYMid slice"><defs><radialGradient id="adspot" cx="'+cx+'" cy="'+cy+'" r="300" gradientUnits="userSpaceOnUse"><stop offset="30%" stop-color="#1a1208" stop-opacity="0"/><stop offset="100%" stop-color="#1a1208" stop-opacity=".62"/></radialGradient></defs>'+inner
