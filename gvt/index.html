@@ -4709,6 +4709,8 @@
   #travelMap .tpo-cov > svg { display:block; width:100%; height:100%; }
   #travelMap .lg-stage.sls.lsw .sls-slot.tpo .tpo-cov { height:44px; }   /**/
   #travelMap .lg-art > svg.tpo-page { position:absolute; left:0; top:0; width:100%; height:100%; display:block; }
+  #travelMap .lg-page.l.tpo-pg .lg-art { left:86px; top:7px; width:240px; height:360px; background:#F2E6C8; }   /**/
+  #travelMap .lg-page.l.tpo-pg .lg-crayon { right:92px; top:98px; font-size:20px; }   /**/
   /**/
   #travelMap .lg-book { --cbk-k:1; --cbk-f:Cochin,Baskerville,'Hoefler Text','Palatino Linotype',Georgia,serif; --cbk-e:'Academy Engraved LET',Cochin,Baskerville,Georgia,serif; }
   html:is([data-script="ar"],[data-script="jp"],[data-script="kr"],[data-script="cn"],[data-script="cyr"]) #travelMap .lg-book { --cbk-f:Cochin,Baskerville,Georgia,var(--ui); --cbk-e:Cochin,Baskerville,Georgia,var(--ui); }   /**/
@@ -84632,7 +84634,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='22.14';        
+let GVT_CV='22.15';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -143943,7 +143945,8 @@ function lg3KnownHTML(){ const nx=lg3NextTok(); let keys='';
     +lgTape('left:-6px;top:-2px;transform:rotate(-40deg)')+lgTape('right:-6px;top:-2px;transform:rotate(40deg)')+lgTape('left:-6px;bottom:-2px;transform:rotate(40deg)')+lgTape('right:-6px;bottom:-2px;transform:rotate(-40deg)')+'</div>'; }
 
 
-function lg3Left(c, scene, cap){ return '<div class="lg-page l"><div class="lg-edge l"></div><div class="lg-art">'+(tpoOn()? tpoLeftScene(c, scene) : scene)  
+function lg3Left(c, scene, cap){ const tp=tpoOn()? tpoPageHTML(c) : ''; if(tp) return tp;    
+  return '<div class="lg-page l"><div class="lg-edge l"></div><div class="lg-art">'+(tpoOn()? tpoLeftScene(c, scene) : scene)  
     +'<div class="lg-h1 l3-h1">'+LG3_E(t(c.name))+'</div>'+(c.place? '<div class="lg-slab yel l3-yel">'+LG3_E(t(c.place))+'</div>' : '')
     +'<div class="lg-cap1">'+LG3_E(t(cap||c.cap))+'</div></div>'+lgTape('left:-14px;top:6px;transform:rotate(-40deg)')+lgTape('right:-12px;top:334px;transform:rotate(-40deg)')
     +(c.crayon? '<div class="lg-crayon">'+LG3_E(c.crayon)+'</div>' : '')+'<div class="lg-no l">'+c.pg[0]+'</div>'+LG_GRAIN+'</div>'; }
@@ -145283,7 +145286,8 @@ function lg3Win(id){ try{ const k=String(lg3Safe(()=>skyCorpsHex())||''); if(!LG
 
 
 
-const TPO={ on:(function(){ try{ const q=/[?&]tpo=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_tpo','0'); else localStorage.removeItem('gvt_tpo'); } return localStorage.getItem('gvt_tpo')==='0'? 0 : 1; }catch(e){ return 1; } })(), k:null, art:null };   
+
+const TPO={ on:(function(){ try{ const q=/[?&]tpo=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_tpo','0'); else localStorage.removeItem('gvt_tpo'); } return localStorage.getItem('gvt_tpo')==='0'? 0 : 1; }catch(e){ return 1; } })(), chap:0, k:null, art:null };   
 const TPO_IDS={ camp:1, elite:1, over:1, dino:1, yeti:1, west:1, teddy:1, caves:1, sky:1, moon:1 };   
 const TPO_TAG={ camp:'ONE HUNDRED LEVELS ON THE RUG', elite:'THEY COME AFTER DARK', over:'THE STORM IN THE BEDROOM', dino:'VISIT BONE VALLEY', yeti:'THE SNOW PALACE AT DUSK', west:'MAIN STREET AT SUNDOWN', teddy:'CAMP SNUGG, ON THE BED', caves:'FOUR EYES IN THE DARK', sky:'OVER YOUR ROOF', moon:'THE GARDEN AT NIGHT' };   
 const TPO_TOP={ camp:'#C8571F', elite:'#0B1A3A', over:'#2A1544', dino:'#3B1B5A', yeti:'#16233A', west:'#241030', teddy:'#6D4118', caves:'#04090E', sky:'#1B2A4A', moon:'#0E1A2E' };   
@@ -145379,6 +145383,12 @@ function tpoArt(){ try{ const k=String(lg3Safe(()=>skyCorpsHex())||''); if(!TPO.
   return TPO.art; }catch(e){ try{ console.error('tpoArt', e); }catch(e2){} return {}; } }
 function tpoPic(id, vb, cls){ const sc=tpoArt()[id]; if(!sc) return ''; return '<svg class="'+(cls||'tpo-pic')+'" viewBox="'+(vb||'-100 -100 200 200')+'" preserveAspectRatio="xMidYMax slice" aria-hidden="true">'+TPO_DEFS+sc+TPO_OVER+'</svg>'; }   
 function tpoCoverHTML(id){ if(!TPO_IDS[id]) return ''; const p=tpoPic(id, '-100 -40 200 140'); return p? '<div class="tpo-cov">'+p+'</div>' : ''; }   
+
+const TPO_CH={ camp:1, elite:1, over:1 }, TPO_RAID={ caves:1, sky:1 };   
+function tpoBook(c){ try{ return !!(c && TPO_IDS[c.id] && (TPO_CH[c.id]? TPO.chap : TPO_RAID[c.id]? true : c.place==='')); }catch(e){ return false; } }   
+function tpoPageHTML(c){ try{ if(!tpoBook(c)) return ''; const sv=tpoPosterSVG(c.id, 'tpo-poster tpo-page'); if(!sv) return '';   
+    return '<div class="lg-page l tpo-pg"><div class="lg-edge l"></div><div class="lg-art">'+sv+'</div>'+lgTape('left:62px;top:3px;transform:rotate(-40deg)')+lgTape('right:68px;top:359px;transform:rotate(-40deg)')
+      +(c.crayon? '<div class="lg-crayon">'+LG3_E(c.crayon)+'</div>' : '')+'<div class="lg-no l">'+c.pg[0]+'</div>'+LG_GRAIN+'</div>'; }catch(e){ try{ console.error('tpoPageHTML', e); }catch(e2){} return ''; } }
 function tpoLeftScene(c, scene){ try{ if(!c || c.tiers || c.place!=='' || !TPO_IDS[c.id]) return scene; return tpoPic(c.id, '-100 -70 200 170', 'lg-scene tpo-page')||scene; }catch(e){ return scene; } }   
 
 
@@ -145398,20 +145408,20 @@ function tpoMeasure(txt, fam, wt, fs, ls){ const k=[txt, fam, wt, fs, ls].join('
 function tpoLines(id){ const c=lgCh(id); if(!c) return null; const ch=(typeof LG3_CH!=='undefined' && LG3_CH[id])||null; const cap=(ch && ch.cap) || c.cap || TPO_TAG[id] || ''; return { name:String(t(c.name)), place:c.place? String(t(c.place)) : '', cap:String(t(cap)) }; }   
 function tpoTitleCase(s){ return String(s).toLowerCase().replace(/(^|[\s\-])(\S)/g, (m, a, b)=>a+b.toUpperCase()); }
 function tpoCapLines(cap){ const parts=String(cap||'').split('. ').map((p, i, a)=>i<a.length-1? p+'.' : p).filter(Boolean); const L=[]; let cur=''; for(const p of parts){ if(cur && (cur+' '+p).length>30){ L.push(cur); cur=p; } else cur=cur? cur+' '+p : p; } if(cur) L.push(cur); return L.slice(0, 3); }   
-function tpoPosterSVG(id){ const c=lgCh(id); if(!c || !TPO_IDS[id]) return ''; const sc=tpoArt()[id]; if(!sc) return ''; const Ln=tpoLines(id)||{ name:'', place:'', cap:'' };   
+function tpoPosterSVG(id, cls){ const c=lgCh(id); if(!c || !TPO_IDS[id]) return ''; const sc=tpoArt()[id]; if(!sc) return ''; const Ln=tpoLines(id)||{ name:'', place:'', cap:'' };   
   const F=TPO_FONT[id]||TPO_FONT.camp, STN="'Futura-CondensedExtraBold','Futura Condensed ExtraBold',Impact,'Arial Black',sans-serif", INK='#1E1A12';
   const nm=F[3]==='title'? tpoTitleCase(Ln.name) : Ln.name, tls=F[3]==='title'? 0 : .4; let fs=F[2]; const tw=tpoMeasure(nm, F[0], F[4], fs, tls); if(tw>182) fs=+Math.max(12, fs*182/tw).toFixed(1); const ty=F[3]==='title'? 38 : 36;
   const title='<g font-family="'+F[0]+'" font-weight="'+F[4]+'" font-size="'+fs+'" text-anchor="middle" letter-spacing="'+tls+'"><text x="102.5" y="'+(ty+2.5)+'" fill="'+INK+'">'+LG3_E(nm)+'</text><text x="100" y="'+ty+'" fill="#FFFFFF" stroke="'+INK+'" stroke-width="1.3" stroke-linejoin="round" paint-order="stroke">'+LG3_E(nm)+'</text></g>';
   let slab=''; if(Ln.place){ const w=Math.min(176, Math.round(tpoMeasure(Ln.place, STN, 400, 8, .5)+11)); slab='<g transform="translate(10 60) rotate(-2)"><rect x="2" y="2" width="'+w+'" height="13" fill="'+INK+'"/><rect width="'+w+'" height="13" fill="#FFD23F" stroke="'+INK+'" stroke-width="1.2"/><text x="'+(w/2).toFixed(1)+'" y="9.6" text-anchor="middle" font-family="'+STN+'" font-size="8" letter-spacing=".5" fill="'+INK+'">'+LG3_E(Ln.place)+'</text></g>'; }
   const lines=tpoCapLines(Ln.cap), n=lines.length||1, y0=n===1? 272 : n===2? 268 : 264, gy=n===1? 290 : n===2? 293 : 296; let capT='';
   lines.forEach((l, i)=>{ capT+='<text x="100" y="'+(y0+i*11)+'" text-anchor="middle" font-family="'+STN+'" font-size="8.4" letter-spacing=".6" fill="#FFD23F"'+(tpoMeasure(l, STN, 400, 8.4, .6)>184? ' textLength="184" lengthAdjust="spacingAndGlyphs"' : '')+'>'+LG3_E(l)+'</text>'; });
-  return '<svg class="tpo-poster" viewBox="0 0 200 300" aria-hidden="true">'+TPO_DEFS+'<rect width="200" height="300" fill="#F2E6C8"/><rect x="0" y="0" width="200" height="52" fill="'+(TPO_TOP[id]||INK)+'"/>'
+  return '<svg class="'+(cls||'tpo-poster')+'" viewBox="0 0 200 300" aria-hidden="true">'+TPO_DEFS+'<rect width="200" height="300" fill="#F2E6C8"/><rect x="0" y="0" width="200" height="52" fill="'+(TPO_TOP[id]||INK)+'"/>'
     +'<svg x="0" y="52" width="200" height="200" viewBox="-100 -100 200 200">'+sc+TPO_OVER+'</svg>'+slab+title
     +'<rect x="0" y="252" width="200" height="48" fill="#15100A" opacity=".9"/><path d="M0 252 H200" stroke="'+INK+'" stroke-width="1.6"/>'+capT
     +'<text x="100" y="'+gy+'" text-anchor="middle" font-family="'+STN+'" font-size="5.2" letter-spacing="1.6" fill="#F2E6C8" opacity=".8">GREEN VS TAN</text>'
     +'<rect x="5" y="5" width="190" height="290" fill="none" stroke="'+INK+'" stroke-width=".9" opacity=".55"/><rect x="0" y="0" width="200" height="300" filter="url(#tpogr)"/></svg>'; }
-function tpoRig(o){ if(o && typeof o==='object' && 'on' in o){ TPO.on=o.on? 1 : 0; try{ if(TPO.on) localStorage.removeItem('gvt_tpo'); else localStorage.setItem('gvt_tpo','0'); }catch(e){} }   
-  return { on:TPO.on, ids:Object.keys(TPO_IDS), tag:TPO_TAG, lines:id=>tpoLines(id), fonts:TPO_FONT, poster:id=>tpoPosterSVG(id), cover:id=>tpoCoverHTML(id), page:id=>tpoPic(id, '-100 -70 200 170', 'lg-scene tpo-page') }; }
+function tpoRig(o){ if(o && typeof o==='object' && 'on' in o){ TPO.on=o.on? 1 : 0; try{ if(TPO.on) localStorage.removeItem('gvt_tpo'); else localStorage.setItem('gvt_tpo','0'); }catch(e){} } if(o && typeof o==='object' && 'chap' in o) TPO.chap=o.chap? 1 : 0;   
+  return { on:TPO.on, ids:Object.keys(TPO_IDS), tag:TPO_TAG, lines:id=>tpoLines(id), fonts:TPO_FONT, poster:id=>tpoPosterSVG(id), cover:id=>tpoCoverHTML(id), page:id=>tpoPic(id, '-100 -70 200 170', 'lg-scene tpo-page'), chap:TPO.chap, book:c=>tpoBook(c) }; }
 function lg3WhereSVG(p){   
   const id=p && p.id, T=LG3_TOK[id]||[412,182], cx=T[0], cy=T[1]+30, inner=lg3KingdomSVG().replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '');
   return '<svg class="ad-map" viewBox="0 0 824 364" preserveAspectRatio="xMidYMid slice"><defs><radialGradient id="adspot" cx="'+cx+'" cy="'+cy+'" r="300" gradientUnits="userSpaceOnUse"><stop offset="30%" stop-color="#1a1208" stop-opacity="0"/><stop offset="100%" stop-color="#1a1208" stop-opacity=".62"/></radialGradient></defs>'+inner
