@@ -2417,6 +2417,15 @@
   @keyframes pkmenace { 0%,38%,100%{transform:rotate(0deg)} 48%,60%{transform:rotate(7deg)} 66%{transform:rotate(-3deg)} 72%{transform:rotate(5deg)} 80%{transform:rotate(0deg)} }
   #parkBg .wdl { animation:pkwaddle 0.85s ease-in-out infinite alternate; }
   @keyframes pkwaddle { from{transform:rotate(-6deg)} to{transform:rotate(6deg)} }
+  /*
+*/
+  .mvl-gait { transform-box:fill-box; transform-origin:50% 100%; }
+  .mvl-go > .mvl-gait { animation:mvlStep 0.36s ease-in-out infinite alternate; }
+  .mvl-hop > .mvl-gait { animation:mvlHop 0.5s ease-out 1; }
+  .mvl-wait > .mvl-gait { animation:none; }
+  @keyframes mvlStep { from{transform:translateY(0) rotate(-1.6deg)} to{transform:translateY(-2.5px) rotate(1.6deg)} }
+  @keyframes mvlHop { 0%{transform:translateY(0)} 40%{transform:translateY(-9px)} 100%{transform:translateY(0)} }
+  @media (prefers-reduced-motion: reduce){ .mvl-go > .mvl-gait, .mvl-hop > .mvl-gait { animation:none; } }
   #parkBg .sklrock { animation:pksklrock 4.4s ease-in-out infinite; }
   @keyframes pksklrock { 0%,100%{transform:rotate(-2.4deg)} 50%{transform:rotate(2.4deg)} }
   #parkBg .volcSmoke circle { animation:pkvsmoke 5.2s ease-in infinite; }
@@ -85642,7 +85651,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='22.72';        
+let GVT_CV='22.73';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -158562,6 +158571,102 @@ function dpvRig(o){ o=o||{}; if(o.on!==undefined){ DPV.on=o.on? 1 : 0; delete PA
   const bg=document.getElementById('parkBg'), fl=document.getElementById('parkFlyer'); return { on:DPV.on, gate:!!(bg && bg.querySelector('.dpv-gate')), far:!!(bg && bg.querySelector('.dpv-far')), canopy:!!(bg && bg.querySelector('.dpv-canopy')), volc:!!(bg && bg.querySelector('.dpv-volc')), brachio:!!(bg && bg.querySelector('.dpv-br')), fly:!!(fl && fl.classList.contains('dpv-fly')), rays:!!(bg && bg.querySelector('.dpv-rays')), rexAl:bg? bg.querySelectorAll('use[href="#dpvRexAl"]').length : 0, trikeAl:!!(bg && bg.querySelector('[id^="dpvAT"]')), dfkAl:!!document.querySelector('#dfk [id^="dpvAD"]'), pond5:!!(bg && bg.querySelector('#dinoPond .dpv-pond5')), skullAl:!!(bg && bg.querySelector('.sklrock [id^="dpvAK"]')), pteroAl:!!(fl && fl.querySelector('[id^="dpvAP"]')), mid:bg? bg.querySelectorAll('.dpv-tf, .dpv-cy, .dpv-bu, .dpv-mo').length : 0 }; }
 
 
+
+
+
+
+
+
+
+
+
+const MVL={ on:(function(){ try{ const q=/[?&]mvl=([01])/.exec(location.search||''); if(q){ if(q[1]==='1') localStorage.setItem('gvt_mvl','1'); else localStorage.removeItem('gvt_mvl'); } return localStorage.getItem('gvt_mvl')==='1'? 1 : 0; }catch(e){ return 0; } })(),   
+  W:1600, gaits:{ stroll:24, walk:16, trot:11, dash:7 }, every:[2.5,5.5], max:2, home:0.2, gap:1.2, greet:150, yieldMax:1.5, minLeg:90, scene:null, sv:null, st:{}, raf:null, t:null, last:0, log:[] };   
+const MVL_NS='http://www.w3.org/2000/svg';
+
+const MVL_SCENES={
+  dino:{ vp:300, floor:{ x0:330, x1:1540, y0:478, y1:612 },
+    keep:[ { id:'pond', x0:680, x1:920, y0:500, y1:600 }, { id:'trike', x0:640, x1:820, y0:440, y1:545 }, { id:'skull', x0:1300, x1:1475, y0:430, y1:530 }, { id:'corner', x0:1240, x1:1600, y0:528, y1:650 } ],   
+    split:{ sel:'#dinoPond', y:575, after:'.dpv-mo' },   
+    svg(){ const bg=document.getElementById('parkBg'); return bg? bg.querySelector('svg.phero') : null; },
+    live(){ try{ return parkSceneOpen() && PARK_CUR==='dino' && dpvOn(); }catch(e){ return false; } },
+    walkers(sv){ const out=[];
+      sv.querySelectorAll('use[href="#dpvRexAl"]').forEach(function(u,i){ const f=u.parentNode, d=f.parentNode; if(!d || d.parentNode!==sv) return; const m=/translate\(([-\d.]+)[ ,]+([-\d.]+)\)\s*scale\(([-\d.]+)\)/.exec(f.getAttribute('transform')||''); if(!m) return; const s=+m[3];
+        out.push({ id:'rex'+(i+1), el:d, x:+m[1]+70*s, y:+m[2]+130*s, s:s, bw:124*s, bh:98*s, face:'l', gait:'walk', trot:0.3, home:(i===2)? [1060,556] : null }); });   
+      const w=sv.querySelector('.wdl'); if(w){ const a=w.parentNode, b=a&&a.parentNode; if(b && b.parentNode===sv){ const m=/translate\(([-\d.]+)[ ,]+([-\d.]+)\)\s*scale\(([-\d.]+)\)/.exec(b.getAttribute('transform')||''); if(m){ const s=+m[3]; out.push({ id:'hatch', el:b, x:+m[1]+60*s, y:+m[2]+129*s, s:s, bw:70*s, bh:100*s, face:'', gait:'dash', run:[80,240], weight:2 }); } } }   
+      return out; } }
+};
+function mvlK(w, y){ const vp=MVL.scene.vp; return Math.max(0.4, Math.min(2.4, (y-vp)/(w.py-vp))); }   
+function mvlPx(gait, y){ const sc=MVL.scene, vp=sc.vp; return (MVL.W/(MVL.gaits[gait]||16))*Math.max(0.3, (y-vp)/(sc.floor.y1-vp)); }   
+function mvlIn(sc, x, y, pad){ const f=sc.floor; if(x<f.x0+pad || x>f.x1-pad || y<f.y0 || y>f.y1) return false; for(let i=0;i<sc.keep.length;i++){ const k=sc.keep[i]; if(x>=k.x0-pad && x<=k.x1+pad && y>=k.y0 && y<=k.y1) return false; } return true; }
+function mvlCrossT(x0, y0, x1, y1, k, pad){ const bx0=k.x0-pad, bx1=k.x1+pad, by0=k.y0, by1=k.y1, dx=x1-x0, dy=y1-y0; let t0=0, t1=1; const P=[-dx,dx,-dy,dy], Q=[x0-bx0,bx1-x0,y0-by0,by1-y0];   
+  for(let i=0;i<4;i++){ if(P[i]===0){ if(Q[i]<0) return -1; } else { const t=Q[i]/P[i]; if(P[i]<0){ if(t>t1) return -1; if(t>t0) t0=t; } else { if(t<t0) return -1; if(t<t1) t1=t; } } } return t0; }
+function mvlHolds(k, x, y, pad){ return x>=k.x0-pad && x<=k.x1+pad && y>=k.y0 && y<=k.y1; }
+function mvlFirstHit(sc, ax, ay, tx, ty, pad){ let best=null, bt=2; for(let i=0;i<sc.keep.length;i++){ const k=sc.keep[i]; if(mvlHolds(k, ax, ay, pad)) continue;     const t=mvlCrossT(ax, ay, tx, ty, k, pad); if(t>=0 && t<bt){ bt=t; best=k; } } return best; }   
+function mvlRoute(sc, ax, ay, tx, ty, pad, depth){   
+  const hit=mvlFirstHit(sc, ax, ay, tx, ty, pad); if(!hit) return [[tx,ty]]; if(depth>=4) return null; const m=pad+6;
+  const cs=[[hit.x0-m,hit.y0-6],[hit.x1+m,hit.y0-6],[hit.x0-m,hit.y1+6],[hit.x1+m,hit.y1+6]].filter(function(c){ return mvlIn(sc, c[0], c[1], 0) && !mvlFirstHit(sc, ax, ay, c[0], c[1], pad); }); if(!cs.length) return null;
+  cs.sort(function(a,b){ return (Math.hypot(a[0]-ax,a[1]-ay)+Math.hypot(tx-a[0],ty-a[1]))-(Math.hypot(b[0]-ax,b[1]-ay)+Math.hypot(tx-b[0],ty-b[1])); });
+  for(let j=0;j<cs.length;j++){ const rest=mvlRoute(sc, cs[j][0], cs[j][1], tx, ty, pad, depth+1); if(rest) return [cs[j]].concat(rest); } return null; }
+function mvlExit(sc, w){   
+  for(let i=0;i<sc.keep.length;i++){ const k=sc.keep[i]; if(w.x<k.x0 || w.x>k.x1 || w.y<k.y0 || w.y>k.y1) continue; const m=w.bw/2+6;
+    const c=[[k.x0-m,w.y],[k.x1+m,w.y],[w.x,k.y0-6],[w.x,k.y1+6]].filter(function(q){ return mvlIn(sc, q[0], q[1], w.bw/2); }); if(!c.length) return null; c.sort(function(a,b){ return Math.hypot(a[0]-w.x,a[1]-w.y)-Math.hypot(b[0]-w.x,b[1]-w.y); }); return c[0]; }
+  return null; }
+function mvlGapPx(a, b, ay){ const kb=Math.max(mvlK(b,b.y), b.go? mvlK(b,b.ty) : 0); return MVL.gap*Math.max(a.bw*mvlK(a, ay==null? a.y : ay), b.bw*kb); }   
+function mvlCrowded(w, x, y, away){ if(away){ const dx=x-w.x, dy=y-w.y, ex=away.x-w.x, ey=away.y-w.y; if(dx*ex+dy*ey>0) return true; }     for(const id in MVL.st){ const o=MVL.st[id]; if(o===w) continue; const g=mvlGapPx(w,o,y), pts=[[o.x,o.y]]; if(o.go && o.legs){ pts.push([o.tx,o.ty]); } for(let i=0;i<pts.length;i++){ const dx=x-pts[i][0], dy=y-pts[i][1]; if(dx*dx+dy*dy<g*g) return true; } } return false; }
+function mvlTarget(w, away){ const sc=MVL.scene, f=sc.floor, pad=w.bw/2;
+  if(!away && Math.random()<MVL.home && (Math.abs(w.x-w.hx)>1 || Math.abs(w.y-w.hy)>1) && mvlIn(sc, w.hx, w.hy, 0) && !mvlCrowded(w, w.hx, w.hy)) return [w.hx, w.hy];   
+  for(let i=0;i<60;i++){ let x, y; if(w.run){ const r=w.run[0]+Math.random()*(w.run[1]-w.run[0]), a=Math.random()*Math.PI*2; x=w.x+Math.cos(a)*r; y=w.y+Math.sin(a)*r*0.45; } else { x=f.x0+Math.random()*(f.x1-f.x0); y=f.y0+Math.random()*(f.y1-f.y0); }
+    x=Math.round(x); y=Math.round(y); if(!mvlIn(sc, x, y, pad)) continue; const dx=x-w.x, dy=y-w.y; if(dx*dx+dy*dy<MVL.minLeg*MVL.minLeg) continue; if(mvlCrowded(w, x, y, away)) continue; return [x, y]; }
+  return null; }
+function mvlPlace(w){ const k=mvlK(w, w.y), f=(w.face==='l' && w.dir>0)? -1 : 1;   
+  w.wrap.setAttribute('transform', 'translate('+(w.x-w.px).toFixed(1)+' '+(w.y-w.py).toFixed(1)+') translate('+w.px+' '+w.py+') scale('+(f*k).toFixed(3)+' '+k.toFixed(3)+') translate('+(-w.px)+' '+(-w.py)+')'); }   
+function mvlWrap(sv, w){ const g=document.createElementNS(MVL_NS,'g'), inner=document.createElementNS(MVL_NS,'g'); g.setAttribute('class','mvl'); g.setAttribute('data-fig', w.id); inner.setAttribute('class','mvl-gait'); sv.insertBefore(g, w.el); g.appendChild(inner); inner.appendChild(w.el); w.wrap=g; w.inner=inner; }
+function mvlLeg(w, pt){ w.leg={ x0:w.x, y0:w.y, x1:pt[0], y1:pt[1] }; const d=Math.hypot(pt[0]-w.x, pt[1]-w.y), ym=(w.y+pt[1])/2; w.dur=Math.max(0.15, d/mvlPx(w.gaitNow, ym)); w.p=0; if(Math.abs(pt[0]-w.x)>2){ const dd=(pt[0]>w.x)? 1 : -1; if(dd!==w.dir){ w.dir=dd; mvlPlace(w); } } }   
+function mvlWalk(id, x, y, gait){ const w=MVL.st[id]; if(!w || w.go) return false; const sc=MVL.scene, pad=w.bw/2; let legs=null, ax=w.x, ay=w.y, pre=[];
+  if(!mvlIn(sc, ax, ay, 0)){ const e=mvlExit(sc, w); if(!e) return false; pre=[e]; ax=e[0]; ay=e[1]; }   
+  legs=mvlRoute(sc, ax, ay, x, y, pad, 0); if(!legs) return false; legs=pre.concat(legs);
+  w.go=1; w.tx=x; w.ty=y; w.wait=0; w.waited=0; w.gaitNow=gait||((w.trot && Math.random()<w.trot)? 'trot' : w.gait); w.nLegs=legs.length; w.legs=legs; mvlLeg(w, w.legs.shift()); w.wrap.classList.remove('mvl-hop'); w.wrap.classList.add('mvl-go'); w.t0=performance.now();
+  MVL.log.push({ id:id, from:[Math.round(w.leg.x0), Math.round(w.leg.y0)], to:[x, y], legs:w.nLegs, gait:w.gaitNow, t:Math.round(performance.now()) }); if(MVL.log.length>200) MVL.log.shift();
+  if(!MVL.raf){ MVL.last=performance.now(); MVL.raf=requestAnimationFrame(mvlFrame); } return true; }
+function mvlStop(w, again){ w.go=0; w.legs=null; w.wrap.classList.remove('mvl-go'); w.wrap.classList.remove('mvl-wait'); if(again) w.again=performance.now()+400; }
+function mvlYield(w){ for(const id in MVL.st){ const o=MVL.st[id]; if(o===w) continue; const g=mvlGapPx(w,o), dx=o.x-w.x, dy=o.y-w.y; if(dx*dx+dy*dy>=g*g) continue;
+    const ahead=(w.leg.x1-w.leg.x0)*dx+(w.leg.y1-w.leg.y0)*dy; if(ahead<=0) continue;   
+    const mine=w.bw*mvlK(w,w.y), its=o.bw*mvlK(o,o.y); if(its>mine*1.05 || (Math.abs(its-mine)<=mine*0.05 && (!o.go || o.id<w.id))) return o; } return null; }   
+function mvlGreet(w){ let best=null, bd=MVL.greet*mvlK(w,w.y); for(const id in MVL.st){ const o=MVL.st[id]; if(o===w || o.go) continue; const d=Math.hypot(o.x-w.x, o.y-w.y); if(d<bd){ bd=d; best=o; } } if(!best) return;
+  if(Math.abs(best.x-w.x)>2){ w.dir=(best.x>w.x)? 1 : -1; best.dir=(w.x>best.x)? 1 : -1; mvlPlace(w); mvlPlace(best); }   
+  for(const o of [w, best]){ o.wrap.classList.remove('mvl-hop'); void o.wrap.getBoundingClientRect(); o.wrap.classList.add('mvl-hop'); } MVL.log.push({ greet:[w.id, best.id], t:Math.round(performance.now()) }); }
+function mvlOrder(){ const sc=MVL.scene, sv=sc.svg(); if(!sv) return; const split=sv.querySelector(sc.split.sel); if(!split) return; const ws=Object.keys(MVL.st).map(function(id){ return MVL.st[id]; }).sort(function(a,b){ return a.y-b.y; });
+  const behind=ws.filter(function(w){ return w.y<sc.split.y; }), front=ws.filter(function(w){ return w.y>=sc.split.y; });
+  let ref=split; for(let i=behind.length-1;i>=0;i--){ const w=behind[i]; if(w.wrap.nextElementSibling!==ref) sv.insertBefore(w.wrap, ref); ref=w.wrap; }   
+  let anchor=split, e=split.nextElementSibling; while(e && e.matches && e.matches(sc.split.after)){ anchor=e; e=e.nextElementSibling; }
+  ref=anchor; for(let i=0;i<front.length;i++){ const w=front[i]; if(ref.nextElementSibling!==w.wrap) sv.insertBefore(w.wrap, ref.nextElementSibling); ref=w.wrap; } }   
+function mvlFrame(now){ MVL.raf=null; const sc=MVL.scene, sv=sc && sc.svg(), dt=Math.min(0.1, Math.max(0, (now-MVL.last)/1000)); MVL.last=now; let busy=0, moved=0;
+  for(const id in MVL.st){ const w=MVL.st[id]; if(!w.go) continue; if(!sv || !sv.contains(w.wrap)){ w.go=0; continue; }
+    const y=mvlYield(w); if(y){ w.wait+=dt; w.waited=(w.waited||0)+dt; w.wrap.classList.add('mvl-wait'); if(w.wait>MVL.yieldMax){ mvlStop(w, 1); MVL.log.push({ gaveWay:w.id, to:y.id, t:Math.round(now) }); let t2=mvlTarget(w, y) || mvlTarget(w); if(!t2){ const L=w.leg, dl=Math.hypot(L.x1-L.x0, L.y1-L.y0)||1, g=mvlGapPx(w, y), bx=Math.round(w.x-(L.x1-L.x0)/dl*g), by=Math.round(w.y-(L.y1-L.y0)/dl*g); if(mvlIn(MVL.scene, bx, by, w.bw/2)) t2=[bx, by]; }     if(t2){ w.again=0; mvlWalk(id, t2[0], t2[1], w.gaitNow); } } busy++; continue; }
+    if(w.wait){ w.wait=0; w.wrap.classList.remove('mvl-wait'); }
+    w.p=Math.min(1, w.p+dt/w.dur); const L=w.leg; w.x=L.x0+(L.x1-L.x0)*w.p; w.y=L.y0+(L.y1-L.y0)*w.p; mvlPlace(w); moved=1;
+    if(w.p>=1){ w.x=L.x1; w.y=L.y1; if(w.legs && w.legs.length){ mvlLeg(w, w.legs.shift()); busy++; } else { mvlStop(w, 0); MVL.log.push({ arrive:id, at:[Math.round(w.x), Math.round(w.y)], waited:+(w.waited||0).toFixed(2), t:Math.round(now) }); mvlGreet(w); } } else busy++; }
+  if(moved) mvlOrder(); if(busy) MVL.raf=requestAnimationFrame(mvlFrame); }
+function mvlLive(){ const sc=MVL.scene; return !!(MVL.on && sc && sc.live() && sc.svg() && !(typeof reducedMotion==='function' && reducedMotion())); }
+function mvlTick(){ MVL.t=null; if(!mvlLive()) return;
+  if(!document.hidden){ const now=performance.now(), free=[]; let going=0; for(const id in MVL.st){ const w=MVL.st[id]; if(w.go) going++; else if(!(w.again && w.again>now)){ const n=w.weight||1; for(let i=0;i<n;i++) free.push(id); } }
+    if(free.length && going<MVL.max){ const id=free[Math.floor(Math.random()*free.length)], w=MVL.st[id], t=mvlTarget(w); if(t) mvlWalk(id, t[0], t[1]); } }
+  MVL.t=setTimeout(mvlTick, (MVL.every[0]+Math.random()*(MVL.every[1]-MVL.every[0]))*1000); }
+function mvlStopAll(){ if(MVL.t){ clearTimeout(MVL.t); MVL.t=null; } if(MVL.raf){ cancelAnimationFrame(MVL.raf); MVL.raf=null; } }
+function mvlDress(){   
+  const sc=MVL_SCENES[PARK_CUR]||null, sv=sc? sc.svg() : null;
+  if(sc && sv && MVL.scene===sc && MVL.sv===sv && sv.querySelector('g.mvl')){ if(!MVL.t && mvlLive()) MVL.t=setTimeout(mvlTick, 1500); return Object.keys(MVL.st).length; }
+  mvlStopAll(); MVL.st={}; MVL.scene=sc; MVL.sv=sv; if(!sc || !sv || !MVL.on || (typeof reducedMotion==='function' && reducedMotion())) return 0;
+  const ws=sc.walkers(sv); for(let i=0;i<ws.length;i++){ const w=ws[i]; w.px=w.x; w.py=w.y; w.hx=w.x; w.hy=w.y; w.dir=(w.face==='l')? -1 : 1; w.go=0; w.wait=0; if(w.home){ w.hx=w.home[0]; w.hy=w.home[1]; } mvlWrap(sv, w); mvlPlace(w); MVL.st[w.id]=w; }
+  mvlOrder(); if(!mvlLive()) return ws.length;
+  for(const id in MVL.st){ const w=MVL.st[id]; if(!mvlIn(sc, w.x, w.y, 0) && w.home) mvlWalk(id, w.hx, w.hy, 'walk'); }   
+  MVL.t=setTimeout(mvlTick, (1.5+Math.random()*1.5)*1000); return ws.length; }
+function mvlRig(o){ o=o||{}; if(o.every) MVL.every=o.every; if(o.max!=null) MVL.max=o.max; if(o.on!=null) MVL.on=o.on? 1 : 0; if(o.walk) mvlWalk(o.walk[0], o.walk[1], o.walk[2], o.walk[3]); if(o.dress) mvlDress(); if(o.stop) mvlStopAll();
+  const st={}; for(const id in MVL.st){ const w=MVL.st[id]; st[id]={ x:+w.x.toFixed(1), y:+w.y.toFixed(1), px:w.px, py:w.py, hx:w.hx, hy:w.hy, go:w.go, dir:w.dir, k:+mvlK(w,w.y).toFixed(3), bw:w.bw, gait:w.gaitNow||w.gait, tx:w.tx, ty:w.ty, wait:+(w.wait||0).toFixed(2), legs:w.legs? w.legs.length : 0 }; }
+  return { on:MVL.on, scene:MVL.scene? Object.keys(MVL_SCENES).find(function(k){ return MVL_SCENES[k]===MVL.scene; }) : null, every:MVL.every, max:MVL.max, gaits:MVL.gaits, st:st, log:MVL.log.slice(-40) }; }
+
+
 const YPB={ on:(function(){ try{ const q=/[?&]ypb=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_ypb','0'); else localStorage.removeItem('gvt_ypb'); } return localStorage.getItem('gvt_ypb')==='0'? 0 : 1; }catch(e){ return 1; } })() };
 function ypbOn(){ try{ return !!YPB.on; }catch(e){ return false; } }
 const YPB_P={ trunk:'#F4F2EC', trunkSh:'#CFC8BC', bark:'#2E2A27', branch:'#4A3B31', twig:'#BD842F', twig2:'#8E5E24', snow:'#FFFFFF', snowSh:'#C8DAE9', shadow:'#8FB0CC', pool:'#FFE4B0', sun:'#FFF6DC', ray:'#FFF0C4' };
@@ -163667,6 +163772,7 @@ function paintParkScene(dpk){
       +'<button type="button" id="castleHot" onclick="UI.castleTap()">'+(META.silverKey? '<span class="key"><svg viewBox="0 0 36 36" style="display:block;width:100%">'+PK_KEYGLYPH+'</svg></span>' : '')+'</button>';   
   }
   parkSceneLayout();
+  try{ mvlDress(); }catch(e){}   
 }
 
 
@@ -164137,7 +164243,7 @@ function openParkScene(id){
   locSync();   
   if(PARK_CUR==='moon') mgEntryChord();   
 }
-function closeParkScene(){ document.getElementById('parkscene').classList.add('hidden'); stageResync(); grpBtnSync();   
+function closeParkScene(){ document.getElementById('parkscene').classList.add('hidden'); try{ mvlStopAll(); }catch(e){}   stageResync(); grpBtnSync();   
   if(COOP && COOP.campWish) COOP.campWish=null;   
   clearTimeout(CREW.pollT); crewTick();
   locSync(); themeHome(); msPauseSync(); }   
@@ -182788,6 +182894,7 @@ window.GVT = {
   ywf(o){ return ywfRig(o); },   
   yps(o){ return ypsRig(o); },   
   dpv(o){ return dpvRig(o); },   
+  mvl(o){ return mvlRig(o); },   
   cmx(o){ return cmxRig(o); },   
   pth(){ return pthRig(); },   
   
