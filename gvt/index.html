@@ -85210,7 +85210,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='22.42';        
+let GVT_CV='22.43';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -132822,7 +132822,7 @@ const WF_FISH_ART='<g stroke-linejoin="round" stroke-linecap="round"><path d="M0
 function wfShowSVG(f,i,ox,oy){ return '<g transform="translate('+ox+','+oy+')"><g class="wf-bite'+i+'" opacity="0">'+WF_BITE_RINGS+'</g></g>'
   +(i===2? '<g transform="translate('+ox+','+oy+')"><g class="wf-haul2" opacity="0">'+WF_FISH_ART+'</g></g>' : ''); }
 function wfPatchSVG(nt){ return '<g id="wf-patch"><ellipse cx="367" cy="523" rx="106" ry="11" fill="'+(nt?'#D3D7DF':'#DCE4EC')+'" opacity=".8"/></g>'; }   
-function wfSnowmenSVG(live){ const sn=ywfOn()? ywfSnow : TMAP_ART.paint.snowman;     return '<g id="ro-snowmen">'+WF_SNOWMEN.map((p,i)=>live? '<g class="wf-sn wf-sn'+(i+1)+'" pointer-events="all" onclick="UI.wfSnowTap(event,\'s'+(i+1)+'\')" style="cursor:pointer"><rect x="'+WF_SNOWMAN_PADS[i][0]+'" y="'+WF_SNOWMAN_PADS[i][1]+'" width="'+WF_SNOWMAN_PADS[i][2]+'" height="'+WF_SNOWMAN_PADS[i][3]+'" fill="none" pointer-events="all"/><g class="wf-wig">'+sn(p[0],p[1],p[2])+'</g></g>' : sn(p[0],p[1],p[2])).join('')+'</g>'; }   
+function wfSnowmenSVG(live){ const sn=ywfOn()? ywfSnow : TMAP_ART.paint.snowman;     return '<g id="ro-snowmen">'+WF_SNOWMEN.map((p,i)=>live? '<g class="wf-sn wf-sn'+(i+1)+'"'+ywfSnStep(i)+' pointer-events="all" onclick="UI.wfSnowTap(event,\'s'+(i+1)+'\')" style="cursor:pointer"><rect x="'+WF_SNOWMAN_PADS[i][0]+'" y="'+WF_SNOWMAN_PADS[i][1]+'" width="'+WF_SNOWMAN_PADS[i][2]+'" height="'+WF_SNOWMAN_PADS[i][3]+'" fill="none" pointer-events="all"/><g class="wf-wig">'+sn(p[0],p[1],p[2])+'</g></g>' : ywfSnStill(i, sn(p[0],p[1],p[2]))).join('')+'</g>'; }   
 function wfFamilySVG(){ const F=WF_FAMILY, sn=ywfOn()? ywfSnow : TMAP_ART.paint.snowman; let hands='';       
   for(let i=0;i<F.length-1;i++){ const a=F[i], b=F[i+1]; hands+='<path d="M'+(a[0]+18*a[2])+' '+(a[1]-16*a[2])+' L'+(b[0]-18*b[2])+' '+(b[1]-16*b[2])+'" stroke="'+(ywfOn()? '#5A3E2B' : '#6E4522')+'" stroke-width="1.6" stroke-linecap="round"/>'; }    
   return '<g id="ro-family"><g class="wf-fam">'+F.map((p,i)=>'<g class="wf-fw wf-fw'+(i+1)+'" pointer-events="all" onclick="UI.wfSnowTap(event,\'f'+(i+1)+'\')" style="cursor:pointer">'+wfSnowPad(i)+'<g class="wf-wig">'+sn(p[0],p[1],p[2])+'</g></g>').join('')+hands+'</g></g>'; }   
@@ -133047,7 +133047,7 @@ function wfRig(){
     plane:wpSeat(), wpd:wpD().slice(), pose:wpPose().slice(), lake:Object.assign({},lakeBox()), rod:Object.assign({},lakeRodBox()), open:lakeOpen(), rodDue:lakeRodDue(), found:!!META.parkYeti, park:Object.assign({},WF_PARK_SPOT), castle:Object.assign({},CASTLE_WIN), store:storeFor(roomCur()),
     seat:Object.fromEntries(Object.keys(DECOR_SPOTS).filter(k=>decorHome(k)).map(k=>[k, rpXY(k)])), placed:((META.rdec&&META.rdec[roomCur()])||[]).slice(),
     anims:document.getAnimations({subtree:true}).length, clip, cssN:(WF_FOOT_CSS_M||'').length, stage:R(st),
-    snow:Object.assign({},(META.wfSnow&&typeof META.wfSnow==='object')? META.wfSnow : {}), snowStars:WF_SNOW_STARS, pads:WF_SNOW_PADS.map(p=>p.slice()), snowmen:WF_SNOWMAN_PADS.map(p=>p.slice()) };   
+    snow:Object.assign({},(META.wfSnow&&typeof META.wfSnow==='object')? META.wfSnow : {}), snowStars:WF_SNOW_STARS, pads:WF_SNOW_PADS.map(p=>p.slice()), snowmen:WF_SNOWMAN_PADS.map((p,i)=>{ const q=p.slice(); q[1]+=ywfSnDy(i); return q; }) };   
 }
 
 
@@ -157734,6 +157734,10 @@ function ywfFootSVG(nt){ const sn=nt? '#E2E5EA' : '#F1F5F9', sh=nt? '#B4BCC8' : 
 function ypvWfFlank(nt){ return ywfOn()? (nt? YPV_WF.flN : YPV_WF.flD) : ''; }   
 function ypvPine(x,y,s,nt,kind){ const k=Math.abs(Math.round(x*7+y*13))%3; return '<g class="ypv-wp" transform="translate('+x+','+y+') scale('+s+')">'+(kind===2? (nt? YPV_WF.spKN : YPV_WF.spKD) : (nt? YPV_WF.spN[k] : YPV_WF.spD[k]))+'</g>'; }   
 function ywfSnow(x,y,s){ return YPV_WF.sm[x+','+y] || TMAP_ART.paint.snowman(x,y,s); }   
+
+function ywfSnDy(i){ return (i===0 && ywfOn())? 30 : 0; }   
+function ywfSnStep(i){ const d=ywfSnDy(i); return d? ' transform="translate(0 '+d+')"' : ''; }   
+function ywfSnStill(i,a){ const d=ywfSnDy(i); return d? '<g transform="translate(0 '+d+')">'+a+'</g>' : a; }   
 function ypsRig(o){ o=o||{}; if(o.on!==undefined){ YPS.on=o.on? 1 : 0; delete PARK_HERO.yeti; delete PARK_HERO.yetiURI; if(typeof parkSceneOpen==='function' && parkSceneOpen() && PARK_CUR==='yeti') paintParkScene(false); else if(S.mode==='menu') renderMenu(); } return { on:YPS.on, key:(function(){ try{ return localStorage.getItem('gvt_yps'); }catch(e){ return null; } })() }; }   
 function ywfRig(o){ o=o||{}; if(o.on!==undefined){ YWF.on=o.on? 1 : 0; ywfDoorSync(); if(S.mode==='menu') renderMenu(); } const st=document.getElementById('roomStage'); return { on:YWF.on, sm:st? st.querySelectorAll('.ywf-sm').length : 0, caves:st? st.querySelectorAll('.ywf-cave').length : 0, anims:st && st.getAnimations? st.getAnimations({subtree:true}).filter(a=>a.effect && a.effect.target && a.effect.target.closest && a.effect.target.closest('.ywf-sm')).length : 0 }; }   
 function ypvDoorArt(){ return '<g transform="translate(-8,108) scale(2.4)">'+YPV_ART.gate+'</g>'+'<g transform="translate(-178,-190)">'+ypPennants(200,382,392,382)+'</g>'+'<g transform="translate(0,-100)">'+YPV_ART.castle+'</g>'; }   
