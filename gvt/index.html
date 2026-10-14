@@ -84704,7 +84704,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='22.23';        
+let GVT_CV='22.24';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -177194,17 +177194,25 @@ function dlgScrM(svg){ const r=svg.getBoundingClientRect(), cs=getComputedStyle(
   return { a:kx*sx, b:0, c:0, d:ky*sy, e:r.left+kx*tx, f:r.top+ky*ty }; }
 function dlgDots(){ const dpr=window.devicePixelRatio||1; return Math.min(dpr, (GV.tier>=1 || (window.GVT_TIER|0)>=1)? 2 : 3); }
 
-function dlgPicture(u){ const svg=DLGP.svg, m=dlgScrM(svg); if(!m) return Promise.resolve(null); const dpr=window.devicePixelRatio||1, sc=Math.abs(m.a)*DLGP.dd;
+
+function dlgNeed(m){ m=m||(DLGP.svg? dlgScrM(DLGP.svg) : null); if(!m) return 0; return Math.max(Math.abs(m.a), DLGP.sc||0)*(DLGP.dd||dlgDots()); }   
+function dlgDense(u, need){ const P=u.__p; return !need || !P || !(P.sc>0) || P.sc>=need*0.97; }   
+function dlgLow(m){ const need=dlgNeed(m); if(!need) return false; for(const u of DLGP.sleep){ const P=u.__p; if(P && P.sc>0 && P.sc<need*0.97) return true; } return false; }   
+function dlgFloorK(r){ try{ const W0=parseFloat(getComputedStyle(DLGP.svg).width); if(!(W0>0) || !(r.width>0) || !(DLGP.sc>0)) return 1; return Math.max(1, DLGP.sc*W0/r.width); }catch(e){ return 1; } }   
+setTimeout(()=>{ try{ if(window.GVT && !GVT.rbl) GVT.rbl={ st:()=>({ need:+dlgNeed().toFixed(3), sc:DLGP.sc, dd:DLGP.dd, low:(DLGP.svg? dlgLow() : false), pics:[...DLGP.sleep].filter(u=>u.__p && u.__p.sc>0).map(u=>[u.id||'?', +u.__p.sc.toFixed(3), u.__p.rec.cv.width, u.__p.rec.cv.height]) }) }; }catch(e){} }, 0);   
+
+
+function dlgPicture(u){ const svg=DLGP.svg, m=dlgScrM(svg); if(!m) return Promise.resolve(null); const dpr=window.devicePixelRatio||1, sc=dlgNeed(m);   
   let bx=u.__box; const V=DLGP.vis; if(bx && V){ bx=[Math.max(bx[0], V[0]), Math.max(bx[1], V[1]), Math.min(bx[2], V[2]), Math.min(bx[3], V[3])]; if(bx[2]<=bx[0] || bx[3]<=bx[1]) bx=null; }   
   if(!bx) return Promise.resolve(null); const whole=!V || dlgIn(u.__box, V);   
   let [x0, y0, x1, y1]=bx; { const dx=(m.a*x0+m.e)*dpr, dy=(m.d*y0+m.f)*dpr; x0=(Math.floor(dx)/dpr-m.e)/m.a; y0=(Math.floor(dy)/dpr-m.f)/m.d; }   
   const W=Math.max(1, Math.ceil((x1-x0)*sc)), H=Math.max(1, Math.ceil((y1-y0)*sc)); const w=W/sc, h=H/sc;
   const hid=DLGP.sleep.has(u); if(hid){ u.style.display=''; dlgSpend(u); dlgLoops0(u); }   
   const part=dlgSer(u); if(hid) u.style.display='none'; if(!part) return Promise.resolve(null);
-  const ck=W+'x'+H+'|'+bx.map(v=>v.toFixed(2)).join(',')+'|'+part; DLGP.px+=W*H; const hit=DLGP.pics.get(ck); if(hit){ DLGP.hits++; return Promise.resolve({ rec:hit, x:x0, y:y0, w, h, whole }); }
+  const ck=W+'x'+H+'|'+bx.map(v=>v.toFixed(2)).join(',')+'|'+part; DLGP.px+=W*H; const hit=DLGP.pics.get(ck); if(hit){ DLGP.hits++; return Promise.resolve({ rec:hit, x:x0, y:y0, w, h, whole, sc }); }
   const doc='<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="'+W+'" height="'+H+'" viewBox="'+x0+' '+y0+' '+w+' '+h+'">'+DLGP.defs+part+'</svg>';
   return new Promise(res=>{ const im=new Image(); im.onload=()=>{ const t1=performance.now(); const cv=document.createElement('canvas'); cv.width=W; cv.height=H; cv.getContext('2d').drawImage(im, 0, 0, W, H);   
-      const rec={ cv, url:'', vurl:im.src }; if(DLGP.pics.size>360) DLGP.pics.delete(DLGP.pics.keys().next().value); DLGP.pics.set(ck, rec); DLGP.encMs+=performance.now()-t1; DLGP.made++; res({ rec, x:x0, y:y0, w, h, whole }); };   
+      const rec={ cv, url:'', vurl:im.src }; if(DLGP.pics.size>360) DLGP.pics.delete(DLGP.pics.keys().next().value); DLGP.pics.set(ck, rec); DLGP.encMs+=performance.now()-t1; DLGP.made++; res({ rec, x:x0, y:y0, w, h, whole, sc }); };   
     im.onerror=()=>{ DLGP.log.push(['pic-error', u.id||u.getAttribute('class'), doc.length]); res(false); };   
     im.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(doc); }); }   
 
@@ -177218,8 +177226,8 @@ function dlgAge(u){ let A=[]; try{ A=u.getAnimations({ subtree:true }); }catch(e
 function dlgHide(u){ if(DLGP.sleep.has(u)) return; u.style.display='none'; DLGP.sleep.add(u); }
 const dlgFrame=()=>new Promise(r=>requestAnimationFrame(()=>r()));
 
-async function dlgLay(tok){ const t0=performance.now(); let aw=dlgAwake(); const make=[];
-  for(const u of DLGP.units){ if(u.__life || aw.has(u)) continue; const key=DLGP.ctx+'|'+u.getAttribute('transform')+'|'+(u.getAttribute('class')||''); if(u.__p!==undefined && u.__pk===key && !u.__dirty) continue; u.__pk=key; make.push(u); }   
+async function dlgLay(tok){ const t0=performance.now(); let aw=dlgAwake(); const make=[], need=dlgNeed();   
+  for(const u of DLGP.units){ if(u.__life || aw.has(u)) continue; const key=DLGP.ctx+'|'+u.getAttribute('transform')+'|'+(u.getAttribute('class')||''); if(u.__p!==undefined && u.__pk===key && !u.__dirty && dlgDense(u, need)) continue; u.__pk=key; make.push(u); }   
   if(make.length){ let ts=performance.now();
     const P=[]; for(const u of make){ if(performance.now()-ts>DLG_SLICE_MS){ await dlgFrame(); if(tok!==DLGP.tok) return; ts=performance.now(); }
       if(!DLGP.sleep.has(u)) dlgLoops0(u);   
@@ -177249,7 +177257,7 @@ function dlgCanvas(id, after){ const svg=DLGP.svg; let cv=document.getElementByI
 function dlgSvg(id, after){ const svg=DLGP.svg; let t=document.getElementById(id); if(!t){ t=document.createElementNS('http://www.w3.org/2000/svg', 'svg'); t.id=id; }
   for(const a of ['viewBox', 'preserveAspectRatio', 'class', 'data-rn']){ const v=svg.getAttribute(a); if(v!=null) t.setAttribute(a, v); else t.removeAttribute(a); } dlgLike(svg, t, 1); t.style.pointerEvents='none'; svg.parentNode.insertBefore(t, after.nextSibling); return t; }   
 function dlgDrawTo(cv, list){ if(!list.length){ if(cv.style.display!=='none') cv.style.display='none'; return 0; } if(cv.style.display==='none') cv.style.display='';   
-  const r=DLGP.svg.getBoundingClientRect(), dpr=window.devicePixelRatio||1, W=Math.round(r.width*dpr), H=Math.round(r.height*dpr); if(cv.width!==W) cv.width=W; if(cv.height!==H) cv.height=H;
+  const r=DLGP.svg.getBoundingClientRect(), dpr=window.devicePixelRatio||1, kf=dlgFloorK(r), W=Math.round(r.width*kf*dpr), H=Math.round(r.height*kf*dpr); if(cv.width!==W) cv.width=W; if(cv.height!==H) cv.height=H;    
   const g=cv.getContext('2d'); g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, cv.width, cv.height); const m=dlgScrM(DLGP.svg); if(!m || !r.width) return 0; const sx=cv.width/r.width, sy=cv.height/r.height;
   let n=0; for(const u of list){ const P=u.__p; if(!P) continue; g.drawImage(P.rec.cv, (m.a*P.x+m.e-r.left)*sx, (m.d*P.y+m.f-r.top)*sy, m.a*P.w*sx, m.d*P.h*sy); n++; } return n; }   
 
@@ -177327,7 +177335,7 @@ function dlgTick(ts){ DLGP.raf=requestAnimationFrame(dlgTick); if(!DLGP.on || S.
   { const ck=dlgCaps().join(); if(ck!==DLGP.capK){ DLGP.capK=ck; dlgTrim(); dlgFill(); DLGP.pend=1; } }   
   if(!DLGP.touchT) DLGP.touchT=ts; { const dz=DLG_DOZE_MS>0 && ts-DLGP.touchT>DLG_DOZE_MS; if(dz!==!!DLGP.dozing){ DLGP.dozing=dz? 1 : 0; if(dz) DLGP.dozeN++; DLGP.rotT=ts; DLGP.pend=1; } }   
   { const f=++DLGP.fr; if((f % 120)===60) dlgChaosSoon();     if((f % 120)===0 || (DLGP.moved.size && (f % 3)===0)) setTimeout(dlgRoam, 0, (f % 120)===0); }   
-  if(ts-DLGP.scT>500){ DLGP.scT=ts; const m=dlgScrM(DLGP.svg), sc=m? +Math.abs(m.a).toFixed(3) : 0; if(sc && DLGP.sc && sc!==DLGP.sc){ if(DLGP.scW===sc){ DLGP.scW=0; dlgRelay(); return; } DLGP.scW=sc; } else DLGP.scW=0; }   
+  if(ts-DLGP.scT>500){ DLGP.scT=ts; const m=dlgScrM(DLGP.svg), sc=m? +Math.abs(m.a).toFixed(3) : 0; if(sc && DLGP.sc && sc!==DLGP.sc){ if(DLGP.scW===sc){ DLGP.scW=0; dlgRelay(); return; } DLGP.scW=sc; } else { DLGP.scW=0; if(m && dlgLow(m)) DLGP.pend=1; } }       
   if(DLG_ROT_MS>0 && !DLGP.dozing && DLGP.queue.length && dlgCaps()[0]>0 && ts-DLGP.rotT>DLG_ROT_MS){ DLGP.rotT=ts; const out=DLGP.budget.shift(); if(out){ DLGP.queue.push(out); if(dlgNl(out)>DLG_LOOPS) DLGP.budget.length=0; } for(const u of DLGP.budget){ const i=DLGP.queue.indexOf(u); if(i>=0) DLGP.queue.splice(i, 1); } const was0=new Set(DLGP.budget); dlgFill(); DLGP.pend=1; dlgPlayTurn(DLGP.budget.filter(u=>!was0.has(u))); }   
   if(DLGP.pend){ DLGP.pend=0; DLGP.parking.clear(); const aw=dlgAwake(); const L=[]; for(const u of DLGP.units) if(!aw.has(u) && !u.__life && !DLGP.sleep.has(u)) L.push({ u, L:dlgLoopsOf(u) }); if(!DLGP.park) DLGP.parkT=ts; DLGP.park=L; for(const e of L) DLGP.parking.add(e.u); DLGP.layDue=1; }   
   if(!DLGP.park) return; { const over=ts-DLGP.parkT>=DLG_PARK_MAX; DLGP.park=DLGP.park.filter(e=>{ if(over || dlgParkStep(e.L)){ DLGP.parking.delete(e.u); DLGP.layDue=1; return false; } return true; }); }   
@@ -177584,7 +177592,7 @@ function dlgeSync(){ const svg=DLGP.svg; const ok=DLGE.on && DLGP.on && svg && s
     let H=DLGE.halos.get(u); if(H && H.key===key){ if(H.el.previousSibling!==an) an.parentNode.insertBefore(H.el, an.nextSibling); if(H.cvs) dlgeSeat(H, box, M); continue; }
     dlgeDrop(u); const el=document.createElement('div'); el.className='dlge-halo'; if(u.id) el.setAttribute('data-gid', u.id); dlgLike(svg, el, 0); el.style.overflow='hidden';
     H={ el, key, cvs:null, box }; DLGE.halos.set(u, H); an.parentNode.insertBefore(el, an.nextSibling);
-    const r=svg.getBoundingClientRect(), sc=M.sx*(r.width>0? r.width/M.W : 1)*(DLGP.dd||dlgDots()); const tok=DLGE.tok;
+    const r=svg.getBoundingClientRect(), sc=M.sx*Math.max(r.width>0? r.width/M.W : 1, (DLGP.sc||0)/(M.sx||1))*(DLGP.dd||dlgDots()); const tok=DLGE.tok;    
     dlgeMake(u, h, sp, box, sc).then(cvs=>{ if(DLGE.halos.get(u)!==H || tok!==DLGE.tok || !cvs){ if(!cvs && DLGE.halos.get(u)===H) DLGE.err++; return; }
       cvs.forEach((cv, i)=>{ cv.className='dlge-cv'; if(sp.ids.length>1){ const nm=sp.alt? (i? 'dlgeUp' : 'dlgeDn') : (i? 'dlgePk' : 'dlgeTr'); cv.style.animation=nm+' '+sp.dur+' '+sp.ease+' '+sp.delay+' infinite '+(sp.alt? 'alternate' : 'normal'); } H.el.appendChild(cv); });
       H.cvs=cvs; dlgeSeat(H, box, M); }); } }
