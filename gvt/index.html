@@ -85248,7 +85248,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='22.51';        
+let GVT_CV='22.52';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -95971,7 +95971,7 @@ function startBattlefield(mapId,diffOverride,teamSize,plan,rivX){
   
   
   const mapReq=mapId||META.bfMap;
-  const map=bfMap(bfMapResolve(mapReq));
+  const map=tsnMap(bfMap(bfMapResolve(mapReq)));   
   
   
   const riv=rivX||todaysRival();
@@ -177935,6 +177935,20 @@ function ptDoorFallback(e){
 
 
 const OPENER_MAP='crossing';   
+
+
+
+
+
+
+const TSN={ on:(function(){ try{ const q=/[?&]tsn=([01])/.exec(location.search||''); if(q){ if(q[1]==='1') localStorage.setItem('gvt_tsn','1'); else localStorage.removeItem('gvt_tsn'); } return localStorage.getItem('gvt_tsn')==='1'? 1 : 0; }catch(e){ return 0; } })() };   
+function tsnOn(){ return !!TSN.on; }
+function tsnMap(m){ return (OP_ARM && m && m.id===OPENER_MAP && tsnOn())? Object.assign({}, m, { ground:'snow', tsn:1, build:()=>tsnBuild(m) }) : m; }   
+function tsnBuild(m){ const h=m.build(); h.rocks=(h.rocks||[]).map((r,i)=>Object.assign({}, r, { art:'drift', chain:'tsn'+i })); return h; }   
+function tsnRig(o){ if(o && o.on!==undefined) TSN.on=o.on? 1 : 0;   
+  const bf=S.bf, t=S.cfg&&S.cfg.terrain;
+  return { cv:GVT_CV, on:TSN.on, opener:!!(bf&&bf.opener), mapId:bf? bf.mapId : null, ground:t? (t.ground||'') : null, rivers:t? (t.rivers||[]).map(r=>({ x:r.x, w:r.w, bridges:(r.bridges||[]).map(b=>b.y) })) : null,
+    rocks:t? (t.rocks||[]).map(r=>({ x:r.x, y:r.y, r:r.r, art:r.art||'', chain:r.chain||'' })) : null, flakes:(t&&t.flakes)? t.flakes.length : 0, duck:!!(t&&t.riverDuck), light:(typeof lightField==='function')? !!lightField() : null }; }
 let OP_ARM=0;              
 function startOpener(){ OP_ARM=1; try{ startBattlefield(OPENER_MAP, null, 1, null, ARMIES.find(a=>a.id==='tan')||ARMIES[2]); } finally { OP_ARM=0; } }   
 function titleClickEat(){   
@@ -181152,7 +181166,8 @@ window.GVT = {
     return { set:DECOR_HALLOW.slice(), own:DECOR_HALLOW.filter(decOwns), out:DECOR_HALLOW.filter(decorOn), cap:CHEST_CAP, allN:DECOR_ALL_N, on:halloweenOn(), night:roomNight(), led:(META.hw? { at:META.hw.at, cap:META.hw.cap } : null), due:hwDue(), next:hwNext(), step:HW_STEP, rung:hwRung(), capStars:HW_CAP_STARS }; },   
   fzb(o){ return fzbRig(o); },   
   otp(o){ return otpRig(o); },   
-  xbi(o){ return xbiRig(o); },   
+  xbi(o){ return xbiRig(o); },
+  tsn(o){ return tsnRig(o); },   
   night(v){ NW_PIN=(v===undefined||v===null)? null : (v? 1 : 0); if(roomOpenNow()) renderMenu(); return { pin:NW_PIN, night:roomNight(), from:NW_NIGHT[0], to:NW_NIGHT[1], tick:!!NW_TICK }; },   
   dogFreeze(on){ DOGRIG.frozen=on?1:0; DOG_LAST=0; return DOGRIG.frozen; },
   dogStep(s){ if(!DOGT) dogArm(); let r=Math.max(0,+s||0);
