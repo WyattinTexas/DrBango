@@ -84704,7 +84704,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='22.21';        
+let GVT_CV='22.22';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -98816,6 +98816,40 @@ function rbaSmash(u,b,tx,ty){ if(!rbaOwn(u)) return false;
     u.rcAt=S.t; u.rcH=h; bfSfx(SFX.wshot, hz.x, hz.y); return true; }
   return false; }
 function rbaRig(){ return { cv:GVT_CV, dials:Object.assign({},RBA), men:S.units.filter(u=>!u.dead && rbaOwn(u)).map(u=>({ id:u.id, t:u.type, x:+u.x.toFixed(1), y:+u.y.toFixed(1), sga:u.sgaK||null, brTo:u.brTo==null? null : +(u.brTo-S.t).toFixed(3), brFc:u.brFc||0, rc:u.rcAt==null? null : +(S.t-u.rcAt).toFixed(3), rcH:u.rcH==null? null : u.rcH, pluck:+(u.pcPluck||0).toFixed(3), th:u.kyThAt==null? null : +(S.t-u.kyThAt).toFixed(3) })) }; }   
+
+
+
+
+
+
+
+
+
+const CBX={ on:1, closer:4*28, scatter:14 };   
+function cbxU(u){ return !!(CBX.on && u && !S.bf && (u.type==='kbcannon' || cannonU(u))); }   
+function cbxFire(u,b,dmg,dist){   
+  const tgt={ x:b.x-10, y:b.y-42, vx:0, vy:0 }, g9=cannonU(u)? gigaU(u) : false;   
+  const P=cannonU(u)? { spd:CANNON_LOB_SPD, r:CANNON_R*(g9? GIGA.r : 1), iron:1, tag:'cbxiron' } : { spd:190, r:24, cot:1, tag:'cbxcot' };   
+  lobFire(u, tgt, { scatter:CBX.scatter, splash:(cannonU(u)? CANNON_SPLASH : ((u.def && u.def.splash)||40)) }, 1, 0, P);   
+  const sh=S.shots[S.shots.length-1]; if(sh && sh.k==='lob' && sh.src===u && !sh.cbx) sh.cbx={ dmg:dmg, d:Math.round(dist||0) };   
+}
+function cbxLand(sh){   
+  const x=sh.tx, y=sh.ty, R=sh.splash||40, c=sh.cbx||{}, dmg=Math.max(0,c.dmg|0);
+  bfSfx(SFX.boom, x, y);
+  if(sh.cot) snowSplashFx(x,y,R); else S.fx.push({k:'puff',x,y:y-10,t:0,dur:0.45,R:R});   
+  const b=S.tanBase; if(!b || b.dead || !dmg) return;   
+  const fortUp9=teddyFortUp();   
+  if(!fortUp9) b.hp=Math.max(0, b.hp-dmg);
+  b.hitT=0.25;
+  sqSiegeHaste(dmg);   
+  S.fx.push({k:'ring',x:b.x-6,y:b.y-40,r:6,R:34,t:0,dur:0.3,col:'rgba(255,243,196,0.8)'});
+  if(fortUp9) S.fx.push({k:'puff',x:b.x-12+(Math.random()-0.5)*26,y:b.y-46+(Math.random()-0.5)*18,t:0,dur:0.32,R:14,col:'#f1ecf7'});   
+  else S.floats.push({x:b.x,y:b.y-96,txt:'−'+dmg,t:0,col:'#BFE39A'});
+  if(b.hp<=0) campCrateFall();
+}
+function cbxRig(){ return { cv:GVT_CV, dials:Object.assign({},CBX), guns:S.units.filter(u=>!u.dead && cbxU(u)).map(u=>({ id:u.id, t:u.type, x:+u.x.toFixed(1), y:+u.y.toFixed(1), rng:+campSiegeRng(u).toFixed(1), sT:(u.siegeT==null? null : +u.siegeT.toFixed(3)), k:u.sgaK||null, n:u.sgaN|0 })),
+  shots:S.shots.filter(sh=>sh.cbx).map(sh=>({ src:sh.src&&sh.src.id, cot:sh.cot|0, iron:sh.iron|0, t:+sh.t.toFixed(3), dur:+sh.dur.toFixed(3), tx:Math.round(sh.tx), ty:Math.round(sh.ty), dmg:sh.cbx.dmg, d:sh.cbx.d })) }; }   
+
 function campSmash(u,dist){
   const b=S.tanBase; if(!b||b.dead) return;
   
@@ -98832,6 +98866,7 @@ function campSmash(u,dist){
   const nAtk=(S.crewN&&S.crewN[u.coopBy||'me'])|0;
   const share=Math.min(1, CAMP_CREW/Math.max(1,nAtk));
   const dmg=Math.max(1, Math.round((BF_BASEDMG[u.type]||6)*(u.vet?1.5:1)*(u.coopUM!=null?u.coopUM:upMul(u.type))*soulDmgMulU(u)*share));   
+  if(cbxU(u)){ cbxFire(u,b,dmg,dist); return; }   
   const fortUp9=teddyFortUp();   
   if(!fortUp9) b.hp=Math.max(0, b.hp-dmg);
   b.hitT=0.25;
@@ -99038,7 +99073,8 @@ function campSiegeRng(u){
     if(sw.w==='lightsaber' || sw.w==='commander') return melee;   
     return Math.max(melee,(sw.rng||u.def.rng)*radioAura(u).rng*lzRngMul(u)+tkSilvRng(u));
   }
-  return Math.max(melee, ((u.type==='mortar' && enhU(u,'cannon'))? CANNON_RUN : u.def.rng)*radioAura(u).rng*lzRngMul(u)*((u.type==='bazooka'&&enhU(u,'longtube'))?ENH_BAZ_RNG:1)+tkSilvRng(u)+bakRng(u));   
+  const r9=Math.max(melee, ((u.type==='mortar' && enhU(u,'cannon'))? CANNON_RUN : u.def.rng)*radioAura(u).rng*lzRngMul(u)*((u.type==='bazooka'&&enhU(u,'longtube'))?ENH_BAZ_RNG:1)+tkSilvRng(u)+bakRng(u));   
+  return cbxU(u)? Math.max(melee, r9-CBX.closer) : r9;   
 }
 
 
@@ -116559,7 +116595,7 @@ function update(dt){
   
   for(let i=S.shots.length-1;i>=0;i--){
     const sh=S.shots[i];
-    if(!S.bf && (sh.k==='rocket' || sh.k==='lob') && magShot(sh,dt)){ S.shots.splice(i,1); continue; }   
+    if(!S.bf && (sh.k==='rocket' || sh.k==='lob') && !sh.cbx && magShot(sh,dt)){ S.shots.splice(i,1); continue; }   
     if(sh.k==='rocket'){ if(sh.hsm) hsmSteer(sh);    
       const dx=sh.tx-sh.x, dy=(sh.ty-14)-sh.y, d=Math.hypot(dx,dy);
       if(d<10){ S.shots.splice(i,1); if(sh.hsm) hsmLand(sh);   else if(sh.dfAir) dfBurst(sh);   else if(sh.refl) cmdoReflLand(sh); else if(sh.foe) foeSplash(sh.tx,sh.ty,sh.splash,sh.src,sh.mwf,rbOf(sh)); else splash(sh.tx,sh.ty,sh.splash,sh.dmg,sh.papa? 'papa' : true,sh.src,false,false,sh.big,rbOf(sh),sh.air); }   
@@ -116580,7 +116616,7 @@ function update(dt){
       sh.t+=dt;
       if(sh.t>=sh.dur){ if(sh.gren && sh.air){ S.shots.splice(i,1); splash(sh.tx,sh.ty,sh.splash,sh.dmg,false,sh.src,false,false,0,0,1); continue; }    
         if(sh.gren){ if(!sh.landed) grLand(sh); continue; }   
-        S.shots.splice(i,1); if(sh.refl) cmdoReflLand(sh);
+        S.shots.splice(i,1); if(sh.refl) cmdoReflLand(sh); else if(sh.cbx){ cbxLand(sh); }    
         else if(sh.foe && sh.fish){ hyLand(sh); }   
         else if(sh.foe){ const c9=foeSplash(sh.tx,sh.ty,sh.splash,sh.src,sh.mwf,0,sh);    
           
