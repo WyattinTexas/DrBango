@@ -85500,7 +85500,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='22.60';        
+let GVT_CV='22.61';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -166047,8 +166047,7 @@ function lrcShade(rgb, f, a){ return 'rgba('+Math.round(Math.min(255,rgb[0]*f))+
 function lrcNormal(a,b,c){ const u=[b[0]-a[0],b[1]-a[1],b[2]-a[2]], v=[c[0]-a[0],c[1]-a[1],c[2]-a[2]], n=[u[1]*v[2]-u[2]*v[1], u[2]*v[0]-u[0]*v[2], u[0]*v[1]-u[1]*v[0]], l=Math.hypot(n[0],n[1],n[2])||1; return [n[0]/l,n[1]/l,n[2]/l]; }
 function lrcDrawGun(ctx, g){ const m=g.model, cam=g.cam, rgb=lrcRGB(g.hex), lit=g.lit, coreA=(g.coreA==null? 1 : g.coreA);
   ctx.save(); ctx.globalAlpha=g.alpha;
-  const a0=lrcProj(m.len[0],cam), a1=lrcProj(m.len[1],cam); let dx=a1[0]-a0[0], dy=a1[1]-a0[1]; const dl=Math.hypot(dx,dy)||1; dx/=dl; dy/=dl;
-  ctx.strokeStyle='rgba(255,255,255,.22)'; ctx.lineWidth=.8; ctx.beginPath(); ctx.moveTo(a0[0]-dx*900, a0[1]-dy*900); ctx.lineTo(a1[0]+dx*900, a1[1]+dy*900); ctx.stroke();   
+  
   const solids=(Q, offx, alpha)=>{ if(alpha<=0) return; const faces=[]; for(let i=0;i<Q.length;i++){ const f=Q[i], P=[]; let zs=0; for(let j=0;j<f.length;j++){ const pp=lrcProj([f[j][0]+offx, f[j][1], f[j][2]],cam); P.push(pp); zs+=pp[2]; } const r0=lrcRot([f[0][0]+offx,f[0][1],f[0][2]],cam.yaw,cam.pitch,cam.roll), r1=lrcRot([f[1][0]+offx,f[1][1],f[1][2]],cam.yaw,cam.pitch,cam.roll), r2=lrcRot([f[2][0]+offx,f[2][1],f[2][2]],cam.yaw,cam.pitch,cam.roll); let n=lrcNormal(r0,r1,r2); if(n[2]<0) n=[-n[0],-n[1],-n[2]]; faces.push({ P:P, z:zs/f.length, d:Math.max(0, n[0]*LRC_LIGHT[0]+n[1]*LRC_LIGHT[1]+n[2]*LRC_LIGHT[2]) }); }
     faces.sort((a,b)=>a.z-b.z); ctx.shadowColor=lrcShade(rgb,1,.85*lit*alpha); ctx.shadowBlur=18*lit;
     for(let k=0;k<faces.length;k++){ const fc=faces[k], bright=lit? (0.62+0.48*fc.d) : (0.30+0.12*fc.d); ctx.fillStyle=lit? lrcShade(rgb,bright,alpha) : 'rgba(40,42,46,'+(0.55*alpha)+')'; ctx.beginPath(); ctx.moveTo(fc.P[0][0],fc.P[0][1]); for(let j=1;j<fc.P.length;j++) ctx.lineTo(fc.P[j][0],fc.P[j][1]); ctx.closePath(); ctx.fill(); ctx.shadowBlur=0; ctx.strokeStyle=lit? lrcShade(rgb,1.35,.55*alpha) : 'rgba(120,124,130,'+(.5*alpha)+')'; ctx.lineWidth=.7; ctx.stroke(); ctx.shadowBlur=18*lit; }
@@ -166059,7 +166058,11 @@ function lrcDrawGun(ctx, g){ const m=g.model, cam=g.cam, rgb=lrcRGB(g.hex), lit=
   ctx.strokeStyle='rgba(255,255,255,.86)'; ctx.lineWidth=1.05; ctx.lineCap='round'; ctx.beginPath(); for(let i=0;i<m.L.length;i++){ const s=m.L[i], p0=lrcProj(s[0],cam), p1=lrcProj(s[1],cam); ctx.moveTo(p0[0],p0[1]); ctx.lineTo(p1[0],p1[1]); } ctx.stroke();   
   ctx.restore(); }
 
-const LRC_SEAT={ C:{x:0.47,y:0.44,k:0.00903,a:1}, L:{x:0.17,y:0.72,k:0.00509,a:0.33}, R:{x:0.58,y:0.11,k:0.00394,a:0.33} };   
+
+const LRC_SEAT={ C:{x:0.47,y:0.44,k:0.00903,a:1,ph:0}, L:{x:0.17,y:0.72,k:0.00509,a:0.33,ph:1.3}, R:{x:0.58,y:0.11,k:0.00394,a:0.33,ph:2.6}, T:{x:0.74,y:-0.30,k:0.00330,a:0.10,ph:2.6}, B:{x:-0.22,y:1.10,k:0.00440,a:0.10,ph:1.3} };   
+const LRC_TRACK=[LRC_SEAT.T, LRC_SEAT.R, LRC_SEAT.C, LRC_SEAT.L, LRC_SEAT.B];   
+function lrcSeatYaw(i){ return 0.12+Math.PI*(i%2); }   
+function lrcCamLerp(A, B, p){ return { yaw:A.yaw+(B.yaw-A.yaw)*p, pitch:A.pitch+(B.pitch-A.pitch)*p, roll:A.roll, cx:A.cx+(B.cx-A.cx)*p, cy:A.cy+(B.cy-A.cy)*p, k:A.k+(B.k-A.k)*p }; }   
 function lrcEase(p){ return p<0? 0 : p>1? 1 : p*p*(3-2*p); }
 function lrcPrev(id){ const o=lrcBeams().map(b=>b.id), i=o.indexOf(id); return o[(i+o.length-1)%o.length]; }
 function lrcNext(id){ const o=lrcBeams().map(b=>b.id), i=o.indexOf(id); return o[(i+1)%o.length]; }
@@ -166068,14 +166071,13 @@ function lrcSeatLerp(A,B,p){ return { x:A.x+(B.x-A.x)*p, y:A.y+(B.y-A.y)*p, k:A.
 function lrcRender(cv, tms){ const W=cv.clientWidth||1, H=cv.clientHeight||1, dpr=Math.min(2, window.devicePixelRatio||1); if(cv.width!==Math.round(W*dpr) || cv.height!==Math.round(H*dpr)){ cv.width=Math.round(W*dpr); cv.height=Math.round(H*dpr); }
   const ctx=cv.getContext('2d'); if(!ctx) return; ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H); const t=tms/1000, guns=[]; lfrTick(tms);    
   if(!LRC.cur) return;
-  if(!LRC.swap){ guns.push({ id:lrcPrev(LRC.cur), seat:LRC_SEAT.L, yaw:-0.9, ph:1.3 }); guns.push({ id:lrcNext(LRC.cur), seat:LRC_SEAT.R, yaw:0.9, ph:2.6 }); guns.push({ id:LRC.cur, seat:LRC_SEAT.C, yaw:0.12, ph:0, live:true }); }
-  else { const sw=LRC.swap, p=(tms-sw.t0)/sw.dur; if(p>=1){ LRC.cur=sw.to; LRC.swap=null; return lrcRender(cv, tms); } const e=lrcEase(p), from=sw.dir>0? LRC_SEAT.R : LRC_SEAT.L, to=sw.dir>0? LRC_SEAT.L : LRC_SEAT.R;
-    const leave=lrcSeatLerp(LRC_SEAT.C, to, e), coreOut=lrcEase(p/0.42); guns.push({ id:sw.from, seat:leave, yaw:0.12+sw.dir*Math.PI*e, ph:0, coreDx:coreOut*120, coreA:1-coreOut, alpha:leave.a });   
-    const come=lrcSeatLerp(from, LRC_SEAT.C, e), coreIn=lrcEase((p-0.5)/0.5); guns.push({ id:sw.to, seat:come, yaw:0.12-sw.dir*Math.PI*(1-e), ph:0, coreDx:(1-coreIn)*120, coreA:coreIn, alpha:come.a, live:true, flash:(p>0.9? (p-0.9)/0.1 : 0) });   
-    const farId=sw.dir>0? lrcPrev(sw.from) : lrcNext(sw.from), newId=sw.dir>0? lrcNext(sw.to) : lrcPrev(sw.to); guns.push({ id:farId, seat:sw.dir>0? LRC_SEAT.L : LRC_SEAT.R, yaw:sw.dir>0? -0.9 : 0.9, ph:1.3, alpha:LRC_SEAT.L.a*(1-lrcEase(p/0.5)) }); guns.push({ id:newId, seat:sw.dir>0? LRC_SEAT.R : LRC_SEAT.L, yaw:sw.dir>0? 0.9 : -0.9, ph:2.6, alpha:LRC_SEAT.R.a*lrcEase((p-0.5)/0.5) }); }
-  guns.sort((a,b)=>(a.live?1:0)-(b.live?1:0));
-  for(let i=0;i<guns.length;i++){ const g=guns[i], cam=lrcCam(g.seat, W, H, t, g.yaw, g.ph), hex=lrcBeam(g.id).hex, lit=lrcLocked(g.id)? 0 : 1, model=lrcModelOf(g.id); if(g.live) lfrKick(cam, tms);    
-    lrcDrawGun(ctx, { model:model, hex:hex, lit:lit, coreDx:g.coreDx||0, coreA:g.coreA, alpha:(g.alpha!=null? g.alpha : g.seat.a), cam:cam });
+  if(!LRC.swap){ guns.push({ id:lrcPrev(LRC.cur), s0:3 }); guns.push({ id:lrcNext(LRC.cur), s0:1 }); guns.push({ id:LRC.cur, s0:2, live:true }); }   
+  else { const sw=LRC.swap, p=(tms-sw.t0)/sw.dur; if(p>=1){ LRC.cur=sw.to; LRC.swap=null; return lrcRender(cv, tms); } const e=lrcEase(p), d=sw.dir, coreOut=lrcEase(p/0.42), coreIn=lrcEase((p-0.5)/0.5);   
+    const ids=d>0? [lrcNext(sw.to), sw.to, sw.from, lrcPrev(sw.from)] : [lrcPrev(sw.to), sw.to, sw.from, lrcNext(sw.from)];   
+    for(let j=0;j<4;j++){ const s0=d>0? j : 4-j, g={ id:ids[j], s0:s0, s1:s0+d, e:e }; if(s0===2){ g.coreDx=coreOut*120; g.coreA=1-coreOut; } if(s0+d===2){ g.coreDx=(1-coreIn)*120; g.coreA=coreIn; g.live=true; g.flash=(p>0.9? (p-0.9)/0.1 : 0); } guns.push(g); } }   
+  guns.sort((a,b)=>(a.live?1:0)-(b.live?1:0)); if(LRC.T!=null) LRC.last=guns;   
+  for(let i=0;i<guns.length;i++){ const g=guns[i], SA=LRC_TRACK[g.s0], SB=(g.s1==null? null : LRC_TRACK[g.s1]), camA=lrcCam(SA, W, H, t, lrcSeatYaw(g.s0), SA.ph), cam=SB? lrcCamLerp(camA, lrcCam(SB, W, H, t, lrcSeatYaw(g.s0)+(g.s1-g.s0)*Math.PI, SB.ph), g.e) : camA, alpha=SB? SA.a+(SB.a-SA.a)*g.e : SA.a, hex=lrcBeam(g.id).hex, lit=lrcLocked(g.id)? 0 : 1, model=lrcModelOf(g.id); g.cam=cam; g.a=alpha; if(g.live) lfrKick(cam, tms);       
+    lrcDrawGun(ctx, { model:model, hex:hex, lit:lit, coreDx:g.coreDx||0, coreA:g.coreA, alpha:alpha, cam:cam });   
     if(g.flash){ const em=lrcProj(model.emitter,cam); ctx.save(); ctx.globalAlpha=g.flash*lit; ctx.fillStyle='#fff'; ctx.shadowColor=hex; ctx.shadowBlur=30; ctx.beginPath(); ctx.arc(em[0],em[1],10+10*g.flash,0,Math.PI*2); ctx.fill(); ctx.restore(); }
     if(g.live && LRC.beam){ const bp=(tms-LRC.beam.t0)/LRC.beam.dur; if(bp>=1) LRC.beam=null; else { const em=lrcProj(model.emitter,cam), mz=lrcProj(model.muzzle,cam); let ddx=mz[0]-em[0], ddy=mz[1]-em[1]; const dl=Math.hypot(ddx,ddy)||1; ddx/=dl; ddy/=dl; ctx.save(); ctx.globalAlpha=1-bp; ctx.lineCap='round'; ctx.shadowColor=hex; ctx.shadowBlur=16; ctx.strokeStyle=hex; ctx.lineWidth=5; ctx.beginPath(); ctx.moveTo(em[0],em[1]); ctx.lineTo(em[0]+ddx*1600, em[1]+ddy*1600); ctx.stroke(); ctx.shadowBlur=0; ctx.strokeStyle='#fff'; ctx.lineWidth=1.8; ctx.stroke(); ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(em[0],em[1],8*(1-bp)+4,0,Math.PI*2); ctx.fill(); ctx.restore(); } } if(g.live) lfrBeams(ctx, model, cam, hex, lit, tms); } lfrDraw(ctx, W, H, tms); }   
 function lrcFrame(){ const cv=document.getElementById('lrcCanvas'); if(!cv || !LRC.on){ LRC.run=0; return; } try{ lrcRender(cv, lrcNow()); }catch(e){} if(LRC.T==null) requestAnimationFrame(lrcFrame); else LRC.run=0; }   
@@ -166104,7 +166106,7 @@ function lrcPick(id){ if(!LRC.on || !id || id===LRC.sel || LRC.swap) return; if(
   const o=lrcBeams().map(b=>b.id), d=o.indexOf(id)-o.indexOf(LRC.cur), dir=((d>0 && d<=o.length/2) || (d<0 && -d>o.length/2))? 1 : -1;   
   LRC.sel=id; if(lrcRM()){ LRC.cur=id; LRC.swap=null; lrcWords(false); return; } LRC.swap={ from:LRC.cur, to:id, dir:dir, t0:lrcNow(), dur:950 }; lrcWords(true); }
 function lrcAct(){ if(!LRC.on || !LRC.sel) return; const id=LRC.sel; if(lrcLocked(id)){ shopDeny('shgn-'+id); return; } UI.laser(id); }   
-function lrcProbe(){ const q=k=>Array.from(document.querySelectorAll(k)); const cv=document.getElementById('lrcCanvas'); return { on:LRC.on, sel:LRC.sel, cur:LRC.cur, swap:LRC.swap? { from:LRC.swap.from, to:LRC.swap.to } : null, run:LRC.run, beam:!!LRC.beam, page:!!document.querySelector('#flPage.flh-lsr.lrc'), canvas:!!cv, cw:cv? cv.width : 0, ch:cv? cv.height : 0, chips:q('#lrcRail .lrc-chip').map(c=>c.getAttribute('data-id')), chipOn:q('#lrcRail .lrc-chip.on').map(c=>c.getAttribute('data-id')), chipCls:q('#lrcRail .lrc-chip').map(c=>c.className.replace('lrc-chip','').trim()), big:(document.querySelector('#lrcBig .lrc-w')||{}).textContent||null, does:(document.querySelector('#lrcBig small')||{}).textContent||null, btn:(document.querySelector('#lrcSide .lrc-btn')||{}).textContent||null, btnCls:(document.querySelector('#lrcSide .lrc-btn')||{}).className||null, price:!!document.querySelector('#lrcSide .lrc-price'), caps:q('#flPage .lrc-cap b').map(b=>b.textContent), oldCase:!!document.querySelector('#flPage .lch-page .sh-case') }; }   
+function lrcProbe(){ const q=k=>Array.from(document.querySelectorAll(k)); const cv=document.getElementById('lrcCanvas'); return { on:LRC.on, sel:LRC.sel, cur:LRC.cur, swap:LRC.swap? { from:LRC.swap.from, to:LRC.swap.to } : null, run:LRC.run, beam:!!LRC.beam, page:!!document.querySelector('#flPage.flh-lsr.lrc'), canvas:!!cv, cw:cv? cv.width : 0, ch:cv? cv.height : 0, chips:q('#lrcRail .lrc-chip').map(c=>c.getAttribute('data-id')), chipOn:q('#lrcRail .lrc-chip.on').map(c=>c.getAttribute('data-id')), chipCls:q('#lrcRail .lrc-chip').map(c=>c.className.replace('lrc-chip','').trim()), big:(document.querySelector('#lrcBig .lrc-w')||{}).textContent||null, does:(document.querySelector('#lrcBig small')||{}).textContent||null, btn:(document.querySelector('#lrcSide .lrc-btn')||{}).textContent||null, btnCls:(document.querySelector('#lrcSide .lrc-btn')||{}).className||null, price:!!document.querySelector('#lrcSide .lrc-price'), caps:q('#flPage .lrc-cap b').map(b=>b.textContent), oldCase:!!document.querySelector('#flPage .lch-page .sh-case'), track:(LRC.last? LRC.last.map(g=>({ id:g.id, s0:g.s0, s1:(g.s1==null? null : g.s1), e:(g.e==null? null : +g.e.toFixed(4)), live:!!g.live, yaw:+g.cam.yaw.toFixed(4), pitch:+g.cam.pitch.toFixed(4), cx:+g.cam.cx.toFixed(1), cy:+g.cam.cy.toFixed(1), k:+g.cam.k.toFixed(5), a:+g.a.toFixed(3), coreA:(g.coreA==null? 1 : +g.coreA.toFixed(3)) })) : null) }; }   
 
 
 
