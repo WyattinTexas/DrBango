@@ -84822,7 +84822,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='22.26';        
+let GVT_CV='22.27';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -164309,7 +164309,7 @@ function surpUp(){ return rosPaintStands() && S.mode==='menu'; }
 
 
 
-const FWP={ raf:0, cv:null, id:null, t0:0, last:-1, W:0, H:0, dpr:1, sh:null, rm:false, n:0 };
+const FWP={ raf:0, cv:null, id:null, t0:0, last:-1, W:0, H:0, dpr:1, sh:null, rm:false, n:0, inT:0 };   
 const FWP_R=54;   
 function fwpStop(){ if(FWP.raf) cancelAnimationFrame(FWP.raf); FWP.raf=0; if(FWP.cv && FWP.cv.parentNode){ const pg=FWP.cv.parentNode; pg.removeChild(FWP.cv); if(pg.classList) pg.classList.remove('fwp-on'); } FWP.cv=null; FWP.id=null; FWP.sh=null; }
 function fwpCx(){ return FWP.W*0.70; } function fwpCy(){ return FWP.H*0.27; }   
@@ -164352,7 +164352,15 @@ function fwpDraw(t, still){ const cv=FWP.cv; if(!cv) return; const g=cv.getConte
         g.beginPath(); g.moveTo(sh.x+Math.cos(a)*R*0.82, sh.y+Math.sin(a)*R*0.82+droop); g.lineTo(sh.x+Math.cos(a)*R, sh.y+Math.sin(a)*R+droop); g.stroke(); }
       if(b<0.15){ g.globalAlpha=(1-b/0.15)*0.9; g.fillStyle='#FFFFFF'; g.beginPath(); g.arc(sh.x, sh.y, 10*(0.4+(b/0.15)*0.6), 0, 7); g.fill(); }
       g.globalAlpha=1; g.lineCap='butt'; } } }
-function fwpRig(o){ o=o||{}; if(o.play) fwpPlay(o.play); if(o.stop) fwpStop(); return { cv:GVT_CV, id:FWP.id, playing:!!FWP.cv, raf:!!FWP.raf, rm:FWP.rm, n:FWP.n, dur:fwpDur(), sh:FWP.sh? FWP.sh.map(s=>({ at:s.at, x:Math.round(s.x), y:Math.round(s.y), hex:s.hex })) : null }; }
+function fwpRig(o){ o=o||{}; if(o.play) fwpPlay(o.play); if(o.stop) fwpStop(); return { cv:GVT_CV, id:FWP.id, playing:!!FWP.cv, raf:!!FWP.raf, rm:FWP.rm, n:FWP.n, dur:fwpDur(), inT:!!FWP.inT, enterId:fwpEnterId(), sh:FWP.sh? FWP.sh.map(s=>({ at:s.at, x:Math.round(s.x), y:Math.round(s.y), hex:s.hex })) : null }; }
+
+
+
+
+const FWP_IN_MS=400;
+function fwpEnterId(){ return (fwOwned() && META.fwOn && FW_COLORS.some(c=>c.id===META.fwOn))? META.fwOn : 'rainbow'; }
+function fwpEnter(key){ if(key!=='fireworks') return; clearTimeout(FWP.inT); const n=FWP.n;
+  FWP.inT=setTimeout(()=>{ FWP.inT=0; const pg=document.getElementById('flPage'); if(FWP.n!==n || FWP.cv || !pg || !pg.classList.contains('flh-fw') || !shopIsOpen() || SHOP.store!=='lab' || SHOP.labOpen!=='fireworks') return; fwpPlay(fwpEnterId()); }, FWP_IN_MS); }
 
 
 
@@ -164574,7 +164582,7 @@ function flhLsrPageHTML(S){ const anim=LAB_PG.anim; LAB_PG.anim=0; SHOP.labSel=n
   return '<div id="flPage" class="flh-lsr'+(anim? ' in' : '')+'"><div class="lch-page lch-lz"><b class="lch-ttl">LASER ROOM</b>'+shopLasersInnerHTML()+'</div></div>'; }   
 function flhCryPageHTML(S){ const anim=LAB_PG.anim; LAB_PG.anim=0; SHOP.labSel=null;
   return '<div id="flPage" class="flh-cry'+(anim? ' in' : '')+'"><div class="lch-page lch-cry"><b class="lch-ttl">CRYSTAL ROOM</b>'+shopSaberInnerHTML()+'</div></div>'; }   
-function lchLabPage(key){ openShop('lab'); SHOP.labOpen=key; SHOP.labSel=null; LAB_PG.anim=0; shopRefresh(); }   
+function lchLabPage(key){ openShop('lab'); SHOP.labOpen=key; SHOP.labSel=null; LAB_PG.anim=0; shopRefresh(); fwpEnter(key); }       
 function lchShopGo(dept, spot){ if(dept==='saber') lchLabPage('crystals'); else if(dept==='lasers') lchLabPage('lasers'); else if(dept==='motor'){ openShop('hangar'); shopJump('motor', false); } else { openShop(); shopJump(dept, false); } if(spot) nmSpot(spot); }   
 function lchHangarTap(){ if(!LCH.on || S.mode!=='menu' || shopIsOpen()) return; try{ audio(); }catch(e){} SFX.blip(); openShop('hangar'); shopJump('motor', false); }   
 function lchProbe(){ const q=k=>Array.from(document.querySelectorAll(k)); return { on:LCH.on, tabs:SHOP_TABS.map(t=>t.id), tab:SHOP.tab, store:SHOP.store, labOpen:SHOP.labOpen, hit:(typeof FHG!=='undefined' && FHG.on)? /data-fhg="hit"/.test(fhgArt()) : null, bays:q('#flhHall .flh-bay[data-key]').map(b=>b.getAttribute('data-key')), pips:q('#flhMap .flh-pip').map(p=>p.getAttribute('data-key')), page:(document.getElementById('flPage')||{}).className||null, sign:(document.querySelector('#toyshop .sh-sign b')||{}).textContent||null }; }   
@@ -174660,10 +174668,10 @@ window.UI = {
   
   labToggle(key){ const b9=document.querySelector('#shLab .flh-bay[data-key="'+key+'"]'); if(b9 && b9.classList.contains('flh-lock')){ SFX.blip(); b9.classList.remove('flh-rattle'); void b9.offsetWidth; b9.classList.add('flh-rattle'); return; }   
     if(SHOP.labOpen===key || LAB_PG.t) return;   
-    SFX.blip(); const d=document.getElementById('shLab'), h=document.getElementById('flhHall'); SHOP.flhSel=null; SHOP.flhCue=null; if(!d || !b9 || !h || reducedMotion()){ SHOP.labOpen=key; SHOP.labSel=null; LAB_PG.anim=0; shopRefresh(); return; }   
+    SFX.blip(); const d=document.getElementById('shLab'), h=document.getElementById('flhHall'); SHOP.flhSel=null; SHOP.flhCue=null; if(!d || !b9 || !h || reducedMotion()){ SHOP.labOpen=key; SHOP.labSel=null; LAB_PG.anim=0; shopRefresh(); fwpEnter(key); return; }   
     b9.classList.add('flh-open');   
     LAB_PG.t=setTimeout(()=>{ if(!shopIsOpen() || SHOP.store!=='lab'){ LAB_PG.t=0; return; } try{ SFX.whoosh(); }catch(e){} const v=document.getElementById('flhVeil'); h.style.transformOrigin=flhOrigin(b9); h.style.transition='transform .44s cubic-bezier(.5,0,.85,.5)'; h.style.transform=flhZoom(b9); if(v) v.classList.add('on');   
-      LAB_PG.t=setTimeout(()=>{ LAB_PG.t=0; if(!shopIsOpen() || SHOP.store!=='lab') return; LAB_PG.anim=1; SHOP.flhAnim={ kind:'in', key:key }; SHOP.labOpen=key; SHOP.labSel=null; d.scrollTop=0; shopRefresh(); }, 430); }, 300); },   
+      LAB_PG.t=setTimeout(()=>{ LAB_PG.t=0; if(!shopIsOpen() || SHOP.store!=='lab') return; LAB_PG.anim=1; SHOP.flhAnim={ kind:'in', key:key }; SHOP.labOpen=key; SHOP.labSel=null; d.scrollTop=0; shopRefresh(); fwpEnter(key); }, 430); }, 300); },       
   labPageBack(){ const key=SHOP.labOpen, p=document.getElementById('flPage'); if(!key || key==='-' || LAB_PG.t) return; LAB_PG.x=Date.now();   SFX.clack(); const rm=reducedMotion();   
     const go=()=>{ LAB_PG.t=0; if(!shopIsOpen() || SHOP.store!=='lab') return; SHOP.flhAnim={ kind:'out', key:key }; SHOP.flhSel=null; SHOP.labOpen='-'; SHOP.labSel=null; SHOP.labNext=null; const d0=document.getElementById('shLab'); if(d0) d0.scrollTop=0; shopRefresh(); };
     if(rm || !p){ go(); return; } p.classList.add('out'); LAB_PG.t=setTimeout(go, 220); },
