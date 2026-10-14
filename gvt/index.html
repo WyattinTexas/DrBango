@@ -85229,7 +85229,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='22.47';        
+let GVT_CV='22.48';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -98695,7 +98695,7 @@ function bfMarch(u,dt,goal){
   
   const wkv=nx*sp*v2m, wkf=u.cmdWkF?7:(u.type==='jane'? JANE_WKF : u.type==='kingbear'? KB_HERO_WKF : 20);   
   if(u.coopBy && u.glOn && GLIDE_FACE){   }
-  else if(wkv>wkf){ u.wkX=1; u.wkT=S.t; } else if(wkv<-wkf){ u.wkX=-1; u.wkT=S.t; }   
+  else wkStride(u,wkv,wkf,dt);   
   for(const rk of S.cfg.terrain.rocks){          
     const ax=u.x-rk.x, ay=u.y-rk.y, dd=Math.hypot(ax,ay), min=rk.r+pad;
     if(dd>0.1&&dd<min){ u.x+=ax/dd*(min-dd)*Math.min(1,dt*8); u.y+=ay/dd*(min-dd)*Math.min(1,dt*8); }
@@ -120165,6 +120165,30 @@ function drawSprite(k,x,y,w,rot,wob,imgOverride,flip){
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+const CFP={ step:4, grace:0.3 };   
+function wkStride(u,wkv,wkf,dt){   
+  const s=(wkv>wkf)? 1 : (wkv<-wkf)? -1 : 0; if(!s) return;
+  if(u.wkS!==s){ u.wkS=s; u.wkSD=0; }   
+  u.wkSD+=Math.abs(wkv)*dt;   
+  if(u.wkX===s || u.wkSD>=CFP.step){ u.wkX=s; u.wkT=S.t; } }   
+function flSeat(o,v){ o.flA=v; o.flAt=S.t; return v; }   
+function flChair(o,v){ return (o.flAt!=null && o.flA!==v && S.t-o.flAt<CFP.grace)? o.flA : v; }   
+function cfpRig(o){ if(o){ if(o.step!=null) CFP.step=+o.step; if(o.grace!=null) CFP.grace=+o.grace; }   
+  const U=(o&&o.id!=null)? S.units.find(q=>q.id===o.id) : null;
+  return { cv:GVT_CV, step:CFP.step, grace:CFP.grace, hold:WKF_HOLD, u:U? { id:U.id, wkX:U.wkX==null? null : U.wkX, wkAge:U.wkT==null? null : +(S.t-U.wkT).toFixed(3), wkS:U.wkS==null? null : U.wkS, wkSD:U.wkSD==null? null : +U.wkSD.toFixed(2), flA:U.flA==null? null : !!U.flA, flAge:U.flAt==null? null : +(S.t-U.flAt).toFixed(3), fl:!!unitFl(U) } : null }; }
+
 const WKF_HOLD=0.15;
 function wkBack(o,dir){ return !!(o.wkT && S.t-o.wkT<WKF_HOLD && o.wkX===-dir); }
 
@@ -120181,11 +120205,12 @@ function aimLive(o){ return !!(AIM_FACE && o.faceX && o.faceTo!=null && S.t<o.fa
 function aimBeat(o){ return !!(AIM_BEAT>0 && o.faceAt!=null && S.t-o.faceAt<AIM_BEAT && !(o.def && (o.def.ride||o.def.vehicle)) && aimLive(o)); }   
 function unitFaceX(u){ return aimLive(u)? u.faceX : ((S.bf&&u.side==='foe')?-1:1); }   
 function foeFaceX(f){ return aimLive(f)? f.faceX : -1; }                                
-function foeFl(f){ return (f.wkT && S.t-f.wkT<WKF_HOLD && !aimBeat(f))? f.wkX===1 : foeFaceX(f)>0; }  
+function foeFl(f){ return (f.wkT && S.t-f.wkT<WKF_HOLD && !aimBeat(f))? flSeat(f, f.wkX===1) : aimLive(f)? flSeat(f, f.faceX>0) : flChair(f, false); }   
 function unitFl(u){ const b=!!(S.bf && u.side==='foe');   
-  if(u.cmdFs && !(u.wkT && S.t-u.wkT<WKF_HOLD) && (u.cmdSwT>0||u.cmdFx>0||u.cmdWallT>0)) return u.cmdFs<0;   
-  if(aimLive(u) && (!(u.wkT && S.t-u.wkT<WKF_HOLD) || aimBeat(u))) return u.faceX<0;   
-  return b !== wkBack(u, b?-1:1); }
+  const wk9=!!(u.wkT && S.t-u.wkT<WKF_HOLD);   
+  if(u.cmdFs && !wk9 && (u.cmdSwT>0||u.cmdFx>0||u.cmdWallT>0)) return flSeat(u, u.cmdFs<0);   
+  if(aimLive(u) && (!wk9 || aimBeat(u))) return flSeat(u, u.faceX<0);   
+  return wk9? flSeat(u, b !== wkBack(u, b?-1:1)) : flChair(u, b); }   
 
 
 
@@ -182066,6 +182091,7 @@ window.GVT = {
       bigText:(up? (up.querySelector('.xj-big')||{}).textContent : null)||null,
       anims:anim(card)+anim(up) }; },
   
+  cfp(o){ return cfpRig(o); },   
   bfSarge(seat){ if(!S.bf) return null;
     const s=(seat==null? bfMySeat() : seat|0), st=S.bf.seats[s];
     return { seat:s, cd:+bfSargeCd(s).toFixed(2), max:BF_SARGE_DOWN, ready:bfSargeCd(s)<=0,
