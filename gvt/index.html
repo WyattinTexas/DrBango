@@ -55618,7 +55618,7 @@ function netSync(){
         
         
         adv:advCount(),
-        advv:3,   
+        advv:4, advo:advCount523(),   
         
         
         
@@ -86364,7 +86364,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='23.15';        
+let GVT_CV='23.16';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -165458,15 +165458,28 @@ const ADV_CELLS=[
   ()=> (((META.nemesis&&META.nemesis.w)|0)>0)?1:0,  
   ()=> META.nemBank?1:0,                            
   ...['ice','bone','croak','fields'].flatMap(k=>['e','m','h','g'].map(d=>()=>(META[k]&&META[k][d])?1:0)),   
-  ()=> (META.mom&&META.mom.done)?1:0                
+  ()=> (META.mom&&META.mom.done)?1:0,               
+  
+  ()=> META.nemT20?1:0,                             
+  ()=> META.nemM20?1:0,                             
+  ...['palace','caves','sky','chess','gmy'].flatMap(k=>['e','m','h','g'].map(d=>()=>(META[k]&&META[k][d])?1:0)),   
+  ()=> (META.ice&&META.ice.u)?1:0,                  
+  ()=> (META.bone&&META.bone.u)?1:0                 
 ];
-const ADV_PARKS=['yeti','dino','western','teddy'];  
+const ADV_PARKS=['yeti','dino','western','teddy','moon'];      
 const ADV_MAX=THIRD_MAX+ADV_PARKS.length*50+ADV_CELLS.length;   
 function advCount(){
   let n=Math.max(0, Math.min(THIRD_MAX, META.campaign|0));              
   for(const id of ADV_PARKS){ const p=(META.parks&&META.parks[id])||{};
     n+=Math.max(0, Math.min(parkLevels(id), p.lv|0)); }                 
   for(const cl of ADV_CELLS){ try{ n+=cl()?1:0; }catch(e){} }           
+  return n;
+}
+const ADV_PARKS_523=ADV_PARKS.slice(0,4), ADV_CELLS_523=ADV_CELLS.slice(0,23);   
+function advCount523(){
+  let n=Math.max(0, Math.min(THIRD_MAX, META.campaign|0));
+  for(const id of ADV_PARKS_523){ const p=(META.parks&&META.parks[id])||{}; n+=Math.max(0, Math.min(parkLevels(id), p.lv|0)); }
+  for(const cl of ADV_CELLS_523){ try{ n+=cl()?1:0; }catch(e){} }
   return n;
 }
 const WR_TABS = [ {id:'rating', lab:'RATING'}, {id:'bf1', lab:'1v1'}, {id:'bf2', lab:'2v2'}, {id:'squad', lab:'SQUAD'}, {id:'adv', lab:'ADVENTURE'}, {id:'torch', lab:'THE GAUNTLET'}, {id:'horde', lab:'SURVIVAL'} ];   
@@ -183547,11 +183560,12 @@ window.GVT = {
   
   adv(){ const cells={}; const names=['nemPark','nemY50','nemD50','nemW20','nemRoom','nemBank',
       'ice_e','ice_m','ice_h','ice_g','bone_e','bone_m','bone_h','bone_g',
-      'croak_e','croak_m','croak_h','croak_g','fields_e','fields_m','fields_h','fields_g','mom'];   
+      'croak_e','croak_m','croak_h','croak_g','fields_e','fields_m','fields_h','fields_g','mom',
+      'nemT20','nemM20','palace_e','palace_m','palace_h','palace_g','caves_e','caves_m','caves_h','caves_g','sky_e','sky_m','sky_h','sky_g','chess_e','chess_m','chess_h','chess_g','gmy_e','gmy_m','gmy_h','gmy_g','ice_u','bone_u'];   
     ADV_CELLS.forEach((c,j)=>{ let v=0; try{ v=c()?1:0; }catch(e){} cells[names[j]||('c'+j)]=v; });
     const legs={ camp:Math.max(0,Math.min(THIRD_MAX,META.campaign|0)),
       parks:ADV_PARKS.map(id=>{ const p=(META.parks&&META.parks[id])||{}; return Math.max(0,Math.min(parkLevels(id),p.lv|0)); }) };
-    return { n:advCount(), max:ADV_MAX, cells:cells, legs:legs }; },
+    return { n:advCount(), max:ADV_MAX, old:advCount523(), cells:cells, legs:legs }; },
   
   namePromptState(){ const el=document.getElementById('nameProm');
     return { up: !!el && !el.classList.contains('hidden'),
