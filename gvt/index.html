@@ -86392,7 +86392,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='23.33';        
+let GVT_CV='23.34';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -124302,7 +124302,7 @@ function draw(){
   ccnCam9(camv);   
   if(camv) cx.translate(-camv.x, -(camv.y||0));
   rugShadow(camv);   
-  drawRug();
+  drawRug(); lagRugBand(S.bf? WORLD_W : W, WORLD_H);    
   if(S.bf && S.bf.hlb) hlbDrawUnder();   
   if(gmyOn()) gmyDrawUnder();   
   if(cavesOn()) caveDrawLive();   
@@ -160637,7 +160637,7 @@ function lagRig(o){ o=o||{}; if(o.on!==undefined){ LAG.on=o.on? 1 : 0; delete PA
   const k=document.getElementById('volcKey');
   return { on:LAG.on, dino:q('.lag-dino'), army:q('#lag-army'), dog:q('#lag-dog'), walkers:q('.lag-walker'), smil:q('.lag-walker animateTransform'), twk:q('.lag-twk'), plume:q('.lag-plume'), ptero:q('.lag-ptero'), strip:q('.lag-strip'),
     trikeAl:q('.lag-trike [id^="dpvAT"]'), skullAl:q('.lag-skull [id^="dpvAK"]'), rexAl:q('.lag-rex use[href="#dpvRexAl"]'), egg:q('.wdl'), old:q('.dpv-far')+q('.dpv-volc')+q('.dpv-gate')+q('#dinoPond')+q('.dpv-canopy'), sgp:q('.lag-dino .sgp'), raster:q('.lag-dino image'),
-    lock:k && k.parentNode? k.parentNode.getAttribute('transform') : null, volcHot:box('volcHot'), pondHot:box('pondHot'), pkRod:box('pkRod'), wf:lagWFRead(), fort:lagFortRead(), hall:lagHallRead(), lab:lagLabRead(), title:lagTitleRead(), store:lagStoreRead(), cdr:lagCdrRead(), rank:lagRankRead(), fzb:lagFzbRead(), log:lagLogRead(), adv:lagAdvRead(), map:lagMapRead(), chrome:lagChromeRead(), yard:lagYardRead(), char:lagCharRead() }; }    
+    lock:k && k.parentNode? k.parentNode.getAttribute('transform') : null, volcHot:box('volcHot'), pondHot:box('pondHot'), pkRod:box('pkRod'), wf:lagWFRead(), fort:lagFortRead(), hall:lagHallRead(), lab:lagLabRead(), title:lagTitleRead(), store:lagStoreRead(), cdr:lagCdrRead(), rank:lagRankRead(), fzb:lagFzbRead(), log:lagLogRead(), adv:lagAdvRead(), map:lagMapRead(), chrome:lagChromeRead(), yard:lagYardRead(), char:lagCharRead(), field:lagFieldRead() }; }    
 
 
 
@@ -160745,6 +160745,12 @@ function lagInk(v,hex){
   return v.split('fill="#22262E" fill-opacity=".9"').join('fill="'+sh+'" fill-opacity="'+A+'"').split('stroke="#22262E" stroke-opacity=".9"').join('stroke="'+sh+'" stroke-opacity="'+A+'"'); }
 function lagSpr(src,k,hex){ if(!lagOn() || !src || typeof src!=='string') return src; const key=String(k)+'|'+String(hex||'')+'|'+src.length+'|'+src.slice(0,96)+'|'+src.slice(-48); const m=LAG_SPRM[key]; if(m && m.s===src) return m.v; let v=src; const keep=SGP_SIG; SGP_SIG={}; try{ v=sgpPass(src,'char'); }catch(e){ v=src; } finally{ SGP_SIG=keep; } try{ v=lagInk(v,hex); }catch(e){} LAG_SPRM[key]={ s:src, v:v }; return v; }
 function lagCharRead(){ const out={ memo:Object.keys(LAG_SPRM).length }; try{ const u=decodeURIComponent(sprURI('rifleman','#4A6B35').split(',').slice(1).join(',')); out.rifle=(u.match(/class="sgp"/g)||[]).length; out.ink=(u.match(/(?:stroke|fill)-opacity="0\.55"/g)||[]).length; out.defs=(u.match(/sgp-defs/g)||[]).length; }catch(e){ out.err=String(e).slice(0,80); } try{ const men=[...document.querySelectorAll('[id^="ro-vt"] image, [data-gid^="ro-vt"] image')]; out.men=men.length; out.menSgp=men.filter(function(i){ return /sgp/.test(decodeURIComponent(i.getAttribute('href')||'')); }).length; }catch(e){} try{ const H=typeof IMGU!=='undefined'? Object.keys(IMGU) : []; out.tints=H.length; if(H.length){ const set=IMGU[H[0]]; const ks=Object.keys(set); out.tintSgp=ks.filter(function(q){ const im=set[q]; return im && /sgp/.test(String(im.src||'')); }).length; out.tintN=ks.length; } }catch(e){} return out; }
+
+
+
+const LAG_BAND={ n:0, h:0, w:0, g:null };
+function lagRugBand(WD,HT){ if(!lagOn() || S.momRaid || !(WD>0) || !(HT>0)) return; if(LAG_BAND.h!==HT || !LAG_BAND.g){ const g=cx.createLinearGradient(0,0,0,HT); g.addColorStop(0,'rgba(255,244,220,0.16)'); g.addColorStop(0.42,'rgba(255,244,220,0)'); g.addColorStop(0.60,'rgba(30,20,8,0)'); g.addColorStop(1,'rgba(30,20,8,0.24)'); LAG_BAND.g=g; LAG_BAND.h=HT; } LAG_BAND.w=WD; cx.fillStyle=LAG_BAND.g; cx.fillRect(0,0,WD,HT); LAG_BAND.n++; }
+function lagFieldRead(){ return { n:LAG_BAND.n, h:LAG_BAND.h, w:LAG_BAND.w, mode:S.mode, bf:!!S.bf }; }
 
 
 
