@@ -87270,7 +87270,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='23.62';        
+let GVT_CV='23.63';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -149074,7 +149074,7 @@ function gfLeave(){
   const a=h.animate([{ transform:'translate('+p.x.toFixed(1)+'px,'+p.y.toFixed(1)+'px)', opacity:1 },{ transform:'translate('+p.x.toFixed(1)+'px,'+(p.y+GF_OUT.sink).toFixed(1)+'px)', opacity:0 }], { duration:GF_OUT.ms, easing:'ease-in', fill:'forwards' });
   const rm=()=>{ try{ h.remove(); }catch(e){} }; a.onfinish=rm; setTimeout(rm, GF_OUT.ms+400); }
 function gfDrop(){ if(gfLive()){ gfFreeze(); try{ GFH.hand.remove(); }catch(e){} } GFH.hand=null; GFH.state='gone'; GFH.free=0; GFH.seq++; }   
-function gfInScene(){ return !!(LTUT.on || FXT.on || SURP.on || TLT.on); }   
+function gfInScene(){ return !!(LTUT.on || FXT.on || SURP.on || TLT.on || FFG5.on); }       
 function gfOwned(){ return !!(gfInScene() || TOUR.walk || TOUR.owe || TOUR.up || TEND.up || LBEAT.up || TOUR.dim || tourDue()); }   
 function gfCardAt(p){ let els=null; try{ els=document.elementsFromPoint(p.x, p.y); }catch(e){ return false; } for(const el of (els||[])){ if(el.closest && el.closest('#roomModal > *, #shConfirm, #milePop, #premPop, #mboxPop, #nameProm')) return true; } return false; }   
 function gfTick(){   
@@ -150108,7 +150108,7 @@ function surpTutLeg(){
 }
 function surpTutTick(){
   if(!SURP.on) return;
-  if(!surpUp() || S.mode!=='menu'){ surpTutFold(); return; }   
+  if(!surpUp() || S.mode!=='menu'){ surpTutFold(); ffg5Start(); return; }   
   if(TOUR.raf) return;   
   const leg=surpTutLeg(), dt=Date.now()-SURP.t;
   if(leg!==SURP.leg){ surpTutEnter(leg); return; }
@@ -150167,6 +150167,49 @@ function surpTutUp(e){ if(SURP.fd[e.pointerId]==null) return; delete SURP.fd[e.p
 function surpTutFingers(){ const now=Date.now(); for(const k in SURP.fd){ if(now-SURP.fd[k]<SURP_HOLD_MAX_MS) return true; delete SURP.fd[k]; } return false; }   
 function surpTutHeld(){ return surpTutFingers() || Date.now()-SURP.pd<SURP_TOUCH_MS; }   
 window.addEventListener('pointerdown', surpTutFinger, true); window.addEventListener('pointerup', surpTutUp, true); window.addEventListener('pointercancel', surpTutUp, true);
+
+
+
+
+
+
+
+const FFG5_SEAT='#fortscene .wt-x', FFG5_OUT_MS=400;   
+let FFG5={ on:0, leg:'', tid:0, hand:null, dim:null, ring:null, t:0, seq:0, at:null, gone:0 };   
+function ffg5On(){ return !/[?&]ffg5=0(&|$)/.test(location.search); }
+function ffg5Due(){ return ffg5On() && S.mode==='menu' && fortSceneOpen() && tourDue() && !FXT.on && !TLT.on; }   
+function ffg5Start(){ if(FFG5.on || !ffg5Due()) return; FFG5.on=1; FFG5.leg=''; FFG5.t=FFG5.gone=Date.now(); FFG5.seq++; FFG5.at=null; clearInterval(FFG5.tid); FFG5.tid=setInterval(ffg5Tick, LT_TICK_MS); }
+function ffg5Covered(){   
+  if(fxCardUp() || milePopUp() || shopIsOpen() || document.querySelector('#comms .cm-win')) return true;
+  for(const k of ['nameProm','sabrite','soulrite','paintrite','icerite','picker','premPop','ageGate','adAsk','trcPage']){ const e=document.getElementById(k); if(e && !e.classList.contains('hidden')) return true; }
+  return !fxTutSeatShown(FFG5_SEAT); }
+function ffg5Tick(){
+  if(!FFG5.on) return;
+  if(!fortSceneOpen() || S.mode!=='menu' || !tourDue() || FXT.on || TLT.on){ ffg5Fold(); return; }   
+  if(ffg5Covered()){ if(FFG5.leg!=='wait'){ ffg5Pieces(); FFG5.leg='wait'; FFG5.seq++; } FFG5.t=Date.now(); return; }   
+  if(FFG5.leg!=='out'){ if(Date.now()-FFG5.gone>=FFG5_OUT_MS) ffg5Enter('out'); return; }
+  if(FFG5.at && Date.now()-FFG5.t>=TOUR_GLIDE_MS+GF_TAP.hold && !fxTutSeatLive(FFG5_SEAT, FFG5.at.x, FFG5.at.y)) ffg5Enter('out');   
+}
+function ffg5Enter(leg){ const k=++FFG5.seq; FFG5.leg=leg; FFG5.t=Date.now(); ffg5Pieces();
+  if(leg!=='out') return;
+  const r=fxRectOf(FFG5_SEAT); if(!r || !fxTutSeatShown(FFG5_SEAT)){ FFG5.leg=''; return; }   
+  ffg5Light(r); const at=gfSeat(r); FFG5.at=at;   
+  if(reducedMotion()) return;   
+  gfEnsure(); FFG5.hand=GFH.hand;
+  gfTravel(at, ()=>{ if(FFG5.hand===GFH.hand && FFG5.seq===k) gfRest(); }); }   
+function ffg5Light(r){ ffg5Dark();   
+  const q=labTutFit({ x:r.left-TOUR_LIT_PAD, y:r.top-TOUR_LIT_PAD, w:r.width+2*TOUR_LIT_PAD, h:r.height+2*TOUR_LIT_PAD });
+  const NS='http://www.w3.org/2000/svg'; const dim=document.createElementNS(NS,'svg'); dim.id='tourDim';
+  const p=document.createElementNS(NS,'path'); p.setAttribute('fill','rgba(0,0,0,'+TOUR_DIM_A+')'); p.setAttribute('fill-rule','evenodd'); p.setAttribute('d', tourDimPath([q])); dim.appendChild(p);
+  document.body.appendChild(dim); FFG5.dim=dim;
+  const rg=document.createElement('div'); rg.id='tourRing'; rg.style.left=q.x+'px'; rg.style.top=q.y+'px'; rg.style.width=q.w+'px'; rg.style.height=q.h+'px'; document.body.appendChild(rg); FFG5.ring=rg;
+  void dim.getBoundingClientRect(); dim.classList.add('in'); rg.classList.add('in'); }
+function ffg5Dark(){ for(const k of ['dim','ring']){ if(FFG5[k]){ try{ FFG5[k].remove(); }catch(e){} FFG5[k]=null; } } }
+function ffg5Pieces(){ if(FFG5.hand){ FFG5.hand=null; gfPark(); } ffg5Dark(); }   
+function ffg5Fold(){ clearInterval(FFG5.tid); FFG5.tid=0; FFG5.on=0; FFG5.leg=''; FFG5.seq++; FFG5.at=null; ffg5Pieces(); gfAway(true); }   
+function ffg5Down(e){ if(!FFG5.on || FFG5.leg!=='out' || e.isPrimary===false) return; ffg5Fold(); }   
+window.addEventListener('pointerdown', ffg5Down, true);
+function ffg5Rig(){ const el=document.querySelector(FFG5_SEAT), r=el? el.getBoundingClientRect() : null; return { on:FFG5.on, leg:FFG5.leg, at:FFG5.at, due:ffg5Due(), sw:ffg5On(), seat:(r && r.width>0)? { l:Math.round(r.left), t:Math.round(r.top), w:Math.round(r.width), h:Math.round(r.height) } : null, hand:{ st:GFH.state, at:GFH.at, live:gfLive(), away:GFH.away|0 }, light:!!(FFG5.dim && FFG5.dim.isConnected), ring:!!(FFG5.ring && FFG5.ring.isConnected) }; }   
 
 
 
@@ -185050,6 +185093,7 @@ requestAnimationFrame(frame);
 
 
 window.GVT = {
+  ffg5(){ return ffg5Rig(); },   
   tsl(o){ return tslRig(o); },   
   tkh(o){ return tkhRig(o); },   
   ffg(){ return ffgRig(); },   
