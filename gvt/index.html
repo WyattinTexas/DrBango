@@ -81190,6 +81190,11 @@ function nbwGreet(id){ if(Math.random()>0.75) return; const a=nbwPos(id); if(!a)
 
 
 
+
+
+
+
+
 const NBX={ on:1, t:null, st:null, waltz:[14,26], legs:8, r:[52,74], max:5, every:[1.3,3.2], tick:[1.6,3.4], gap:[18,32], base:null, log:[] };   
 try{ if(/[?&]nbx=0(&|$)/.test(location.search)) NBX.on=0; }catch(e){}
 
@@ -81199,10 +81204,14 @@ const NBX_GUESTS=[
   { id:'owl',     art:'mouse', x:330,  y:604, face:'l', k:0.0040, v:50, kinds:['wiggle','hop','turn'],     idle:'nbl-wobble 2.8s ease-in-out infinite',         gait:'nbw-waddle .7s' },
   { id:'queen',   art:'mouse', x:1460, y:506, face:'l', k:0.0042, v:48, kinds:['bow','turn','wiggle'],     idle:'nbl-sway 3.2s ease-in-out -.8s infinite',      gait:'nbw-step .5s' },
   { id:'guard',   art:'mouse', x:1275, y:502, face:'l', k:0.0038, v:98, kinds:['hop','turn','wiggle'],     idle:'nbl-hopi 1.5s ease-in-out -.3s infinite',      gait:'nbw-scurry .22s' } ];
+const NBX2={ stars:10, dance:2.4, orn:2.7, log:[] };   
+const NBX_ORN=[ ['xmginger',0], ['xmcane',3], ['xmbird',4], ['xmstar',5], ['xmstocking',6], ['xmbell',7], ['xmsnowflake',8], ['xmangel',10] ];   
 const NBX_COUPLES=[['nut','clara'],['ginger1','ginger2'],['snowman','reindeer'],['queen','cheddar'],['owl','guard']];   
 function nbxArt(g){ try{ if(g.art==='pic') return (typeof NCB_PIC!=='undefined' && NCB_PIC[g.id])||''; return (typeof NCB_MOUSE!=='undefined' && NCB_MOUSE[g.id])||''; }catch(e){ return ''; } }
 function nbxCSS(){ let c='.nbx-waltz .nba-fig>g{animation:nbx-sway 1.2s ease-in-out infinite!important}@keyframes nbx-sway{0%,100%{transform:rotate(-4deg) translateY(0)}50%{transform:rotate(4deg) translateY(-3px)}}';
   for(let i=0;i<NBX_GUESTS.length;i++){ const g=NBX_GUESTS[i]; c+='.nba-fig[data-fig='+g.id+']>g{transform-box:fill-box;transform-origin:50% 100%;animation:'+g.idle+'}.nbw.nbw-go[data-fig='+g.id+'] .nba-fig{animation:'+g.gait+' ease-in-out infinite alternate}'; }
+  c+='svg:not(.nba-still) .nba-fig.nbx-dance{animation:nbx-dance '+NBX2.dance+'s ease-in-out 1!important}@keyframes nbx-dance{0%{transform:translateY(0) rotate(0) scaleX(1)}12%{transform:translateY(-16px) rotate(-8deg) scaleX(1)}24%{transform:translateY(0) rotate(0) scaleX(1)}36%{transform:translateY(-10px) rotate(0) scaleX(-1)}48%{transform:translateY(0) rotate(8deg) scaleX(-1)}60%{transform:translateY(-16px) rotate(0) scaleX(1)}72%{transform:translateY(0) rotate(-8deg) scaleX(1)}84%{transform:translateY(-10px) rotate(6deg) scaleX(1)}100%{transform:translateY(0) rotate(0) scaleX(1)}}';   
+  c+='.nbx-star{font-family:inherit;font-size:34px;font-weight:900;fill:#FFD54A;stroke:#4A1018;stroke-width:2px;paint-order:stroke;text-anchor:middle;pointer-events:none;transform-box:fill-box;transform-origin:50% 100%;animation:nbx-rise 1.7s ease-out 1 forwards}@keyframes nbx-rise{0%{opacity:0;transform:translateY(8px) scale(.6)}18%{opacity:1;transform:translateY(0) scale(1.1)}70%{opacity:1;transform:translateY(-24px) scale(1)}100%{opacity:0;transform:translateY(-40px) scale(1)}}';   
   return c; }
 function nbxGuests(bg){ if(!NBX.on) return 0; const sv=bg && bg.querySelector('svg.phero.nut'); if(!sv || sv.querySelector('.nbw[data-fig="clara"]')) return 0;   
   const fl=Array.prototype.slice.call(sv.querySelectorAll('.nbw, .nbw-p')).filter(function(e){ return e.parentNode===sv; }); if(!fl.length) return 0;
@@ -81218,7 +81227,7 @@ function nbxDials(on){ if(on){ if(!NBX.base) NBX.base={ max:NBW.max, every:NBW.e
   else if(NBX.base){ NBW.max=NBX.base.max; NBW.every=NBX.base.every; NBA.tick=NBX.base.tick; NBA.gap=NBX.base.gap; NBX.base=null; } }
 function nbxDress(bg){ nbxStop(); const sv=bg && bg.querySelector('svg.phero.nut'); if(!sv) return;   
   if(!NBX.on){ nbxDials(0); for(let i=0;i<NBX_GUESTS.length;i++){ delete NBW.v[NBX_GUESTS[i].id]; delete NBA_KINDS[NBX_GUESTS[i].id]; } return; }
-  nbxDials(1); if(!nbxLive()) return; NBX.t=setTimeout(nbxTick, (6+Math.random()*6)*1000); }
+  nbxDials(1); nbxOrnaments(sv); nbxTaps(bg);   if(!nbxLive()) return; NBX.t=setTimeout(nbxTick, (6+Math.random()*6)*1000); }
 function nbxTick(){ NBX.t=null; if(!nbxLive()) return;   
   if(!document.hidden && !NBX.st){ const p=nbxPair(); if(p) nbxWaltz(p[0], p[1]); }
   NBX.t=setTimeout(nbxTick, (NBX.waltz[0]+Math.random()*(NBX.waltz[1]-NBX.waltz[0]))*1000); }
@@ -81238,6 +81247,28 @@ function nbxLeg(W){ const A=NBW.st[W.a], B=NBW.st[W.b]; if(!A || !B || A.nbx!==W
   const ga=nbwWalk(W.a, Math.round(W.cx+c*W.r), Math.round(W.cy+s*W.ry)), gb=nbwWalk(W.b, Math.round(W.cx-c*W.r), Math.round(W.cy-s*W.ry)); if(!ga && !gb){ nbxEnd(W); return; }
   W.poll=setTimeout(function p(){ W.poll=null; if(!A.go && !B.go) nbxLeg(W); else W.poll=setTimeout(p, 60); }, 60); }
 function nbxEnd(W){ if(!W) return; if(W.poll){ clearTimeout(W.poll); W.poll=null; } for(let i=0;i<2;i++){ const s=NBW.st[i? W.b : W.a]; if(s && s.nbx===W){ s.nbx=null; s.el.classList.remove('nbx-waltz'); } } if(NBX.st===W){ NBX.st=null; NBX.log.push({ done:[W.a, W.b], legs:W.i, t:Math.round(performance.now()) }); } }
+
+function nbxTaps(bg){ const ps=document.getElementById('parkscene'); if(!ps || ps.__nbxTap) return; ps.__nbxTap=1; ps.addEventListener('click', nbxTapEv, true); }   
+function nbxTapOk(t, ps){ for(let e=t; e && e!==ps; e=e.parentNode){ if(e.nodeType!==1) return false; const tg=e.tagName.toLowerCase(); if(e.namespaceURI==='http://www.w3.org/2000/svg' && tg!=='svg') continue; if(tg==='button' || tg==='a' || tg==='input' || tg==='select' || tg==='textarea' || e.hasAttribute('onclick') || e.hasAttribute('data-nav')) return false; if(tg==='svg') return e.classList.contains('phero'); if(e.id==='parkBg') return true; const cl=e.classList; if(!(cl.contains('wt-mid') || cl.contains('wt-shelf') || cl.contains('wt-foot') || cl.contains('wt-spacer'))) return false; } return true; }   
+function nbxHit(x, y){ const sv=nbaSvg(); if(!sv) return null; let best=null, by=-1e9; sv.querySelectorAll('.nbw').forEach(function(w){ const r=w.getBoundingClientRect(); if(!r.width) return; const m=8; if(x<r.left-m || x>r.right+m || y<r.top-m || y>r.bottom+m) return; if(r.bottom>by){ by=r.bottom; best=w.getAttribute('data-fig'); } }); return best; }   
+function nbxTapEv(ev){ try{ if(!NBX.on || PARK_CUR!=='nut' || !parkSceneOpen()) return; const ps=document.getElementById('parkscene'); if(!ps || !nbxTapOk(ev.target, ps)) return; const id=nbxHit(ev.clientX, ev.clientY); if(id) nbxTapFig(id); }catch(e){} }
+function nbxTapFig(id){ const s=NBW.st[id]; if(!s || !s.fig || !NBX.on) return false; nbxDance(id); const w=nbxGift(id); NBX2.log.push({ tap:id, w:w, t:Math.round(performance.now()) }); if(NBX2.log.length>40) NBX2.log.shift(); try{ if(w && SFX.coin) SFX.coin(); else if(SFX.twink) SFX.twink(); else SFX.blip(); }catch(e){} return true; }
+function nbxDance(id){ const s=NBW.st[id], sv=nbaSvg(); if(!s || !s.fig || !sv || sv.classList.contains('nba-still') || reducedMotion()) return false; const f=s.fig;   
+  ['nba-hop','nba-bow','nba-bowl','nba-wiggle','nba-turn','nba-peek','nba-spin'].forEach(function(c){ f.classList.remove(c); }); if(f.classList.contains('nbx-dance')){ f.classList.remove('nbx-dance'); void f.getBoundingClientRect(); }   
+  f.classList.add('nbx-dance'); if(s.nbxD) clearTimeout(s.nbxD); s.nbxD=setTimeout(function(){ s.nbxD=null; f.classList.remove('nbx-dance'); }, NBX2.dance*1000+150); return true; }
+function nbxGift(id){ if(!META.nbxTap || typeof META.nbxTap!=='object') META.nbxTap={}; if(META.nbxTap[id]) return 0; META.nbxTap[id]=1; const w9=starX(NBX2.stars); META.starBank+=w9; META.starsLifetime+=w9; saveMeta(); nbxFloat(id, '+'+w9+'★'); return w9; }   
+function nbxFloat(id, txt){ const s=NBW.st[id], sv=nbaSvg(); if(!s || !s.fig || !sv) return null; const r=s.fig.getBoundingClientRect(), b=sv.getBoundingClientRect(), K=Math.max(b.width/1600, b.height/650), OX=(b.width-1600*K)/2, OY=(b.height-650*K)/2;   
+  const x=(r.left+r.width/2-b.left-OX)/K, y=(r.top+r.height*0.42-b.top-OY)/K, t=document.createElementNS('http://www.w3.org/2000/svg','text'); t.setAttribute('class','nbx-star'); t.setAttribute('x', x.toFixed(1)); t.setAttribute('y', y.toFixed(1)); t.textContent=txt; sv.appendChild(t);
+  setTimeout(function(){ if(t.parentNode) t.parentNode.removeChild(t); }, 1900); return t; }
+
+function nbxPiece(id){ try{ const r=(typeof XM_BY!=='undefined') && XM_BY[id]; if(!r || !r.art || !r.fp) return null; let a=r.art; if(typeof XH2_SHADOW!=='undefined') a=a.replace(XH2_SHADOW, ''); a=a.replace(/ class="xm[a-z]+"/g, ''); return { art:a, fp:r.fp }; }catch(e){ return null; } }   
+function nbxOrnaments(sv){ if(!sv || sv.querySelector('.nbx-orn')) return 0; const balls=Array.prototype.filter.call(sv.querySelectorAll('.nba-orn'), function(g){ const c=g.firstElementChild; return !!(c && c.tagName==='circle' && c.getAttribute('r')); }); let n=0;   
+  for(let i=0;i<NBX_ORN.length;i++){ const o=NBX_ORN[i], g=balls[o[1]], p=nbxPiece(o[0]); if(!g || !p) continue; const c=g.firstElementChild, cx=+c.getAttribute('cx'), cy=+c.getAttribute('cy'), r=+c.getAttribute('r'), f=p.fp, sc=NBX2.orn*r/Math.max(f[2], f[3]);
+    g.innerHTML='<g class="nbx-orn" data-piece="'+o[0]+'" data-ball="'+cx+' '+cy+' '+r+'" transform="translate('+(cx-(f[0]+f[2]/2)*sc).toFixed(2)+' '+((cy-r)-f[1]*sc).toFixed(2)+') scale('+sc.toFixed(4)+')">'+p.art+'</g>'; n++; }
+  if(n){ nbxOrnFit(sv); try{ requestAnimationFrame(function(){ nbxOrnFit(sv); }); }catch(e){} }   
+  return n; }
+function nbxOrnFit(sv){ let n=0; try{ sv.querySelectorAll('.nbx-orn[data-ball]').forEach(function(g){ const b=g.getAttribute('data-ball').split(' ').map(Number), bb=g.getBBox(); if(!(bb.width>0 && bb.height>0)) return; const sc=NBX2.orn*b[2]/Math.max(bb.width, bb.height);   
+    g.setAttribute('transform', 'translate('+(b[0]-(bb.x+bb.width/2)*sc).toFixed(2)+' '+((b[1]-b[2])-bb.y*sc).toFixed(2)+') scale('+sc.toFixed(4)+')'); g.setAttribute('data-fit', '1'); n++; }); }catch(e){} return n; }
 
 
 
@@ -85731,7 +85762,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='22.84';        
+let GVT_CV='22.85';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -181763,7 +181794,7 @@ requestAnimationFrame(frame);
 window.GVT = {
   r5g(){ return r5gRig(); },   
   llk(o){ return llkRig(o); },   
-  nbx(o){ o=o||{}; if(o.on!=null) NBX.on=o.on? 1 : 0; if(o.waltz) return nbxWaltz(o.waltz[0], o.waltz[1]); if(o.stop) nbxStop(); const W=NBX.st; return { cv:GVT_CV, on:NBX.on, guests:NBX_GUESTS.map(function(g){ return g.id; }).filter(function(id){ return !!NBW.st[id]; }), walkers:Object.keys(NBW.st).length, dials:{ max:NBW.max, every:NBW.every.slice(), tick:NBA.tick.slice(), gap:NBA.gap.slice() }, base:NBX.base, waltz:W? { a:W.a, b:W.b, i:W.i, n:W.n, cx:Math.round(W.cx), cy:Math.round(W.cy), r:Math.round(W.r) } : null, ticker:!!NBX.t, log:NBX.log.slice(-20) }; },   
+  nbx(o){ o=o||{}; if(o.on!=null) NBX.on=o.on? 1 : 0; if(o.waltz) return nbxWaltz(o.waltz[0], o.waltz[1]); if(o.stop) nbxStop(); if(o.tap) return nbxTapFig(o.tap); if(o.hit) return nbxHit(o.hit[0], o.hit[1]); if(o.tapReset){ META.nbxTap={}; saveMeta(); } const W=NBX.st, sv=nbaSvg(); return { cv:GVT_CV, on:NBX.on, guests:NBX_GUESTS.map(function(g){ return g.id; }).filter(function(id){ return !!NBW.st[id]; }), walkers:Object.keys(NBW.st).length, dials:{ max:NBW.max, every:NBW.every.slice(), tick:NBA.tick.slice(), gap:NBA.gap.slice() }, base:NBX.base, waltz:W? { a:W.a, b:W.b, i:W.i, n:W.n, cx:Math.round(W.cx), cy:Math.round(W.cy), r:Math.round(W.r) } : null, ticker:!!NBX.t, log:NBX.log.slice(-20), taps:Object.keys((META.nbxTap && typeof META.nbxTap==='object')? META.nbxTap : {}), orn:sv? Array.prototype.map.call(sv.querySelectorAll('.nbx-orn'), function(g){ return g.getAttribute('data-piece'); }) : [], balls:sv? sv.querySelectorAll('.nba-orn').length : 0, stars:NBX2.stars, taplog:NBX2.log.slice(-20) }; },   
   ncb16(o){ if(o && o.hpX!=null) NCB_KING.hpX=+o.hpX; const w=parkCfg('nut',20).waves, k=w[w.length-1].groups[0], r=sweetsCfg('e').waves, q=r[r.length-1].groups[0]; return { cv:GVT_CV, hpX:NCB_KING.hpX, king:{ wave:w[w.length-1].name, t:k.t, bnm:k.bnm||null, hpX:k.hpX||1 }, raid:{ wave:r[r.length-1].name, t:q.t, bnm:q.bnm||null, hpX:q.hpX||1 }, live:S.foes.filter(f=>f.type==='tansarge' && !f.dead).map(f=>({ id:f.id, bnm:f.bnm||null, hp:+(+f.hp).toFixed(1), hpMax:f.hpMax })) }; },   
   ncb15(){ const ids=['nutshako','nutcoat','nutboots','nutcrown']; return { cv:GVT_CV, worth:Object.assign({},NCB_WORTH), rows:ids.map(i=>[i].concat(lensLines2(i)||[])), tune:ncb15Tune(), own:ids.filter(outfitOwns), on:ids.filter(outfitOn) }; },   
   ncb14(o){ if(o && o.on!=null) NCB14.on=o.on? 1 : 0; if(o && o.m!=null) NCB14.m=+o.m; const cats=(S.foes||[]).filter(f=>f.type==='tanmortar' && !f.dead).map(f=>({ id:f.id, x:+f.x.toFixed(1), y:+f.y.toFixed(1), holds:ncb14Holds(f), sees:hasGreenTarget(f), pick:!!tanPick(f), aimT:+(f.aimT||0).toFixed(2), shot:+(f.shot||0).toFixed(2) })); return { cv:GVT_CV, on:NCB14.on, m:NCB14.m, px:NCB14.m*TK_M, line:ncb14LineX(), W:W, mice:ncb14Mice(), cats:cats, key:(function(){ try{ return localStorage.getItem('gvt_ncb14'); }catch(e){ return null; } })() }; },   
