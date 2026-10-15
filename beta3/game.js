@@ -3792,6 +3792,63 @@ function ssClockInherit(resume, key) {
   return ms;
 }
 
+/* THE WORDMARK'S FLARE — the motion AROUND the painted title (home scene,
+   10/15, Skylar). Returns { wake(full), sleep() }. `at` is the wordmark's
+   centre + scale (null for the live-text title: no swooshes to ride, the
+   glints alone carry it). Both curves are measured on art/title.webp
+   (1350x544 → 340x137 design units, off the centre): the upper arc sweeps
+   from over the first S to above the second S; the tail runs under the
+   swirl and trails off right under PELL. Dust is born on the curves and
+   rises a little; the rider follows the tail. Nothing touches the title. */
+function ssTitleFlare(scene, l, at) {
+  if (!at) return { wake() { }, sleep() { } };
+  const U = l.u(1), S = at.s;
+  const V = (pts) => pts.map(([x, y]) => new Phaser.Math.Vector2(x * S * U, y * S * U));
+  const upper = new Phaser.Curves.Spline(V([[-96, -33], [-62, -46], [-28, -50], [8, -46], [40, -39], [70, -32]]));
+  const lower = new Phaser.Curves.Spline(V([[-68, 40], [-50, 35], [-30, 37], [-10, 37], [6, 39], [20, 45], [34, 48], [50, 46], [66, 40]]));
+  const dust = scene.add.particles(at.x, at.y, 'dot', {
+    emitZone: [{ type: 'random', source: upper }, { type: 'random', source: lower }],
+    speedX: { min: -3 * U, max: 6 * U }, speedY: { min: -9 * U, max: -2 * U },
+    lifespan: { min: 1500, max: 2900 }, frequency: 120, quantity: 1,
+    scale: { start: 0.17 * U * S, end: 0.03 * U * S }, alpha: { start: 0.8, end: 0 },
+    blendMode: 'ADD', tint: [0xffd77a, 0xfff2c9, 0xffc85a, 0xffe9a8], emitting: false,
+  });
+  const rider = scene.add.image(at.x, at.y, 'spark4').setDisplaySize(l.u(12 * S), l.u(12 * S)).setAlpha(0).setBlendMode('ADD').setTint(0xffe6a6);
+  let riderEv = null, riderTw = null, awake = false;
+  const ride = () => {
+    riderEv = null;
+    if (!awake || !rider.active) return;
+    const p = new Phaser.Math.Vector2();
+    riderTw = scene.tweens.addCounter({
+      from: 0, to: 1, duration: 1250 + Math.random() * 350, ease: 'Sine.easeInOut',
+      onUpdate: (tw) => {
+        const t = tw.getValue();
+        lower.getPoint(t, p);
+        rider.setPosition(at.x + p.x, at.y + p.y).setAlpha(Math.sin(t * Math.PI) * 0.95);
+        if (Math.random() < 0.55) dust.emitParticleAt(at.x + p.x, at.y + p.y);
+      },
+      onComplete: () => { riderTw = null; rider.setAlpha(0); if (awake) riderEv = scene.time.delayedCall(4500 + Math.random() * 4000, ride); },
+    });
+  };
+  return {
+    wake(full) {
+      this.sleep();
+      awake = true;
+      if (!full) return;
+      dust.start();
+      riderEv = scene.time.delayedCall(1800 + Math.random() * 2500, ride);
+    },
+    sleep() {
+      awake = false;
+      dust.stop();
+      if (riderEv) { riderEv.remove(false); riderEv = null; }
+      if (riderTw) { riderTw.stop(); riderTw = null; }
+      rider.setAlpha(0);
+    },
+  };
+}
+
+
 // The title wordmark — live text drawn once into a canvas texture in the palette
 // of the painted set. Latin titles get the hand-set treatment (gentle arch,
 // bookend letters a touch larger, tight tracking, per-letter tilt along the
@@ -6763,32 +6820,71 @@ class Home extends Phaser.Scene {
     cycle();
     this.time.addEvent({ delay: 9000, loop: true, callback: () => { this.tweens.add({ targets: this.showC, alpha: 0, duration: 500, onComplete: () => { this.showC.setAlpha(1); cycle(); } }); } });
 
-    // title — the painted wordmark, just above the horizon glow. Sparkles are
-    // separate sprites so they can twinkle without redrawing the texture.
+    // title — the painted wordmark, just above the horizon glow.
     const tk = ssTitleTex(this);
     const tScale = Math.min(1, 384 / tk.w);           // long localized titles fit the frame
     const title = this.titleT = ui(this.add.image(l.x(0), l.y(300), tk.key)
       .setDisplaySize(l.u(tk.w * tScale), l.u(tk.h * tScale)));
     this.titleBase = { sx: title.scaleX, sy: title.scaleY };
-    // sparkles sit on letter-tip anchors from the renderer; fractional fallback
-    // covers a non-Latin title, which reports no anchors
+    /* THE WORDMARK'S FLARE (10/15, Skylar: "little glimmer and stuff around
+       it … not pulsing the StarSpell logo"). The wordmark itself never
+       breathes, scales or pulses any more (the 1.02 breath retired here) —
+       every motion is AROUND it, gold, additive, and quiet:
+        · GLINTS — diffraction crosses perched on letter tips and out in the
+          painting's dust field, each on its own clock: dark most of the
+          time, then a flash (alpha + a size pop + a slow spin), never two
+          in step. The old four yoyo'd in lockstep; these eleven flicker.
+        · DUST — a slow drift of tiny motes born along the two painted
+          swooshes (the arc over STAR, the tail under the swirl), rising a
+          little and fading, so the swooshes read as moving stardust.
+        · THE RIDER — every few seconds one glint rides the lower tail left
+          to right, shedding dust as it goes — the swoosh in motion.
+       Reduce-motion keeps only gentle glints. The spark anchors come from
+       the renderer (painted art: measured letter-tip fractions; live text:
+       its own tips; non-Latin: fractional fallback), the swoosh curves are
+       the painted wordmark's own and are skipped for the live-text title. */
     const spots = tk.anchors.length
       ? tk.anchors.map((a, i) => [a.x * tScale, a.y * tScale, [15, 11, 13][i % 3]])
       : [[-0.36 * tk.w * tScale, -0.30 * tk.h * tScale, 15], [0.30 * tk.w * tScale, -0.38 * tk.h * tScale, 11], [0.42 * tk.w * tScale, 0.24 * tk.h * tScale, 13]];
+    if (tk.key === 'title@art') {
+      // out in the painting's own dust field (design units off the centre)
+      for (const s of [[-128, -22, 9], [-150, 14, 7], [118, -26, 8], [150, -50, 10], [96, 44, 7], [-22, -58, 6], [62, 50, 6]]) spots.push([s[0] * tScale, s[1] * tScale, s[2]]);
+    }
     this.sparkles = [];
     for (const [fx, fy, fs] of spots) {
-      this.sparkles.push(ui(this.add.image(l.x(fx), l.y(300 + fy), 'spark4')
-        .setDisplaySize(l.u(fs), l.u(fs)).setAlpha(0.75).setBlendMode('ADD')));
+      const sp = ui(this.add.image(l.x(fx), l.y(300 + fy), 'spark4')
+        .setDisplaySize(l.u(fs), l.u(fs)).setAlpha(0.22).setBlendMode('ADD').setTint(0xffe6a6));   // warm — the painting's own gold, not white
+      sp.flareSize = fs;
+      this.sparkles.push(sp);
     }
-    // the breath and sparkle idle tweens are re-armed on wake (beginAscent
-    // kills them so its fade-to-0 doesn't fight the alpha yoyos)
+    this.flare = ssTitleFlare(this, l, tk.key === 'title@art' ? { x: l.x(0), y: l.y(300), s: tScale } : null);
+    // the glint and flare idle motion is re-armed on wake (beginAscent
+    // kills the ui tweens so its fade-to-0 doesn't fight the flashes)
     this.idleTweens = () => {
       title.setScale(this.titleBase.sx, this.titleBase.sy);
-      this.tweens.add({ targets: title, scaleX: this.titleBase.sx * 1.02, scaleY: this.titleBase.sy * 1.02, duration: 2200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      const gentle = ssReduceMotion();
       for (const sp of this.sparkles) {
+        if (!sp.active) continue;
+        this.tweens.killTweensOf(sp);
+        sp.setAlpha(0.22).setDisplaySize(l.u(sp.flareSize), l.u(sp.flareSize));
+        if (gentle) {
+          this.tweens.add({ targets: sp, alpha: 0.5, duration: 1800 + Math.random() * 1600, yoyo: true, repeat: -1, delay: Math.random() * 2000 });
+          continue;
+        }
         this.tweens.add({ targets: sp, angle: 360, duration: 36000 + Math.random() * 20000, repeat: -1 });
-        this.tweens.add({ targets: sp, alpha: 0.3, duration: 1600 + Math.random() * 1400, yoyo: true, repeat: -1, delay: Math.random() * 1500 });
+        const bx = sp.scaleX, by = sp.scaleY;
+        const flash = () => {
+          if (!sp.active || !this.sys.isActive()) return;
+          const k = 1.35 + Math.random() * 0.5, d = 260 + Math.random() * 240;
+          this.tweens.add({
+            targets: sp, duration: d, yoyo: true, ease: 'Sine.easeInOut',
+            alpha: { from: 0.22, to: 0.95 }, scaleX: { from: bx, to: bx * k }, scaleY: { from: by, to: by * k },
+            onComplete: () => { sp.setAlpha(0.22).setScale(bx, by); this.time.delayedCall(700 + Math.random() * 2600, flash); },
+          });
+        };
+        this.time.delayedCall(Math.random() * 2400, flash);
       }
+      if (this.flare) this.flare.wake(!gentle);
       // the daily herald's ember breath (guarded: the first idleTweens call
       // runs before the chip is built; the wake path re-arms it here)
       if (this.dailyGlow) {
@@ -7163,6 +7259,7 @@ class Home extends Phaser.Scene {
       DIAG('intro begin');
       // the meadow ui waits at alpha 0 for the camera to come down
       for (const o of this.uiItems) { this.tweens.killTweensOf(o); o.setAlpha(0); }
+      if (this.flare) this.flare.sleep();
       this.sky.grain.setVisible(false);          // never during a flight
       // a shade below the true zenith: the violet dusk band peeks in at the
       // bottom edge — deeper twilight than the battle sky's flat navy, and a
@@ -8567,6 +8664,7 @@ class Home extends Phaser.Scene {
       SFX.crickets(false); SFX.birds(false); SFX.riser();
       this.sky.scatterFlies();
       for (const o of this.uiItems) this.tweens.killTweensOf(o);
+      if (this.flare) this.flare.sleep();
       // BUGFIX: this tweened `scale`, whose setter writes BOTH axes — a setDisplaySize'd
       // button (scaleX ~1.17, scaleY ~0.60) had its height snapped to the scaleX value, so
       // the pressed button doubled in height for 130ms and never came back. Drive the axes
