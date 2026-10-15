@@ -80619,6 +80619,24 @@ const LOC={ id:null, src:null, g:null, d:null, buf:null, bid:null, busy:null, ar
 
 
 function locBattle(){ return S.mode!=='menu' || !!(S.raid||S.park||S.bf); }
+
+
+
+
+
+
+
+const DCO={ on:(function(){ try{ const m=/[?&]dco=([01])/.exec(location.search||''); if(m){ if(m[1]==='0') localStorage.setItem('gvt_dco','0'); else localStorage.removeItem('gvt_dco'); } return localStorage.getItem('gvt_dco')==='0'? 0 : 1; }catch(e){ return 1; } })(),
+  id:'drumcadence', lit:0, duckMs:260 };   
+function dcoUp(){ if(!DCO.on) return false;
+  try{ if(FO && FO.cine && FO.key==='crossing') return true;   
+    if(S.bf && S.bf.opener && COMM.brief && COMM.brief.kind==='camp') return true; }catch(e){}   
+  return false; }
+function dcoStart(F){ try{ if(!dcoUp()) return; locSync();
+  setTimeout(()=>{ if(FO===F && !F.launching && LOC.id===DCO.id) locDuck(); }, CI_ROAR_MS+DCO.duckMs); }catch(e){} }   
+function dcoKnock(){ if(!DCO.lit || dcoUp()) return; DCO.lit=0; try{ if(LOC.id===DCO.id) locSync(); }catch(e){} }   
+function dcoRig(){ return { cv:GVT_CV, on:DCO.on, up:dcoUp(), lit:DCO.lit, id:LOC.id, src:!!LOC.src, busy:LOC.busy||null, gain:(LOC.g? +LOC.g.gain.value.toFixed(4) : null), duck:(LOC.d? +LOC.d.gain.value.toFixed(3) : null), vol:locVol(DCO.id), mode:S.mode, opener:!!(S.bf&&S.bf.opener), brief:(COMM.brief? COMM.brief.kind : null), fo:(FO? FO.key : null) }; }   
+
 function locNow(){
   if(S.bf && S.bf.nem) return 'nemesis';        
   if(!S.bf && S.mode==='play' && S.cfg && ((S.cfg.sd200 && S.foes.some(f=>f.nem && !f.dead)) || chsNemOn()  )) return 'nemesis';   
@@ -80638,6 +80656,7 @@ function locNow(){
   
   
   if(ncmInFight()) return 'nutball';   
+  if(dcoUp()){ DCO.lit=1; return DCO.id; }    
   if(locBattle() && !(parkSceneOpen()||raidSceneOpen())) return null;   
   if(sdnUp()) return null;   
   if(TMAP.up) return 'map';   
@@ -83899,6 +83918,7 @@ function commClear(){
   if(COMM.heldAnn){ S.ann=COMM.heldAnn; COMM.heldAnn=null; }
   if(COMM.heldCoach){ coach=COMM.heldCoach; COMM.heldCoach=null; }
   if(COMM.heldSay){ const hs=COMM.heldSay; COMM.heldSay=null; if(S.mode==='play') sbSay(hs.key, hs.args); }   
+  dcoKnock();    
 }
 
 
@@ -85112,7 +85132,7 @@ function ciOnHint(F, e){ if(!e || !F.el.classList.contains('ci-skip')) return fa
 function ciGate(go){ if(FO || FO_PASS || typeof go!=='function' || reducedMotion() || ciSeen() || coopJoinPend || S.mode==='play') return false;
   try{ sessionStorage.setItem('gvt_ci','1'); }catch(e){}
   try{ META.ciDone=1; saveMeta(); }catch(e){}   
-  try{ themeKill(); const F=foMount('crossing', { go, cine:true });
+  try{ themeKill(); const F=foMount('crossing', { go, cine:true });   dcoStart(F);    
     F.timer=setTimeout(()=>{ if(FO===F) ciEnd(F); }, CI_END_MS);
     setTimeout(()=>{ if(FO!==F) return; F.cineF=CI_PUSH; foCam(); }, 60);   
     setTimeout(()=>{ if(FO===F) F.el.classList.add('ci-skip'); }, CI_SKIP_MS);
@@ -86700,7 +86720,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='23.43';        
+let GVT_CV='23.44';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -183897,6 +183917,7 @@ requestAnimationFrame(frame);
 
 
 window.GVT = {
+  dco(){ return dcoRig(); },   
   tkd(o){ return tkdRig(o); },   
   rcc(){ return rccRig(); },   
   lbc(o){ return lbcRig(o); },   
