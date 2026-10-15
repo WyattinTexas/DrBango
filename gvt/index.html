@@ -86369,7 +86369,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='23.21';        
+let GVT_CV='23.22';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -133096,7 +133096,10 @@ function wwsTownGroundSVG(){
 
 
 const WWS_HILL='#9F5024', WWS_TOP='#BA6130';   
-function wwsRidgeSVG(){ const AR=TMAP_ART.art; return '<g id="wl-ridge">'+WL_BUTTES.map(b=>AR.butte(b[0],b[1],b[2],b[3]).replace(/^<ellipse[^>]*\/>/,'').split('#B0562E').join(WWS_TOP).split('#8B3E1E').join(WWS_HILL)).join('')+'</g>'; }   
+
+const WHP={ on:(()=>{ try{ const m=/[?&]whp=(\d)/.exec(location.search); return m? +m[1] : 1; }catch(e){ return 1; } })(), order:[2,0,1,3] };   
+function whpOrder(){ return WHP.on? WHP.order.slice() : WL_BUTTES.map((b,i)=>i); }   
+function wwsRidgeSVG(){ const AR=TMAP_ART.art; return '<g id="wl-ridge">'+whpOrder().map(i=>WL_BUTTES[i]).map(b=>AR.butte(b[0],b[1],b[2],b[3]).replace(/^<ellipse[^>]*\/>/,'').split('#B0562E').join(WWS_TOP).split('#8B3E1E').join(WWS_HILL)).join('')+'</g>'; }   
 function wwsFloorSVG(){
   wwsArm(); const paper=!!MAPPIN, T=WWS.town, Bk=WWS.bank, S=paper? null : wwsSched();
   const tw=inner=>'<g class="wws-town" transform="translate('+T.tx+','+T.ty+') scale('+T.s+')">'+inner+'</g>';
@@ -182824,6 +182827,7 @@ window.GVT = {
   scc(v, a){ return sccRig(v, a); },   
   prf(){ const P=S.mode==='play', B=P? prfBox() : null; return { cv:GVT_CV, on:PRF.on, m:PRF.m, R0:PRF.R0, R:prfR(), tkM:TK_M, box:B? [B.x,B.y] : null, mine:P? prfMine() : null, map:P? prfMap() : null, W:S.bf? WORLD_W : W, H:WORLD_H, mid:MID, strip:MID_BUFFER, line:(!S.bf && P)? campDeployX() : null }; },   
   prs(){ const P=S.mode==='play'; return { cv:GVT_CV, holds:1, half:P? tapHalf() : null, east:!!(S.bf && bfMyTeam()==='foe') }; },   
+  whp(){ return { cv:GVT_CV, on:WHP.on, order:whpOrder(), buttes:WL_BUTTES.map(b=>b.slice()), feet:WL_BUTTES.map(b=>b[1]+b[3]/2), seam:gravRidgeSeam(), ridge:[...document.querySelectorAll('#wl-ridge > path')].map(p=>({ d:(p.getAttribute('d')||'').slice(0,12), fill:p.getAttribute('fill') })) }; },   
   wws(){ const S9=wwsOn()? wwsSched() : null; return { cv:GVT_CV, on:WWS.on, armed:WWS.armed, track:wwsOn()? WWS.track : WL_TRACK, shells:wwsShells().map(a=>a.slice()), stop0:+wwsStop0().toFixed(3), stopX:WWS.stopX, x0:WWS.x0, engS:WWS.engS, plane:(WP_SEAT_D.western||[]).slice(), sky:{ night:roomNight(), phase:wwsMoonPhase(), sun:[860,124], window:NW_NIGHT.slice(), pin:NW_PIN }, dur:WWS.dur, hold:WWS.hold, gap:WWS.gap, speed:WWS.speed, loop:WWS.loop, deck:Object.assign({},WWS.deck), sign:Object.assign({},WWS.sign), desk:WWS.desk.slice(), bench:WWS.bench.slice(), door:WWS.door.slice(), cross:WWS.cross.slice(), spots:{ bank:Object.assign({},wwsSpot('bank')), wpark:Object.assign({},wwsSpot('wpark')) }, big:ROOM_BIG.western.slice(), edge:ROOM_EDGE_CLIP.western.slice(), pond:{ cx:WL_POND.cx, cy:WL_POND.cy }, pool:Object.assign({},BFISH_POOL), pail:Object.assign({},BFISH_PAIL), rod:Object.assign({},BFISH_ROD), wrd:{ py:WRD.py, lane:WRD.lane.slice(), lapMs:WRD.lapMs }, seats:Object.fromEntries(Object.keys(WWS.seats).map(k=>[k, (DECOR_SEAT_R.western[k]||[]).slice()])), sched:S9? { li:S9.li, st0:S9.st0, stops:S9.stops.slice(), trips:S9.trips.map(t=>t.slice()), greet:S9.greet? Object.assign({},S9.greet) : null, punches:S9.punches.slice(), walkers:S9.walkers.map(w=>({ k:w.k, n:w.pts.length, pts:w.pts.map(p=>p.slice()) })), eng:S9.eng.map(p=>p.slice()) } : null }; },   
   psb(){ const w=document.getElementById('wartable'), g=document.getElementById('glScr'), d=document.querySelector('#wartable .psb-door'), f=document.querySelector('#wartable .wt-foot2'), R=e=>{ if(!e) return null; const b=e.getBoundingClientRect(); return [+b.left.toFixed(1), +b.top.toFixed(1), +b.width.toFixed(1), +b.height.toFixed(1)]; }; return { cv:GVT_CV, wt:PSB.wt, fitN:PSB.fitN, hidden:!!(d && d.style.display==='none'), tight:!!(d && d.classList.contains('psb-tight')), park:MGP.park, wsv:WSV.on, wtShown:!!w && !w.classList.contains('hidden'), glOpen:!!GL.open, glShown:!!g && !g.classList.contains('hidden'), sel:GL.sel, card:!!document.querySelector('#roomModal .rmback'), stage:!!document.querySelector('#roomModal .msa-body'), tile:!!document.querySelector('#wartable .wsv-tile'), row:!!document.querySelector('#wartable .wsv-row'), door:R(d), doorLab:d? (d.querySelector('.dlab')||{}).textContent : null, badge:d? ((d.querySelector('.wt-new')||{}).textContent||null) : null, prev:d && d.previousElementSibling? (d.previousElementSibling.querySelector('.dlab')||{}).textContent : null, foot:R(f), footScroll:f? [f.scrollWidth, f.clientWidth] : null, ghost:R(document.querySelector('#wartable .gb-seat')), grp:R(document.getElementById('grpBtn')) }; },   
   dsb(){ const T=S.cfg&&S.cfg.terrain, R=(T&&T.rocks)||[]; return { cv:GVT_CV, on:DSB.on, gate:dsbOn(), bd:!!(S.bf&&S.bf.bd), plc:COOP? COOP.plc : null, map:S.bf? S.bf.mapId : null, W:S.bf? WORLD_W : 0, H:S.bf? WORLD_H : 0, mid:MID, buffer:MID_BUFFER, trkBan:TRK_BAN, trenchW:TRENCH_W, works:DSB.WORKS.map(w=>[w.dx,w.y]), bags:R.filter(r=>r.dsb).map(r=>[r.x,r.y,r.r]), rocks:R.map(r=>[r.x,r.y,r.r,r.art||'']), trench:(T&&T.trench)? T.trench.pts : null, rail:(T&&T.rail)? T.rail.ban.map(p=>p.pts) : null, jax:(T&&T.jax)? T.jax.map(j=>[j.x,j.y]) : null, bases:S.bf? [[S.bf.base.you.x,S.bf.base.you.y],[S.bf.base.foe.x,S.bf.base.foe.y]] : null }; },   
