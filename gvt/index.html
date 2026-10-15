@@ -46501,7 +46501,40 @@ const ENG_CHARGE=1.6, ENG_RAMP=0.25, ENG_J2_WIND=2;
 
 const VEH_ACCEL=['STEADY','QUICK','LIGHTNING'];   
 function vehSpd(fk,eng){ const s=(fk==='tank2'||fk==='tank3'  )? Math.round(T2_SPD*BF_PACE) : BF_MOVE[fk].moveSpd; return eng? Math.round(s*ENG_MUL) : s; }   
-function vehDmg(fk){ const d=UDEF[fk]||{}; return d.dmg? d.dmg : (d.ram|0)+(v3jFamK(fk)? J2_RAM_ADD : 0); }       
+
+
+
+
+
+
+
+
+
+
+const TKD={ base:{ bftank:6, tank2:10, tank3:10 }, plate:{ bftank:2, tank2:3, tank3:3 }, v3:5, crit:{ bftank:0.05, tank2:0.10, tank3:0.12 }, critPlate:0.005, critX:2, hits:null, force:null };   
+function tkdFace(t){ return (t==='bftank' || t==='tank2' || t==='tank3')? t : null; }   
+function tkdDmgAt(fk,p,q){ fk=tkdFace(fk); if(!fk) return 0; p=Math.max(0,Math.min(VEH_TIERS,p|0)); q=(fk==='tank3')? Math.max(0,Math.min(VEH_TIERS,q|0)) : 0; return TKD.base[fk]+TKD.plate[fk]*p+TKD.v3*q; }   
+function tkdCritAt(fk,p,q){ fk=tkdFace(fk); if(!fk) return 0; p=Math.max(0,Math.min(VEH_TIERS,p|0)); q=(fk==='tank3')? Math.max(0,Math.min(VEH_TIERS,q|0)) : 0; return Math.min(CRIT_UNIT_MAX, TKD.crit[fk]+TKD.critPlate*(p+q)); }   
+function tkdPlates(u){   
+  if(!tkrTank(u)) return null;
+  if(u.coopMods) return [u.tkdP|0, (u.type==='tank3')? u.tkdQ|0 : 0];   
+  if(S.bf && !bfHumanU(u)) return [0,0];   
+  return [vehTier('bftank'), (u.type==='tank3')? t3Tier() : 0];   
+}
+function tkdAdd(u){ const pq=tkdPlates(u); if(!pq) return 0; return tkdDmgAt(u.type,pq[0],pq[1])-((UDEF[u.type]&&UDEF[u.type].dmg)||0); }   
+function tkdCrit(u){ if(!tkrTank(u)) return 0; if(!u.coopMods && S.bf && !bfHumanU(u)) return 0; const pq=tkdPlates(u); return tkdCritAt(u.type,pq[0],pq[1]); }   
+function tkdShot(u,dmg){ const c=tkdCrit(u), r9=(TKD.force!=null)? !!TKD.force : (c>0 && Math.random()<c), d=r9? dmg*TKD.critX : dmg;   
+  if(TKD.hits){ const pq=tkdPlates(u)||[0,0]; TKD.hits.push({ t:u.type, seat:u.seat|0, mine:!u.coopMods && bfHumanU(u), p:pq[0], q:pq[1], c:+c.toFixed(4), crit:r9? 1 : 0, dmg:+(+d).toFixed(3), base:+(+dmg).toFixed(3), bf:!!S.bf }); }
+  return { d:d, c:r9? 1 : 0 }; }
+function tkdCritFx(sh){ try{ critFx({ x:sh.tx, y:sh.ty }); }catch(e){} }   
+function tkdTok(type){ if(!tkdFace(type)) return null; return 'tk:'+vehTier('bftank')+'.'+((type==='tank3')? t3Tier() : 0); }   
+function tkdWireIn(u,cm){ if(!u || !cm || !tkrTank(u) || !Array.isArray(cm.mo)) return; for(let i=0;i<cm.mo.length;i++){ const m=cm.mo[i]; if(typeof m!=='string' || m.slice(0,3)!=='tk:') continue; const a=m.slice(3).split('.'); u.tkdP=Math.max(0,Math.min(VEH_TIERS,(+a[0])|0)); u.tkdQ=Math.max(0,Math.min(VEH_TIERS,(+a[1])|0)); return; } }   
+function tkdRig(o){ o=o||{}; if(o.arm) TKD.hits=[]; if(o.disarm) TKD.hits=null; if(o.force!==undefined) TKD.force=o.force;   
+  const table={}; for(const fk of ['bftank','tank2','tank3']){ table[fk]=[]; for(let p=0;p<=VEH_TIERS;p++){ if(fk==='tank3'){ for(let q=0;q<=VEH_TIERS;q++) table[fk].push([p,q,tkdDmgAt(fk,p,q),+tkdCritAt(fk,p,q).toFixed(4)]); } else table[fk].push([p,0,tkdDmgAt(fk,p,0),+tkdCritAt(fk,p,0).toFixed(4)]); } }
+  const fk=vehFaceK('bftank'), p=vehTier('bftank'), q=t3Tier();
+  return { cv:GVT_CV, dials:{ base:TKD.base, plate:TKD.plate, v3:TKD.v3, crit:TKD.crit, critPlate:TKD.critPlate, critX:TKD.critX, cap:CRIT_UNIT_MAX, mult:CRIT_MULT }, face:fk, p:p, q:q, mine:{ dmg:tkdDmgAt(fk,p,q), crit:+tkdCritAt(fk,p,q).toFixed(4), tok:tkdTok(fk) }, sheet:vehDmg(fk), table:table, hits:TKD.hits? TKD.hits.slice() : null, force:TKD.force }; }
+
+function vehDmg(fk,r,q){ const d=UDEF[fk]||{}; return d.dmg? (tkdFace(fk)? tkdDmgAt(fk, (r==null)? vehTier('bftank') : r, (q==null)? ((fk==='tank3')? t3Tier() : 0) : q) : d.dmg) : (d.ram|0)+(v3jFamK(fk)? J2_RAM_ADD : 0); }           
 function vehAccelG(fk,eng){ return (v3jFamK(fk)?1:0)+(eng?1:0); }       
 
 
@@ -86436,7 +86469,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='23.39';        
+let GVT_CV='23.40';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -87865,6 +87898,7 @@ function coopPlaceCmd(u, bot, bi, re){
   
   
   
+  { const tk9=tkdTok(u.type); if(tk9) cm.mo=(cm.mo||[]).concat(tk9); }    
   if(vehKind(u.type) && vehEng(u.type)) cm.mo=(cm.mo||[]).concat('ve');
   
   
@@ -88189,6 +88223,7 @@ function coopApply(cm){
     
     if(u.def && u.def.vehicle && Array.isArray(cm.mo) && cm.mo.indexOf('ve')>=0){
       u.def.moveSpd=Math.round(u.def.moveSpd*ENG_MUL); u.def.eng=1; }   
+    tkdWireIn(u,cm);    
     
     
     { const lt=Array.isArray(cm.mo)? cm.mo.find(m=>typeof m==='string'&&m.slice(0,3)==='lz:') : null;
@@ -96585,6 +96620,7 @@ function roomPlaced(seat,type,x,y,para,kit9){
     if(soulIs('u',type)) cm.mo=(cm.mo||[]).concat('sl');   
     if(bondWarOn()) cm.mo=(cm.mo||[]).concat('bw');   
     if(vehKind(type)) cm.vh=vehHP(type)|0;
+    { const tk9=tkdTok(type); if(tk9) cm.mo=(cm.mo||[]).concat(tk9); }    
     if(vehKind(type) && vehEng(type)) cm.mo=(cm.mo||[]).concat('ve');   
     { const pr=META.up[type]||0; if(pr>0 && (HP_RANK100[type]||PERK_MARKS[type]||HEROES.indexOf(type)>=0)) cm.mo=(cm.mo||[]).concat('mr'+pr); }   
     if(META.laserOn) cm.mo=(cm.mo||[]).concat('lz:'+META.laserOn);   
@@ -96868,6 +96904,7 @@ function roomDressUnit(u, cm){
   
   if(u.def && u.def.vehicle && Array.isArray(cm.mo) && cm.mo.indexOf('ve')>=0){
     u.def.moveSpd=Math.round(u.def.moveSpd*ENG_MUL); u.def.eng=1; }   
+  tkdWireIn(u,cm);    
   
   
   
@@ -118110,7 +118147,7 @@ function update(dt){
     
     
     
-    const dmg = (def.dmg+bakDmg(u)+pickDmg(u)+toothDmg(u)+medrDmg(u)+reunDmg(u)+sqlDmg(u)  ) * (u.vet?1.5:1) * (tube?ENH_BAZ_DMG:1) * lzDmgMul(u) * sandDmgMul(u) *   
+    const dmg = (def.dmg+tkdAdd(u)  +bakDmg(u)+pickDmg(u)+toothDmg(u)+medrDmg(u)+reunDmg(u)+sqlDmg(u)  ) * (u.vet?1.5:1) * (tube?ENH_BAZ_DMG:1) * lzDmgMul(u) * sandDmgMul(u) *   
       ((ssw&&ssw.dgM)||1) *   
       (u.coopUM!=null? u.coopUM : ((S.bf&&!bfHumanU(u))? ((((S.bf.nem&&(S.bf.nem.park||S.bf.nem.bank))||S.bf.away||S.bf.hard)&&u.side==='foe'&&u.nrk!=null)? upMulR(u.type,u.nrk) : 1) : upMul(u.type))) *   
       soulDmgMulU(u) * jhkMul(u) *   
@@ -118225,7 +118262,7 @@ function update(dt){
       const mzx=u.x+42*mzl, mzy=u.y-44;
       S.fx.push({k:'puff',x:mzx,y:mzy,t:0,dur:0.4,R:14});                 
       S.fx.push({k:'flash',x:mzx,y:mzy,ang:Math.atan2(ty-mzy,tx-mzx),R:20,lw:3.2,t:0,dur:0.13});   
-      S.shots.push({k:'rocket',x:mzx,y:mzy,tx,ty,spd:520,dmg,splash:def.splash+t2SplashAdd(u),vx2:false,src:u});   
+      { const s9=tkdShot(u,dmg); S.shots.push({k:'rocket',x:mzx,y:mzy,tx,ty,spd:520,dmg:s9.d,splash:def.splash+t2SplashAdd(u),vx2:false,src:u,tkdC:s9.c}); }       
     } else if(u.type==='bazooka'){
       bfSfx(SFX.rocket, u.x, u.y);
       
@@ -118381,7 +118418,7 @@ function update(dt){
     if(!S.bf && (sh.k==='rocket' || sh.k==='lob') && !sh.cbx && magShot(sh,dt)){ S.shots.splice(i,1); continue; }   
     if(sh.k==='rocket'){ if(sh.hsm) hsmSteer(sh);    
       const dx=sh.tx-sh.x, dy=(sh.ty-14)-sh.y, d=Math.hypot(dx,dy);
-      if(d<10){ S.shots.splice(i,1); if(sh.hsm) hsmLand(sh);   else if(sh.dfAir) dfBurst(sh);   else if(sh.refl) cmdoReflLand(sh); else if(sh.foe) foeSplash(sh.tx,sh.ty,sh.splash,sh.src,sh.mwf,rbOf(sh)); else splash(sh.tx,sh.ty,sh.splash,sh.dmg,sh.papa? 'papa' : true,sh.src,false,false,sh.big,rbOf(sh),sh.air); }   
+      if(d<10){ S.shots.splice(i,1); if(sh.hsm) hsmLand(sh);   else if(sh.dfAir) dfBurst(sh);   else if(sh.refl) cmdoReflLand(sh); else if(sh.foe) foeSplash(sh.tx,sh.ty,sh.splash,sh.src,sh.mwf,rbOf(sh)); else { if(sh.tkdC) tkdCritFx(sh);   splash(sh.tx,sh.ty,sh.splash,sh.dmg,sh.papa? 'papa' : true,sh.src,false,false,sh.big,rbOf(sh),sh.air); } }   
       else { sh.x+=dx/d*sh.spd*dt; sh.y+=dy/d*sh.spd*dt;
         
         
@@ -168587,7 +168624,7 @@ function shopRigHTML(t){
   const sheet='<div class="sh-sheet" id="shst-'+t+'">'
     +stl('hp','HP',hpN, nxP? '+'+(vehHP(fk,r+1)-hpN) : v3n? '+'+(fk==='tank3'? T3.plate : V3J.plateHp)   : '')   
     +stl('spd','MOVEMENT SPEED',eng? espd : spd, nxE? '+'+(espd-spd) : '')
-    +stl('dmg','DAMAGE',vehDmg(fk),'')
+    +stl('dmg','DAMAGE',vehDmg(fk, own? r : 0, own? null : 0), (tkdFace(fk) && nxP)? '+'+TKD.plate[fk] : (fk==='tank3' && v3n)? '+'+TKD.v3 : '')    
     +stl('acc','ACCELERATION',VEH_ACCEL[ag], nxE? VEH_ACCEL[ag+1] : '', 'to')
     +(fk==='jeep3'? stl('sarge','DAMAGE FROM SARGE',Math.round(V3J.x*100)+'%','') : '')   
     +(fk==='tank3'? stl('small','RIFLES AND PISTOLS','0%','') : '')   
@@ -183317,6 +183354,7 @@ requestAnimationFrame(frame);
 
 
 window.GVT = {
+  tkd(o){ return tkdRig(o); },   
   rcc(){ return rccRig(); },   
   lbc(o){ return lbcRig(o); },   
   bkt(){ const bk=document.querySelector('#travelMap .lg-book'), st=bk && bk.querySelector('.lg-stage.sls.lsw'); return Object.assign(LSW.bkt(), { cls:!!(st && st.classList.contains('bkt')), names:st? [...st.querySelectorAll('.sls-slot .sls-nm')].map(n=>{ const sl=n.closest('.sls-slot'); return { id:sl? sl.getAttribute('data-book') : null, px:parseFloat(getComputedStyle(n).fontSize), tf:n.style.transform||'', w:n.clientWidth, h:n.clientHeight }; }) : null }); },   
