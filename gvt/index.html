@@ -54265,7 +54265,7 @@ META.rackSeen=Array.isArray(META.rackSeen)? META.rackSeen.filter(x=>typeof x==='
   META.sargeUp = Object.assign({}, META.sargeUp||{});
   if(META.sargeUp.pistol==null) META.sargeUp.pistol = ((META.up||{}).sarge)|0;
 })();
-function saveMeta(){ try{ localStorage.setItem('gvt_meta', JSON.stringify(tlzReal())); }catch(e){} uiKSync(); }       
+function saveMeta(){ try{ localStorage.setItem('gvt_meta', JSON.stringify(META)); }catch(e){} uiKSync(); }   
 
 
 
@@ -54461,7 +54461,7 @@ function accDeal(html, bk){ let el=document.getElementById('accPage'); if(!el){ 
   el.innerHTML='<div class="rmback acc-top"><div class="rmcard acc-card"><button class="rmx" onclick="'+bk+'()">✕</button>'+html+'</div></div>';
   if(!ACC.w) ACC.w=setInterval(()=>{ try{ if(S.mode!=='menu' && ACC.face!=='bye') accShut(); }catch(e){} }, 500); }   
 function accShut(){ const el=document.getElementById('accPage'); if(el) el.remove(); if(ACC.w){ clearInterval(ACC.w); ACC.w=0; } }
-function accSnap(){ try{ return META.account? '' : JSON.stringify(tlzReal()); }catch(e){ return ''; } }   
+function accSnap(){ try{ return META.account? '' : JSON.stringify(META); }catch(e){ return ''; } }   
 function accHasPlay(raw){ try{ const m=JSON.parse(raw); return !!m && ((m.campaign|0)>0 || (m.starsLifetime|0)>0 || (m.lvl|0)>1 || (m.starBank|0)>0); }catch(e){ return false; } }
 function accMe(){ return crewPost('poll', {}).then(r=>(r && r.ok && typeof r.me==='string' && r.me)? r.me : ''); }   
 function accOpen(from){ ACC.face=''; ACC.err=0; ACC.busy=0; ACC.from=from||''; try{ SFX.blip(); }catch(e){} try{ UI.closeModal(); }catch(e){} accDeal(accHTML(), 'accClose'); }
@@ -54521,7 +54521,7 @@ function accOutGo(){
   acsOut().then(accMe).then(me=>{   
     if(!me) throw new Error('no uid');
     const A=accLoad();
-    A.u[me]={ m:JSON.stringify(tlzReal()), n:String(META.name||''), p:String(META.account), a:String(META.avatar||''), t:Date.now() };
+    A.u[me]={ m:JSON.stringify(META), n:String(META.name||''), p:String(META.account), a:String(META.avatar||''), t:Date.now() };
     if(!accStore(A)) throw new Error('stash');
     const g=A.g; let next=null;
     if(g && typeof g.m==='string'){ try{ next=JSON.parse(g.m); }catch(e){ next=null; } }
@@ -54753,7 +54753,7 @@ function ngpPlay(k){
     .catch(()=>{ ngpUnstash(me); ngpUnhold(); NGP.busy=0; NGP.face='seats'; NGP.err='HQ UNREACHABLE. CHECK BACK AFTER THE NEXT PATROL'; ngpPaint(); });
 }
 
-function ngpStash(me){ if(!me) return false; const A=accLoad(); A.u[me]={ m:JSON.stringify(tlzReal()), n:String(META.name||''), p:String(META.account||''), a:String(META.avatar||''), t:Date.now(), s:NGP.seat|0 }; return accStore(A); }
+function ngpStash(me){ if(!me) return false; const A=accLoad(); A.u[me]={ m:JSON.stringify(META), n:String(META.name||''), p:String(META.account||''), a:String(META.avatar||''), t:Date.now(), s:NGP.seat|0 }; return accStore(A); }
 function ngpUnstash(me){ const A=accLoad(); if(A.u[me]){ delete A.u[me]; accStore(A); } }
 function ngpHold(){ NGP.ls=lastSync; lastSync=Date.now()+864e5; }   
 function ngpUnhold(){ lastSync=NGP.ls; }
@@ -54837,7 +54837,7 @@ function acsPush(why){
   return acsSend(L, st, why);
 }
 function acsTick(){ try{ if(document.hidden) return;
-  if(ACS.on && META.account && !ACS.hold && !ACS.gone && S.mode==='menu' && saveMeta===ACS_SAVE0 && !ACC.busy && !NGP.busy && acsPend(acsLoad()) && Date.now()-ACS.at>ACS_GAP){ ACS.at=Date.now(); acsAfter(ACS.pre!==null? ACS.pre : JSON.stringify(tlzReal())); return; }   
+  if(ACS.on && META.account && !ACS.hold && !ACS.gone && S.mode==='menu' && saveMeta===ACS_SAVE0 && !ACC.busy && !NGP.busy && acsPend(acsLoad()) && Date.now()-ACS.at>ACS_GAP){ ACS.at=Date.now(); acsAfter(ACS.pre!==null? ACS.pre : JSON.stringify(META)); return; }   
   acsPush('tick'); }catch(e){} }
 
 function acsOut(){
@@ -56225,7 +56225,7 @@ const CMDO={
 
 
 let CMDO_REPOSE=0.2;
-function cmdoOwned(){ return META.campaign>=CMDO_LVL || !!(TLZ && TLZ.live); }    
+function cmdoOwned(){ return META.campaign>=CMDO_LVL; }
 
 
 
@@ -86364,7 +86364,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='23.19';        
+let GVT_CV='23.20';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -97435,7 +97435,7 @@ function endBattlefield(reason, fromRelay){
     return;
   }
   bf.resolved=true; bf.ending=false; S.slowmo=1; S.drag=null; S.pan=null;
-  if(bf.opener){ tlzReturn(); META.opener=1; if(coach) coachDone(); }   
+  if(bf.opener){ META.opener=1; if(coach) coachDone(); }   
   sqNoteClear();   
   commClear();   
   { const gw9=gaWalkPov(reason); if(gw9) reason=gw9; else if(bfMyTeam()==='foe') reason=BF_FLIP[reason]||reason; }   
@@ -149096,7 +149096,6 @@ function tlfSay(line){
 function tlfSaySeat(){ const el=TLT.say; if(!el) return; const nc=document.querySelector('#fortscene .fh-namecol'), r=nc? nc.getBoundingClientRect() : null; el.style.top=((r && r.height>0 && r.bottom<window.innerHeight*0.4)? Math.round(r.bottom+6) : 8)+'px'; el.style.left='50%'; }
 window.tlfProbe=function(){ return { on:TLT.on, leg:TLT.leg, arm:TLT.arm, at:TLT.at, say:TLT.sayK, door:tlfDoor(), lines:tlfLines(), shelf:flxShelfOn() }; };
 function showMenu(){
-  tlzReturn();   
   LAND_N++;   
   awayForfeit();   
   if(S.mode==='play'||S.mode==='win'||S.mode==='lose') themeHome();   
@@ -179977,28 +179976,8 @@ function tsnRig(o){ if(o && o.on!==undefined) TSN.on=o.on? 1 : 0;
   const bf=S.bf, t=S.cfg&&S.cfg.terrain;
   return { cv:GVT_CV, on:TSN.on, opener:!!(bf&&bf.opener), mapId:bf? bf.mapId : null, ground:t? (t.ground||'') : null, rivers:t? (t.rivers||[]).map(r=>({ x:r.x, w:r.w, bridges:(r.bridges||[]).map(b=>b.y) })) : null,
     rocks:t? (t.rocks||[]).map(r=>({ x:r.x, y:r.y, r:r.r, art:r.art||'', chain:r.chain||'' })) : null, flakes:(t&&t.flakes)? t.flakes.length : 0, duck:!!(t&&t.riverDuck), light:(typeof lightField==='function')? !!lightField() : null }; }
-
-
-
-
-
-
-
-
-const TLZ={ on:(function(){ try{ const q=/[?&]tlz=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_tlz','0'); else localStorage.removeItem('gvt_tlz'); } return localStorage.getItem('gvt_tlz')==='0'? 0 : 1; }catch(e){ return 1; } })(), live:0, bak:null, purse:1000 };   
-const TLZ_DECK={"aplBench":"","aplBmb":1,"aplCap":10,"aplDf":1,"aplOrd":1,"cmdKey":0,"coopLevels":[1,2,3,4,5,6,10,16,17,18,19,20,21,24,25,26,27,28,29,30,31,33,34,35,36,37,38,39,40,41,42,44,45,46,47,48,49,50,51,53,54,55,56,57,58,62,63,64,65,67,68,69,71,72,73,74,80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100],"elderSab":1,"enh":{"on":["jumptank","riotshield","aerial","stormcoil","telekinesis","guardianshotgun","flamestrike","renegadepistol","medicshield","emperorsblade","gotime","smokypowder","ambush","longeye","stride","cannon","lightarrow","medicrifle","reunited","golddetector","bigbangers","bakerrifle","foxhole","bombpack","gravgun","buddyshield","bigpop","bigpapa","jetboots","aces","arabesquemod","reveriemod","propshot","iceblade","redmines","larsonradio","janehk","penetrate","paperdecoy","flamestrike2","skeetsight","heatseeker","stakeshot","thecrank","doubletap","impeng","mindcontrol","pararescue","ocrocket","gigacannon","pocketdome","thegrab","trenchkit","smokegrenade","goldengun","heavyartillery"],"own":["bigbangers","jumptank","riotshield","dualgun","aerial","longtube","stormcoil","buddyshield","foxhole","gravgun","telekinesis","outlawsniper","guardianshotgun","renegadepistol","flamestrike","medicshield","ambush","bakerrifle","emperorsblade","gotime","smokypowder","eldersaber","smuggler","longeye","unarmed","flameblade","stride","cannon","medicrifle","lightarrow","golddetector","iceblade","freezebeam","intelligence","reunited","bigpapa","bombpack","bigpop","cougar","jetboots","aces","arabesquemod","reveriemod","propshot","janehk","redmines","larsonradio","penetrate","paperdecoy","skeetsight","flamestrike2","heatseeker","stakeshot","thecrank","doubletap","impeng","mindcontrol","pararescue","frankbolt","ocrocket","gigacannon","pocketdome","thegrab","fullsquad","trenchkit","smokegrenade","goldengun","heavyartillery"]},"gearUnlocked":["jetpack"],"heroSel":"kingbear","highBlade":1,"jetEng":1,"jetLvl":7,"jetV2":1,"laserOn":"teal","outfit":{"own":["mustache","belt","helmet","safarihat","snowhat","snowjacket","explorervest","snowboots","explorerboots","banditmask","cowboy","poncho","spurs","sheriffbadge","kingcrown","scout","advhat","furryhat","sheriffhat","muskboots","khakis","snowpants","chaps","cargopants","musksash","muskpads","efhelmet","efarmor","kingbearhat","muskarmor","fuzzyhat","muskhelmet","pajamapants","elitepants","monocle","fancybelt","eyepatch","dogglasses","scouter","princecrown","corsage","gnomebelt","gnomebeard","steelboots","aviators","tinfoilhat","gnomeboots","rockerhair","captainhat","icehood","iceplate","icegreaves","bodyarmor","iceboots","champhelm","champgreaves","champplate","champboots","champpatch","handlerhat","pharaohhelmet","marshalcap","pumpkin","gnomecap","skygoggles","santahat","pilotgloves","reactivegreaves","duelglove","acegloves","honkhorn","kingchest","nemesisboots","infilset","footwraps","headwraps","bodywraps","legwraps","luckysocks","sqtunic","chefhat","hoverboots","robovisor","sniperhat","sqboots"],"wear":["corsage","sheriffbadge","champpatch","honkhorn","gnomebelt","nemesisboots","captainhat","mustache","pilotgloves","legwraps","skygoggles","kingchest","muskpads","musksash"]},"pet":{"coat":{"bilbo":0,"bishop":0,"calvin":1,"coyote":0,"flappy":0,"floop":0,"francis":1,"hunter":0,"knight":1,"merlin":0,"nutcracker":1,"otto":0,"patch":0,"puff":3,"rook":0,"sandwiches":0,"slush":0,"smash":0,"snatch":0,"sugarplum":0,"tiny":3,"tiptoe":0,"witchpet":3},"mig":2,"name":{"bilbo":"","bishop":"","calvin":"","coyote":"","flappy":"","floop":"","francis":"","hunter":"","knight":"","merlin":"","nutcracker":"","otto":"","patch":"","puff":"","rook":"","sandwiches":"","slush":"","smash":"","snatch":"","sugarplum":"","tiny":"","tiptoe":"","witchpet":""},"own":{"bilbo":1,"bishop":1,"calvin":1,"coyote":1,"flappy":1,"floop":1,"francis":1,"hunter":1,"knight":1,"merlin":1,"nutcracker":1,"otto":1,"patch":1,"puff":1,"rook":1,"sandwiches":1,"slush":1,"snatch":1,"tiny":1,"tiptoe":1,"witchpet":1},"path":{"bilbo":"tags","puff":"bellows"},"rebase":{},"rung":{"bilbo":{"n":5,"pend":0},"bishop":{"n":0,"pend":0},"calvin":{"n":2,"pend":0},"coyote":{"n":10,"pend":0},"flappy":{"n":1,"pend":0},"floop":{"n":3,"pend":0},"francis":{"n":4,"pend":0},"hunter":{"n":0,"pend":0},"knight":{"n":1,"pend":0},"merlin":{"n":3,"pend":0},"nutcracker":{"n":0,"pend":0},"otto":{"n":1,"pend":0},"patch":{"n":1,"pend":0},"puff":{"n":6,"pend":0},"rook":{"n":0,"pend":0},"sandwiches":{"n":0,"pend":0},"slush":{"n":5,"pend":0},"snatch":{"n":1,"pend":0},"tiny":{"n":1,"pend":0},"tiptoe":{"n":1,"pend":0},"witchpet":{"n":1,"pend":0}},"seen":{"bilbo":1,"bishop":1,"calvin":1,"coyote":1,"flappy":1,"floop":1,"francis":1,"hunter":1,"knight":1,"merlin":1,"nutcracker":1,"otto":1,"patch":1,"puff":1,"rook":1,"sandwiches":1,"slush":1,"snatch":1,"tiny":1,"tiptoe":1,"witchpet":1},"sel":"calvin","team":{},"xp":{"bilbo":1108,"bishop":17,"calvin":230,"coyote":3505,"flappy":213,"floop":648,"francis":926,"hunter":22,"knight":103,"merlin":497,"nutcracker":62,"otto":104,"patch":152,"puff":1583,"rook":0,"sandwiches":59,"slush":265,"smash":0,"snatch":159,"sugarplum":0,"tiny":137,"tiptoe":196,"witchpet":97}},"platoon":["rifleman","mgunner","bazooka","radioman","commando","minesweeper","dogfighter","mortar","grenadier","medic"],"platoonMet":["rifleman","mgunner","bazooka","mortar","grenadier","minesweeper","flame","radioman","medic","commando","spy","bfjeep","bftank","dogfighter","bomber"],"saberColor":"#C8CDD6","saberColor2":"#FFE14D","saberMix":1,"sargeUnlocked":["shotgun","sniper","lightsaber"],"sargeUp":{"commander":52,"lightsaber":54,"pistol":100,"shotgun":27,"sniper":26},"sargeWeapon":"commander","sky":{"e":1,"g":1,"h":1,"m":1},"soul":"u:sarge","unlocked":["rifleman","mgunner","bazooka","mortar","sarge","minesweeper","flame","radioman","medic","jane","kingyeti","kingrex","kingcroak","kingbear","princess","grenadier"],"up":{"bazooka":53,"commando":23,"flame":41,"flappy":1,"grenadier":16,"jane":31,"kingbear":100,"kingcroak":33,"kingrex":97,"kingyeti":51,"medic":88,"mgunner":54,"minesweeper":21,"mortar":52,"patch":2,"princess":10,"radioman":27,"rifleman":51,"sarge":100,"spy":20},"vehOwned":["bfjeep","bftank","jeep2","tank2"],"vehUp":{"bfjeep":8,"bftank":8,"bomber":5,"dogfighter":8}};   
-function tlzOn(){ return !!TLZ.on; }
-function tlzLend(){ if(!tlzOn() || TLZ.live) return false; const bak={}; for(const k in TLZ_DECK){ bak[k]=META[k]; META[k]=JSON.parse(JSON.stringify(TLZ_DECK[k])); } TLZ.bak=bak; TLZ.live=1; return true; }   
-function tlzReturn(){ if(!TLZ.live) return false; const bak=TLZ.bak||{}; for(const k in TLZ_DECK){ if(bak[k]===undefined) delete META[k]; else META[k]=bak[k]; } TLZ.bak=null; TLZ.live=0; return true; }   
-function tlzPurse(){ if(TLZ.live && S.bf && S.bf.opener) S.plastic=TLZ.purse; }
-function tlzReal(){ if(!TLZ.live) return META; const m=Object.assign({}, META), bak=TLZ.bak||{}; for(const k in TLZ_DECK){ if(bak[k]===undefined) delete m[k]; else m[k]=bak[k]; } return m; }   
-function tlzRig(o){ o=o||{}; if(o.on!==undefined) TLZ.on=o.on? 1 : 0; if(o.purse!==undefined) TLZ.purse=o.purse|0; if(o.lend) tlzLend(); if(o.ret) tlzReturn();
-  let st=null; try{ const m=JSON.parse(localStorage.getItem('gvt_meta')||'null'); st=m? { upRifle:(m.up&&m.up.rifleman)|0, unlocked:(m.unlocked||[]).length, heroSel:m.heroSel||null, enhOn:((m.enh&&m.enh.on)||[]).length, sw:m.sargeWeapon||null, opener:m.opener|0 } : null; }catch(e){}
-  let sw=null; try{ const b=sargeStats(); sw={ w:b.w, r:b.r }; }catch(e){}
-  let pk=null, plv=null; try{ pk=petSel(); plv=pk? petLv(pk) : null; }catch(e){}
-  return { cv:GVT_CV, on:TLZ.on, live:TLZ.live, purse:TLZ.purse, keys:Object.keys(TLZ_DECK).length, opener:!!(S.bf&&S.bf.opener), plastic:S.plastic, tray:(S.bf? bfTray() : null), upRifle:(META.up&&META.up.rifleman)|0, sw, hero:heroSel(), pet:pk, petLv:plv, jet:jetOwned(), labOn:((META.enh&&META.enh.on)||[]).length, unlocked:(META.unlocked||[]).length, stored:st }; }
 let OP_ARM=0;              
-function startOpener(){ OP_ARM=1; tlzLend(); try{ startBattlefield(OPENER_MAP, null, 1, null, ARMIES.find(a=>a.id==='tan')||ARMIES[2]); tlzPurse(); } catch(e){ tlzReturn(); throw e; } finally { OP_ARM=0; } }       
+function startOpener(){ OP_ARM=1; try{ startBattlefield(OPENER_MAP, null, 1, null, ARMIES.find(a=>a.id==='tan')||ARMIES[2]); } finally { OP_ARM=0; } }   
 function titleClickEat(){   
   let tm=0;
   const off=()=>{ clearTimeout(tm); document.removeEventListener('click', eat, true); document.removeEventListener('pointerdown', off, true); document.removeEventListener('pointerup', up, true); document.removeEventListener('pointercancel', up, true); };
@@ -182819,7 +182798,6 @@ requestAnimationFrame(frame);
 
 
 window.GVT = {
-  tlz(o){ return tlzRig(o); },   
   sgd(){ return sgdRig(); },   
   fwd(){ return fwdRig(); },   
   bst(){ return bstRig(); },
@@ -183430,7 +183408,7 @@ window.GVT = {
   mvDayState(){ return { latch:META.mvDay||0, due:mvDayDue(), quiet:mvDayQuiet(), staged:!!MVDAY.tid, armed:MVDAY.armed|0, hand:MVDAY.hand? (MVDAY.geo||true) : false, glove:FHAND.ok, handEl:!!document.getElementById('mvHand'), dest:SHIP_DEST, trv:SHIPTRV, cur:roomCur(), ride:mvDayRide() }; },   
   paintState(){ return { owed:paintRiteOwed(), open:paintRiteIsOpen(), lvl:PAINT_GIFT_LVL, dyes:(META.dyes||[]).slice(), on:META.dyeOn||null, gift:META.dyeGift||null, price:dyePrice(), paid:dyePaid(), base:DYE_BASE, step:PAINT_ESCALATOR, sel:PAINTRITE.sel===undefined? null : PAINTRITE.sel }; },   
   rdecState(){ return JSON.parse(JSON.stringify({ cur:roomCur(), rooms:ownedRooms(), rdec:META.rdec, pos:META.roomPosR, seen:META.rdecSeen, ship:META.rdecShip, v:META.rdecV||0, trv:SHIPTRV })); },   
-  meta(){ return JSON.parse(JSON.stringify(tlzReal())); },
+  meta(){ return JSON.parse(JSON.stringify(META)); },
   
   
   
