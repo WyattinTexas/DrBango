@@ -4910,6 +4910,9 @@
   #travelMap .lsw-stars { position:absolute; left:50%; bottom:16.5px; margin-left:-20px; width:48px; height:16px; display:flex; justify-content:space-between; align-items:center; z-index:2; pointer-events:none; }
   #travelMap .lsw-stars > svg { display:block; flex:0 0 auto; width:16px; height:16px; overflow:visible; }
   /**/
+  #travelMap .lg-stage.sls.lsw.bkt .sls-slot .sls-nm { left:22px; right:13px; color:transparent; background:linear-gradient(180deg, #FFE9A3 0%, #E8C45A 46%, #B8892A 100%); -webkit-background-clip:text; background-clip:text; text-shadow:none; filter:drop-shadow(0 1.2px 0 rgba(0,0,0,.72)); }
+  #travelMap .lg-stage.sls.lsw.bkt .sls-slot .sls-nm.long, #travelMap .lg-stage.sls.lsw.bkt .sls-slot .sls-nm.xl { font-size:11px; }
+  /**/
   #travelMap .sls-slot.tpo .sls-art { display:none; }
   #travelMap .tpo-cov { position:absolute; left:17px; top:8px; right:8px; height:52px; overflow:hidden; pointer-events:none; background:#1E1A12; }
   #travelMap .tpo-cov > svg { display:block; width:100%; height:100%; }
@@ -86378,7 +86381,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='23.26';        
+let GVT_CV='23.27';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -146535,7 +146538,13 @@ function floor(B){ const x0=-B.x, x1=840+B.x, W=x1-x0, fh=110+B.y; let s='<rect 
 
 function inkOf(e){ const q=e.getBoundingClientRect(), k=(q.width/(e.offsetWidth||1))||1, g=document.createRange(); g.selectNodeContents(e); const rs=[...g.getClientRects()]; if(!rs.length) return { w:0, lines:0 }; const tops=[]; let l=1e9, r=-1e9; for(const c of rs){ l=Math.min(l, c.left); r=Math.max(r, c.right); if(!tops.some(t=>Math.abs(t-c.top)<2)) tops.push(c.top); } return { w:(r-l)/k, lines:tops.length }; }
 function fitTitle(st){ const b=st.querySelector(':scope > .sls-title b'); if(!b) return; b.style.fontSize=''; if(!b.clientWidth) return; let fs=parseFloat(getComputedStyle(b).fontSize)||30; while(inkOf(b).w>b.clientWidth-6 && fs>TITLE_MIN){ fs-=1; b.style.fontSize=fs+'px'; } }   
-function fitNames(st){ for(const n of st.querySelectorAll('.sls-slot .sls-nm')){ n.style.fontSize=''; if(!n.clientWidth) continue; const cs=getComputedStyle(n); let fs=parseFloat(cs.fontSize)||11; const lhK=(parseFloat(cs.lineHeight)||fs*1.02)/fs, over=()=>{ const i=inkOf(n); return i.w>n.clientWidth+0.5 || i.lines*fs*lhK>n.clientHeight+0.5; }; while(over() && fs>NAME_MIN){ fs-=0.5; n.style.fontSize=fs+'px'; } } }
+
+
+
+
+const BKT=(function(){ try{ const q=/[?&]bkt=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_bkt','0'); else localStorage.removeItem('gvt_bkt'); } return localStorage.getItem('gvt_bkt')==='0'? 0 : 1; }catch(e){ return 1; } })(), BKT_SQ=0.88;
+function fitNames(st){ st.classList.toggle('bkt', !!BKT); for(const n of st.querySelectorAll('.sls-slot .sls-nm')){ n.style.fontSize=''; n.style.transform=''; n.style.left=''; n.style.right=''; if(!n.clientWidth) continue; const cs=getComputedStyle(n); let fs=parseFloat(cs.fontSize)||11; const lhK=(parseFloat(cs.lineHeight)||fs*1.02)/fs, W=n.clientWidth, H=n.clientHeight, L0=parseFloat(cs.left)||0, R0=parseFloat(cs.right)||0, over=()=>{ const i=inkOf(n); return i.w>W+0.5 || i.lines*fs*lhK>H+0.5; };
+  while(over() && fs>NAME_MIN){ if(BKT){ const i=inkOf(n), k=W/i.w; if(k>=BKT_SQ && i.lines*fs*lhK<=H+0.5){ const e=(W/k-W)/2; n.style.left=(L0-e).toFixed(2)+'px'; n.style.right=(R0-e).toFixed(2)+'px'; n.style.transform='scaleX('+k.toFixed(3)+')'; if(inkOf(n).lines===i.lines) break; n.style.left=''; n.style.right=''; n.style.transform=''; } } fs-=0.5; n.style.fontSize=fs+'px'; } } }   
 function fit(bk, w, h){ const ks=ksOf(w, h, bk); bk.style.setProperty('--ks', ks.toFixed(4)); const st=bk.querySelector(':scope > .lg-stage.sls.lsw'); if(!st) return ks; try{ fitTitle(st); fitNames(st); }catch(e){ try{ console.error('LSW.fit words', e); }catch(e2){} }
   const n=need(w, h, ks); if(n.x>(+st.getAttribute('data-bx')||0)-PAD || n.y>(+st.getAttribute('data-by')||0)-PAD){ const B=bleedOf(n), wl=st.querySelector(':scope > .sls-wall'), fl=st.querySelector(':scope > .sls-floor');   
     if(wl) wl.outerHTML=wall(st.getAttribute('data-wall')||'wood', B); if(fl) fl.outerHTML=floor(B); st.setAttribute('data-bx', B.x); st.setAttribute('data-by', B.y); }
@@ -146543,7 +146552,7 @@ function fit(bk, w, h){ const ks=ksOf(w, h, bk); bk.style.setProperty('--ks', ks
 
 function xf(cur, pg){ return cur==='shelf' || pg==='shelf'; }
 function flipCls(cur, x){ return (cur==='shelf'? ' lsw-from' : '')+(x? ' lsw-xf' : ''); }
-return { H, WALL, ROW, BAR, XF_MS, STARS, star, stars, ksOf, need, bleed, wall, floor, fit, fitTitle, fitNames, xf, flipCls };
+return { H, WALL, ROW, BAR, XF_MS, STARS, star, stars, ksOf, need, bleed, wall, floor, fit, fitTitle, fitNames, xf, flipCls, bkt:()=>({ on:BKT, sq:BKT_SQ }) };    
 })();
 
 
@@ -182832,6 +182841,7 @@ requestAnimationFrame(frame);
 
 
 window.GVT = {
+  bkt(){ const bk=document.querySelector('#travelMap .lg-book'), st=bk && bk.querySelector('.lg-stage.sls.lsw'); return Object.assign(LSW.bkt(), { cls:!!(st && st.classList.contains('bkt')), names:st? [...st.querySelectorAll('.sls-slot .sls-nm')].map(n=>{ const sl=n.closest('.sls-slot'); return { id:sl? sl.getAttribute('data-book') : null, px:parseFloat(getComputedStyle(n).fontSize), tf:n.style.transform||'', w:n.clientWidth, h:n.clientHeight }; }) : null }); },   
   sgd(){ return sgdRig(); },   
   fwd(){ return fwdRig(); },   
   bst(){ return bstRig(); },
