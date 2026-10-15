@@ -4204,6 +4204,11 @@
   .wr-boss.t-s .wr-bwell { border-color:#D9DDE3; box-shadow:inset 0 -8px 14px rgba(0,0,0,0.45), 0 3px 8px rgba(0,0,0,0.5), 0 0 10px 1px rgba(170,176,186,0.60); }
   .wr-boss.t-g2 .wr-bwell { border-color:#FFD24A; box-shadow:inset 0 -8px 14px rgba(0,0,0,0.45), 0 3px 8px rgba(0,0,0,0.5), 0 0 11px 2px rgba(217,165,68,0.65); }
   .wr-boss.t-p .wr-bwell { border-color:#E8F1FF; box-shadow:inset 0 -8px 14px rgba(0,0,0,0.45), 0 3px 8px rgba(0,0,0,0.5), 0 0 12px 3px rgba(214,232,255,0.72); }   /**/
+  /*
+
+*/
+  .wr-wall.lbc .wr-boss.t-h .wr-bwell { border-color:#FFD24A; box-shadow:inset 0 -8px 14px rgba(0,0,0,0.45), 0 3px 8px rgba(0,0,0,0.5), 0 0 11px 2px rgba(217,165,68,0.65); }
+  .wr-boss.t-u .wr-bwell { border-color:#FF5A2E; box-shadow:inset 0 -8px 14px rgba(0,0,0,0.45), 0 3px 8px rgba(0,0,0,0.5), 0 0 12px 3px rgba(255,90,46,0.72); }
   .wr-bname { min-height:1.35em; font-size:clamp(10px,2vh,16px); letter-spacing:0.1em; color:#EDEADF;
     text-align:center; opacity:0; transition:opacity 0.25s; }
   .wr-bname.on { opacity:1; }
@@ -62056,7 +62061,7 @@ function nxFit(){ const el=document.getElementById('nxStrip'), w=document.getEle
 
 function nxArtCss(){ if(NX_CSS) return; NX_CSS=1; try{ const st=document.createElement('style'); st.id='nxArtCss'; let s=''; for(const k in NX_ART) s+='.w3s.k-'+k+'{-webkit-mask-image:url('+NX_ART[k]+');mask-image:url('+NX_ART[k]+')}'; st.textContent=s; document.head.appendChild(st); }catch(e){} }   
 function w3Row(){ const top=campTop(), led=META.campaign|0; return nxTable().B.filter(r=>r.n<=top).map(r=>({ n:r.n, k:r.k, nm:r.nm, done:led>=r.n })); }   
-function w3Shows(bag,ro){ return !bag && ro===undefined && campTop()>ELITE_TOP; }   
+function w3Shows(bag,ro){ return !lbcOn() && !bag && ro===undefined && campTop()>ELITE_TOP; }   
 function w3RowHTML(){ const R=w3Row(); if(!R.length) return ''; nxArtCss();
   return '<div class="wr-w3" data-notr aria-label="'+escH(t('THE THIRD HUNDRED'))+'"><div class="wr-w3row'+(R.length>8? ' w3wrap" style="--w3n:'+R.length : '')+'">'    
     +R.map(r=>'<button type="button" id="wrb-w3-'+r.n+'" class="wr-boss w3'+(r.done? ' down t-g2' : '')+'" aria-label="'+escH(r.done? t(r.nm) : tf('LEVEL %1', r.n))+'" onclick="UI.w3Go('+r.n+')"><span class="wr-bwell"><i class="w3s k-'+escH(r.k||'none')+'"></i></span><span class="wr-btick">✓</span></button>').join('')
@@ -86381,7 +86386,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='23.27';        
+let GVT_CV='23.28';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -165712,7 +165717,7 @@ function wrPreload(){ if(wrPreloaded) return; wrPreloaded=true;
 
 
 
-function wrTier(k){ const b=META[k]; return b? (b.g?'g': b.h?'h': b.m?'m': b.e?'e': '') : ''; }
+function wrTier(k){ const b=META[k]; return b? ((lbcOn()&&b.u)?'u': b.g?'g': b.h?'h': b.m?'m': b.e?'e': '') : ''; }   
 
 
 
@@ -165776,8 +165781,8 @@ function wrBossWallHTML(bag, note, ro){
     { id:'bear',    nm:'EMPEROR BEAR' },   
     { id:'larson',  nm:'COMMANDER LARSON' }   
   ];
-  return '<div class="wr-wall'+(strip?' wr-strip':' wr-grid')+(inert?' ro':'')+(w3Shows(bag,ro)?' w3on':'')+'"><div class="wr-wrow">'   
-    +wall.map(b=>{ const s=B[b.id]||{}, cls='wr-boss'+(s.done?' down'+(TC[s.tier]||MC[s.metal]||''):''),   
+  return '<div class="wr-wall'+(strip?' wr-strip':' wr-grid')+(inert?' ro':'')+(w3Shows(bag,ro)?' w3on':'')+(lbcOn()?' lbc':'')+'"><div class="wr-wrow">'   
+    +wall.map(b=>{ const s=B[b.id]||{}, cls='wr-boss'+(s.done?' down'+(lbcOn()? lbcRing(b.id,s) : (TC[s.tier]||MC[s.metal]||'')):''),       
         face='<span class="wr-bwell"><img src="'+F[b.id]+'" alt=""></span>'+'<span class="wr-btick">✓</span>';   
       return inert? '<span class="'+cls+'" role="img" aria-label="'+b.nm+'">'+face+'</span>'   
         : '<button type="button" id="wrb-'+b.id+'" class="'+cls+'" aria-label="'+b.nm+'" onclick="UI.wrBossGo(\''+b.id+'\',\''+b.nm+'\')">'+face+'</button>'; }).join('')
@@ -165806,13 +165811,13 @@ function wrBossWallHTML(bag, note, ro){
 
 
 
-const WR_BW_ORDER=['nemesis','mom','rex','yeti','croak','robo','bear','larson','princess'], WR_BW_TIER={e:1,m:2,h:3,g:4}, WR_BW_METAL={bronze:1,silver:2,gold:3,mega:4  }, WR_BW_RE=/^[0-4]{5,9}$/;   
+const WR_BW_ORDER=['nemesis','mom','rex','yeti','croak','robo','bear','larson','princess'], WR_BW_TIER={e:1,m:2,h:3,g:4,u:5  }, WR_BW_METAL={bronze:1,silver:2,gold:3,mega:4  }, WR_BW_RE=/^[0-5]{5,9}$/;       
 function wrWallBW(){ const B=wrWallBag(); return WR_BW_ORDER.map(k=>{ const s=B[k]; return (s&&s.done)? String(s.metal||WR_BW_TIER[s.tier]||1) : '0'; }).join(''); }   
 function wrWallHas(bw){ return typeof bw==='string' && WR_BW_RE.test(bw); }
 function wrWallDecode(bw){
   const s=wrWallHas(bw)? bw : '', B={};
   WR_BW_ORDER.forEach((k,i)=>{ const d=(i<s.length)? (s.charCodeAt(i)-48) : 0, king=(k==='rex'||k==='yeti'||k==='croak'||k==='bear'||k==='princess');   
-    B[k]={ done:d>0, tier:(d>0&&king)? 'emhg'[Math.min(d,4)-1] : '', metal:(d>0&&!king)? Math.min(d,(k==='larson')? WR_BW_METAL.mega : WR_BW_METAL.gold) : 0 };     });   
+    B[k]={ done:d>0, tier:(d>0&&king)? 'emhgu'[Math.min(d, lbcOn()? 5 : 4)-1] : '', metal:(d>0&&!king)? Math.min(d,(k==='larson')? WR_BW_METAL.mega : WR_BW_METAL.gold) : 0 };     });   
   return B;
 }
 function wrViewRow(){ if(!WR.view) return null; const r=wrList('adv').find(x=>x.uid===WR.view); return (r&&!r.you)? r : null; }
@@ -165822,6 +165827,33 @@ function wrWallPanelHTML(){
     +'<button type="button" class="x" onclick="UI.wrViewX()" title="'+escH(t('MY WALL'))+'" aria-label="'+escH(t('MY WALL'))+'">✕</button></div>'
     +wrBossWallHTML(wrWallDecode(r.bw), wrWallHas(r.bw)? '' : t('NO WALL REPORTED YET'));
 }
+
+
+
+
+
+
+
+
+
+
+
+
+const LBC={ on:(function(){ try{ const q=/[?&]lbc=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_lbc','0'); else localStorage.removeItem('gvt_lbc'); } return localStorage.getItem('gvt_lbc')==='0'? 0 : 1; }catch(e){ return 1; } })(), red:'#FF5A2E' };   
+const LBC_KING={ e:' t-e', m:' t-m', h:' t-h', g:' t-g', u:' t-u' };   
+function lbcOn(){ return !!LBC.on; }
+function lbcRing(id,s){ if(!s || !s.done) return '';
+  if(id==='nemesis' || id==='mom' || id==='robo') return ' t-g2';   
+  if(id==='larson'){ const m=s.metal|0; return m>=WR_BW_METAL.mega? ' t-g2' : m>=WR_BW_METAL.silver? ' t-s' : ' t-b'; }   
+  return LBC_KING[s.tier]||''; }   
+function lbcRig(o){ o=o||{}; if(o.on!==undefined) LBC.on=o.on? 1 : 0;
+  const rd=w=>{ if(!w) return null; const R={}, C={}; w.querySelectorAll('.wr-wrow > .wr-boss').forEach((b,i)=>{ const id=(b.id||'').replace(/^wrb-/,'')||('#'+i), m=/\bt-[a-z0-9]+\b/.exec(b.className), c=b.querySelector('.wr-bwell');
+      R[id]=b.classList.contains('down')? (m? m[0] : 'down') : ''; C[id]=c? getComputedStyle(c).borderTopColor : null; });
+    return { nine:w.querySelectorAll('.wr-wrow > .wr-boss').length, w3:!!w.querySelector('.wr-w3'), w3n:w.querySelectorAll('.wr-w3 .wr-boss').length, blue:!!w.querySelector('.wr-blue'), bluen:w.querySelectorAll('.wr-blue .wr-boss').length, lbc:w.classList.contains('lbc'), w3on:w.classList.contains('w3on'), rings:R, border:C }; };
+  let key=null; try{ key=localStorage.getItem('gvt_lbc'); }catch(e){}
+  let ultra=null; try{ ultra={ ice:(META.ice&&META.ice.u)|0, bone:(META.bone&&META.bone.u)|0 }; }catch(e){}
+  return { cv:GVT_CV, on:LBC.on, key:key, red:LBC.red, wall:rd(document.querySelector('#worldrank .wr-wall.wr-grid')), strip:rd(document.querySelector('#worldrank .wr-wall.wr-strip')), bw:wrWallBW(), re:WR_BW_RE.source, bag:wrWallBag(), ultra:ultra, view:WR.view||null }; }
+
 
 
 
@@ -182841,6 +182873,7 @@ requestAnimationFrame(frame);
 
 
 window.GVT = {
+  lbc(o){ return lbcRig(o); },   
   bkt(){ const bk=document.querySelector('#travelMap .lg-book'), st=bk && bk.querySelector('.lg-stage.sls.lsw'); return Object.assign(LSW.bkt(), { cls:!!(st && st.classList.contains('bkt')), names:st? [...st.querySelectorAll('.sls-slot .sls-nm')].map(n=>{ const sl=n.closest('.sls-slot'); return { id:sl? sl.getAttribute('data-book') : null, px:parseFloat(getComputedStyle(n).fontSize), tf:n.style.transform||'', w:n.clientWidth, h:n.clientHeight }; }) : null }); },   
   sgd(){ return sgdRig(); },   
   fwd(){ return fwdRig(); },   
