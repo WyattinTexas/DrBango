@@ -71493,7 +71493,7 @@ function hrdWave(n){
   if(horde){ const bs=lc.waves.filter(w=>clean(w) && w.boss); src=bs.length? bs[bs.length-1] : null; }
   if(!src){ src=lc.waves.filter(w=>clean(w) && !w.boss && !w.piece).reduce((b,w)=>(!b || size(w)>size(b))? w : b, null) || lc.waves.filter(clean)[0] || null; if(horde) mul=HRD_BIG; }
   const rn=mul*(1+HRD_RAMP.n*(n-1));   
-  const groups=(src? src.groups : [{f:'column',t:'tanrifle',n:5,e:'right'}]).map(g=>Object.assign({}, g, (rn!==1 && g.f!=='boss')? {n:Math.max(1,Math.round((g.n|0)*rn))} : {}));
+  const groups=(src? src.groups : [{f:'column',t:'tanrifle',n:5,e:'right'}]).map(g=>smtGroup(Object.assign({}, g, (rn!==1 && g.f!=='boss')? {n:Math.max(1,Math.round((g.n|0)*rn))} : {})));   
   const w={ groups, name:(src && src.name) || '', hrdN:n, hrdL:L };
   if(horde && src && src.boss) w.boss=true;
   return { w, hp:(lc.hpMul||1)*(n>100? 1+0.05*(n-100) : 1)*(1+HRD_RAMP.hp*(n-1)), rate:lc.rateMul||1, bossF:(lc.bossF!=null? lc.bossF : 0.5) };
@@ -71594,7 +71594,7 @@ function hrdSarge(){
 }
 function hrdFlank(n){   
   const w=S.cfg.waves[n-1]; if(!w) return;
-  const g=w.groups.find(x=>x.f!=='boss' && FDEF[x.t] && !FDEF[x.t].fly) || { t:'tanrifle', n:5 };
+  const g=w.groups.find(x=>x.f!=='boss' && FDEF[x.t] && !FDEF[x.t].fly && smtInf(x)) || { t:'tanrifle', n:5 };   
   const sz=w.groups.reduce((a,x)=>a+(x.f==='boss'? 0 : (x.n|0)),0), k=Math.max(2, Math.round(sz*HRD_FLANK_K));
   const eds=(n%HRD_EVERY===0)? ['top','bottom'] : [(n%2)? 'top' : 'bottom'];
   for(const e of eds){ const i0=S.foes.length; spawnGroup({ f:'solo', t:g.t, n:k, e, k:n });
@@ -71798,6 +71798,17 @@ function hrdHudLine(){
   if(S.wave%HRD_EVERY===0 && (S.sq.t-S.hrd.pushT)>=hrdGapOf(S.wave+1)) return tf('BREATHER · WAVE %1 IN %2S', S.wave+1, left);   
   return tf('WAVE %1 · NEXT IN %2S', S.wave, left);
 }
+
+
+
+
+
+
+
+const SMT={ on:1, tagX:0.3, mouse:'wmouse', mortar:'tanmortar' };   
+function smtTagV(v){ if(!(SMT.on && hrdOn())) return v; const H=S.hrd, x=v*SMT.tagX+(H.tagRem||0), r=Math.round(x); H.tagRem=x-r; return r; }   
+function smtGroup(g){ return (SMT.on && g.t===SMT.mouse)? Object.assign(g, { t:SMT.mortar, f:'line', e:'right', smt:1 }) : g; }   
+function smtInf(g){ return !g.smt; }   
 function hrdEnd(){
   const n=S.wave|0, best=Math.max(META.hrdBest|0, n), isNew=n>0 && n>(S.hrd.best0|0);
   for(const b of S.blobs){ const v9=gtxTag(b.v); S.plastic+=v9; if(META.stats) META.stats.tags=(META.stats.tags|0)+v9; } S.blobs.length=0;   
@@ -86162,7 +86173,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='23.03';        
+let GVT_CV='23.04';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -116544,7 +116555,7 @@ function update(dt){
   if(S.sq && S.mode==='play' && !S.bf){
     S.tagT+=dt;
     if(S.tagT>=CAMP_TICK_EVERY){ S.tagT-=CAMP_TICK_EVERY;   
-      const pour=Math.round(((S.raid && S.raid.t==='u')? EV_TICK_U : CAMP_TICK)*iceP3TagX()*kyuTagX()*momP3TagX()*bfTagX()*rtxTagX()*gtxX());           
+      const pour=smtTagV(Math.round(((S.raid && S.raid.t==='u')? EV_TICK_U : CAMP_TICK)*iceP3TagX()*kyuTagX()*momP3TagX()*bfTagX()*rtxTagX()*gtxX()));               
       S.plastic+=pour;
       S.floats.push({x:166, y:280, txt:'+'+pour, t:0, col:'#FFF3C4'});
     }
@@ -120443,7 +120454,7 @@ function foeFell(f,u){
       
       
       if(!(u&&u.side==='jax') && !FS_NOBLOB && !f.def.bubbleOf && !f.def.mine)
-        S.blobs.push({x:f.x,y:f.y-8,v:Math.round(f.def.bounty*(f.bountyMul||1)*iceP3TagX()*kyuTagX()*momP3TagX()*bfTagX()),t:0});       
+        S.blobs.push({x:f.x,y:f.y-8,v:smtTagV(Math.round(f.def.bounty*(f.bountyMul||1)*iceP3TagX()*kyuTagX()*momP3TagX()*bfTagX())),t:0});           
       if(f.type==='crawler'){ META.stats.crawlerKills++; }
       if(f.boss){
         
