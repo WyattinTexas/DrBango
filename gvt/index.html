@@ -85731,7 +85731,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='22.81';        
+let GVT_CV='22.82';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -134961,7 +134961,7 @@ function roomFloorSVG(){
   const r=roomCur();
   if(r==='attic') return atticFloorSVG();   
   if(r==='backyard') return MAPPIN? yardMapFloorSVG() : yardFloorSVG(roomNight());   
-  if(r==='winter') return MAPPIN? wfMapSVG() : wfPaperSVG(roomNight());   
+  if(r==='winter') return MAPPIN? wfMapSVG() : (pkoOn()? pkoSVG(wfPaperSVG(roomNight())) : wfPaperSVG(roomNight()));       
   if(r==='rooftop') return roofFloorSVG(roomNight());   
   if(r==='western'){
     if(wwsOn()) return wwsFloorSVG();   
@@ -140099,7 +140099,7 @@ function roomSVG(){
   
   
   +'<g class="rfloor">'+roomFloorSVG()+'</g>'   
-  +(wfLive()? wfMoversSVG(nt) : '')   
+  +(wfLive()? (pkoOn()? pkoSVG(wfMoversSVG(nt)) : wfMoversSVG(nt)) : '')       
   
   
   
@@ -158494,7 +158494,8 @@ function ypvHeroSVG(){
     +'<path d="M0 650 L0 566 Q80 596 172 584 Q120 622 192 650 z" fill="#EEF5FB" stroke="#1A2636" stroke-width="1.2" stroke-opacity=".45"/>'
     +'<path d="M1600 650 L1600 556 Q1512 590 1462 578 Q1516 618 1448 650 z" fill="#E8F1F9" stroke="#1A2636" stroke-width="1.2" stroke-opacity=".45"/>';
 }
-function ypvLiveHTML(){ return YPV.on? '<svg class="phero ypv-live" viewBox="0 0 1600 650" preserveAspectRatio="xMidYMid slice" aria-hidden="true">'+YPV_LIVE+'</svg>' : ypsOn()? '<svg class="phero ypv-live" viewBox="0 0 1600 650" preserveAspectRatio="xMidYMid slice" aria-hidden="true">'+YPV_WF.alLive+'</svg>' : ''; }   
+function ypvLiveHTML(){ const s=ypvLiveHTML0(); return pkoOn()? pkoSVG(s) : s; }    
+function ypvLiveHTML0(){ return YPV.on? '<svg class="phero ypv-live" viewBox="0 0 1600 650" preserveAspectRatio="xMidYMid slice" aria-hidden="true">'+YPV_LIVE+'</svg>' : ypsOn()? '<svg class="phero ypv-live" viewBox="0 0 1600 650" preserveAspectRatio="xMidYMid slice" aria-hidden="true">'+YPV_WF.alLive+'</svg>' : ''; }   
 function ypvRig(o){ o=o||{}; if(o.on!==undefined){ YPV.on=o.on? 1 : 0; delete PARK_HERO.yeti; delete PARK_HERO.yetiURI; if(typeof parkSceneOpen==='function' && parkSceneOpen() && PARK_CUR==='yeti') paintParkScene(false); else if(S.mode==='menu') renderMenu(); }
   const sv=document.querySelector('#parkBg svg.ypv-live'); return { on:YPV.on, live:!!sv, snowmen:sv? sv.querySelectorAll('.ypv-sm').length : 0, anims:sv && sv.getAnimations? sv.getAnimations({subtree:true}).length : 0, par:sv? sv.getAttribute('preserveAspectRatio') : null }; }
 
@@ -158825,6 +158826,55 @@ function ypbFrontSVG(){ if(!ypbOn()) return '';
     +ypbBirch(150,650,720,20,8,4,[[0.64,1,0.34,0.34],[0.74,1,0.3,0.3],[0.84,-1,0.3,0.26],[0.92,1,0.26,0.24]])
     +ypbBirch(1468,650,700,18,10,6,[[0.56,1,0.3,0.26],[0.7,-1,0.26,0.3],[0.8,-1,0.34,0.28],[0.9,1,0.28,0.24]])
     +'</g>'; }
+
+
+const PKO={ on:(function(){ try{ const q=/[?&]pko=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_pko','0'); else localStorage.removeItem('gvt_pko'); } return localStorage.getItem('gvt_pko')==='0'? 0 : 1; }catch(e){ return 1; } })(), k:0.6, a:0.55, drop:0.30, chroma:0.85, floor:0.06 };
+function pkoOn(){ return PKO.on===1; }
+const PKO_NAMED={ white:[255,255,255], black:[0,0,0], red:[255,0,0], gold:[255,215,0], navy:[0,0,128], gray:[128,128,128], grey:[128,128,128], silver:[192,192,192], brown:[165,42,42], orange:[255,165,0], yellow:[255,255,0], green:[0,128,0], blue:[0,0,255], purple:[128,0,128], pink:[255,192,203], tan:[210,180,140], ivory:[255,255,240], snow:[255,250,250], beige:[245,245,220], maroon:[128,0,0], olive:[128,128,0], teal:[0,128,128], lime:[0,255,0], aqua:[0,255,255], cyan:[0,255,255], magenta:[255,0,255], crimson:[220,20,60], indigo:[75,0,130], violet:[238,130,238], khaki:[240,230,140], coral:[255,127,80], salmon:[250,128,114], tomato:[255,99,71], chocolate:[210,105,30], sienna:[160,82,45], peru:[205,133,63], wheat:[245,222,179], linen:[250,240,230], lavender:[230,230,250], plum:[221,160,221], orchid:[218,112,214], skyblue:[135,206,235], steelblue:[70,130,180], slategray:[112,128,144], dimgray:[105,105,105], darkgray:[169,169,169], lightgray:[211,211,211], whitesmoke:[245,245,245], gainsboro:[220,220,220], firebrick:[178,34,34], darkred:[139,0,0], darkgreen:[0,100,0], forestgreen:[34,139,34], seagreen:[46,139,87], darkblue:[0,0,139], midnightblue:[25,25,112], royalblue:[65,105,225], dodgerblue:[30,144,255], deepskyblue:[0,191,255], saddlebrown:[139,69,19], goldenrod:[218,165,32], darkgoldenrod:[184,134,11], darkorange:[255,140,0], orangered:[255,69,0], hotpink:[255,105,180], deeppink:[255,20,147] };
+function pkoCol(v){ if(!v) return null; v=String(v).trim(); let m;   
+  if((m=/^#([0-9a-f]{3,4})$/i.exec(v))) return [parseInt(m[1][0]+m[1][0],16), parseInt(m[1][1]+m[1][1],16), parseInt(m[1][2]+m[1][2],16)];
+  if((m=/^#([0-9a-f]{6})(?:[0-9a-f]{2})?$/i.exec(v))) return [parseInt(m[1].slice(0,2),16), parseInt(m[1].slice(2,4),16), parseInt(m[1].slice(4,6),16)];
+  if((m=/^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/i.exec(v))) return [Math.round(+m[1]), Math.round(+m[2]), Math.round(+m[3])];
+  const n=PKO_NAMED[v.toLowerCase()]; return n? n.slice() : null; }
+function pkoLin(v){ v/=255; return v<=0.04045? v/12.92 : Math.pow((v+0.055)/1.055, 2.4); }
+function pkoY(c){ return 0.2126*pkoLin(c[0])+0.7152*pkoLin(c[1])+0.0722*pkoLin(c[2]); }   
+function pkoShade(c){   
+  const r=pkoLin(c[0]), g=pkoLin(c[1]), b=pkoLin(c[2]);
+  const l=Math.cbrt(0.4122214708*r+0.5363325363*g+0.0514459929*b), m=Math.cbrt(0.2119034982*r+0.6806995451*g+0.1073969566*b), s=Math.cbrt(0.0883024619*r+0.2817188376*g+0.6299787005*b);
+  let L=0.2104542553*l+0.7936177850*m-0.0040720468*s, A=1.9779984951*l-2.4285922050*m+0.4505937099*s, B=0.0259040371*l+0.7827717662*m-0.8086757660*s;
+  L=Math.max(PKO.floor, L-PKO.drop); A*=PKO.chroma; B*=PKO.chroma;
+  const l2=L+0.3963377774*A+0.2158037573*B, m2=L-0.1055613458*A-0.0638541728*B, s2=L-0.0894841775*A-1.2914855480*B, l3=l2*l2*l2, m3=m2*m2*m2, s3=s2*s2*s2;
+  const R=4.0767416621*l3-3.3077115913*m3+0.2309699292*s3, G=-1.2684380046*l3+2.6097574011*m3-0.3413193965*s3, Bl=-0.0041960863*l3-0.7034186147*m3+1.7076147010*s3;
+  const enc=function(v){ v=Math.max(0,Math.min(1,v)); v=v<=0.0031308? 12.92*v : 1.055*Math.pow(v,1/2.4)-0.055; v=Math.round(v*255); return (v<16?'0':'')+v.toString(16); };
+  return '#'+enc(R)+enc(G)+enc(Bl); }
+const PKO_TAG=/<(\/?)([A-Za-z][\w:.-]*)((?:\s+[^\s=>\/"']+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+))?)*)\s*(\/?)>/g, PKO_ATTR=/([^\s=]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/g;
+const PKO_SHAPE={ path:1, rect:1, circle:1, ellipse:1, polygon:1 }, PKO_SKIP={ defs:1, clipPath:1, mask:1, pattern:1, marker:1, filter:1 }, PKO_KEYS=['fill','stroke','stroke-width','stroke-opacity'];
+function pkoSVG(s){   
+  if(!s || s.indexOf('stroke')<0) return s;
+  const stack=[{ fill:'#000', stroke:'none', 'stroke-width':'1', 'stroke-opacity':'1', skip:0 }];
+  const own=function(attrs){ const o={}; let m; PKO_ATTR.lastIndex=0; while((m=PKO_ATTR.exec(attrs))){ const k=m[1], v=m[2]!==undefined? m[2] : m[3]!==undefined? m[3] : m[4]; if(k==='style'){ v.split(';').forEach(function(d){ const i=d.indexOf(':'); if(i>0){ const p=d.slice(0,i).trim(); if(PKO_KEYS.indexOf(p)>=0) o[p]=d.slice(i+1).trim(); } }); o._style=v; } else if(PKO_KEYS.indexOf(k)>=0 && o[k]===undefined) o[k]=v; } return o; };
+  const setA=function(attrs,name,val){ const re=new RegExp('(\\s'+name+'\\s*=\\s*)("[^"]*"|\'[^\']*\'|[^\\s>]+)'); return re.test(attrs)? attrs.replace(re,'$1"'+val+'"') : attrs+' '+name+'="'+val+'"'; };
+  const setS=function(attrs,name,val){ return attrs.replace(/(\sstyle\s*=\s*")([^"]*)(")/, function(m0,a,b,c){ return a+b.replace(new RegExp('(^|;)(\\s*'+name+'\\s*:\\s*)[^;]*'), '$1$2'+val)+c; }); };
+  return s.replace(PKO_TAG, function(m0, close, tag, attrs, selfc){
+    const top=stack[stack.length-1];
+    if(close){ if(stack.length>1 && top.tag===tag) stack.pop(); return m0; }
+    if(PKO_SHAPE[tag]){
+      if(top.skip) return m0;
+      const o=own(attrs), eff=function(k){ return o[k]!==undefined? o[k] : top[k]; };
+      const fv=eff('fill'), sv=eff('stroke'); if(!fv || /^(none|transparent)$/i.test(fv) || !sv || /^none$/i.test(sv)) return m0;
+      const sc=pkoCol(sv); if(!sc) return m0;
+      const fc=pkoCol(fv), grad=!fc && /^url\(/i.test(fv); if(!fc && !grad) return m0;
+      const sw=parseFloat(eff('stroke-width')); if(!(sw>0)) return m0;
+      if(fc? !(pkoY(sc)<pkoY(fc)) : !(pkoY(sc)<0.3)) return m0;   
+      const so=parseFloat(eff('stroke-opacity')), so2=(so>=0 && so<PKO.a)? so : PKO.a, w2=+(sw*PKO.k).toFixed(3), col=fc? pkoShade(fc) : sv;
+      let a2=setA(setA(setA(attrs,'stroke',col),'stroke-width',String(w2)),'stroke-opacity',String(so2));
+      if(o._style!==undefined){ if(/(^|;)\s*stroke\s*:/.test(o._style)) a2=setS(a2,'stroke',col); if(/(^|;)\s*stroke-width\s*:/.test(o._style)) a2=setS(a2,'stroke-width',String(w2)); if(/(^|;)\s*stroke-opacity\s*:/.test(o._style)) a2=setS(a2,'stroke-opacity',String(so2)); }
+      return '<'+tag+a2+(selfc? '/>' : '>');
+    }
+    if(!selfc){ const o=own(attrs), f={ tag:tag, skip:top.skip||(PKO_SKIP[tag]?1:0) }; PKO_KEYS.forEach(function(k){ f[k]=o[k]!==undefined? o[k] : top[k]; }); stack.push(f); }
+    return m0;
+  });
+}
 
 function parkHeroSVG(id){
   if(PARK_HERO[id]) return PARK_HERO[id];
@@ -159560,6 +159610,7 @@ function parkHeroSVG(id){
       v+='<path d="M'+x+' '+(y-6)+' v12 M'+(x-6)+' '+y+' h12" stroke="#dff0ff" stroke-width="2" opacity="0.65" stroke-linecap="round"/>'; }
     v+=ypbFrontSVG();   
   }
+  if(id==='yeti' && pkoOn()) v=pkoSVG(v);    
   PARK_HERO[id]=v;
   return v;
 }
