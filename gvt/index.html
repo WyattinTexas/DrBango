@@ -85834,7 +85834,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='22.98';        
+let GVT_CV='22.99';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -102281,6 +102281,18 @@ function saberNext(u,sw,r9){
   for(const f of S.foes){ if(f.burrow||f.x>W-10||f.pendDie) continue; if((f.def.fly||f.skyDrop) && !hrtS3Grd(f)) continue;     const d=Math.hypot(f.x-u.x,f.y-u.y); if(d<bd){bd=d;best=f;} }   
   return best;
 }
+
+
+
+
+
+
+
+
+
+const SSP={ on:1, ring:4 };   
+function sspOver(d,st){ return !!(SSP.on && st-d>SSP.ring); }   
+
 function updateSaber(u,dt,sw){
   if(!u.home) u.home={x:u.x,y:u.y};
   if(!u.saberState) u.saberState='idle';
@@ -102341,7 +102353,7 @@ function updateSaber(u,dt,sw){
   
   
   const dx=u.home.x-u.x, dy=u.home.y-u.y, d=Math.hypot(dx,dy);
-  if(d>4){ const sp=390*infDashX(u); u.x+=dx/d*sp*dt; u.y+=dy/d*sp*dt; }   
+  if(d>4){ const sp=390*infDashX(u); if(sspOver(d,sp*dt)){ u.x=u.home.x; u.y=u.home.y; } else { u.x+=dx/d*sp*dt; u.y+=dy/d*sp*dt; } }   
   else { u.x=u.home.x; u.y=u.home.y; u.saberState='idle'; u.saberTarget=null; }   
 }
 
@@ -102678,7 +102690,7 @@ function updateCmdDash(u,dt,sw){
   }
   
   const dx=u.home.x-u.x, dy=u.home.y-u.y, d=Math.hypot(dx,dy);
-  if(d>4){ const sp=WPN_MILE.sgRet*fzWalk(u); u.x+=dx/d*sp*dt; u.y+=dy/d*sp*dt; cmdWkStamp(u,dx/d*sp); }   
+  if(d>4){ const sp=WPN_MILE.sgRet*fzWalk(u); if(sspOver(d,sp*dt)){ u.x=u.home.x; u.y=u.home.y; } else { u.x+=dx/d*sp*dt; u.y+=dy/d*sp*dt; } cmdWkStamp(u,dx/d*sp); }   
   else { u.x=u.home.x; u.y=u.home.y; u.cmdDash=null; u.cmdTarget=null; }
   return true;
 }
@@ -102756,7 +102768,7 @@ function updateSgDash(u,dt,sw){
   }
   
   const dx=u.home.x-u.x, dy=u.home.y-u.y, d=Math.hypot(dx,dy);
-  if(d>4){ const sp=WPN_MILE.sgRet*fzWalk(u); u.x+=dx/d*sp*dt; u.y+=dy/d*sp*dt; }   
+  if(d>4){ const sp=WPN_MILE.sgRet*fzWalk(u); if(sspOver(d,sp*dt)){ u.x=u.home.x; u.y=u.home.y; } else { u.x+=dx/d*sp*dt; u.y+=dy/d*sp*dt; } }   
   else { u.x=u.home.x; u.y=u.home.y; sgDashEnd(u); }   
 }
 
@@ -103000,7 +103012,7 @@ function updateFoeSaber(f,dt){
   
   if(!f.home){ f.saberState='idle'; f.saberTarget=null; return; }
   const dx=f.home.x-f.x, dy=f.home.y-f.y, d=Math.hypot(dx,dy);
-  if(d>4){ f.x+=dx/d*sb.ret*dt; f.y+=dy/d*sb.ret*dt; }
+  if(d>4){ if(sspOver(d,sb.ret*dt)){ f.x=f.home.x; f.y=f.home.y; } else { f.x+=dx/d*sb.ret*dt; f.y+=dy/d*sb.ret*dt; } }   
   else { f.saberState='idle'; f.saberTarget=null; }
 }
 
