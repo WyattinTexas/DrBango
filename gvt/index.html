@@ -49946,7 +49946,25 @@ const BF_MAPS = [
       cq:cqShipBuild() }) }
 ];
 
-const BF_BENCH={ starship:1, tundra:1 };   
+const BF_BENCH={ starship:1, tundra:1, pbvsea:1, pbvfarm:1, bed:1, open:1 };       
+
+
+
+
+
+
+
+
+
+
+
+const BHF_IDS=['pbvsea','pbvfarm','bed','open'];   
+const BHF_FEAT_DAYS=['2026-10-16','2026-10-18','2026-10-20','2026-10-22','2026-10-24','2026-10-26','2026-10-28','2026-10-30','2026-10-31'];   
+function bhfFeatDay(){ return !hlbOff('library') && BHF_FEAT_DAYS.indexOf(todayStr())>=0; }   
+function bhfFeatOff(id){ if(id!=='library') return false; const t=todayStr(); return t>=BHF_FEAT_DAYS[0] && t<HALLOWEEN_WIN[1]; }   
+function bhfRoomKeep(id){ return BHF_IDS.indexOf(id)>=0 && !!coopLaunching; }   
+function bhfRead(){ return { cv:GVT_CV, bench:Object.keys(BF_BENCH).filter(k=>BF_BENCH[k]), ids:BHF_IDS.slice(), days:BHF_FEAT_DAYS.slice(), today:todayStr(), featDay:bhfFeatDay(), feat:featBattle(), hw:halloweenOn(), pick:META.bfMap }; }   
+
 
 
 
@@ -87069,7 +87087,7 @@ function bfMap(id){ return BF_MAPS.find(m=>m.id===id)||BF_MAPS[0]; }
 
 
 
-function bfMapResolve(id){ if(BF_BENCH[id] || hlbOff(id)) id='random';       
+function bfMapResolve(id){ if((BF_BENCH[id] && !bhfRoomKeep(id)) || hlbOff(id)) id='random';           
   if(id!=='random') return id; const L=BF_MAPS.filter(m=>!BF_BENCH[m.id] && !hlbBenched(m) && !m.nempark && !m.nemlair && !m.nembank && !m.nemtown && !m.nemfluff && !m.nemgarden); for(const m of BF_MAPS){ if(m.halloween && !hlbBenched(m)) L.push(m); }     return L[(Math.random()*L.length)|0].id; }   
 function bfMapLabel(id){ return id==='random'? 'RANDOM' : bfMap(id).name; }
 
@@ -87793,7 +87811,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='24.15';        
+let GVT_CV='24.16';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -96214,7 +96232,7 @@ function ptyPickerHTML(here){
     
     
     const pk=ptyPickParse('bf');
-    const ids=['random'].concat(WT_MAP_ORDER.filter(id=>!hlbOff(id)));    
+    const ids=['random'].concat(WT_MAP_ORDER.filter(id=>!BF_BENCH[id] && !hlbOff(id)));        
     const show=PTY.maps? ids : ids.slice(0,6);
     let maps='';
     for(const id of show){
@@ -156432,8 +156450,8 @@ function wtMapIsNew(id){ return WT_NEW_IDS.indexOf(id)>=0 && !(META.mapSeen&&MET
 const FEAT_STARS=30;
 function featBattle(){
   const d=new Date(), s=d.getFullYear()*511+(d.getMonth()+1)*37+d.getDate()*7;
-  const L=WT_MAP_ORDER.filter(id=>!BF_BENCH[id] && !hlbOff(id));       
-  return { map:L[s%L.length], size:1+(((s/13)|0)%4) };
+  const L=WT_MAP_ORDER.filter(id=>!BF_BENCH[id] && !hlbOff(id) && !bhfFeatOff(id));       
+  return { map:bhfFeatDay()? 'library' : L[s%L.length], size:1+(((s/13)|0)%4) };   
 }
 function featDone(){ return !!(META.featDays && META.featDays[todayStr()]); }
 
