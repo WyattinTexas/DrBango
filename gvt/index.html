@@ -87512,7 +87512,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='23.91';        
+let GVT_CV='23.92';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -162910,6 +162910,54 @@ function lagCharRead(){ const out={ memo:Object.keys(LAG_SPRM).length }; try{ co
 const LAG_BAND={ n:0, h:0, w:0, g:null };
 function lagRugBand(WD,HT){ if(!lagOn() || S.momRaid || !(WD>0) || !(HT>0)) return; if(LAG_BAND.h!==HT || !LAG_BAND.g){ const g=cx.createLinearGradient(0,0,0,HT); g.addColorStop(0,'rgba(255,244,220,0.16)'); g.addColorStop(0.42,'rgba(255,244,220,0)'); g.addColorStop(0.60,'rgba(30,20,8,0)'); g.addColorStop(1,'rgba(30,20,8,0.24)'); LAG_BAND.g=g; LAG_BAND.h=HT; } LAG_BAND.w=WD; cx.fillStyle=LAG_BAND.g; cx.fillRect(0,0,WD,HT); LAG_BAND.n++; }
 function lagFieldRead(){ return { n:LAG_BAND.n, h:LAG_BAND.h, w:LAG_BAND.w, mode:S.mode, bf:!!S.bf }; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+var ODE={ on:(function(){ try{ return new URLSearchParams(location.search).get('ode')==='0'? 0 : 1; }catch(e){ return 1; } })(), minted:0, same:0, skip:0, miss:0, wide:0, runs:0, sarge:0, as:0, keys:{}, mine:new Set() };
+const ODE_AS={ kingcroak:'kingcroakfire' };   
+function odeOn(){ return ODE.on===1 && typeof lagOn==='function' && lagOn(); }
+function odeMint(k){   
+  const im=IMG[k]; if(!im || ODE.mine.has(im) || (typeof PET_BOX!=='undefined' && PET_BOX[k])) { ODE.skip++; return false; }
+  const P='data:image/svg+xml;utf8,', src=String(im.src||''); if(src.indexOf(P)!==0){ ODE.skip++; return false; }
+  let full=''; try{ full=decodeURIComponent(src.slice(P.length)); }catch(e){ ODE.miss++; return false; }
+  const a=full.indexOf('>'), z=full.lastIndexOf('</svg>'); if(a<0 || z<a){ ODE.miss++; return false; }
+  const head=full.slice(0,a+1), body=full.slice(a+1,z);
+  let raw=null; try{ raw=amMold(k); }catch(e){ raw=null; } if(typeof raw!=='string'){ ODE.miss++; return false; }
+  const hex=(body===raw.split('currentColor').join(GREEN))? GREEN : (body===raw.split('currentColor').join(TAN))? TAN : null; if(!hex){ ODE.miss++; return false; }
+  const sk=ODE_AS[k] && SPRITES_SRC[ODE_AS[k]]? ODE_AS[k] : k; let v=body; try{ v=(sk===k)? lagSpr(body,k,hex) : lagSpr(amMold(sk).split('currentColor').join(hex),sk,hex); }catch(e){ v=body; } if(typeof v!=='string' || v===body){ ODE.same++; return false; }
+  const nu=new Image(); ODE.mine.add(nu);
+  nu.onload=()=>{ if(IMG[k]!==im) return; IMG[k]=nu; ODE.minted++; ODE.keys[k]=hex; if(typeof SPR_WIDE!=='undefined' && SPR_WIDE[k] && typeof sprWideMint==='function'){ try{ sprWideMint(k, v); ODE.wide++; }catch(e){} } };
+  nu.src=P+encodeURIComponent(head+v+'</svg>'); return true; }
+function odeMintAll(){ if(!odeOn()) return; ODE.runs++; const ks=Object.keys(IMG); let i=0;
+  const step=()=>{ const t0=Date.now(); while(i<ks.length && Date.now()-t0<12){ try{ odeMint(ks[i]); }catch(e){ ODE.miss++; } i++; } if(i<ks.length) setTimeout(step,0); else ODE.t=Date.now(); }; setTimeout(step,0); }
+try{ if(typeof buildSprites==='function' && !ODE.bs0){ const b0=buildSprites; ODE.bs0=b0;
+  buildSprites=function(done){ return b0.call(this, function(){ try{ if(typeof done==='function') return done.apply(this, arguments); } finally { try{ odeMintAll(); }catch(e){} } }); }; } }catch(e){}
+try{ if(typeof spriteMint==='function' && !ODE.sm0){ const m0=spriteMint; ODE.sm0=m0;
+  spriteMint=function(k){ const r=m0.apply(this, arguments); if(odeOn()){ const old=IMG[k]; let n=0; const look=()=>{ if(IMG[k]!==old){ try{ odeMint(k); }catch(e){} } else if(++n<20) setTimeout(look,150); }; setTimeout(look,150); } return r; }; } }catch(e){}
+try{ if(typeof sprURI==='function' && !ODE.su0){ const u0=sprURI; ODE.su0=u0;
+  sprURI=function(k,color,vbox,body){ const as=ODE_AS[k]; if(as && ODE.on===1 && SPRITES_SRC[as] && (body==null || body===SPRITES_SRC[k])){ ODE.as++; return u0.call(this, as, color, vbox||'0 0 140 140'); } return u0.apply(this, arguments); }; } }catch(e){}
+try{ if(typeof shakeCamHTML==='function' && !ODE.sc0){ const c0=shakeCamHTML; ODE.sc0=c0;
+  shakeCamHTML=function(){ const v=c0.apply(this, arguments); if(ODE.on!==1 || typeof v!=='string') return v; const a=v.indexOf('cam-lilc'); if(a<0) return v; const i=v.indexOf('src="',a); if(i<0) return v; const j=v.indexOf('"',i+5); if(j<0) return v;
+    return v.slice(0,i+5)+sprURI('kingcroaklil',null,'0 0 140 140')+v.slice(j); }; } }catch(e){}   
+function odeCut(v,id){   
+  const a=v.indexOf('<g id="'+id+'"'); if(a<0) return v; const re=/<g\b[^>]*>|<\/g>/g; re.lastIndex=a; let d=0, m;
+  while((m=re.exec(v))){ if(m[0]==='</g>'){ if(--d===0) return v.slice(0,a)+v.slice(re.lastIndex); } else if(m[0].slice(-2)!=='/>') d++; } return v; }
+try{ if(typeof lagDinoSVG==='function' && !ODE.ld0){ const l0=lagDinoSVG; ODE.ld0=l0;
+  lagDinoSVG=function(){ const v=l0.apply(this, arguments); if(ODE.on!==1 || typeof v!=='string') return v; const c=odeCut(v,'lag-army'); if(c!==v) ODE.sarge++; return c; }; } }catch(e){}
+function odeRead(){ const bg=document.getElementById('parkBg'); return { on:ODE.on, live:odeOn(), minted:ODE.minted, same:ODE.same, skip:ODE.skip, miss:ODE.miss, wide:ODE.wide, runs:ODE.runs, sarge:ODE.sarge, as:ODE.as, keys:Object.keys(ODE.keys).length,
+  done:!!ODE.t, parkSarge:bg? bg.querySelectorAll('#lag-army').length : -1, parkDog:bg? bg.querySelectorAll('#lag-dog').length : -1 }; }
 
 
 
