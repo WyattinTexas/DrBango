@@ -64136,7 +64136,7 @@ function olvRex6(L){ olvRedDot(olvB2L()); for(const f of S.foes){ if(!rdLive(f) 
 
 
 
-const ERP={ hpX:1.6, every:5, hum:2.5, first:1.0, cap:10, gapAdd:6,   
+const ERP={ hpX:0.9, every:5, hum:2.5, first:1.0, cap:10, gapAdd:-5,   
   bot:{ hp:4, spd:40, w:62, rng:170, bounty:6, lzCd:6.0, lzTell:0.8, lzRun:170, lzR:14, lzPips:1, lzLead:60 },   
   jeep:{ hp:14, spd:92, bounty:30, w:78 },   
   air:{ at:[2,4,6], per:4, hpX:1, fcd:1.8, cd0:2.0, dx:70, say0:1.5, sayT:8, ox0:200, oxPad:200, oy0:110, oyPad:200 } };   
@@ -64157,7 +64157,7 @@ function erpOval(){ const A=ERP.air, y1=Math.max(A.oy0+120, WORLD_H-A.oyPad); re
 function erpAirCall(L,k){ const A=ERP.air, V=erpOval(), t0=+S.t.toFixed(2); L.called[k]=t0; if(L.t0==null) L.t0=t0;   
   for(let i=0;i<A.per;i++) L.q.push({ at:t0+0.2, x:W+40+i*A.dx, y:Math.round(V.y0+(V.y1-V.y0)*((i+0.5)/A.per)+(k%2? 18 : -18)), fl:k, i:i });
   bfSfx(SFX.prop, W-40, Math.round((V.y0+V.y1)/2)); if(!reducedMotion()) S.shake=Math.max(S.shake,0.2); L.log.push(['flight', k, t0, S.wave|0]); if(L.log.length>60) L.log.shift(); }
-function erpAirPass(dt){ if(!(dt>0) || !erpOn()) return; const L=erpL(), A=ERP.air, w=S.wave|0;   
+function erpAirPass(dt){ if(!(dt>0) || !erpOn()) return; const L=erpL(), A=ERP.air, w=S.wave|0; lveTick(L);       
   for(let k=0;k<A.at.length;k++){ if(L.called[k]!=null || w<A.at[k]) continue; erpAirCall(L,k); }   
   for(let i=L.q.length-1;i>=0;i--){ const q=L.q[i]; if(S.t<q.at) continue; L.q.splice(i,1); const f=spawnFoe('skyfighter', q.x, foeBandY(q.y), null, false); if(!f) continue;   
     f.y=q.y; f.erpAir=1+q.fl; f.hp=f.hpMax=Math.max(1,Math.round(FDEF.skyfighter.hp*(S.cfg.hpMul||1)*A.hpX)); L.born++; if(q.i===0) bfSfx(SFX.prop, W-40, q.y); }   
@@ -64166,6 +64166,7 @@ function erpAirPass(dt){ if(!(dt>0) || !erpOn()) return; const L=erpL(), A=ERP.a
   skyWreckTick(L,dt); }   
 function erpFly(f,dt,L){ const A=ERP.air, V=erpOval(), T={ fcd:A.fcd, acd:A.fcd }; let K=f.sky;   
   if(!K) K=f.sky={ dir:-1, bankT:0, cd:A.cd0+((f.id|0)%5)*0.17, lane:(f.y<(V.y0+V.y1)/2)? 0 : 1, born:S.t, boxArm:0, laps:0, hd:Math.PI, bank:0, alt:SKY_ALT, altT:SKY_ALT, spdMul:1, spdNow:SKY_SPD[f.type]||150, wpDir:-1, wing:0, wingBox:0 };
+  if(f.retreat){ K.dir=1; K.hd=0; f.x+=(SKY_SPD[f.type]||150)*dt; return; }    
   if(K.bankT>0) K.bankT=Math.max(0,K.bankT-dt);
   if(dfHuntBy(f,K,T,dt)) return;   
   const spd=SKY_SPD[f.type]||150;
@@ -64196,6 +64197,23 @@ const SR6={ every:8, hum:3, first:1.0, cap:12, perGen:3, genHpX:0.6, hpX:2.2, re
 
 const CHU6={ look1:0.9, look2:0.9, say:1.2, spd:60, dx:56, dy:28, plate:3.0 };   
 CP_SPEC[OLV6.cpLink]=Object.assign({}, CP, { of:'printbot', popAll:1, every:ERP.every, hum:ERP.hum, first:ERP.first, cap:ERP.cap, hpX:1 });   
+
+
+
+
+
+
+
+
+const LVE={ standX:840, sheets:6, routSpd:240 };   
+CP_SPEC[OLV6.cpLink].standX=LVE.standX;   
+function lveTick(L){ const cp=cp6Of();   
+  if(cp){ L.lveCp=1; const K=cp.cpk; if(LVE.sheets>0 && K && K.ph==='wait' && K.n>=LVE.sheets && !L.lveOut){ cpJam(cp,K,cpSpec(cp)); K.c=1e9; L.lveOut=+S.t.toFixed(2); } return; }   
+  if(!L.lveCp) return; if(L.lveFell==null){ L.lveFell=+S.t.toFixed(2); L.lveN=0; }
+  for(const f of S.foes){ if(f.dead || f.hp<=0 || f.retreat || f.cpQuiet) continue; lveRout(f); L.lveN++; } }   
+function lveRout(o){ o.retreat=1; o.form=null; o.aimT=0; o.burst=0; o.mgRootT=0; o.burrow=false; o.dash=false; o.haltT=0; if(!o.def.fly) o.def=Object.assign({},o.def,{ spd:LVE.routSpd/LR_ROUT_X }); if(!o.def.fly && !reducedMotion()) S.fx.push({k:'puff',x:o.x,y:o.y-6,t:0,dur:0.3,R:10}); }   
+function lveProbe(){ const L=S.erp, on=!!(L && L.cfg===S.cfg), cp=cp6Of(); return { dials:Object.assign({},LVE), hpX:ERP.hpX, gapAdd:ERP.gapAdd, standX:CP_SPEC[OLV6.cpLink].standX, cpX:cp? Math.round(cp.x) : null, cpSt:(cp && cp.cpk)? cp.cpk.st : null, cpPh:(cp && cp.cpk)? cp.cpk.ph : null, prints:(cp && cp.cpk)? cp.cpk.n : null, out:on? (L.lveOut||null) : null, fell:on? (L.lveFell==null? null : L.lveFell) : null, routed:on? (L.lveN|0) : 0, left:S.foes.filter(f=>!f.dead).map(f=>f.type+(f.retreat? '>' : '')) }; }   
+
 function miniUp(f){ return !!(f && f.def && f.def.mini6 && !f.dead && f.hp>0 && S.foes.indexOf(f)>=0); }
 function cp6Of(){ for(const f of S.foes){ if(f.def && f.def.cp && f.link===OLV6.cpLink && !f.dead) return f; } return null; }
 function olvSeeingRed(L,dt){ const RM=reducedMotion(), cp=cp6Of(); if(cp && !L.cpSeen){ L.cpSeen=+S.t.toFixed(2); cp.olvH=1; }
@@ -87493,7 +87511,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='23.88';        
+let GVT_CV='23.89';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
