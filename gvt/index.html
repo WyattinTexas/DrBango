@@ -47252,7 +47252,7 @@ function t3Prize(n){ const fresh=!vehOwns('tank3'); if(fresh){ if(!Array.isArray
 const ENG_CHARGE=1.6, ENG_RAMP=0.25, ENG_J2_WIND=2;
 
 const VEH_ACCEL=['STEADY','QUICK','LIGHTNING'];   
-function vehSpd(fk,eng){ const s=(fk==='tank2'||fk==='tank3'  )? Math.round(T2_SPD*BF_PACE) : BF_MOVE[fk].moveSpd; return eng? Math.round(s*ENG_MUL) : s; }   
+function vehSpd(fk,eng){ const s=(fk==='tank2'||fk==='tank3'  )? Math.round(T2_SPD*BF_PACE) : BF_MOVE[fk].moveSpd; const b=eng? Math.round(s*ENG_MUL) : s; return fk==='jeep3'? fsvSpd(b) : b; }       
 
 
 
@@ -50995,7 +50995,7 @@ function fsqLatch(u){ if(u.fsqI) return; u.fsqI=1; if(!fsqIE(u)) return; u.def.m
 function fsqRide(u,dt){ if(!u.fsq) u.fsq=[]; if(!S.bf.fsqN) S.bf.fsqN={ board:0, shot:0, box:0 };   
   if(u.fsq.length<FSQ.cap && fsqSeatsHere(u)) for(const o of S.units){    
     if(u.fsq.length>=FSQ.cap) break;
-    if(o===u || o.dead || o.type!=='rifleman' || o.side!==u.side || o.seat!==u.seat || o.dropT>0 || o.jetT>0 || o.falling || o.hlbAir || o.shv || (S.drag&&S.drag.unit===o) || rgOn(o)) continue;
+    if(!fsvFree(u,o)) continue;    
     if(Math.hypot(o.x-u.x,o.y-u.y)>FSQ.grabR) continue;
     fsqSeat(u,o); fsqBoardSay(u,o); }    
   const g=u.fsq.find(r=>r.seat==='gunner'); if(g) fsqGun(u,g,dt); }
@@ -51008,7 +51008,7 @@ function fsqGun(u,g,dt){ g.cd-=dt; if(g.cd>0) return; const d=g.o.def||UDEF.rifl
     if(bf.fsqN) bf.fsqN.box++; return; }
   const tgt=bfNearestEnemy(u,reach); if(!tgt) return;
   g.cd=1/rate; const fz=fssMz(u,tgt.x,mx,my); tslPush(u,{k:'tracer',x1:fz[0],y1:fz[1],x2:tgt.x,y2:tgt.y-18,t:0,dur:0.08}); bfSfx(SFX.pew,u.x,u.y); hurt(tgt,dmg,u);     if(bf.fsqN) bf.fsqN.shot++; }
-function fsqDrive(u,dt){ const bf=S.bf, me=bf.base[u.side], fo=bf.base[enemySide(u)];   
+function fsqDrive(u,dt){ if(fsvSeek(u,dt)) return;     const bf=S.bf, me=bf.base[u.side], fo=bf.base[enemySide(u)];   
   const cx0=(me.x+fo.x)/2, cy0=(me.y+fo.y)/2, rx=Math.max(120,Math.abs(fo.x-cx0)-FSQ.pass), ry=Math.max(60,Math.min(cy0-90,WORLD_H-110-cy0)*FSQ.ryK);
   if(u.fsqDir==null) u.fsqDir=1;
   const t0=Math.atan2((u.y-cy0)/ry,(u.x-cx0)/rx), th=t0+u.fsqDir*Math.min(1.2, FSQ.lead/(Math.hypot(rx*Math.sin(t0),ry*Math.cos(t0))||1));
@@ -87493,7 +87493,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='23.85';        
+let GVT_CV='23.86';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -100955,7 +100955,7 @@ function bfMarch(u,dt,goal){
       if(Math.hypot(ex,ey)>J2_SIGHT) continue;
       if(nx*ex+ny*ey>0){ j2close=true; break; }
     }
-    u.j2c = j2close? Math.min(1,(u.j2c||0)+dt/(isJ2? (engB? J2_RAMP/ENG_J2_WIND : J2_RAMP) : ENG_RAMP)) : 0;
+    u.j2c = j2close? Math.min(1,(u.j2c||0)+dt*fsvWind(u)   /(isJ2? (engB? J2_RAMP/ENG_J2_WIND : J2_RAMP) : ENG_RAMP)) : 0;
     v2m = 1+((isJ2? J2_CHARGE : ENG_CHARGE)-1)*u.j2c;
     if(u.j2c>0.4 && Math.random()<dt*26)
       S.fx.push({k:'puff',x:u.x-(S.bf? (u.side==='you'?30:-30) : 30),y:u.y-2,t:0,dur:0.26,R:9});
@@ -103139,6 +103139,7 @@ function placeUnit(type,x,y,side,seat){
       
       
       if(vehEng(type)){ u.def.moveSpd=Math.round(u.def.moveSpd*ENG_MUL); u.def.eng=1; }   
+      fsvLatch(u);   
     }
     
     
@@ -131066,12 +131067,34 @@ function fsqtPill(K){ btnRects.fsqt=null; const u=S.sel; if(!fsqtShows(u)) retur
   fitText(cx, lbl, bx+bw/2, by+bh/2+1, bw-12, 'bold', Math.round(18*K), Math.round(10*K)); cx.restore();
   btnRects.fsqt=[bx,by,bw,bh]; }
 function fsqtPress(p){ const r=btnRects.fsqt, u=S.sel; if(!r || !u || !inRect(p.x,p.y,r) || !fsqtShows(u)) return false; FSQT.pr=1; fsqtSet(u, !fsqtAtk(u)); return true; }   
-function fsqtTap(e,prev){ if(!S.bf || S.bf.resolved || S.drag || COMM.brief || HQS.on) return; const p=evPos(e); for(const r of trayRects) if(r && inRect(p.x,p.y,r)) return;
-  const w=evPosW(e); let hit=null, hd=1e9; for(const u of S.units){ if(!fsqtShows(u)) continue; const d=Math.hypot(u.x-w.x,(u.y-24)-w.y); if(d<FSQT.grab && d<hd){ hd=d; hit=u; } }
+function fsqtTap(e,prev,dh){ if(!S.bf || S.bf.resolved || S.drag || COMM.brief || HQS.on) return; const p=evPos(e); for(const r of trayRects) if(r && inRect(p.x,p.y,r)) return;
+  const w=evPosW(e); let hit=null, hd=1e9; for(const u of S.units){ if(!fsqtShows(u)) continue; const d=Math.hypot(u.x-w.x,(u.y-24)-w.y); if(d<fsvGrab(u) && d<hd){ hd=d; hit=u; } }    
+  if(dh && fsqtShows(dh)) hit=dh;    
   if(hit) S.sel=(prev===hit)? null : hit; }   
-cv.addEventListener('pointerdown', e=>{ FSQT.pr=0; FSQT.dn=(!FSQT.on || e.isPrimary===false || S.mode!=='play' || !S.bf)? null : { x:e.clientX, y:e.clientY, t:performance.now(), sel:S.sel, busy:!!(S.drag || S.jetAim || S.jv2Hold || S.eshAim || S.ftAim) }; }, { passive:true });   
-cv.addEventListener('pointerup', e=>{ const d=FSQT.dn; FSQT.dn=null; if(!d || d.busy || FSQT.pr || e.isPrimary===false) return; if(performance.now()-d.t>400 || Math.hypot(e.clientX-d.x, e.clientY-d.y)>12) return; try{ fsqtTap(e,d.sel); }catch(x){} }, { passive:true });
+cv.addEventListener('pointerdown', e=>{ FSQT.pr=0; FSQT.dn=(!FSQT.on || e.isPrimary===false || S.mode!=='play' || !S.bf)? null : { x:e.clientX, y:e.clientY, t:performance.now(), sel:S.sel, busy:!!(S.drag || S.jetAim || S.jv2Hold || S.eshAim || S.ftAim), hit:fsvPick(e)   }; }, { passive:true });   
+cv.addEventListener('pointerup', e=>{ const d=FSQT.dn; FSQT.dn=null; if(!d || d.busy || FSQT.pr || e.isPrimary===false) return; if(performance.now()-d.t>400 || Math.hypot(e.clientX-d.x, e.clientY-d.y)>12) return; try{ fsqtTap(e,d.sel,d.hit); }catch(x){} }, { passive:true });
 cv.addEventListener('pointercancel', ()=>{ FSQT.dn=null; }, { passive:true });
+
+
+
+
+
+
+
+
+
+const FSV={ spd:0.04, wind:0.10, seek:260, grabK:0.75 };   
+function fsvFree(u,o){ return !(o===u || o.dead || o.type!=='rifleman' || o.side!==u.side || o.seat!==u.seat || o.dropT>0 || o.jetT>0 || o.falling || o.hlbAir || o.shv || (S.drag&&S.drag.unit===o)); }   
+function fsvSeek(u,dt){ if(!FSV.seek || !u.fsq || u.fsq.length>=FSQ.cap || !fsqSeatsHere(u)) return false;   
+  let o=null, od=FSV.seek; for(const q of S.units){ if(!fsvFree(u,q)) continue; const d=Math.hypot(q.x-u.x,q.y-u.y); if(d<od){ od=d; o=q; } }
+  if(!o) return false; bfMarch(u,dt,{ x:o.x, y:o.y }); u.marching=true; return true; }
+function fsvGrab(u){ return Math.max(FSQT.grab, unitW(u.type)*FSV.grabK); }
+function fsvPick(e){ try{ if(!S.bf || S.bf.resolved || S.drag || COMM.brief || HQS.on) return null; const p=evPos(e); for(const r of trayRects) if(r && inRect(p.x,p.y,r)) return null;   
+  const w=evPosW(e); let hit=null, hd=1e9; for(const u of S.units){ if(!fsqtShows(u)) continue; const d=Math.hypot(u.x-w.x,(u.y-24)-w.y); if(d<fsvGrab(u) && d<hd){ hd=d; hit=u; } } return hit; }catch(x){ return null; } }
+function fsvSpd(b,n){ if(n==null) n=v3jTier(); return Math.round(b*(1+FSV.spd*n)); }   
+function fsvGain(eng){ const s=BF_MOVE.jeep3.moveSpd, b=eng? Math.round(s*ENG_MUL) : s, n=v3jTier(); return fsvSpd(b,n+1)-fsvSpd(b,n); }   
+function fsvLatch(u){ if(u.type!=='jeep3') return; const n=v3jTier(); if(!n) return; u.def.moveSpd=fsvSpd(u.def.moveSpd,n); u.fsvN=n; }   
+function fsvWind(u){ return 1+FSV.wind*(u.fsvN|0); }   
 
 function evPos(e){ const r=cv.getBoundingClientRect(); return { x:(e.clientX-r.left)/scale, y:(e.clientY-r.top)/scale }; }
 function evPosW(e){ const p=evPos(e), z9=zoomZ(); p.x/=z9; p.y/=z9; if(typeof cfcUnCam==='function') cfcUnCam(p); ccnUnCam(p);     const cm=S.bf? S.bf.cam : cCamOn(); if(cm){ p.x+=cm.x; p.y+=cm.y||0; } return p; }   
@@ -170676,7 +170699,7 @@ function shopRigHTML(t){
   const stl=(k,lab,val,gain,cls)=>'<span class="sh-st" data-k="'+k+'"><i>'+lab+'</i><b>'+val+'</b><em'+(cls?' class="'+cls+'"':'')+'>'+(gain||'')+'</em></span>';
   const sheet='<div class="sh-sheet" id="shst-'+t+'">'
     +stl('hp','HP',hpN, nxP? '+'+(vehHP(fk,r+1)-hpN) : v3n? '+'+(fk==='tank3'? T3.plate : V3J.plateHp)   : '')   
-    +stl('spd','MOVEMENT SPEED',eng? espd : spd, nxE? '+'+(espd-spd) : '')
+    +stl('spd','MOVEMENT SPEED',eng? espd : spd, nxE? '+'+(espd-spd) : (fk==='jeep3' && v3n)? '+'+fsvGain(eng)   : '')
     +stl('dmg','DAMAGE',vehDmg(fk, own? r : 0, own? null : 0), (tkdFace(fk) && nxP)? '+'+TKD.plate[fk] : (fk==='tank3' && v3n)? '+'+TKD.v3 : '')    
     +stl('acc','ACCELERATION',VEH_ACCEL[ag], nxE? VEH_ACCEL[ag+1] : '', 'to')
     +(fk==='jeep3'? stl('sarge','DAMAGE FROM SARGE',Math.round(V3J.x*100)+'%','') : '')   
