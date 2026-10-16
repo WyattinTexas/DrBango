@@ -15709,6 +15709,9 @@
   html.pjp-on .fortcard .ros-paint .sh-tag.wear { color:#fff; }   /**/
   html.pjp-on.ftn-on .fortcard .ros-jars { gap:4px clamp(6px,1.4vw,14px); }   /**/
   html.pjp-on:not(.ftn-on) .fortcard .ros-jars { gap:2px clamp(5px,1vw,8px); }   /**/
+  html.pjp-on .fortcard .ros-jars { flex-wrap:nowrap; max-width:100%; }   /**/
+  html.pjp-on .fortcard .ros-jars .sh-jar, html.pjp-on .fortcard .ros-jars .sh-bucket { flex:0 1 auto; min-width:0; }
+  html.pjp-on.ftn-on .fortcard .ros-paint .sh-tag { font-size:calc(clamp(8px,1.2vw,14px) * var(--pjpTag,1)); padding:1px 4px; }   /**/
   .mb-card.mbpjp { width:min(94vw,400px); }   /**/
   .mbpjp .mb-band { text-transform:uppercase; }
   .mbpjp .mb-win { width:min(84vw,330px); }
@@ -87929,7 +87932,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='24.20';        
+let GVT_CV='24.21';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -170719,6 +170722,20 @@ function pjpCard(id){ const a=dyeRowOf(id), p=document.getElementById('milePop')
     +'</div>';
   p.classList.remove('hidden');
   SFX.fanfare(); return true; }
+
+
+function pjpFitRow(){ const row=document.querySelector('#roomModal .fortcard #rosPaint .ros-jars'); if(!PJP.on || !row) return 0;
+  const tags=[...row.querySelectorAll('.sh-jar .sh-tag')]; if(tags.length<2) return 0;
+  const hit=()=>{ const r=tags.map(t=>t.getBoundingClientRect()); for(let i=1;i<r.length;i++){ const a=r[i-1], b=r[i]; if(Math.min(a.right,b.right)-Math.max(a.left,b.left)>0 && Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top)>0) return true; } return false; };
+  let k=1; row.style.setProperty('--pjpTag','1');
+  while(hit() && k>0.5){ k=Math.round((k-0.05)*100)/100; row.style.setProperty('--pjpTag',String(k)); }
+  PJP.fit=k; return k; }
+function pjpFitSoon(){ if(!rosPaintStands()) return; pjpFitRow(); try{ requestAnimationFrame(()=>{ if(rosPaintStands()) pjpFitRow(); }); }catch(e){} }   
+const pjpFortDeal=fortDeal, pjpFortSync=fortSync;
+fortDeal=function(){ const r=pjpFortDeal.apply(this,arguments); pjpFitSoon(); return r; };
+fortSync=function(){ const r=pjpFortSync.apply(this,arguments); pjpFitSoon(); return r; };
+window.addEventListener('resize', ()=>{ clearTimeout(PJP.rz); PJP.rz=setTimeout(pjpFitSoon, 120); });
+try{ if(document.fonts && document.fonts.ready) document.fonts.ready.then(pjpFitSoon); }catch(e){}
 
 Object.assign(TR.ar||(TR.ar={}), {"OWNED":"مملوك"});
 Object.assign(TR.ja||(TR.ja={}), {"OWNED":"しょゆう"});
