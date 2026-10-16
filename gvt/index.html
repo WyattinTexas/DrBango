@@ -87457,7 +87457,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='23.79';        
+let GVT_CV='23.80';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -134042,8 +134042,7 @@ const WENG='<ellipse cx="60" cy="129" rx="23" ry="5.5" fill="#000" opacity="0.25
  +'<g class="wws-flag" transform="translate(46,84)"><path d="M0 0 v-24" stroke="#6b4423" stroke-width="2.2" stroke-linecap="round"/><path d="M0 -24 l15 5 l-15 5 z" fill="#D2452D" stroke="#8a2a1e" stroke-width="1"/></g>'
  +'<path d="M54 64 Q45 72 46 84" stroke="#D8E1EE" stroke-width="5.5" fill="none" stroke-linecap="round"/>'
  +'<g class="wws-arm"><path d="M66 64 Q75 70 76 82" stroke="#D8E1EE" stroke-width="5.5" fill="none" stroke-linecap="round"/><g transform="translate(77,84)"><path d="M-1 -2 l9 -3.5 M-1 2 l9 3.5" stroke="#3a3a3a" stroke-width="2.6" stroke-linecap="round"/><circle cx="-1.5" cy="0" r="2.8" fill="#8f9398" stroke="#3a3a3a" stroke-width="1"/></g></g>'
- +'<circle cx="60" cy="50" r="8.5" fill="#E8B890"/>'
- +'<path d="M56 54 q4 3 8 0" stroke="#5a442a" stroke-width="2" fill="none" stroke-linecap="round"/>'
+ +'<circle cx="60" cy="50" r="8.5" fill="#E8B890"/>'   
  +'<path d="M49 44 Q49 33 60 33 Q71 33 71 44 z" fill="#3D5A8A"/>'
  +'<path d="M53 36.5 v7.5 M57 34.5 v9.5 M61 34.5 v9.5 M65 36 v8" stroke="#DDE6F2" stroke-width="2"/>'
  +'<path d="M47 44 h26 l3 3.2 h-32 z" fill="#2A3F63"/>';
@@ -134228,6 +134227,7 @@ function wwsFloorSVG(){
     +tw(wwsTownGroundSVG())   
     +(paper? '' : wwsPondSVG()+'<g id="wl-track">'+railroadPath(WWS.track)+'</g>')
     +wwsDeckSVG()+(paper? '' : dsrtFarSVG())   
+    +(paper? '' : wpwSVG(0))   
     +wlSnakeSVG()
     +tw(wrTownSVG()+wrTownNearSVG(paper? '' : 'row')+wrGateSVG())
     +wwsCactusSVG(C[0][0],C[0][1],C[0][2],0)+wwsCactusSVG(C[2][0],C[2][1],C[2][2],2)   
@@ -134235,8 +134235,9 @@ function wwsFloorSVG(){
     +(paper? '' : wwsStyle(S)+wwsFolkSVG(S)+tw(wrTownNearSVG('barrel')))
     +'<g id="wws-bank" transform="translate('+Bk.tx+','+Bk.ty+') scale('+Bk.s+')">'+bankArtSVG()+'</g>'
     +(paper? '' : dsrtMidSVG())   
+    +(paper? '' : wpwSVG(1))   
     +(paper? '' : wrPosseSVG(WWS.posseY)
-      +'<g id="wws-weeds" transform="translate(0,-20)">'+wlWeedSVG('wl-weed',false)+wlWeedSVG('wl-weed2',true)+'</g>'
+      +(wpwOn()? '' : '<g id="wws-weeds" transform="translate(0,-20)">'+wlWeedSVG('wl-weed',false)+wlWeedSVG('wl-weed2',true)+'</g>')   
       +wwsTrainSVG()+'<g id="wl-tunnels"></g>')+(paper? '' : dsrtNearSVG())       
     +wwsSignSVG()
     +(paper? '' : wwsEngSVG())
@@ -134513,6 +134514,77 @@ function wppRig(){ const on=wppOn(), S=on? wppSched() : null, g=document.getElem
 setTimeout(()=>{ try{ if(window.GVT && !GVT.wpp) GVT.wpp=wppRig; }catch(e){} }, 0);
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+const WPW={ on:(()=>{ try{ const m=/[?&]wpw=(\d)/.exec(location.search); return m? +m[1] : 1; }catch(e){ return 1; } })(),   
+  yh:227, y0:420, s0:0.66, r:16, g:392, e:0.5, bk:0.9, x0:-220, x1:1180, kf:[],   
+  
+  w:[ { id:'wl-weed',  rest:4, seed:31, lane:[[-220,284],[40,281],[150,277],[268,267],[420,266],[505,256],[880,256],[1180,262]], v:[40,22,58], stones:[-40,330,470,895] },   
+      { id:'wl-weed2', rest:4, seed:17, lane:[[-220,422],[236,420],[548,415],[647,420],[759,427],[892,420],[1180,418]], v:[52,30,78], stones:[60,236,548,647,759,892] } ] };   
+function wpwOn(){ return !!WPW.on && wwsOn(); }
+function wpwY(w,x){ const P=w.lane; if(x<=P[0][0]) return P[0][1]; for(let i=1;i<P.length;i++){ if(x<=P[i][0]){ const a=P[i-1], b=P[i]; return a[1]+(b[1]-a[1])*(x-a[0])/(b[0]-a[0]); } } return P[P.length-1][1]; }   
+function wpwK(y){ return WPW.s0*(y+WPW.yh)/(WPW.y0+WPW.yh); }   
+function wpwEnds(){ let B=0; try{ B=teBand(); }catch(e){} return (B>180)? [-(Math.ceil(B)+40), 960+Math.ceil(B)+40] : [WPW.x0, WPW.x1]; }   
+function wpwAt(a,b,X){ const T=b[0]-a[0], A=(b[2]-a[2])/(2*T), B=a[2], C=a[1]-X; const tau=Math.abs(A)<1e-9? -C/B : (-B+Math.sqrt(Math.max(0,B*B-4*A*C)))/(2*A); return [a[0]+tau, X, a[2]+(b[2]-a[2])*tau/T]; }   
+
+function wpwPlan(i,x0,x1){ const w=WPW.w[i], R=wwsRng(w.seed), rr=(a,b)=>a+R()*(b-a), q=w.v[2]/WPW.w[1].v[2];
+  const K=[[0,x0,w.v[0]]]; let ph=0, guard=0;
+  while(guard++<300){ const p=K[K.length-1], v=p[2], k=ph%3; let v1, T;
+    if(k===0){ v1=w.v[2]*rr(0.85,1.15); T=Math.min(2.2,Math.max(0.6,Math.abs(v1-v)/(rr(24,34)*q))); }
+    else if(k===1){ v1=v*rr(0.82,0.95); T=rr(0.8,1.6); }
+    else { v1=w.v[1]*(R()<0.22? rr(0.12,0.3) : rr(0.7,1.25)); if(v1>v) v1=v*0.9; T=Math.min(4,Math.max(1.2,(v-v1)/(rr(8,13)*q))); }
+    ph++; const b=[p[0]+T, p[1]+(v+v1)/2*T, v1]; if(b[1]>=x1){ K.push(wpwAt(p,b,x1)); break; } K.push(b); }
+  const out=[K[0]]; for(let j=1;j<K.length;j++){ for(const P of w.lane) if(P[0]>K[j-1][1]+0.01 && P[0]<K[j][1]-0.01) out.push(wpwAt(K[j-1],K[j],P[0])); out.push(K[j]); }
+  return out; }
+
+function wpwHops(K,w){ const H=[]; let free=-1;
+  for(const X of w.stones){ let j=1; while(j<K.length && K[j][1]<X) j++; if(j>=K.length || X<K[j-1][1]) continue;
+    const s=wpwAt(K[j-1],K[j],X), t0=s[0]; if(t0<free) continue; let vz=WPW.bk*s[2]/wpwK(wpwY(w,X)); if(vz*vz/(2*WPW.g)<1.5) continue;   
+    const seq=[]; let tt=t0; while(true){ const hh=vz*vz/(2*WPW.g), T1=2*vz/WPW.g; if(hh<1.2) break; seq.push([+tt.toFixed(3), +T1.toFixed(3), +hh.toFixed(2)]); tt+=T1; vz*=WPW.e; }
+    H.push(seq); free=tt+0.3; }
+  return H; }
+
+function wpwCSS(i){ const E=wpwEnds(), key=i+':'+E[0], w=WPW.w[i]; let c=WPW.kf[key]; if(c){ Object.assign(w, c.rig); return c; }
+  const K=wpwPlan(i,E[0],E[1]), H=wpwHops(K,w), te=K[K.length-1][0], L=+(te+w.rest).toFixed(1), x='wpw'+i, n=x+(E[0]===WPW.x0? '' : 'b'+(-E[0])), P=v=>(v/L*100).toFixed(4)+'%', f=v=>+v.toFixed(2);   
+  const cb=(v0,v1)=>{ const c=(v0+v1)>1e-6? v0/(v0+v1) : 0.5; return 'cubic-bezier(.3333,'+(2*c/3).toFixed(4)+',.6667,'+((1+2*c)/3).toFixed(4)+')'; };   
+  let tr='', sp='', th=0;
+  K.forEach((k,j)=>{ const y=wpwY(w,k[1]), s=wpwK(y), tf=(j===K.length-1)? 'linear' : cb(k[2],K[j+1][2]);
+    if(j>0){ const a=K[j-1]; th+=(k[1]-a[1])/((wpwK(wpwY(w,a[1]))+s)/2*WPW.r)*180/Math.PI; }   
+    tr+=P(k[0])+'{transform:translate('+f(k[1])+'px,'+f(y)+'px) scale('+s.toFixed(4)+');animation-timing-function:'+tf+'}'; sp+=P(k[0])+'{transform:rotate('+f(th)+'deg);animation-timing-function:'+tf+'}'; });
+  const ye=wpwY(w,E[1]); tr+='100%{transform:translate('+E[1]+'px,'+f(ye)+'px) scale('+wpwK(ye).toFixed(4)+')}'; sp+='100%{transform:rotate('+f(th)+'deg)}';   
+  const UP='cubic-bezier(.3333,.6667,.6667,1)', DN='cubic-bezier(.3333,0,.6667,.3333)';   
+  let hp='0%{transform:translate(0px,0px)}', sh='0%{transform:scale(1);opacity:1}', pf='0%{opacity:0;transform:scale(.6)}'; const land=[];
+  for(const seq of H){ seq.forEach((b,m)=>{ const [t0,T1,hh]=b, z=1/(1+hh/(1.5*WPW.r));
+      hp+=P(t0)+'{transform:translate(0px,0px);animation-timing-function:'+UP+'}'+P(t0+T1/2)+'{transform:translate(0px,'+f(-hh)+'px);animation-timing-function:'+DN+'}';
+      sh+=P(t0)+'{transform:scale(1);opacity:1;animation-timing-function:'+UP+'}'+P(t0+T1/2)+'{transform:scale('+z.toFixed(3)+');opacity:'+z.toFixed(3)+';animation-timing-function:'+DN+'}';
+      land.push([t0+T1, m? 0.32 : 0.55]); });
+    const z=seq[seq.length-1], tl=z[0]+z[1]; hp+=P(tl)+'{transform:translate(0px,0px)}'; sh+=P(tl)+'{transform:scale(1);opacity:1}'; }
+  land.forEach((l,j)=>{ const nx=land[j+1]? land[j+1][0]-0.02 : 1e9, end=Math.min(l[0]+0.35, nx); pf+=P(l[0]-0.01)+'{opacity:0;transform:scale(.6)}'+P(l[0])+'{opacity:'+l[1]+';transform:scale(.7)}'+P(end)+'{opacity:0;transform:scale(1.3)}'; });
+  hp+='100%{transform:translate(0px,0px)}'; sh+='100%{transform:scale(1);opacity:1}'; pf+='100%{opacity:0;transform:scale(.6)}';
+  c={ n:n, L:L, x0:E[0], x1:E[1], kf:'@keyframes '+n+'x{'+tr+'}@keyframes '+n+'r{'+sp+'}@keyframes '+n+'h{'+hp+'}@keyframes '+n+'s{'+sh+'}@keyframes '+n+'p{'+pf+'}',
+    rig:{ K:K.map(k=>[+k[0].toFixed(3), +k[1].toFixed(2), +k[2].toFixed(2)]), H:H, Lc:L, ends:E.slice() } };
+  Object.assign(w, c.rig); return (WPW.kf[key]=c); }
+
+function wpwSVG(i){ if(!wpwOn() || reducedMotion()) return ''; const w=WPW.w[i], c=wpwCSS(i), L=c.L, ph=((performance.now()/1000)%L).toFixed(3), n='wpw'+i, y=wpwY(w,c.x0);
+  const run=k=>'#roomStage .'+n+k+'{animation:'+c.n+k+' '+L+'s linear infinite;animation-delay:-'+ph+'s}';
+  return '<g id="'+w.id+'" pointer-events="none"><style>'+c.kf+run('x')+run('r')+run('h')+run('s')+run('p')+'</style>'
+    +'<g class="'+n+'x" transform="translate('+c.x0+','+y+') scale('+wpwK(y).toFixed(4)+')"><g class="'+n+'s"><ellipse cx="1" cy="0" rx="14" ry="4" fill="#000" opacity=".16"/></g>'
+    +'<g class="'+n+'p" opacity="0">'+dustPuff(-2,-2,1,1)+'</g><g class="'+n+'h"><g transform="translate(0,-'+WPW.r+')"><g class="'+n+'r">'+tumbleweedArt()+'</g></g></g></g></g>'; }
+
+function wpwRig(){ return { cv:GVT_CV, on:WPW.on, live:wpwOn(), yh:WPW.yh, y0:WPW.y0, s0:WPW.s0, r:WPW.r, g:WPW.g, e:WPW.e, bk:WPW.bk, x0:WPW.x0, x1:WPW.x1,
+  w:WPW.w.map((w,i)=>{ wpwCSS(i); return { id:w.id, L:w.Lc, ends:w.ends, lane:w.lane, stones:w.stones, v:w.v, keys:w.K, hops:w.H, painted:!!document.querySelector('#'+w.id+' .wpw'+i+'x') }; }) }; }
+setTimeout(()=>{ try{ if(window.GVT && !GVT.wpw) GVT.wpw=wpwRig; }catch(e){} }, 0);
 
 function wlRig(){
   const g=id=>!!document.getElementById(id), svg=document.querySelector('#roomStage > svg'), st=document.getElementById('roomStage'), q=s=>svg? svg.querySelector(s) : null;
