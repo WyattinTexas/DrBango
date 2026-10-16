@@ -50101,7 +50101,7 @@ const BF_PERSONA = {
 
 
 
-const ENH_ORDER=['longtube','foxhole','aerial','jumptank','bigbangers','riotshield','dualgun','buddyshield','stormcoil','gravgun','ambush','medicshield','telekinesis','outlawsniper','guardianshotgun','renegadepistol','flamestrike','flamestrike2','bakerrifle','bigpop','longeye','cougar','stride','unarmed','cannon','gotime','medicrifle','smokypowder','emperorsblade','eldersaber','smuggler','freezebeam','flameblade','jetboots','golddetector','lightarrow','iceblade','bigpapa','bombpack','reunited','intelligence','stakeshot','trenchkit','aces','arabesquemod','reveriemod','propshot','janehk','redmines','larsonradio','paperdecoy','skeetsight','thecrank','ocrocket','smokegrenade','heatseeker','penetrate','doubletap','pocketdome','thegrab','fullsquad','impeng','gigacannon','magnustank','pararescue','mindcontrol','frankbolt','runninggun','goldengun','heavyartillery','inspiringsoldiers','mirrorblade','hotstreak','janehook','coinflip','mousemod','setupknockdown','shotclaw','boomstick','dragonflysight'];                                                                                                       
+const ENH_ORDER=['longtube','foxhole','aerial','jumptank','bigbangers','riotshield','dualgun','buddyshield','stormcoil','gravgun','ambush','medicshield','telekinesis','outlawsniper','guardianshotgun','renegadepistol','flamestrike','flamestrike2','bakerrifle','bigpop','longeye','cougar','stride','unarmed','cannon','gotime','medicrifle','smokypowder','emperorsblade','eldersaber','smuggler','freezebeam','flameblade','jetboots','golddetector','lightarrow','iceblade','bigpapa','bombpack','reunited','intelligence','stakeshot','trenchkit','aces','arabesquemod','reveriemod','propshot','janehk','redmines','larsonradio','paperdecoy','skeetsight','thecrank','ocrocket','smokegrenade','heatseeker','penetrate','doubletap','pocketdome','thegrab','fullsquad','impeng','gigacannon','magnustank','pararescue','mindcontrol','frankbolt','runninggun','goldengun','heavyartillery','inspiringsoldiers','mirrorblade','hotstreak','janehook','coinflip','mousemod','setupknockdown','shotclaw','boomstick','dragonflysight','blackhole','teddy'];                                                                                                       
 
 
 
@@ -72513,7 +72513,7 @@ function spbDrawOrb(sh){
   cx.strokeStyle=SPB_LILAC; cx.lineWidth=1.2; cx.beginPath(); cx.arc(sh.x,sh.y,5*g,0,7); cx.stroke();
   cx.fillStyle='#FFFFFF'; cx.beginPath(); cx.arc(sh.x-1,sh.y-1,2*g,0,7); cx.fill(); cx.restore();
 }
-function spbFxDraw(e,k){
+function spbFxDraw(e,k){ if(e.m==='hole' || e.m==='wave' || e.m==='gulp' || e.m==='quake' || e.m==='teddy') return spbFx2(e,k);   
   cx.save();
   if(e.m==='hit'){ cx.globalAlpha=0.7*(1-k); cx.fillStyle='#FFFFFF'; cx.beginPath(); cx.arc(e.x,e.y,9+6*k,0,7); cx.fill(); }
   else { const x=e.x+e.vx*k*e.dur*2.4, y=e.y+e.vy*k*e.dur*2.4, r=(e.m==='spark'? 3.2 : 2.4)*(1-k*0.5);
@@ -72537,7 +72537,9 @@ function spbDrawHands(u){
   cx.strokeStyle='#C9A227'; cx.lineWidth=0.9; cx.beginPath(); cx.moveTo(-10,-1); cx.lineTo(-8.4,-2.2); cx.moveTo(10,-1); cx.lineTo(8.4,-2.2); cx.moveTo(-10,7); cx.lineTo(-8.4,8.2); cx.moveTo(10,7); cx.lineTo(8.4,8.2); cx.stroke();
   if(!RM){ const w9=Math.sin(S.t*3+x*0.01); cx.globalAlpha=0.7; cx.strokeStyle=SPB_HEX; cx.lineWidth=0.8; cx.beginPath(); cx.moveTo(-1,-2); cx.quadraticCurveTo(-3+w9,-7,1,-9-w9); cx.moveTo(2,-3); cx.quadraticCurveTo(5-w9,-6,3,-10+w9); cx.stroke(); cx.globalAlpha=1; }
   cx.restore();
-  cx.save(); cx.translate(x+7,y-37); cx.rotate(0.55*fk); cx.lineCap='round';
+  if(u.spbWave>0) u.spbWave=Math.max(0, u.spbWave-1/60); const wv=(u.spbWave>0)? Math.sin(Math.PI*2*(1-u.spbWave/SP_WAVE_T)) : 0;   
+  if(wv && !RM){ cx.save(); cx.globalAlpha=0.5*Math.abs(wv); cx.strokeStyle=SPB_HEX; cx.lineWidth=2.4; cx.lineCap='round'; cx.beginPath(); cx.arc(x+7,y-37,11,-1.2,-1.2+1.3*wv,wv<0); cx.stroke(); cx.restore(); }
+  cx.save(); cx.translate(x+7,y-37); cx.rotate(0.55*fk+0.95*wv); cx.lineCap='round';
   cx.strokeStyle='rgba(42,26,16,.9)'; cx.lineWidth=2.1; cx.beginPath(); cx.moveTo(-0.6,1.6); cx.lineTo(6.8,-8.3); cx.stroke();
   cx.strokeStyle='#5A3A20'; cx.lineWidth=1.3; cx.beginPath(); cx.moveTo(-0.6,1.6); cx.lineTo(6.8,-8.3); cx.stroke();
   cx.strokeStyle='#F2E8C8'; cx.lineWidth=1.3; cx.beginPath(); cx.moveTo(5.7,-6.8); cx.lineTo(6.8,-8.3); cx.stroke();
@@ -72559,6 +72561,316 @@ function spbOpen(){
     +'</div>';
   p.classList.remove('hidden');
   SFX.fanfare();
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const SPB_SP={ earthquake:{ name:'EARTHQUAKE', start:1, cd:16, hex:'#D08A3C' }, tsunami:{ name:'TSUNAMI', start:1, cd:14, hex:'#33C8E8' }, blackhole:{ name:'BLACK HOLE', cd:20, hex:'#9B4DFF' }, teddy:{ name:'TEDDY BOMB', cd:20, hex:'#E58BB6' } }, SPB_SPELLS=['earthquake','tsunami','blackhole','teddy'], SPB_BUY=['blackhole','teddy'];
+const QK_AHEAD=140, QK_SIDE=224, QK_STAG=0.6, QK_TICKS=4, QK_DMG=1, TD_N=5, TD_FUSE=2;   
+function spbPrice(){ return SABER_PRICE + SABER_ESCALATOR*SPB_BUY.filter(k=>enhOwns(k)).length; }   
+function spbScale(u){ const sw=u? unitSargeStats(u) : null; return (sw && sw.w==='spellbook')? sw.dmg/SPB_DMG0 : 1; }   
+const BH_R=336, BH_EAT=24, BH_HOLD=1.15, TS_R=336, TS_SPD=300, TS_PUSH=140, TS_DMG=1, TS_GAP=0.25, TS_FAN=Math.PI/4, TS_BAND=14, SP_PAD_T=2.5, SP_FIZZ_T=1.0, SP_WAVE_T=0.4;
+
+
+const SPB_INC=(function(){ const root={};
+(function(root){
+  var INC={ N:48, minLen:40, minPts:6,
+            swTurns:1.35, swSame:0.7, swRatio:1.5, swEnd:0.4,
+            wvAspect:1.5, wvMinH:0.14, wvMono:0.75, wvDead:0.1, wvDeadPx:4, wvTips:3, wvEndTip:0.75,
+            infClose:0.35, infAspMin:1.25, infAspMax:5, infRange:0.72, infTotal:0.4 };   
+  var TR={ N:64, tol:26, cover:0.8, stay:0.8, dots:120 };
+  
+  var SIGNS={
+    blackhole:function(cx,cy,s){ s=s||1; var out=[], n=TR.dots, turns=2.25, R=80*s; for(var i=0;i<=n;i++){ var t=i/n, th=t*turns*2*Math.PI, r=R*(1-0.86*t); out.push({x:cx+r*Math.cos(th), y:cy+r*Math.sin(th)}); } return out; },
+    tsunami:function(cx,cy,s){ s=s||1; var out=[], n=TR.dots, W=320*s, A=36*s; for(var i=0;i<=n;i++){ var t=i/n; out.push({x:cx-W/2+W*t, y:cy-A*Math.sin(t*3*2*Math.PI)}); } return out; },
+    earthquake:function(cx,cy,s){ s=s||1; var out=[], n=TR.dots, Hh=300*s, A=40*s; for(var i=0;i<=n;i++){ var t=i/n, k=t*6, ph=k-Math.floor(k), z=(Math.floor(k)%2===0)? ph : 1-ph; out.push({x:cx+A*(2*z-1), y:cy-Hh/2+Hh*t}); } return out; },   
+    teddy:function(cx,cy,s){ s=s||1; var out=[], n=TR.dots, a=150*s; for(var i=0;i<=n;i++){ var th=i/n*2*Math.PI, d=1+Math.pow(Math.sin(th),2); out.push({x:cx+a*Math.cos(th)/d, y:cy+a*Math.sin(th)*Math.cos(th)/d}); } return out; }   
+  };
+  var SIGN_DIR={ blackhole:'start', tsunami:'any', earthquake:'any', teddy:'any' };   
+  function P(p){ return Array.isArray(p)? {x:+p[0],y:+p[1]} : {x:+p.x,y:+p.y}; }
+  function clean(pts){ var out=[]; for(var i=0;i<pts.length;i++){ var q=P(pts[i]); if(!isFinite(q.x)||!isFinite(q.y)) continue; var l=out[out.length-1]; if(l && Math.abs(l.x-q.x)<0.01 && Math.abs(l.y-q.y)<0.01) continue; out.push(q); } return out; }
+  function pathLen(pts){ var L=0; for(var i=1;i<pts.length;i++) L+=Math.hypot(pts[i].x-pts[i-1].x, pts[i].y-pts[i-1].y); return L; }
+  
+  function resample(pts,n){ var L=pathLen(pts), I=L/(n-1), D=0, out=[{x:pts[0].x,y:pts[0].y}];
+    for(var i=1;i<pts.length;i++){ var a=pts[i-1], b=pts[i], d=Math.hypot(b.x-a.x,b.y-a.y);
+      if(D+d>=I && d>0){ var t=(I-D)/d, q={x:a.x+t*(b.x-a.x), y:a.y+t*(b.y-a.y)}; out.push(q); pts.splice(i,0,q); D=0; } else D+=d; }
+    while(out.length<n) out.push({x:pts[pts.length-1].x,y:pts[pts.length-1].y}); return out.slice(0,n); }
+  function smooth(pts){ var out=[pts[0]]; for(var i=1;i<pts.length-1;i++) out.push({x:(pts[i-1].x+pts[i].x+pts[i+1].x)/3, y:(pts[i-1].y+pts[i].y+pts[i+1].y)/3}); out.push(pts[pts.length-1]); return out; }
+  function box(pts){ var x0=1e9,y0=1e9,x1=-1e9,y1=-1e9; for(var i=0;i<pts.length;i++){ var p=pts[i]; if(p.x<x0)x0=p.x; if(p.x>x1)x1=p.x; if(p.y<y0)y0=p.y; if(p.y>y1)y1=p.y; } return {x0:x0,y0:y0,x1:x1,y1:y1,w:x1-x0,h:y1-y0}; }
+  function centroid(pts){ var x=0,y=0; for(var i=0;i<pts.length;i++){ x+=pts[i].x; y+=pts[i].y; } return {x:x/pts.length, y:y/pts.length}; }
+  function wrap(a){ while(a>Math.PI) a-=2*Math.PI; while(a<-Math.PI) a+=2*Math.PI; return a; }
+  function segDist(p,a,b){ var dx=b.x-a.x, dy=b.y-a.y, L2=dx*dx+dy*dy; var t=L2? Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/L2)) : 0; return Math.hypot(p.x-(a.x+t*dx), p.y-(a.y+t*dy)); }
+  function pathDist(p,poly){ var m=1e9; for(var i=1;i<poly.length;i++){ var d=segDist(p,poly[i-1],poly[i]); if(d<m) m=d; } return m; }
+  
+  function traceRead(raw, dots, dir){ var pts=clean(raw||[]); var L=pathLen(pts);
+    if(pts.length<INC.minPts || L<INC.minLen) return { ok:false, why:'short', len:L };
+    var rs=resample(pts.slice(), TR.N), tol=TR.tol, hit=0, on=0, i;
+    for(i=0;i<dots.length;i++) if(pathDist(dots[i], rs)<=tol) hit++;                 
+    for(i=0;i<rs.length;i++) if(pathDist(rs[i], dots)<=tol) on++;                     
+    var cover=hit/dots.length, stay=on/rs.length, d0=Math.hypot(rs[0].x-dots[0].x, rs[0].y-dots[0].y), d1=Math.hypot(rs[0].x-dots[dots.length-1].x, rs[0].y-dots[dots.length-1].y);
+    var dirOk = (dir||'any')==='any' ? true : d0<d1;                                   
+    return { ok: cover>=TR.cover && stay>=TR.stay && dirOk, cover:cover, stay:stay, dirOk:dirOk, len:L, why: cover<TR.cover? 'missed dots' : stay<TR.stay? 'strayed' : !dirOk? 'wrong way' : '' };
+  }
+  function traceSign(raw, kind, cx, cy, s){ var r=traceRead(raw, SIGNS[kind](cx,cy,s), SIGN_DIR[kind]); r.spell = r.ok? kind : null; return r; }
+  
+  function swirl(pts){ var c=centroid(pts), n=pts.length, turn=0, same=0, cnt=0, rs=[], i;
+    for(i=0;i<n;i++) rs.push(Math.hypot(pts[i].x-c.x, pts[i].y-c.y));
+    var angs=[]; for(i=1;i<n;i++) angs.push(Math.atan2(pts[i].y-pts[i-1].y, pts[i].x-pts[i-1].x));
+    for(i=1;i<angs.length;i++) turn+=wrap(angs[i]-angs[i-1]);
+    var a2=[]; for(i=2;i<n;i++) a2.push(Math.atan2(pts[i].y-pts[i-2].y, pts[i].x-pts[i-2].x));
+    var sg=turn<0?-1:1; for(i=1;i<a2.length;i++){ var d=wrap(a2[i]-a2[i-1]); if(Math.abs(d)<0.03) continue; cnt++; if(d*sg>0) same++; }
+    var third=Math.floor(n/3), r0=0, r1=0, rmax=0; for(i=0;i<third;i++) r0+=rs[i]; for(i=n-third;i<n;i++) r1+=rs[i]; for(i=0;i<n;i++) if(rs[i]>rmax) rmax=rs[i];
+    r0/=third; r1/=third;
+    return { turns:Math.abs(turn)/(2*Math.PI), same:cnt? same/cnt : 0, ratio:r1>0.001? r0/r1 : 99, end:rmax>0? rs[n-1]/rmax : 1, dir:sg };
+  }
+  function wave(pts, bx){ var n=pts.length, pos=0, neg=0, i; for(i=1;i<n;i++){ var dx=pts[i].x-pts[i-1].x; if(dx>0.01) pos++; else if(dx<-0.01) neg++; }
+    var mono=(pos+neg)? Math.max(pos,neg)/(pos+neg) : 0, dead=Math.max(INC.wvDead*Math.max(bx.h,1), INC.wvDeadPx), dir=0, ups=0, downs=0, rev=0, anchor=pts[0].y, ext=pts[0].y, prevExt=pts[0].y, swing=0;
+    for(i=1;i<n;i++){ var y=pts[i].y;
+      if(dir===0){ if(y-anchor>dead){ dir=1; ext=y; } else if(anchor-y>dead){ dir=-1; ext=y; } continue; }
+      if(dir===1){ if(y>ext) ext=y; else if(ext-y>dead){ downs++; rev++; swing+=Math.abs(ext-prevExt); prevExt=ext; dir=-1; ext=y; } }
+      else { if(y<ext) ext=y; else if(y-ext>dead){ ups++; rev++; swing+=Math.abs(ext-prevExt); prevExt=ext; dir=1; ext=y; } } }
+    var mean=rev? swing/rev : 0, lastT=Math.abs(ext-prevExt); if(dir!==0 && lastT>dead && (!rev || lastT>=INC.wvEndTip*mean)){ if(dir===1) downs++; else ups++; }
+    return { aspect: bx.h>0.001? bx.w/bx.h : 99, hw: bx.w>0? bx.h/bx.w : 99, mono:mono, rev:rev, ups:ups, downs:downs, tips:Math.max(ups,downs), lastT:+lastT.toFixed(1), mean:+mean.toFixed(1) };
+  }
+  function infinity(pts, bx){ var n=pts.length, cum=0, mx=0, mn=0, i, angs=[]; for(i=1;i<n;i++) angs.push(Math.atan2(pts[i].y-pts[i-1].y, pts[i].x-pts[i-1].x));
+    for(i=1;i<angs.length;i++){ cum+=wrap(angs[i]-angs[i-1]); if(cum>mx) mx=cum; if(cum<mn) mn=cum; }
+    var w=Math.max(bx.w,1), h=Math.max(bx.h,1), close=Math.hypot(pts[n-1].x-pts[0].x, pts[n-1].y-pts[0].y)/Math.max(w,h);
+    return { close:close, aspect:w/h, range:(mx-mn)/(2*Math.PI), total:Math.abs(cum)/(2*Math.PI) }; }
+  function incantRead(raw){ var pts=clean(raw||[]); var L=pathLen(pts);
+    if(pts.length<INC.minPts || L<INC.minLen) return { spell:null, why:'short', len:L, n:pts.length };
+    var rs=smooth(resample(pts.slice(), INC.N)), bx=box(rs), sw=swirl(rs), wv=wave(rs,bx);
+    var rot=rs.map(function(p){ return {x:p.y, y:-p.x}; }), bxr=box(rot), wq=wave(rot,bxr), inf=infinity(rs,bx);   
+    var isSw = sw.turns>=INC.swTurns && sw.same>=INC.swSame && sw.ratio>=INC.swRatio && sw.end<=INC.swEnd;
+    var isInf = !isSw && inf.close<=INC.infClose && inf.aspect>=INC.infAspMin && inf.aspect<=INC.infAspMax && inf.range>=INC.infRange && inf.total<=INC.infTotal;
+    var isWv = !isSw && !isInf && wv.aspect>=INC.wvAspect && wv.hw>=INC.wvMinH && wv.mono>=INC.wvMono && wv.tips===INC.wvTips;
+    var isQk = !isSw && !isInf && !isWv && wq.aspect>=INC.wvAspect && wq.hw>=INC.wvMinH && wq.mono>=INC.wvMono && wq.tips===INC.wvTips;
+    return { spell: isSw? 'blackhole' : isInf? 'teddy' : isWv? 'tsunami' : isQk? 'earthquake' : null, len:L, n:pts.length, sw:sw, wv:wv, wq:wq, inf:inf, box:bx };
+  }
+  var api={ INC:INC, TR:TR, SIGNS:SIGNS, SIGN_DIR:SIGN_DIR, incantRead:incantRead, traceRead:traceRead, traceSign:traceSign, resample:resample, smooth:smooth, clean:clean };
+  if(typeof module!=='undefined' && module.exports) module.exports=api; else { root.incantRead=incantRead; root.traceSign=traceSign; root.INCANT=api; }
+})(root);
+  return root.INCANT; })();
+function spbS(){ if(!S.spb || S.spb.arr!==S.units) S.spb={ arr:S.units, cd:{ earthquake:0, tsunami:0, blackhole:0, teddy:0 }, pad:null, lock:0, flash:0, holes:[], waves:[], quakes:[], teddies:[], last:null, casts:0, fizz:0 }; return S.spb; }   
+function spbKnown(k){ const d=SPB_SP[k]; return !!d && (d.start? spbOwned() : enhOn(k)); }   
+function spbKnownList(){ return SPB_SPELLS.filter(spbKnown); }
+function spbRung(){ return S.mode==='play' && plrHand()==='spellbook' && spbKnownList().length>0; }   
+function spbSarge(){ const u=jetSarge(); return (u && unitSargeStats(u).w==='spellbook')? u : null; }
+function spbReady(k){ return spbKnown(k) && (spbS().cd[k]||0)<=0; }
+
+function drawSpbBtn(){
+  btnRects.spb=null; spbHook();
+  if(!spbRung()) return;
+  const bw=64, bh=56, x=VW-88, y=H-232-colPitch()*(colRungN()-(skdRung()?1:0)-1);
+  btnRects.spb=[x,y,bw,bh];
+  const st=spbS(), js=spbSarge(), ks=spbKnownList(), cds=ks.map(k=>st.cd[k]||0), cd=Math.min.apply(null,cds), lit=!!js && cd<=0 && st.lock<=0, hot=st.pad? 1 : 0;
+  cx.fillStyle=(cd>0||!js||st.lock>0)? 'rgba(38,40,31,0.6)' : 'rgba(38,40,31,0.92)'; rr(x,y,bw,bh,12); cx.fill();
+  cx.save(); cx.globalAlpha=cd>0? 0.25 : 0.85; cx.strokeStyle=SPB_HEX; cx.lineWidth=2; rr(x+1.5,y+1.5,bw-3,bh-3,10); cx.stroke(); cx.restore();
+  if(cd>0){ const mx=Math.max.apply(null, ks.filter(k=>(st.cd[k]||0)===cd).map(k=>SPB_SP[k].cd)), k=1-cd/mx, fh=Math.max(1,bh*k);
+    cx.save(); rr(x,y,bw,bh,12); cx.clip(); cx.fillStyle='rgba(150,90,220,0.45)'; cx.fillRect(x,y+bh-fh,bw,fh); cx.fillStyle=SPB_LILAC; cx.fillRect(x,y+bh-fh,bw,3); cx.restore(); }
+  else if(st.flash>0 || hot){ cx.save(); cx.globalAlpha=hot? 1 : (reducedMotion()? 0.85 : Math.min(1,st.flash/0.9)); cx.strokeStyle='#FFD24A'; cx.lineWidth=3; rr(x,y,bw,bh,12); cx.stroke(); cx.restore(); }
+  const gx=x+bw/2, gy=y+19; cx.save(); cx.globalAlpha=cd>0? 0.2 : (lit||hot? 1 : 0.4); cx.lineJoin='round'; cx.lineCap='round';
+  cx.fillStyle='#7A2E2A'; cx.strokeStyle='#F2E8C8'; cx.lineWidth=1.6;
+  cx.beginPath(); cx.moveTo(gx-17,gy-4); cx.quadraticCurveTo(gx-8.5,gy-11,gx,gy-4); cx.quadraticCurveTo(gx+8.5,gy-11,gx+17,gy-4); cx.lineTo(gx+17,gy+9); cx.quadraticCurveTo(gx+8.5,gy+4,gx,gy+9); cx.quadraticCurveTo(gx-8.5,gy+4,gx-17,gy+9); cx.closePath(); cx.fill();
+  cx.fillStyle='#F2E8C8'; cx.beginPath(); cx.moveTo(gx-14.5,gy-3); cx.quadraticCurveTo(gx-7,gy-8.5,gx,gy-3); cx.lineTo(gx,gy+6); cx.quadraticCurveTo(gx-7,gy+1.5,gx-14.5,gy+6); cx.closePath(); cx.fill();
+  cx.beginPath(); cx.moveTo(gx+14.5,gy-3); cx.quadraticCurveTo(gx+7,gy-8.5,gx,gy-3); cx.lineTo(gx,gy+6); cx.quadraticCurveTo(gx+7,gy+1.5,gx+14.5,gy+6); cx.closePath(); cx.fill();
+  cx.strokeStyle=SPB_HEX; cx.lineWidth=1.4; cx.beginPath(); cx.moveTo(gx-2,gy-6); cx.quadraticCurveTo(gx-6,gy-14,gx+1,gy-17); cx.moveTo(gx+3,gy-7); cx.quadraticCurveTo(gx+9,gy-12,gx+5,gy-18); cx.stroke();
+  cx.globalAlpha=cd>0? 0.35 : (lit||hot? 1 : 0.5); cx.textAlign='center'; cx.font=cf('bold 15px'); cx.fillStyle=lit||hot? '#FFE7A8' : '#CFC6B0'; cx.fillText(t('CAST'), gx, y+bh-11);
+  cx.restore();
+  if(cd>0){ cx.textAlign='center'; cx.font=cf('bold 26px'); cx.fillStyle='#FFD24A'; cx.fillText(Math.ceil(cd), x+bw/2, y+bh/2+2); }
+}
+
+function spbTick(dt){
+  if(!S.spb || S.spb.arr!==S.units) return;
+  const st=S.spb;
+  for(const k of SPB_SPELLS){ if(st.cd[k]>0){ st.cd[k]=Math.max(0,st.cd[k]-dt); if(st.cd[k]===0 && spbKnown(k)) st.flash=0.9; } }
+  if(st.flash>0) st.flash=Math.max(0,st.flash-dt); if(st.lock>0) st.lock=Math.max(0,st.lock-dt);
+  if(st.pad){ st.pad.t-=dt; if(S.mode!=='play' || (st.pad.t<=0 && !st.pad.down)) st.pad=null; }
+  for(let i=st.holes.length-1;i>=0;i--){ const h=st.holes[i]; h.t+=dt; const u=h.u;
+    for(const m of h.men){ const f=m.f; if(m.eat || !f || f.dead) continue;
+      const d=Math.hypot(f.x-h.x, f.y-h.y);
+      const over=(!f.shv && h.t>0.15) || h.t>=BH_HOLD-0.05; if(over && d>BH_EAT*3){ m.eat=2; continue; }   
+      if(d<=BH_EAT || over){ m.eat=1; S.fx.push({ k:'spbx', m:'gulp', x:f.x, y:f.y-16, tx:h.x, ty:h.y-18, t:0, dur:0.25 }); hurt(f, h.dmg, u); h.ate++; } }
+    if(h.t>=BH_HOLD){ st.holes.splice(i,1); S.fx.push({ k:'ring', x:h.x, y:h.y-18, r:40, R:4, t:0, dur:0.22, col:SPB_HEX }); S.fx.push({ k:'ring', x:h.x, y:h.y-18, r:6, R:70, t:0, dur:0.3, col:'#FFFFFF', lw:2 }); bfSfx(SFX.snap,h.x,h.y); setTimeout(()=>{ try{ bfSfx(SFX.cotboom,h.x,h.y); }catch(e){} },60); } }
+  for(let i=st.quakes.length-1;i>=0;i--){ const q=st.quakes[i]; q.t+=dt;   
+    while(q.n<QK_TICKS && q.t>=QK_STAG+q.n*1.0){ q.n++; for(const f of q.men){ if(!f || f.dead) continue; hurt(f, q.dmg, q.u); S.fx.push({ k:'puff', x:f.x+(Math.random()-0.5)*10, y:f.y-4, t:0, dur:0.35, R:9, col:'#C9A77A' }); } }
+    if(q.n>=QK_TICKS) st.quakes.splice(i,1); }
+  for(let i=st.teddies.length-1;i>=0;i--){ const b=st.teddies[i]; b.t+=dt; if(b.t<TD_FUSE) continue; st.teddies.splice(i,1); spbTeddyBoom(b); }
+  for(let i=st.waves.length-1;i>=0;i--){ const w=st.waves[i]; w.t+=dt; if(w.t<0) continue;
+    if(!w.loud){ w.loud=1; bfSfx(SFX.jet, w.x, w.y); }
+    const r0=w.r, r=Math.min(TS_R, w.t*TS_SPD); w.r=r;
+    for(const f of TGTC(w.u)){ if(!f || f.dead || w.cast.hit.has(f)) continue;
+      const dx=f.x-w.x, dy=f.y-w.y, d=Math.hypot(dx,dy); if(d<r0-TS_BAND || d>r+TS_BAND) continue;
+      let da=Math.atan2(dy,dx)-w.a; while(da>Math.PI) da-=2*Math.PI; while(da<-Math.PI) da+=2*Math.PI; if(Math.abs(da)>TS_FAN) continue;
+      if(!ggCanShove(f) || f.dropT>0 || f.burrow || f.jetT>0) continue;
+      w.cast.hit.add(f); w.cast.n++;
+      ggShove(f, f.x-Math.cos(w.a)*24, (f.y-18)-Math.sin(w.a)*24, w.u, w.cast.sh, TS_PUSH);   
+      hurt(f, TS_DMG, w.u); }
+    if(w.t*TS_SPD>=TS_R+40) st.waves.splice(i,1); }
+}
+
+function spbPress(){
+  const st=spbS(), js=spbSarge();
+  if(st.pad){ st.pad=null; return; }
+  if(!js || st.lock>0 || !spbKnownList().some(spbReady)){ SFX.clack(); return; }
+  const r=cv.getBoundingClientRect();
+  st.pad={ t:SP_PAD_T, pts:[], down:false, W:r.width, H:r.height, g:spbGuides(r.width, r.height) };
+  bfSfx(SFX.twink, js.x, js.y);
+}
+
+const SPB_GW={ earthquake:80, tsunami:320, blackhole:160, teddy:300 }, SPB_GH={ earthquake:300, tsunami:72, blackhole:160, teddy:110 };   
+function spbGuides(W,H){ const ks=spbKnownList(), cy=H*0.47, gap=36, sumW=ks.reduce((a,k)=>a+SPB_GW[k],0), use=W-2*Math.max(96, W*0.11), s=Math.min(1, (use-gap*(ks.length-1))/sumW, (H*0.42)/Math.max.apply(null, ks.map(k=>SPB_GH[k])));
+  let x=W*0.48-(sumW*s+gap*(ks.length-1))/2;     return ks.map(k=>{ const g={ k, x:x+SPB_GW[k]*s/2, y:cy, s:+s.toFixed(3) }; x+=SPB_GW[k]*s+gap; return g; }); }   
+function spbJudge(pts){
+  const st=spbS(), pad=st.pad; let spell=null, how='';
+  const r=SPB_INC.incantRead(pts); if(r.spell && spbKnown(r.spell)){ spell=r.spell; how='shape'; }
+  if(!spell && pad) for(const g of pad.g){ const q=SPB_INC.traceSign(pts, g.k, g.x, g.y, g.s); if(q.ok){ spell=g.k; how='trace'; break; } }
+  return { spell, how };
+}
+function spbLift(){
+  const st=spbS(), pad=st.pad; if(!pad) return null;
+  const j=spbJudge(pad.pts); st.pad=null; const js=spbSarge();
+  st.last={ spell:j.spell, how:j.how, n:pad.pts.length, t:+S.t.toFixed(2) };
+  if(j.spell && js && spbReady(j.spell)){ spbGo(js, j.spell); return j.spell; }
+  spbFizzle(js, j.spell); return null;
+}
+function spbFizzle(js, k){ const st=spbS(); st.lock=SP_FIZZ_T; st.fizz++; SFX.clack();
+  if(js){ for(let i=0;i<5;i++) S.fx.push({ k:'puff', x:js.x+14*unitFaceX(js)+(i-2)*4, y:js.y-44-i*3, t:-i*0.04, dur:0.5, R:9, col:'#B9A3D6' });
+    S.floats.push({ x:js.x, y:js.y-62, txt:(k && (spbS().cd[k]||0)>0)? t('FIZZLE')+' '+Math.ceil(spbS().cd[k]) : t('FIZZLE'), t:0, col:SPB_LILAC }); } }
+
+function spbGo(u, k){
+  const st=spbS(), sw=unitSargeStats(u), RM=reducedMotion(); st.cd[k]=SPB_SP[k].cd; st.casts++; u.spbWave=SP_WAVE_T; u.spbT=0;
+  const wd=unitFaceX(u), tx=u.x+14*wd, ty=u.y-46;
+  S.fx.push({ k:'ring', x:tx, y:ty, r:4, R:26, t:0, dur:0.3, col:SPB_SP[k].hex });
+  S.floats.push({ x:u.x, y:u.y-64, txt:t(SPB_SP[k].name)+'!', t:0, col:SPB_SP[k].hex });
+  if(k==='blackhole'){
+    const h={ u, x:u.x, y:u.y, t:0, men:[], ate:0, dmg:sw.dmg }, sh={};
+    for(const f of TGTC(u)){ if(!f || f.dead || f.dropT>0) continue; const d=Math.hypot(f.x-u.x, f.y-u.y); if(d>BH_R) continue;
+      if(!ggCanShove(f)) continue;
+      h.men.push({ f, d:Math.round(d) }); rfPullTo(f, u.x, u.y, Math.max(1, d-12), u, sh); }
+    st.holes.push(h);
+    S.fx.push({ k:'spbx', m:'hole', x:u.x, y:u.y-18, t:0, dur:BH_HOLD });
+    S.fx.push({ k:'ring', x:u.x, y:u.y-6, r:BH_R, R:BH_R*0.92, t:0, dur:0.35, col:SPB_SP.blackhole.hex, lw:2 });
+    if(!RM) S.shake=Math.max(S.shake||0, 0.18);
+    bfSfx(SFX.wpoof, u.x, u.y);
+  } else if(k==='earthquake'){
+    const ax=spbAxis(u), ca=Math.cos(ax), sa=Math.sin(ax), cx0=u.x+ca*QK_AHEAD, cy0=u.y+sa*QK_AHEAD, h=QK_SIDE/2, q={ u, t:0, n:0, men:[], dmg:QK_DMG*spbScale(u), x:cx0, y:cy0, a:ax };
+    for(const f of TGTC(u)){ if(!f || f.dead || f.dropT>0 || f.burrow || f.jetT>0) continue; if(typeof skyAir==='function' && skyAir(f)) continue;
+      const dx=f.x-cx0, dy=f.y-cy0, along=dx*ca+dy*sa, perp=-dx*sa+dy*ca; if(Math.abs(along)>h || Math.abs(perp)>h) continue;
+      q.men.push(f); if(ggCanShove(f)){ f.haltT=Math.max(f.haltT||0, QK_STAG); f.x+=(Math.random()-0.5)*6; } }   
+    st.quakes.push(q); S.fx.push({ k:'spbx', m:'quake', x:cx0, y:cy0, a:ax, t:0, dur:QK_STAG+QK_TICKS, seed:(S.t*1000)|0 });
+    if(!RM) S.shake=Math.max(S.shake||0, 0.55); bfSfx(SFX.rumble, cx0, cy0);
+  } else if(k==='teddy'){
+    const pool=TGTC(u).filter(f=>f && !f.dead && !(f.hp<=0) && !(f.dropT>0) && ggCanShove(f) && !spbHero(f) && !(typeof skyAir==='function' && skyAir(f)) && (S.bf || !(f.x>W-10 || f.x<-40 || f.y<-30 || f.y>WORLD_H+30)));   
+    for(let n=0; n<TD_N && pool.length; n++){ const f=pool.splice(Math.floor(Math.random()*pool.length),1)[0]; const x=f.x, y=f.y;
+      hurt(f, Math.max(9999, (f.hp||0)*10), u);   
+      if(!(f.dead || f.hp<=0)) continue;
+      for(let i=S.fx.length-1;i>=0;i--){ const e=S.fx[i]; if(e.k==='fallen' && Math.hypot(e.x-x,e.y-y)<14) S.fx.splice(i,1); }
+      st.teddies.push({ u, x, y, t:0, dmg:spbScale(u) }); S.fx.push({ k:'spbx', m:'teddy', x, y, t:0, dur:TD_FUSE }); S.fx.push({ k:'puff', x, y:y-14, t:0, dur:0.4, R:16, col:'#F6D7E6' }); }
+    bfSfx(SFX.twink, u.x, u.y);
+  } else {
+    const a=spbAxis(u), cast={ hit:new Set(), n:0, sh:{} };
+    for(let i=0;i<3;i++){ st.waves.push({ u, x:u.x, y:u.y, a, t:-i*TS_GAP, r:0, cast }); S.fx.push({ k:'spbx', m:'wave', x:u.x, y:u.y, a, t:-i*TS_GAP, dur:TS_R/TS_SPD+0.7, i }); }
+    st.lastWave=cast;
+  }
+}
+function spbAxis(u){ const box=S.bf? (S.bf.base && S.bf.base[enemySide(u)]) : S.tanBase; return box? Math.atan2((box.y||u.y)-u.y, box.x-u.x) : (unitFaceX(u)>=0? 0 : Math.PI); }   
+function spbHero(f){ return f.type==='sarge' || f.type==='tansarge' || f.boss || !!(f.def && (f.def.boss || f.def.hero || f.def.vehicle)) || (typeof HEROES!=='undefined' && HEROES.indexOf(f.type)>=0) || (typeof kbHeroU==='function' && kbHeroU(f)); }   
+function spbTeddyBoom(b){   
+  const u=b.u, R=(UDEF.mortar && UDEF.mortar.splash) || 60, dmg=((UDEF.mortar && UDEF.mortar.dmg) || 8)*b.dmg, RM=reducedMotion(); let n=0;
+  if(u) for(const f of TGTC(u)){ if(!f || f.dead || f.dropT>0 || f.burrow || f.jetT>0) continue; if(typeof skyAir==='function' && skyAir(f)) continue; const m=S.bf? 16 : ((f.def && f.def.w) || 0)*0.3; if(Math.hypot(f.x-b.x,f.y-b.y)>R+m) continue; hurt(f, dmg, u); n++; }
+  S.fx.push({ k:'flash', x:b.x, y:b.y-12, ang:0, R:RM? 18 : 34, lw:RM? 3 : 5, t:0, dur:0.18 }); for(let i=0;i<(RM? 2 : 5);i++) S.fx.push({ k:'puff', x:b.x+(i-2)*9, y:b.y-6-(i%2)*8, t:-i*0.03, dur:0.5, R:14+(i%3)*4, col:i%2? '#F6D7E6' : '#D9D4C8' });
+  if(!RM) for(let j=0;j<8;j++){ const a=j/8*Math.PI*2; S.fx.push({ k:'spbx', m:'spark', x:b.x, y:b.y-10, vx:Math.cos(a)*50, vy:Math.sin(a)*34-12, t:0, dur:0.34 }); }
+  if(!RM) S.shake=Math.max(S.shake||0, 0.2); bfSfx(SFX.boom, b.x, b.y); return n; }
+
+let SPB_HOOK=0;
+function spbHook(){ if(SPB_HOOK || typeof cv==='undefined' || !cv) return; SPB_HOOK=1;
+  const gp=e=>{ const r=cv.getBoundingClientRect(); return { x:e.clientX-r.left, y:e.clientY-r.top }; };
+  document.addEventListener('pointerdown', e=>{ if(S.mode!=='play' || e.isPrimary===false) return; const st=S.spb; const pad=st && st.arr===S.units? st.pad : null;
+    if(pad){ e.stopPropagation(); e.preventDefault(); pad.down=true; pad.pts=[gp(e)]; return; }
+    if(e.target!==cv || !btnRects.spb || !spbRung()) return; const p=evPos(e); if(!inRect(p.x,p.y,btnRects.spb)) return;
+    e.stopPropagation(); e.preventDefault(); spbPress(); }, true);
+  document.addEventListener('pointermove', e=>{ const st=S.spb, pad=st && st.pad; if(!pad || !pad.down) return; e.stopPropagation(); const q=gp(e), l=pad.pts[pad.pts.length-1]; if(!l || Math.hypot(q.x-l.x,q.y-l.y)>=2) pad.pts.push(q); }, true);
+  const up=e=>{ const st=S.spb, pad=st && st.pad; if(!pad || !pad.down) return; e.stopPropagation(); e.preventDefault(); pad.down=false; spbLift(); };
+  document.addEventListener('pointerup', up, true); document.addEventListener('pointercancel', e=>{ const st=S.spb; if(st && st.pad && st.pad.down){ st.pad=null; } }, true);
+}
+
+function spbPadDraw(){
+  const st=S.spb; if(!st || st.arr!==S.units || !st.pad || S.mode!=='play') return;
+  const pad=st.pad, RM=reducedMotion(), k=1/scale, pulse=RM? 0 : 0.5+0.5*Math.sin(S.t*6);
+  cx.save();
+  cx.fillStyle='rgba(12,6,24,0.35)'; cx.fillRect(0,0,VW,H);
+  const g=cx.createRadialGradient(VW/2,H/2,Math.min(VW,H)*0.3,VW/2,H/2,Math.max(VW,H)*0.7); g.addColorStop(0,'rgba(90,40,160,0)'); g.addColorStop(1,'rgba(90,40,160,0.35)'); cx.fillStyle=g; cx.fillRect(0,0,VW,H);
+  cx.textAlign='center'; cx.textBaseline='middle'; cx.font=cf('bold 30px'); cx.fillStyle='#F3E6FF'; cx.fillText(t('DRAW THE SIGN'), VW/2, H*0.2);
+  for(const gd of pad.g){ const dots=SPB_INC.SIGNS[gd.k](gd.x, gd.y, gd.s), cool=(st.cd[gd.k]||0)>0, hex=SPB_SP[gd.k].hex;
+    cx.globalAlpha=cool? 0.28 : 0.75+0.25*pulse; cx.fillStyle=hex;
+    for(let i=0;i<dots.length;i+=2){ const d=dots[i]; cx.beginPath(); cx.arc(d.x*k, d.y*k, 2.6*k*1.2, 0, 7); cx.fill(); }
+    cx.globalAlpha=cool? 0.4 : 1; cx.fillStyle='#FFFFFF'; const d0=dots[0]; cx.beginPath(); cx.arc(d0.x*k, d0.y*k, 6*k*1.2, 0, 7); cx.fill(); cx.strokeStyle=hex; cx.lineWidth=2.5; cx.stroke();
+    cx.globalAlpha=cool? 0.5 : 0.95; cx.font=cf('bold 17px'); cx.fillStyle=cool? '#BBB' : '#FFFFFF';
+    const lab=t(SPB_SP[gd.k].name)+(cool? ' '+Math.ceil(st.cd[gd.k]) : ''); cx.fillText(lab, gd.x*k, (gd.y+SPB_GH[gd.k]*gd.s/2+18)*k); }
+  cx.globalAlpha=1;
+  if(pad.pts.length>1){ cx.lineCap='round'; cx.lineJoin='round';
+    cx.strokeStyle='rgba(180,91,255,0.45)'; cx.lineWidth=14*k; cx.beginPath(); pad.pts.forEach((p,i)=>i? cx.lineTo(p.x*k,p.y*k) : cx.moveTo(p.x*k,p.y*k)); cx.stroke();
+    cx.strokeStyle='#FFFFFF'; cx.lineWidth=4*k; cx.beginPath(); pad.pts.forEach((p,i)=>i? cx.lineTo(p.x*k,p.y*k) : cx.moveTo(p.x*k,p.y*k)); cx.stroke(); }
+  const bar=Math.max(0,pad.t/SP_PAD_T); cx.fillStyle='rgba(255,255,255,0.18)'; cx.fillRect(VW/2-120,H*0.2+24,240,5); cx.fillStyle=SPB_HEX; cx.fillRect(VW/2-120,H*0.2+24,240*bar,5);
+  cx.restore();
+}
+
+function spbFx2(e,k){
+  const RM=reducedMotion();
+  if(e.m==='hole'){ const T=e.t, R=40*Math.min(1,T/0.3)*(T>BH_HOLD-0.2? Math.max(0,(BH_HOLD-T)/0.2) : 1);
+    cx.save(); cx.globalAlpha=0.55; cx.fillStyle=SPB_SP.blackhole.hex; cx.beginPath(); cx.arc(e.x,e.y,R+8,0,7); cx.fill();
+    cx.globalAlpha=1; cx.fillStyle='#12061F'; cx.beginPath(); cx.arc(e.x,e.y,R,0,7); cx.fill();
+    if(!RM){ for(let i=0;i<3;i++){ const q=((T*1.6+i/3)%1), rr9=R+8+46*(1-q); cx.globalAlpha=0.5*q; cx.strokeStyle=SPB_LILAC; cx.lineWidth=2; cx.beginPath(); cx.arc(e.x,e.y,rr9,0,7); cx.stroke(); }
+      cx.globalAlpha=0.8; cx.strokeStyle='#E6CFFF'; cx.lineWidth=1.6; for(let i=0;i<4;i++){ const a=T*5+i*Math.PI/2; cx.beginPath(); cx.arc(e.x,e.y,R*0.7,a,a+0.9); cx.stroke(); } }
+    cx.restore(); return; }
+  if(e.m==='quake'){ const T=e.t, life=e.dur, fade=T>life-0.6? Math.max(0,(life-T)/0.6) : 1, h=QK_SIDE/2, ca=Math.cos(e.a), sa=Math.sin(e.a), P=(al,pe)=>[e.x+ca*al-sa*pe, e.y+sa*al+ca*pe];   
+    let r9=(e.seed>>>0)||1; const rnd=()=>{ r9=(Math.imul(r9,1664525)+1013904223)>>>0; return r9/4294967296; }; const grow=Math.min(1, T/0.35);
+    cx.save(); cx.globalAlpha=0.16*fade; cx.fillStyle='#6B4A2A'; for(let i=0;i<7;i++){ const p=P((rnd()-0.5)*2*h*0.8,(rnd()-0.5)*2*h*0.8); cx.beginPath(); cx.ellipse(p[0],p[1],18+rnd()*22,8+rnd()*10,e.a,0,7); cx.fill(); }
+    cx.lineCap='round'; cx.lineJoin='round';
+    for(let i=0;i<9;i++){ const ang=i/9*Math.PI*2+rnd()*0.5, len=h*(0.55+rnd()*0.45)*grow; let al=0, pe=0; const pts=[P(0,0)]; for(let s9=1;s9<=5;s9++){ const d=len*s9/5, j=(rnd()-0.5)*0.7; al=Math.cos(ang+j)*d; pe=Math.sin(ang+j)*d; pts.push(P(Math.max(-h,Math.min(h,al)),Math.max(-h,Math.min(h,pe)))); }
+      cx.globalAlpha=0.55*fade; cx.strokeStyle='#3B2614'; cx.lineWidth=3.2-i%3*0.6; cx.beginPath(); pts.forEach((p,j)=>j? cx.lineTo(p[0],p[1]) : cx.moveTo(p[0],p[1])); cx.stroke();
+      cx.globalAlpha=0.35*fade; cx.strokeStyle='#E8C58A'; cx.lineWidth=1; cx.beginPath(); pts.forEach((p,j)=>j? cx.lineTo(p[0]+1,p[1]-1) : cx.moveTo(p[0]+1,p[1]-1)); cx.stroke(); }
+    if(!RM && T<QK_STAG+QK_TICKS-0.4){ const k2=(T*3)%1; for(let i=0;i<4;i++){ const p=P((rnd()-0.5)*2*h,(rnd()-0.5)*2*h); cx.globalAlpha=0.35*(1-k2)*fade; cx.fillStyle='#CDB48C'; cx.beginPath(); cx.arc(p[0],p[1]-k2*10,4+k2*8,0,7); cx.fill(); } }
+    cx.restore(); return; }
+  if(e.m==='teddy'){ const k2=e.t/e.dur, bob=RM? 0 : Math.sin(e.t*14)*1.2, x=e.x, y=e.y+bob, blink=(k2>0.6 && !RM)? (Math.sin(e.t*(20+30*k2))>0) : true;   
+    cx.save(); cx.globalAlpha=0.25; cx.fillStyle='#000'; cx.beginPath(); cx.ellipse(x,e.y+2,11,3.5,0,0,7); cx.fill(); cx.globalAlpha=1; cx.lineWidth=1.2; cx.strokeStyle='#4A2A14';
+    cx.fillStyle='#B07A48'; cx.beginPath(); cx.ellipse(x,y-8,9,9.5,0,0,7); cx.fill(); cx.stroke(); cx.fillStyle='#E7C9A0'; cx.beginPath(); cx.ellipse(x,y-6,5,5.5,0,0,7); cx.fill();
+    cx.fillStyle='#B07A48'; cx.beginPath(); cx.arc(x-6,y-23,3.6,0,7); cx.fill(); cx.stroke(); cx.beginPath(); cx.arc(x+6,y-23,3.6,0,7); cx.fill(); cx.stroke(); cx.beginPath(); cx.arc(x,y-19,7.5,0,7); cx.fill(); cx.stroke();
+    cx.fillStyle='#E7C9A0'; cx.beginPath(); cx.ellipse(x,y-17,3.4,2.6,0,0,7); cx.fill(); cx.fillStyle='#2A160A'; cx.beginPath(); cx.arc(x-2.8,y-21,1.1,0,7); cx.arc(x+2.8,y-21,1.1,0,7); cx.fill(); cx.beginPath(); cx.arc(x,y-17.6,1,0,7); cx.fill();
+    cx.strokeStyle='#5A3A20'; cx.lineWidth=1.4; cx.beginPath(); cx.moveTo(x,y-26.5); cx.quadraticCurveTo(x+3,y-31,x+1,y-34); cx.stroke();
+    if(blink){ cx.fillStyle='#FFD24A'; cx.beginPath(); cx.arc(x+1,y-34.5,2.4,0,7); cx.fill(); cx.fillStyle='#FFFFFF'; cx.beginPath(); cx.arc(x+1,y-34.5,1,0,7); cx.fill(); }
+    cx.restore(); return; }
+  if(e.m==='gulp'){ const q=k, x=e.x+(e.tx-e.x)*q, y=e.y+(e.ty-e.y)*q; cx.save(); cx.globalAlpha=0.8*(1-q); cx.fillStyle='#E6CFFF'; cx.beginPath(); cx.arc(x,y,10*(1-q)+2,0,7); cx.fill(); cx.restore(); return; }
+  if(e.m==='wave'){ const r=Math.min(TS_R, e.t*TS_SPD); if(r<8) return; const fade=e.t*TS_SPD>TS_R? Math.max(0,1-(e.t*TS_SPD-TS_R)/(0.7*TS_SPD)) : 1, th=9+6*(r/TS_R), a0=e.a-TS_FAN, a1=e.a+TS_FAN;
+    cx.save(); cx.lineCap='round';
+    cx.globalAlpha=0.22*fade; cx.strokeStyle='#1FA3B8'; cx.lineWidth=th*2; cx.beginPath(); cx.arc(e.x,e.y,Math.max(1,r-th),a0,a1); cx.stroke();
+    cx.globalAlpha=0.62*fade; cx.strokeStyle='#2CB7CC'; cx.lineWidth=th; cx.beginPath(); cx.arc(e.x,e.y,Math.max(1,r-th*0.35),a0,a1); cx.stroke();
+    cx.globalAlpha=0.75*fade; cx.strokeStyle='#7FE6F5'; cx.lineWidth=th*0.45; cx.beginPath(); cx.arc(e.x,e.y,r,a0,a1); cx.stroke();
+    cx.globalAlpha=0.95*fade; cx.strokeStyle='#FFFFFF'; cx.lineWidth=2; cx.beginPath(); cx.arc(e.x,e.y,r+th*0.25,a0,a1); cx.stroke();
+    const step=(9-Math.min(4,r/90))*Math.PI/180; cx.lineWidth=1.8;
+    for(let a=a0+step/2;a<a1;a+=step){ const px=e.x+Math.cos(a)*(r+th*0.25), py=e.y+Math.sin(a)*(r+th*0.25), ox=Math.cos(a), oy=Math.sin(a), nx=-oy, ny=ox;
+      cx.beginPath(); cx.moveTo(px,py); cx.quadraticCurveTo(px+ox*6+nx*3, py+oy*6+ny*3, px+ox*3+nx*6, py+oy*3+ny*6); cx.stroke();
+      if(!RM){ const sp=10+((a*97+e.i*13)%8); cx.globalAlpha=0.6*fade; cx.fillStyle='#E9FBFF'; cx.beginPath(); cx.arc(px+ox*sp, py+oy*sp, 1.4, 0, 7); cx.fill(); cx.globalAlpha=0.95*fade; } }
+    cx.globalAlpha=0.14*fade; cx.strokeStyle='#9DEBF5'; cx.lineWidth=Math.min(r,60); cx.beginPath(); cx.arc(e.x,e.y,Math.max(1,r-th*2-Math.min(r,60)/2),a0,a1); cx.stroke();
+    cx.restore(); return; }
 }
 
 
@@ -87941,7 +88253,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='24.24';        
+let GVT_CV='24.25';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -119911,6 +120223,7 @@ function update(dt){
   
   
   
+  spbTick(dt);   
   for(let i=S.shots.length-1;i>=0;i--){
     const sh=S.shots[i];
     if(sh.k==='orb'){ if(spbOrbTick(sh,dt)) S.shots.splice(i,1); continue; }   
@@ -126716,7 +127029,7 @@ function draw(){
 
   if(chsOn() && typeof chs10Draw==='function') chs10Draw();   
   cx.restore();
-  drawHUD();
+  drawHUD(); spbPadDraw();   
   
 
   
@@ -130182,7 +130495,7 @@ function drawHUD(){
     if(bslOn()) drawBmbBtn(x0+TT.length*(tw+gap), y0, tw, th, K);   
     btnRects.vet=null; btnRects.wave=null;
     inqPill(uiK());   
-    drawJetBtn();
+    drawJetBtn(); drawSpbBtn();
     fsqtPill(uiK());   
     drawEmgBtn();
     drawTkBtn();
@@ -130212,7 +130525,7 @@ function drawHUD(){
     fitText(cx, TXT(S.wave===0?'START WAVE 1':'NEXT WAVE'), bx+bw/2, by+bh/2+1, bw-16, 'bold', 22, 14);
     btnRects.wave=[bx,by,bw,bh];
   } else btnRects.wave=null;
-  drawJetBtn();
+  drawJetBtn(); drawSpbBtn();
   drawEmgBtn();
   drawTkBtn();
   drawTkBtn2();   
@@ -130348,7 +130661,7 @@ function btn(id,x,y,w,h,label){
 
 
 
-function colRungN(){ return (skdRung()?1:0)   +(jetOwned()?1:0)+(emgOwned()?1:0)+(tkOwned()?1:0)+(tkTwoOn()?1:0)+(csOn()?1:0)+(cs2On()?1:0)+(snpRung()?1:0)+(fsOn()?1:0) + (laOn()?1:0)+(gsOn()?1:0)+(rpOn()?1:0)+(scOn()?1:0)+(popOn()?1:0)+(ultOn()?1:0); }    
+function colRungN(){ return (skdRung()?1:0)   +(jetOwned()?1:0)+(emgOwned()?1:0)+(tkOwned()?1:0)+(tkTwoOn()?1:0)+(csOn()?1:0)+(cs2On()?1:0)+(snpRung()?1:0)+(fsOn()?1:0) + (laOn()?1:0)+(gsOn()?1:0)+(rpOn()?1:0)+(scOn()?1:0)+(popOn()?1:0)+(ultOn()?1:0)+(spbRung()?1:0)  ; }    
 function colPitch(){ return (H-232-64*(colRungN()-1)<8)? 58 : 64; }
 function drawJetBtn(){
   btnRects.jet=null;
@@ -170176,15 +170489,23 @@ function labGoo(id){ const g=id && LAB_GOO[id]; if(!g) return { job:'#2F7FE0', d
   return { job:g[0], d:g[1], l:l, h:mix(g[0],.25), a45:a(g[0],.45), a70:a(g[0],.7), a40:a(g[0],.4), a55:a(g[0],.55), la95:a(l,.95), a0:a(g[0],0) }; }   
 function labGooStyle(id){ const g=labGoo(id); return ';--job:'+g.job+';--job-d:'+g.d+';--job-l:'+g.l+';--job-h:'+g.h+';--job-a45:'+g.a45+';--job-a70:'+g.a70+';--job-a40:'+g.a40+';--job-a55:'+g.a55+';--job-la95:'+g.la95+';--job-a0:'+g.a0; }   
 const LAB_ARM={ outlawsniper:'SNIPER', stakeshot:'SNIPER', propshot:'SNIPER', longeye:'SNIPER', lightarrow:'SNIPER', guardianshotgun:'SHOTGUN', boomstick:'SHOTGUN'  , shotclaw:'SHOTGUN'  , bigpop:'SHOTGUN', smokypowder:'SHOTGUN', gotime:'SHOTGUN', telekinesis:'SABER', riotshield:'SHOTGUN', renegadepistol:'PISTOLS', cougar:'PISTOLS', smuggler:'PISTOLS', dualgun:'PISTOLS', flamestrike:'SNIPER', flamestrike2:'SNIPER', eldersaber:'SABER', unarmed:'SABER', emperorsblade:'CLAYMORE', flameblade:'CLAYMORE', iceblade:'CLAYMORE', penetrate:'CLAYMORE', mirrorblade:'CLAYMORE'   };       
-const LAB_ARMS=['RIFLE','SNIPER','SHOTGUN','PISTOLS','SABER','CLAYMORE'];   
+const LAB_ARMS=['RIFLE','SNIPER','SHOTGUN','PISTOLS','SABER','CLAYMORE','SPELLBOOK'];       
 const LAB_ARM_ART={ RIFLE:'<svg class="lb-face lb-arm" viewBox="0 0 64 64"><g transform="translate(32 32) rotate(-28)"><path d="M-31 -3.6 L-19 -3 L-15 -2.4 L-15 2.4 L-18 4.4 L-30 5.2 Z" fill="#8A5A2B" stroke="#171512" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/><path d="M-27 -1.2 L-20 -1.4" fill="none" stroke="#B47A3C" stroke-width="1.2" stroke-linecap="round" /><rect x="-15" y="-4.4" width="12" height="7.6" rx="1.4" fill="#3a3f45" stroke="#171512" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/><path d="M-13 -2.4 H-5" fill="none" stroke="#8A97A8" stroke-width="1.1" stroke-linecap="round" /><rect x="-3" y="-3.2" width="31" height="4.2" rx="1.2" fill="#3a3f45" stroke="#171512" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/><path d="M-1 -1.6 H27" fill="none" stroke="#5B6B7F" stroke-width="1" stroke-linecap="round" /><path d="M26 -3.2 h2 v-2.8 h-2 z" fill="#3a3f45" stroke="#171512" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/><path d="M-8 3.2 L-2.5 3.2 L-1.8 8.6 L-6.6 9.8 Q-8.6 6.4 -8 3.2 Z" fill="#3a3f45" stroke="#171512" stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round"/><path d="M-13 3.2 Q-15 7.6 -11 7.6" fill="none" stroke="#171512" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/><path d="M-9.5 3.2 L-11 5.6" fill="none" stroke="#171512" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></g></svg>', SNIPER:'<svg class="lb-face lb-arm" viewBox="0 0 64 64"><g transform="translate(32 32) rotate(-36)"><path d="M-31 -3 L-17 -4 L-15 3 L-20 6 L-31 5 Z" fill="#5B6B7F" stroke="#171512" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/><path d="M-28 -1 L-21 -2" fill="none" stroke="#8A97A8" stroke-width="1.2" stroke-linecap="round" /><rect x="-16" y="-4.2" width="14" height="7.6" rx="1.4" fill="#3a3f45" stroke="#171512" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/><rect x="-2" y="-2.8" width="27" height="3.6" rx="1" fill="#3a3f45" stroke="#171512" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/><rect x="24" y="-3.6" width="6" height="5.2" rx="1.2" fill="#3a3f45" stroke="#171512" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/><path d="M25.5 -1 H28.5" fill="none" stroke="#8A97A8" stroke-width="1.1" stroke-linecap="round" /><path d="M-11 -4.2 v-3.4 h2.6 v3.4 z M1 -4.2 v-3.4 h2.6 v3.4 z" fill="#3a3f45" stroke="#171512" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/><rect x="-16" y="-12.6" width="25" height="5.4" rx="2.7" fill="#3a3f45" stroke="#171512" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/><ellipse cx="9.2" cy="-9.9" rx="1.9" ry="2.4" fill="#62CFF0" stroke="#171512" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/><path d="M-13 -10.8 H3" fill="none" stroke="#8A97A8" stroke-width="1.1" stroke-linecap="round" /><path d="M6.5 -9.9 h.01" fill="none" stroke="#1E82AD" stroke-width="1.6" stroke-linecap="round" /><path d="M12 0.8 L8 11 M14 0.8 L18 11" fill="none" stroke="#171512" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><path d="M6.5 11 h3.5 M16.5 11 h3.5" fill="none" stroke="#171512" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><path d="M-14 3.4 Q-16 8 -12 8" fill="none" stroke="#171512" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/><path d="M-7 3.4 L-9 6" fill="none" stroke="#171512" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></g></svg>', SHOTGUN:'<svg class="lb-face lb-arm" viewBox="0 0 64 64"><g transform="translate(32 32) rotate(-16)"><path d="M-30 -5 L-14 -5.5 L-12 5 L-16 8 L-30 8 Z" fill="#8A5A2B" stroke="#171512" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/><path d="M-27 -1.5 L-18 -2.5 M-27 3.5 L-19 3" fill="none" stroke="#B47A3C" stroke-width="1.2" stroke-linecap="round" /><rect x="-13" y="-6.4" width="15" height="12.6" rx="1.6" fill="#3a3f45" stroke="#171512" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/><circle cx="-6" cy="1.2" r="2.2" fill="#C49A4A" stroke="#171512" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round"/><rect x="2" y="-6.6" width="24" height="5.6" rx="2.6" fill="#3a3f45" stroke="#171512" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/><rect x="2" y="-1" width="24" height="5.6" rx="2.6" fill="#3a3f45" stroke="#171512" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/><path d="M4 -4 H24 M4 1.6 H24" fill="none" stroke="#5B6B7F" stroke-width="1.2" stroke-linecap="round" /><rect x="4" y="5.2" width="13" height="6.2" rx="1.4" fill="#8A5A2B" stroke="#171512" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/><path d="M7 6.6 V10 M10 6.6 V10 M13 6.6 V10" fill="none" stroke="#5E3A18" stroke-width="1.4" stroke-linecap="round" /><path d="M-10 6.2 Q-12 11 -7 11" fill="none" stroke="#171512" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/><path d="M-3 6.2 L-5 8.8" fill="none" stroke="#171512" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></g></svg>', PISTOLS:'<svg class="lb-face lb-arm" viewBox="0 0 64 64"><g transform="translate(32 28) rotate(0)"><g transform="scale(1 1) rotate(-48)"><path d="M-9 2 L-3 2 L-1 9 L-4 15 L-10 14 L-11 7 Z" fill="#8A5A2B" stroke="#171512" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/><path d="M-8 5 L-6 12" fill="none" stroke="#B47A3C" stroke-width="1.2" stroke-linecap="round" /><rect x="-6" y="-3.4" width="10" height="6.4" rx="1.6" fill="#3a3f45" stroke="#171512" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/><circle cx="-2" cy="-.2" r="1.3" fill="#8A97A8"/><circle cx="1.4" cy="-.2" r="1.3" fill="#8A97A8"/><rect x="4" y="-2.8" width="18" height="3.8" rx="1.2" fill="#3a3f45" stroke="#171512" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/><path d="M6 -1 H20" fill="none" stroke="#5B6B7F" stroke-width="1" stroke-linecap="round" /><path d="M-9 -4 l-2 -3 l2.6 -.6 z" fill="#3a3f45" stroke="#171512" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/><path d="M-5 3 Q-5 8 0 7" fill="none" stroke="#171512" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></g><g transform="scale(-1 1) rotate(-48)"><path d="M-9 2 L-3 2 L-1 9 L-4 15 L-10 14 L-11 7 Z" fill="#8A5A2B" stroke="#171512" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/><path d="M-8 5 L-6 12" fill="none" stroke="#B47A3C" stroke-width="1.2" stroke-linecap="round" /><rect x="-6" y="-3.4" width="10" height="6.4" rx="1.6" fill="#3a3f45" stroke="#171512" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/><circle cx="-2" cy="-.2" r="1.3" fill="#8A97A8"/><circle cx="1.4" cy="-.2" r="1.3" fill="#8A97A8"/><rect x="4" y="-2.8" width="18" height="3.8" rx="1.2" fill="#3a3f45" stroke="#171512" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/><path d="M6 -1 H20" fill="none" stroke="#5B6B7F" stroke-width="1" stroke-linecap="round" /><path d="M-9 -4 l-2 -3 l2.6 -.6 z" fill="#3a3f45" stroke="#171512" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/><path d="M-5 3 Q-5 8 0 7" fill="none" stroke="#171512" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></g></g></svg>', SABER:'<svg class="lb-face lb-arm" viewBox="0 0 64 64"><g transform="translate(34 32) rotate(-58)"><path d="M-6 0 H30" fill="none" stroke="BLADEHEX" stroke-width="12" stroke-linecap="round" opacity=".28"/><path d="M-6 0 H30" fill="none" stroke="BLADEHEX" stroke-width="7.2" stroke-linecap="round" opacity=".55"/><path d="M-6 -2.6 H27 Q31 -2.6 31 0 Q31 2.6 27 2.6 H-6 Z" fill="BLADEHEX" stroke="#171512" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/><path d="M-4 0 H26" fill="none" stroke="#FFFFFF" stroke-width="1.7" stroke-linecap="round" opacity=".9"/><rect x="-27" y="-3.6" width="21" height="7.2" rx="2" fill="#C8CDD6" stroke="#171512" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/><path d="M-23 -1.6 H-12" fill="none" stroke="#E9ECF0" stroke-width="1.4" stroke-linecap="round" /><rect x="-22" y="-3.6" width="2.4" height="7.2" rx="0.6" fill="#3a3f45" stroke="#171512" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round"/><rect x="-17" y="-3.6" width="2.4" height="7.2" rx="0.6" fill="#3a3f45" stroke="#171512" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round"/><rect x="-12" y="-3.6" width="2.4" height="7.2" rx="0.6" fill="#3a3f45" stroke="#171512" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round"/><rect x="-8" y="-4.6" width="3.6" height="9.2" rx="1" fill="#3a3f45" stroke="#171512" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/><circle cx="-24.5" cy="0" r="1.6" fill="#E2364F" stroke="#171512" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round"/></g></svg>', CLAYMORE:'<svg class="lb-face lb-arm" viewBox="0 0 64 64"><g transform="translate(29 35) rotate(-45)"><path d="M-1 -5.4 H24 L35 0 L24 5.4 H-1 Z" fill="#C8CDD6" stroke="#171512" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/><path d="M1.5 0 H23" fill="none" stroke="#8E97A6" stroke-width="1.6" stroke-linecap="round" /><path d="M1.5 -3 H22" fill="none" stroke="#E9ECF0" stroke-width="1.3" stroke-linecap="round" /><path d="M-2.6 -12.5 Q-.4 -12.5 -.4 -10.5 V10.5 Q-.4 12.5 -2.6 12.5 Q-4.6 10 -4.6 7.5 V-7.5 Q-4.6 -10 -2.6 -12.5 Z" fill="#C49A4A" stroke="#171512" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/><path d="M-2.5 -9 V9" fill="none" stroke="#F1D08A" stroke-width="1.1" stroke-linecap="round" /><rect x="-19" y="-3" width="15" height="6" rx="2" fill="#6E4A2A" stroke="#171512" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/><path d="M-16.5 -3 L-14.5 3 M-12.5 -3 L-10.5 3 M-8.5 -3 L-6.5 3" fill="none" stroke="#5E3A18" stroke-width="1.3" stroke-linecap="round" /><circle cx="-22.5" cy="0" r="3.8" fill="#C49A4A" stroke="#171512" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><circle cx="-23.4" cy="-.9" r="1.1" fill="#F1D08A"/></g></svg>' };   
 function labSaberHex(){ return (typeof META.saberColor==='string' && /^#[0-9A-Fa-f]{6}$/.test(META.saberColor))? META.saberColor : '#4DA6FF'; }   
 function labArmSVG(w){ return LAB_ARM_ART[w].split('BLADEHEX').join(labSaberHex()); }   
 const LAB_FAM=['commando','medic','flame','minesweeper','bazooka','mgunner','radioman','spy','rifleman','mortar','dogfighter','grenadier','bfjeep','bftank'];               
-const LAB_LINE=['bazooka','mgunner','rifleman','mortar','minesweeper','flame','radioman','medic','grenadier'  ,'commando','spy','shotgun','pistols','rifle','sniper','saber','claymore','sarge','hero','dogfighter','bfjeep','bftank'];           
+const LAB_LINE=['bazooka','mgunner','rifleman','mortar','minesweeper','flame','radioman','medic','grenadier'  ,'commando','spy','shotgun','pistols','rifle','sniper','saber','claymore','spellbook'  ,'sarge','hero','dogfighter','bfjeep','bftank'];           
 let LAB_T=0, LAB_ZAP_T=0, LAB_SEEN_W={};   
 function labSold(id){ return ENH_ORDER.indexOf(id)>=0 && !TROPHY_IDS[id]; }
 function labShows(id){ return !(TROPHY_IDS[id] && !enhOwns(id)) && !spySecret(id); }   
+ENH_INFO.blackhole={ unit:'sarge', name:'BLACK HOLE', sub:'A SWIRL, OUTSIDE IN', tag:'A SPELL FOR THE SPELLBOOK', up:'Tap CAST and draw the swirl: every enemy within '+Math.round(BH_R/TK_M)+' m of Sarge is dragged into him and swallowed, each one taking the book\'s full damage.', down:'It pulls men across mines and under the train, which is their problem. Draw it wrong and it fizzles. Switch it off here and the sign does nothing.' };   
+ENH_INFO.teddy={ unit:'sarge', name:'TEDDY BOMB', sub:'AN INFINITY SIGN', tag:'A SPELL FOR THE SPELLBOOK', up:'Tap CAST and draw an infinity: '+TD_N+' enemy soldiers turn into teddy bears and blow up '+TD_FUSE+' seconds later, each with a mortar\'s blast.', down:'Heroes, bosses, machines and their Sarge are never picked, and the rest are picked at random. Draw it wrong and it fizzles.' };   
+ENH_SHORT.blackhole={ up:'PULLS EVERY MAN IN '+Math.round(BH_R/TK_M)+' M INTO SARGE', down:'DRAW THE SWIRL RIGHT OR IT FIZZLES' }; ENH_SHORT.teddy={ up:''+TD_N+' ENEMIES BECOME TEDDY BOMBS', down:'PICKED AT RANDOM' };
+for(const k of SPB_BUY) Object.defineProperty(ENH_COST, k, { get:spbPrice, enumerable:true, configurable:true });   
+LAB_ARM.blackhole='SPELLBOOK'; LAB_ARM.teddy='SPELLBOOK'; LAB_ARM_ART.SPELLBOOK='<svg class="lb-face lb-arm" viewBox="0 0 64 64"><g transform="translate(32 34) scale(2.1)"><path d="M-12 -2 Q-6 -7 0 -2 Q6 -7 12 -2 L12 8 Q6 4 0 8 Q-6 4 -12 8 z" fill="#7A2E2A" stroke="#3A1412" stroke-width="1.2" stroke-linejoin="round"/><path d="M-10 -1 Q-5 -5 0 -1 L0 6 Q-5 2.5 -10 6 z M10 -1 Q5 -5 0 -1 L0 6 Q5 2.5 10 6 z" fill="#F2E8C8"/><path d="M-1 -4 Q-4 -10 1 -12 M2 -5 Q6 -9 3 -13" fill="none" stroke="#B45BFF" stroke-width="1.1" stroke-linecap="round"/></g></svg>';   
+function spbPartSVG(id){ const bh=id==='blackhole', hex=SPB_SP[id].hex, d=SPB_INC.SIGNS[id](66,31,bh? 0.32 : 0.36).map((p,i)=>(i? 'L' : 'M')+p.x.toFixed(1)+' '+p.y.toFixed(1)).join(' ');   
+  if(bh) return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 132 62"><circle cx="66" cy="31" r="27" fill="#1A0B2E" stroke="'+hex+'" stroke-width="2.5"/><path d="'+d+'" fill="none" stroke="#E6CFFF" stroke-width="3" stroke-linecap="round" stroke-dasharray="1 6"/><circle cx="66" cy="31" r="5" fill="#05010A" stroke="'+hex+'" stroke-width="1.5"/></svg>';
+  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 132 62"><rect x="6" y="6" width="120" height="50" rx="10" fill="#4A2236" stroke="'+hex+'" stroke-width="2.5"/><path d="'+d+'" fill="none" stroke="#F6D7E6" stroke-width="5" stroke-linecap="round"/><path d="'+d+'" fill="none" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round" stroke-dasharray="1 6"/><circle cx="104" cy="18" r="7" fill="#B07A48" stroke="#4A2A14"/><circle cx="99" cy="12" r="3" fill="#B07A48"/><circle cx="109" cy="12" r="3" fill="#B07A48"/></svg>'; }
 function labKeyOf(id){ const u=ENH_INFO[id].unit; return u==='sarge'? (LAB_ARM[id]? LAB_ARM[id].toLowerCase() : 'sarge') : u; }   
 function labDone(id){ return !!META.lab && META.lab.done.indexOf(id)>=0 && !enhOwns(id); }
 function labSeen(id){ return !!(META.lab && META.lab.seen) && META.lab.seen.indexOf(id)>=0; }   
@@ -170477,7 +170798,7 @@ function labBenchHTML(){ const L=META.lab, job=L.job||null, boom=labBoomArmed(),
 
 
 const LLD_LVL={ mgunner:5, minesweeper:10, flame:15, radioman:20, medic:25, commando:30, spy:35 };   
-const LLD_ARM={ shotgun:'shotgun', sniper:'sniper', saber:'lightsaber', claymore:'commander' };   
+const LLD_ARM={ shotgun:'shotgun', sniper:'sniper', saber:'lightsaber', claymore:'commander', spellbook:'spellbook'   };   
 function lldLvl(key){ return LLD_LVL[key]|0; }
 function lldOpen(key){ const lv=lldLvl(key); if(lv) return (META.lvl|0)>=lv; if(LLD_ARM[key]) return wkOwned(LLD_ARM[key]); if(key==='pistols') return pistolRank()>=WPN_MILE.pistolLvl; if(key==='hero') return heroesOwned().length>0; if(key==='dogfighter') return unitOwned('dogfighter'); if(key==='grenadier') return unitOwned('grenadier');     return true; }
 function lldNoHTML(s){ const lv=lldLvl(s.key), lk=!!(lv && s.lock); return '<b class="flh-no'+(lk? ' flh-lv' : '')+'" data-notr>'+(lk? escH(tf('LEVEL %1', lv)) : '')+'</b>'; }   
@@ -171925,7 +172246,7 @@ function shopVialHTML(c){
 
 
 
-function enhPartSVG(id){ if(id==='mousemod') return mousemodSVG();     if(id==='dragonflysight') return dragonflysightSVG();     if(id==='shotclaw') return shotclawSVG(); if(id==='boomstick') return boomstickSVG();         if(id==='janehook') return janehookSVG();     if(id==='heavyartillery') return heavyartillerySVG();     if(id==='goldengun') return goldengunSVG();     if(id==='inspiringsoldiers') return inspiringsoldiersSVG();     if(id==='mirrorblade') return mirrorbladeSVG();     if(id==='setupknockdown') return setupknockdownSVG();     if(id==='coinflip') return coinflipSVG();     if(id==='hotstreak') return hotstreakSVG();     if(id==='runninggun') return runninggunSVG();     if(id==='frankbolt') return frbSVG();     if(id==='pararescue') return prSVG(); if(id==='mindcontrol') return mcSVG();     if(id==='gigacannon') return sqrArt().P.gigaB(); if(id==='magnustank') return sqrArt().P.magnusB();         if(id==='fullsquad') return fsqSVG(); if(id==='impeng') return ieSVG();     if(id==='thegrab') return thegrabSVG();     if(id==='pocketdome') return pocketdomeSVG();     if(id==='doubletap') return doubletapSVG();     if(id==='penetrate') return penetrateSVG();     if(id==='heatseeker') return heatseekerSVG();     if(id==='smokegrenade') return smokegrenadeSVG();     if(id==='ocrocket') return ocrocketSVG();     if(id==='thecrank') return thecrankSVG();     if(id==='skeetsight') return skeetsightSVG();     if(id==='paperdecoy') return paperdecoySVG();     if(id==='larsonradio') return larsonradioSVG();     if(id==='redmines') return redminesSVG();    
+function enhPartSVG(id){ if(id==='blackhole' || id==='teddy') return spbPartSVG(id);     if(id==='mousemod') return mousemodSVG();     if(id==='dragonflysight') return dragonflysightSVG();     if(id==='shotclaw') return shotclawSVG(); if(id==='boomstick') return boomstickSVG();         if(id==='janehook') return janehookSVG();     if(id==='heavyartillery') return heavyartillerySVG();     if(id==='goldengun') return goldengunSVG();     if(id==='inspiringsoldiers') return inspiringsoldiersSVG();     if(id==='mirrorblade') return mirrorbladeSVG();     if(id==='setupknockdown') return setupknockdownSVG();     if(id==='coinflip') return coinflipSVG();     if(id==='hotstreak') return hotstreakSVG();     if(id==='runninggun') return runninggunSVG();     if(id==='frankbolt') return frbSVG();     if(id==='pararescue') return prSVG(); if(id==='mindcontrol') return mcSVG();     if(id==='gigacannon') return sqrArt().P.gigaB(); if(id==='magnustank') return sqrArt().P.magnusB();         if(id==='fullsquad') return fsqSVG(); if(id==='impeng') return ieSVG();     if(id==='thegrab') return thegrabSVG();     if(id==='pocketdome') return pocketdomeSVG();     if(id==='doubletap') return doubletapSVG();     if(id==='penetrate') return penetrateSVG();     if(id==='heatseeker') return heatseekerSVG();     if(id==='smokegrenade') return smokegrenadeSVG();     if(id==='ocrocket') return ocrocketSVG();     if(id==='thecrank') return thecrankSVG();     if(id==='skeetsight') return skeetsightSVG();     if(id==='paperdecoy') return paperdecoySVG();     if(id==='larsonradio') return larsonradioSVG();     if(id==='redmines') return redminesSVG();    
   
   
   
@@ -186787,9 +187108,20 @@ Object.assign(TR["de"]||(TR["de"]={}), {"THE SPELLBOOK":"DAS ZAUBERBUCH","An old
 Object.assign(TR["ru"]||(TR["ru"]={}), {"THE SPELLBOOK":"КНИГА ЗАКЛИНАНИЙ","An old book of spells and a little wand. He throws magic orbs that burst on a whole cluster, quicker than a bazooka and a little softer.":"Старая книга заклинаний и маленькая волшебная палочка. Он бросает волшебные шары, которые взрываются на целой группе: быстрее базуки и чуть слабее.","A magic orb every {0} seconds that bursts on a whole cluster. Every rank makes it hit harder, and it never scorches his own men.":"Волшебный шар каждые {0} секунды взрывается на целой группе. Каждый ранг делает его сильнее, и своих он никогда не обжигает.","A little softer than a bazooka, and every orb has to fly there first.":"Чуть слабее базуки, и каждому шару сначала надо долететь.","📖 THE SPELLBOOK reports to the Training Academy! Sarge throws magic orbs that burst on a whole cluster.":"📖 КНИГА ЗАКЛИНАНИЙ прибыла в учебку! Сардж бросает волшебные шары, которые взрываются на целой группе.","SARGE CAN USE THE SPELLBOOK NOW. Equip it at the Training Academy!":"ТЕПЕРЬ САРДЖ МОЖЕТ ПОЛЬЗОВАТЬСЯ КНИГОЙ ЗАКЛИНАНИЙ. Возьми её в Учебке!"});   
 Object.assign(TR["es"]||(TR["es"]={}), {"THE SPELLBOOK":"EL LIBRO DE HECHIZOS","An old book of spells and a little wand. He throws magic orbs that burst on a whole cluster, quicker than a bazooka and a little softer.":"Un viejo libro de hechizos y una varita pequeña. Lanza orbes mágicos que estallan sobre todo un grupo: más rápido que una bazuca y un poco más suave.","A magic orb every {0} seconds that bursts on a whole cluster. Every rank makes it hit harder, and it never scorches his own men.":"Un orbe mágico cada {0} segundos que estalla sobre todo un grupo. Cada rango lo hace más fuerte, y nunca quema a sus propios hombres.","A little softer than a bazooka, and every orb has to fly there first.":"Un poco más suave que una bazuca, y cada orbe tiene que volar hasta allí primero.","📖 THE SPELLBOOK reports to the Training Academy! Sarge throws magic orbs that burst on a whole cluster.":"📖 ¡EL LIBRO DE HECHIZOS llega a la Academia! Sarge lanza orbes mágicos que estallan sobre todo un grupo.","SARGE CAN USE THE SPELLBOOK NOW. Equip it at the Training Academy!":"¡SARGE YA PUEDE USAR EL LIBRO DE HECHIZOS! Equípalo en la Academia"});   
 Object.assign(TR["ar"]||(TR["ar"]={}), {"THE SPELLBOOK":"كتاب التعاويذ","An old book of spells and a little wand. He throws magic orbs that burst on a whole cluster, quicker than a bazooka and a little softer.":"كتاب تعاويذ قديم وعصا سحرية صغيرة. يرمي كرات سحرية تنفجر على مجموعة كاملة، أسرع من البازوكا وأخف قليلًا.","A magic orb every {0} seconds that bursts on a whole cluster. Every rank makes it hit harder, and it never scorches his own men.":"كرة سحرية كل {0} ثانية تنفجر على مجموعة كاملة. كل رتبة تجعلها أقوى، ولا تحرق رجاله أبدًا.","A little softer than a bazooka, and every orb has to fly there first.":"أخف قليلًا من البازوكا، وعلى كل كرة أن تطير إلى هدفها أولًا.","📖 THE SPELLBOOK reports to the Training Academy! Sarge throws magic orbs that burst on a whole cluster.":"📖 كتاب التعاويذ يلتحق بأكاديمية التدريب! سارج يرمي كرات سحرية تنفجر على مجموعة كاملة.","SARGE CAN USE THE SPELLBOOK NOW. Equip it at the Training Academy!":"يستطيع سارج استخدام كتاب التعاويذ الآن. جهّزه في أكاديمية التدريب!"});   
+Object.assign(TR["ja"]||(TR["ja"]={}), {"CAST":"となえる","DRAW THE SIGN":"しるしを かけ","FIZZLE":"ぷすん","BLACK HOLE":"ブラックホール","TSUNAMI":"つなみ","EARTHQUAKE":"じしん","TEDDY BOMB":"テディばくだん","SPELLBOOK":"まほうの ほん","SPELLBOOK ROOM":"まほうの ほんの へや","A SWIRL, OUTSIDE IN":"うずまき、そとから うちへ","AN INFINITY SIGN":"むげんだいの しるし","A SPELL FOR THE SPELLBOOK":"まほうの ほんの じゅもん","Tap CAST and draw the swirl: every enemy within {0} m of Sarge is dragged into him and swallowed, each one taking the book's full damage.":"となえるを おして うずまきを かくと、サージから {0}メートル いないの てきが みんな ひきよせられて のみこまれ、ほんの ちからの ダメージを うける。","It pulls men across mines and under the train, which is their problem. Draw it wrong and it fizzles. Switch it off here and the sign does nothing.":"じらいや きしゃの したも ひきずっていく。それは てきの もんだいだ。かきまちがえると ぷすんと きえる。ここで オフにすると しるしは なにも おこさない。","Tap CAST and draw an infinity: {0} enemy soldiers turn into teddy bears and blow up {1} seconds later, each with a mortar's blast.":"となえるを おして むげんだいを かくと、てきの へいし {0}にんが テディベアに なって {1}びょうごに ばくはつする。ひとつずつ はくげきほうの ばくはつだ。","Heroes, bosses, machines and their Sarge are never picked, and the rest are picked at random. Draw it wrong and it fizzles.":"ヒーロー、ボス、のりもの、あいての サージは えらばれない。のこりから ランダムに えらばれる。かきまちがえると ぷすんと きえる。","PULLS EVERY MAN IN {0} M INTO SARGE":"{0}メートルの てきを サージへ ひきよせる","DRAW THE SWIRL RIGHT OR IT FIZZLES":"うずまきを ただしく かかないと ぷすん","{0} ENEMIES BECOME TEDDY BOMBS":"てき {0}にんが テディばくだんに","PICKED AT RANDOM":"ランダムに えらばれる"});   
+Object.assign(TR["ko"]||(TR["ko"]={}), {"CAST":"시전","DRAW THE SIGN":"표식을 그려","FIZZLE":"피식","BLACK HOLE":"블랙홀","TSUNAMI":"해일","EARTHQUAKE":"지진","TEDDY BOMB":"곰인형 폭탄","SPELLBOOK":"마법서","SPELLBOOK ROOM":"마법서 방","A SWIRL, OUTSIDE IN":"소용돌이, 바깥에서 안으로","AN INFINITY SIGN":"무한대 표시","A SPELL FOR THE SPELLBOOK":"마법서의 주문","Tap CAST and draw the swirl: every enemy within {0} m of Sarge is dragged into him and swallowed, each one taking the book's full damage.":"시전을 누르고 소용돌이를 그리면 사지 주변 {0}m 안의 적이 모두 끌려와 삼켜지고, 하나하나 마법서의 피해를 고스란히 받아.","It pulls men across mines and under the train, which is their problem. Draw it wrong and it fizzles. Switch it off here and the sign does nothing.":"지뢰 위로도, 기차 밑으로도 끌고 가. 그건 적의 문제야. 잘못 그리면 피식 꺼져. 여기서 끄면 표식을 그려도 아무 일도 없어.","Tap CAST and draw an infinity: {0} enemy soldiers turn into teddy bears and blow up {1} seconds later, each with a mortar's blast.":"시전을 누르고 무한대를 그리면 적 병사 {0}명이 곰인형으로 변해 {1}초 뒤에 터져. 하나하나 박격포만큼 터져.","Heroes, bosses, machines and their Sarge are never picked, and the rest are picked at random. Draw it wrong and it fizzles.":"영웅, 보스, 탈것, 상대 사지는 고르지 않고 나머지에서 무작위로 골라. 잘못 그리면 피식 꺼져.","PULLS EVERY MAN IN {0} M INTO SARGE":"{0}M 안의 적을 사지에게 끌어와","DRAW THE SWIRL RIGHT OR IT FIZZLES":"소용돌이를 제대로 그려야 해","{0} ENEMIES BECOME TEDDY BOMBS":"적 {0}명이 곰인형 폭탄으로","PICKED AT RANDOM":"무작위로 골라"});   
+Object.assign(TR["zh-Hans"]||(TR["zh-Hans"]={}), {"CAST":"施法","DRAW THE SIGN":"画出符号","FIZZLE":"失灵","BLACK HOLE":"黑洞","TSUNAMI":"海啸","EARTHQUAKE":"地震","TEDDY BOMB":"泰迪炸弹","SPELLBOOK":"魔法书","SPELLBOOK ROOM":"魔法书室","A SWIRL, OUTSIDE IN":"螺旋，由外向内","AN INFINITY SIGN":"无穷符号","A SPELL FOR THE SPELLBOOK":"魔法书的咒语","Tap CAST and draw the swirl: every enemy within {0} m of Sarge is dragged into him and swallowed, each one taking the book's full damage.":"点施法再画出螺旋：萨吉身边{0}米内的敌人全被拖到他面前吞掉，每人都吃到魔法书的全部伤害。","It pulls men across mines and under the train, which is their problem. Draw it wrong and it fizzles. Switch it off here and the sign does nothing.":"它会把敌人拖过地雷、拖到火车底下，那是他们的麻烦。画错了就会失灵。在这里关掉，画符号也没有用。","Tap CAST and draw an infinity: {0} enemy soldiers turn into teddy bears and blow up {1} seconds later, each with a mortar's blast.":"点施法再画出无穷符号：{0}个敌兵变成泰迪熊，{1}秒后爆炸，每个都有迫击炮那么大的爆炸。","Heroes, bosses, machines and their Sarge are never picked, and the rest are picked at random. Draw it wrong and it fizzles.":"英雄、首领、载具和对方的萨吉不会被选中，其余的随机挑选。画错了就会失灵。","PULLS EVERY MAN IN {0} M INTO SARGE":"把{0}米内的敌人拉向萨吉","DRAW THE SWIRL RIGHT OR IT FIZZLES":"螺旋画对才不会失灵","{0} ENEMIES BECOME TEDDY BOMBS":"{0}个敌人变成泰迪炸弹","PICKED AT RANDOM":"随机挑选"});   
+Object.assign(TR["de"]||(TR["de"]={}), {"CAST":"ZAUBERN","DRAW THE SIGN":"ZEICHNE DAS ZEICHEN","FIZZLE":"VERPUFFT","BLACK HOLE":"SCHWARZES LOCH","TSUNAMI":"TSUNAMI","EARTHQUAKE":"ERDBEBEN","TEDDY BOMB":"TEDDYBOMBE","SPELLBOOK":"ZAUBERBUCH","SPELLBOOK ROOM":"ZAUBERBUCH-RAUM","A SWIRL, OUTSIDE IN":"EINE SPIRALE, VON AUSSEN NACH INNEN","AN INFINITY SIGN":"EIN UNENDLICH-ZEICHEN","A SPELL FOR THE SPELLBOOK":"EIN ZAUBER FÜR DAS ZAUBERBUCH","Tap CAST and draw the swirl: every enemy within {0} m of Sarge is dragged into him and swallowed, each one taking the book's full damage.":"Tippe ZAUBERN und zeichne die Spirale: jeder Feind im Umkreis von {0} m wird zu Sarge gezogen und verschluckt, und jeder nimmt den vollen Schaden des Buchs.","It pulls men across mines and under the train, which is their problem. Draw it wrong and it fizzles. Switch it off here and the sign does nothing.":"Es zieht Männer über Minen und unter den Zug, das ist ihr Problem. Falsch gezeichnet verpufft es. Hier ausgeschaltet tut das Zeichen nichts.","Tap CAST and draw an infinity: {0} enemy soldiers turn into teddy bears and blow up {1} seconds later, each with a mortar's blast.":"Tippe ZAUBERN und zeichne ein Unendlich-Zeichen: {0} feindliche Soldaten werden zu Teddybären und explodieren {1} Sekunden später, jeder mit dem Knall eines Mörsers.","Heroes, bosses, machines and their Sarge are never picked, and the rest are picked at random. Draw it wrong and it fizzles.":"Helden, Bosse, Fahrzeuge und ihr Sarge werden nie gewählt, der Rest wird zufällig gewählt. Falsch gezeichnet verpufft es.","PULLS EVERY MAN IN {0} M INTO SARGE":"ZIEHT JEDEN MANN IN {0} M ZU SARGE","DRAW THE SWIRL RIGHT OR IT FIZZLES":"ZEICHNE DIE SPIRALE RICHTIG ODER ES VERPUFFT","{0} ENEMIES BECOME TEDDY BOMBS":"{0} FEINDE WERDEN TEDDYBOMBEN","PICKED AT RANDOM":"ZUFÄLLIG GEWÄHLT"});   
+Object.assign(TR["ru"]||(TR["ru"]={}), {"CAST":"ЧАРЫ","DRAW THE SIGN":"НАРИСУЙ ЗНАК","FIZZLE":"ПШИК","BLACK HOLE":"ЧЁРНАЯ ДЫРА","TSUNAMI":"ЦУНАМИ","EARTHQUAKE":"ЗЕМЛЕТРЯСЕНИЕ","TEDDY BOMB":"МИШКА-БОМБА","SPELLBOOK":"КНИГА ЗАКЛИНАНИЙ","SPELLBOOK ROOM":"КОМНАТА КНИГИ ЗАКЛИНАНИЙ","A SWIRL, OUTSIDE IN":"СПИРАЛЬ, СНАРУЖИ ВНУТРЬ","AN INFINITY SIGN":"ЗНАК БЕСКОНЕЧНОСТИ","A SPELL FOR THE SPELLBOOK":"ЗАКЛИНАНИЕ ДЛЯ КНИГИ","Tap CAST and draw the swirl: every enemy within {0} m of Sarge is dragged into him and swallowed, each one taking the book's full damage.":"Нажми ЧАРЫ и нарисуй спираль: каждый враг в {0} м от Сарджа притянут к нему и проглочен, и каждый получает полный урон книги.","It pulls men across mines and under the train, which is their problem. Draw it wrong and it fizzles. Switch it off here and the sign does nothing.":"Она тащит врагов через мины и под поезд, это их беда. Нарисуешь неверно, и будет пшик. Выключишь здесь, и знак ничего не сделает.","Tap CAST and draw an infinity: {0} enemy soldiers turn into teddy bears and blow up {1} seconds later, each with a mortar's blast.":"Нажми ЧАРЫ и нарисуй бесконечность: {0} вражеских солдат станут плюшевыми мишками и взорвутся через {1} секунды, каждый как мина миномёта.","Heroes, bosses, machines and their Sarge are never picked, and the rest are picked at random. Draw it wrong and it fizzles.":"Героев, боссов, машины и их Сарджа не выбирают, остальных выбирают случайно. Нарисуешь неверно, и будет пшик.","PULLS EVERY MAN IN {0} M INTO SARGE":"ТЯНЕТ ВСЕХ В {0} М К САРДЖУ","DRAW THE SWIRL RIGHT OR IT FIZZLES":"РИСУЙ СПИРАЛЬ ВЕРНО, ИНАЧЕ ПШИК","{0} ENEMIES BECOME TEDDY BOMBS":"{0} ВРАГОВ СТАНУТ МИШКАМИ-БОМБАМИ","PICKED AT RANDOM":"ВЫБОР СЛУЧАЙНЫЙ"});   
+Object.assign(TR["es"]||(TR["es"]={}), {"CAST":"HECHIZO","DRAW THE SIGN":"DIBUJA EL SIGNO","FIZZLE":"PFF","BLACK HOLE":"AGUJERO NEGRO","TSUNAMI":"TSUNAMI","EARTHQUAKE":"TERREMOTO","TEDDY BOMB":"OSITO BOMBA","SPELLBOOK":"LIBRO DE HECHIZOS","SPELLBOOK ROOM":"SALA DEL LIBRO DE HECHIZOS","A SWIRL, OUTSIDE IN":"UNA ESPIRAL, DE FUERA HACIA DENTRO","AN INFINITY SIGN":"UN SIGNO DE INFINITO","A SPELL FOR THE SPELLBOOK":"UN HECHIZO PARA EL LIBRO","Tap CAST and draw the swirl: every enemy within {0} m of Sarge is dragged into him and swallowed, each one taking the book's full damage.":"Toca HECHIZO y dibuja la espiral: cada enemigo a {0} m de Sarge es arrastrado hasta él y tragado, y cada uno recibe todo el daño del libro.","It pulls men across mines and under the train, which is their problem. Draw it wrong and it fizzles. Switch it off here and the sign does nothing.":"Arrastra a los hombres sobre minas y bajo el tren, y eso es problema suyo. Si lo dibujas mal, hace pff. Apágalo aquí y el signo no hace nada.","Tap CAST and draw an infinity: {0} enemy soldiers turn into teddy bears and blow up {1} seconds later, each with a mortar's blast.":"Toca HECHIZO y dibuja un infinito: {0} soldados enemigos se vuelven ositos de peluche y estallan {1} segundos después, cada uno con la explosión de un mortero.","Heroes, bosses, machines and their Sarge are never picked, and the rest are picked at random. Draw it wrong and it fizzles.":"Nunca elige héroes, jefes, vehículos ni a su Sarge, y el resto se elige al azar. Si lo dibujas mal, hace pff.","PULLS EVERY MAN IN {0} M INTO SARGE":"ARRASTRA HACIA SARGE A TODOS A {0} M","DRAW THE SWIRL RIGHT OR IT FIZZLES":"DIBUJA BIEN LA ESPIRAL O HACE PFF","{0} ENEMIES BECOME TEDDY BOMBS":"{0} ENEMIGOS SE VUELVEN OSITOS BOMBA","PICKED AT RANDOM":"ELEGIDOS AL AZAR"});   
+Object.assign(TR["ar"]||(TR["ar"]={}), {"CAST":"تعويذة","DRAW THE SIGN":"ارسم الرمز","FIZZLE":"فشلت","BLACK HOLE":"الثقب الأسود","TSUNAMI":"تسونامي","EARTHQUAKE":"الزلزال","TEDDY BOMB":"قنبلة الدبدوب","SPELLBOOK":"كتاب التعاويذ","SPELLBOOK ROOM":"غرفة كتاب التعاويذ","A SWIRL, OUTSIDE IN":"دوامة من الخارج إلى الداخل","AN INFINITY SIGN":"علامة اللانهاية","A SPELL FOR THE SPELLBOOK":"تعويذة لكتاب التعاويذ","Tap CAST and draw the swirl: every enemy within {0} m of Sarge is dragged into him and swallowed, each one taking the book's full damage.":"اضغط تعويذة وارسم الدوامة: كل عدو على بعد {0} م من سارج يُسحب إليه ويُبتلع، وكل واحد يتلقى ضرر الكتاب كاملًا.","It pulls men across mines and under the train, which is their problem. Draw it wrong and it fizzles. Switch it off here and the sign does nothing.":"تسحب الرجال فوق الألغام وتحت القطار، وتلك مشكلتهم. إن رسمتها خطأ فشلت. أطفئها هنا ولن يفعل الرمز شيئًا.","Tap CAST and draw an infinity: {0} enemy soldiers turn into teddy bears and blow up {1} seconds later, each with a mortar's blast.":"اضغط تعويذة وارسم علامة اللانهاية: {0} من جنود العدو يتحولون إلى دببة محشوة وتنفجر بعد {1} ثانية، كل واحد بانفجار قذيفة هاون.","Heroes, bosses, machines and their Sarge are never picked, and the rest are picked at random. Draw it wrong and it fizzles.":"لا يُختار الأبطال ولا الزعماء ولا الآليات ولا سارج الخصم، والباقون يُختارون عشوائيًا. إن رسمتها خطأ فشلت.","PULLS EVERY MAN IN {0} M INTO SARGE":"تسحب كل رجل في {0} م إلى سارج","DRAW THE SWIRL RIGHT OR IT FIZZLES":"ارسم الدوامة صحيحة وإلا فشلت","{0} ENEMIES BECOME TEDDY BOMBS":"{0} أعداء يصبحون قنابل دبدوب","PICKED AT RANDOM":"يُختارون عشوائيًا"});   
 window.GVT = {
   ffi(o){ return ffiRig(o); },   
-  spb(o){ o=o||{}; if(o.own){ META.coopLevels=(META.coopLevels||[]).filter(n=>n!==SPB_LVL).concat([SPB_LVL]); saveMeta(); } if(o.equip){ META.sargeWeapon='spellbook'; saveMeta(); } if(o.rank!=null){ META.sargeUp.spellbook=o.rank|0; saveMeta(); }   
+  spb2(o){ o=o||{}; const st=spbS(); if(o.grant){ for(const k of o.grant) if(!enhOwns(k)){ grantOwned('enh',k); if(!enhOn(k)){ META.enh.on.push(k); enhExclude(k); } } saveMeta(); }   
+    if(o.cd) Object.assign(st.cd, o.cd); if(o.press) spbPress(); let lift=null; if(o.stroke){ if(!st.pad) spbPress(); if(st.pad){ st.pad.pts=o.stroke.slice(); st.pad.down=true; lift=spbLift(); } } if(o.cast){ const js=spbSarge(); if(js) spbGo(js,o.cast); }
+    return { cv:GVT_CV, rung:spbRung(), known:spbKnownList(), cd:Object.assign({},st.cd), lock:st.lock, pad:st.pad? { t:+st.pad.t.toFixed(2), g:st.pad.g, down:st.pad.down } : null, last:st.last, lift, casts:st.casts, fizz:st.fizz, holes:st.holes.length, waves:st.waves.length, quakes:st.quakes.length, teddies:st.teddies.map(b=>({ x:Math.round(b.x), y:Math.round(b.y), t:+b.t.toFixed(2) })), rect:btnRects.spb||null, price:spbPrice(),
+      parts:SPB_BUY.map(k=>({ k, owns:enhOwns(k), on:enhOn(k), arm:LAB_ARM[k], info:!!ENH_INFO[k], cost:ENH_COST[k], sold:labSold(k), room:labKeyOf(k) })) }; },
+  spb(o){ o=o||{}; if(o.own){ if(META.sargeUnlocked.indexOf('spellbook')<0) META.sargeUnlocked.push('spellbook'); saveMeta(); }     if(o.equip){ META.sargeWeapon='spellbook'; saveMeta(); } if(o.rank!=null){ META.sargeUp.spellbook=o.rank|0; saveMeta(); }   
     const sw=sargeStats(), su=S.units? S.units.find(q=>q.type==='sarge' && !q.dead) : null, us=su? unitSargeStats(su) : null;
     return { cv:GVT_CV, order:SARGE_ORDER.slice(), lvl:SPB_LVL, owned:spbOwned(), wk:wkOwned('spellbook'), seen:META.spbSeen|0, w:META.sargeWeapon, bag:sw, unit:us, rank:META.sargeUp.spellbook|0,
       cfg:{ rng:SPB_RNG, cd:SPB_CD, dmg0:SPB_DMG0, dmgPer:SPB_DMG_PER, r:SPB_R, spd:SPB_SPD }, mile:COOP_MILES.filter(m=>m.id==='spellbook').map(m=>({ lvl:m.lvl, kind:m.kind })),
