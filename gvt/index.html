@@ -87457,7 +87457,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='23.80';        
+let GVT_CV='23.81';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -162753,6 +162753,31 @@ try{ if(OLR_FIG.bg && olrFigOn() && !OLR.bg0){ const B=OLR_FIG.bg; OLR.bg0={};
     const d=decodeURIComponent(m[2]), t=/^\s*<svg[^>]*>/.exec(d); if(!t) return u; if(d.slice(t[0].length).replace(/<\/svg>\s*$/,'')!==e.raw){ OLR.figMiss++; return u; } const v=olrBg(k); return v? m[1]+encodeURIComponent(t[0]+v+'</svg>') : u; }catch(x){ return u; } }; }
   if(typeof sgpSVG==='function'){ const g0=sgpSVG; OLR.bg0.sgpSVG=g0; window.sgpSVG=function(s,id){ return g0(olrBgScene(s,id), id); }; }
 } }catch(e){}
+
+
+
+
+
+
+
+
+const DDC={ fig:{}, n:0, used:0, miss:0, door:0, old:{} };
+function ddcOn(){ try{ return olrFigOn(); }catch(e){ return false; } }
+function ddcIds(s,p){ const set={}; s.replace(/\sid="([^"]+)"/g, function(m0,id){ set[id]=1; return m0; }); if(!Object.keys(set).length) return s;
+  return s.replace(/(\sid=")([^"]+)"/g, function(m0,a,id){ return a+p+id+'"'; }).replace(/url\(\s*(['"]?)#([^'")\s]+)\1\s*\)/g, function(m0,q,id){ return set[id]? 'url('+q+'#'+p+id+q+')' : m0; }).replace(/(href=")#([^"]+)"/g, function(m0,a,id){ return set[id]? a+'#'+p+id+'"' : m0; }); }
+function ddcFig(k,p){ if(!ddcOn()) return null; if(!Object.prototype.hasOwnProperty.call(DDC.fig,k)){ let v=null; try{ const hex='#7FA35C', raw=amMold(k), al=(typeof raw==='string')? olrSpr(raw.split('currentColor').join(hex), k, hex) : null; if(al) v=al; }catch(e){ v=null; } if(v) DDC.used++; else DDC.miss++; DDC.fig[k]=v; }
+  const v=DDC.fig[k]; return v? '<g class="olrfig">'+ddcIds(v,p)+'</g>' : null; }
+const DDC_DOOR=[['translate(50.9,41.9) scale(-0.37,0.37)','rex'],['translate(78.4,41.9) scale(0.37)','trike'],['translate(43.2,50.43) scale(0.33)','eggling']];   
+function ddcSeat(s,open,inner){ const a=s.indexOf(open); if(a<0) return null; const t=/<g\b[^>]*>|<\/g>/g; t.lastIndex=a; let d=0, m; while((m=t.exec(s))){ if(m[0]==='</g>'){ if(--d===0) return s.slice(0,a)+open+inner+'</g>'+s.slice(m.index+4); } else if(m[0].slice(-2)!=='/>') d++; } return null; }
+function ddcDoor(s){ if(typeof s!=='string' || !ddcOn()) return s; const p='ddc'+(++DDC.n)+'-'; let v=s;
+  for(let i=0;i<DDC_DOOR.length;i++){ const f=ddcFig(DDC_DOOR[i][1], p+i+'-'); if(!f) continue; const w=ddcSeat(v, '<g transform="'+DDC_DOOR[i][0]+'">', f); if(w) v=w; }
+  if(v!==s) DDC.door++; return v; }
+try{ if(typeof dinoParkArt==='function' && !DDC.old.dinoParkArt){ const f0=dinoParkArt; DDC.old.dinoParkArt=f0; dinoParkArt=function(){ return ddcDoor(f0.apply(this, arguments)); }; } }catch(e){}
+try{ if(ddcOn() && typeof DPV_ART!=='undefined'){ [['alTrike','trike'],['alDilo','dilo'],['alPtero','ptero']].forEach(function(q){ const f=ddcFig(q[1], 'ddcP'+q[1]+'-'); if(f){ DDC.old[q[0]]=DPV_ART[q[0]]; DPV_ART[q[0]]=f; } }); } }catch(e){}
+try{ if(typeof dpvRexNod==='function' && !DDC.old.dpvRexNod){ const n0=dpvRexNod; DDC.old.dpvRexNod=n0; dpvRexNod=function(s){ if(s===SPRITES_SRC.rex){ const f=ddcFig('rex','ddcPrex-'); if(f) s=f; } return n0.call(this, s); }; } }catch(e){}   
+try{ if(typeof lagDinoSVG==='function' && typeof LAG_EGG==='string' && !DDC.old.lagDinoSVG){ const g0=lagDinoSVG, pre='<g class="wdl"><g transform="translate(-60,-129)">', end='</g></g></g></g>', a=LAG_EGG.indexOf(pre);
+  if(a>0 && LAG_EGG.slice(-end.length)===end){ DDC.old.lagDinoSVG=g0; lagDinoSVG=function(){ const v=g0.apply(this, arguments); if(!ddcOn()) return v; const f=ddcFig('eggling','ddcPegg-'); if(!f || v.indexOf(LAG_EGG)<0) return v; return v.split(LAG_EGG).join(LAG_EGG.slice(0, a+pre.length)+f+end); }; } } }catch(e){}   
+function ddcRead(){ return { on:ddcOn(), used:DDC.used, miss:DDC.miss, door:DDC.door, figs:Object.keys(DDC.fig).filter(function(k){ return !!DDC.fig[k]; }), park:['alTrike','alDilo','alPtero'].filter(function(k){ return !!DDC.old[k]; }), wraps:['dinoParkArt','dpvRexNod','lagDinoSVG'].filter(function(k){ return !!DDC.old[k]; }) }; }
 
 function lagSpr(src,k,hex){ if(!lagOn() || !src || typeof src!=='string') return src; const key=String(k)+'|'+String(hex||'')+'|'+src.length+'|'+src.slice(0,96)+'|'+src.slice(-48); const m=LAG_SPRM[key]; if(m && m.s===src) return m.v; const al=olrOn()? olrSpr(src,k,hex) : null;     let v=al||src; if(!al){ const keep=SGP_SIG; SGP_SIG={}; try{ v=sgpPass(src,'char'); }catch(e){ v=src; } finally{ SGP_SIG=keep; } try{ v=lagInk(v,hex); }catch(e){} } if(!olrOn() || typeof OLR_LINES!=='undefined') LAG_SPRM[key]={ s:src, v:v }; return v; }
 function lagCharRead(){ const out={ memo:Object.keys(LAG_SPRM).length }; try{ const u=decodeURIComponent(sprURI('rifleman','#4A6B35').split(',').slice(1).join(',')); out.rifle=(u.match(/class="sgp"/g)||[]).length; out.ink=(u.match(/(?:stroke|fill)-opacity="0\.55"/g)||[]).length; out.defs=(u.match(/sgp-defs/g)||[]).length; }catch(e){ out.err=String(e).slice(0,80); } try{ const men=[...document.querySelectorAll('[id^="ro-vt"] image, [data-gid^="ro-vt"] image')]; out.men=men.length; out.menSgp=men.filter(function(i){ return /sgp/.test(decodeURIComponent(i.getAttribute('href')||'')); }).length; }catch(e){} try{ const H=typeof IMGU!=='undefined'? Object.keys(IMGU) : []; out.tints=H.length; if(H.length){ const set=IMGU[H[0]]; const ks=Object.keys(set); out.tintSgp=ks.filter(function(q){ const im=set[q]; return im && /sgp/.test(String(im.src||'')); }).length; out.tintN=ks.length; } }catch(e){} return out; }
