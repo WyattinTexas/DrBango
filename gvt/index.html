@@ -87672,7 +87672,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='23.97';        
+let GVT_CV='23.98';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -185848,9 +185848,11 @@ function huvNodeSVG(ci){ const K=(PET_COATS.hunter[ci]||PET_COATS.hunter[0]), ar
   return '<g id="ro-hunter" class="ro-hunter" data-ci="'+ci+'"><defs>'+hunInkDef('hunInkR')+'<clipPath id="hunGround" clipPathUnits="userSpaceOnUse"><rect x="-140" y="-300" width="280" height="341"/></clipPath></defs>'
     +'<g class="dhWalk" style="transform:translate(-300px,-300px)"><g class="huVis"><ellipse cx="0" cy="38" rx="17" ry="4.6" fill="#000" opacity="0.2"/><g class="dgPin dogPat"><g class="dhFlip"><g class="huSpk">'+spk+'</g>'
     +'<g class="dgPin dhPose dogsitB"><g transform="translate(0,6) scale(2)"><g filter="url(#hunInkR)">'+art+'</g></g></g></g></g></g><g class="huPoof">'+pf+'<g class="huPfR">'+px+'</g></g></g></g>'; }
+function huvResume(el){ const cls=(HVR.mode==='out')? 'hunOut' : (HVR.pin? 'hunIn' : null); if(!cls) return; const dl=-Math.max(0, Date.now()-((HVR.mode==='out')? HVR.outAt : HVR.pin))/1000;   
+  for(const n of el.querySelectorAll('.huVis,.huPf,.huPfR')) n.style.animationDelay=dl.toFixed(3)+'s'; huvPoof(el,cls); }
 function huvPoof(el,cls){ try{ el.classList.remove('hunIn'); el.classList.remove('hunOut'); if(cls) el.classList.add(cls); }catch(e){} }
-function huvBye(el){ HVR.mode='out'; HVR.t=0; HUR.mode='bye'; huvPoof(el,'hunOut'); try{ SFX.wpoof(); }catch(e){} }   
-function huvDrop(el){ if(el) try{ el.remove(); }catch(e){} hunPlayEnd(); HUR.el=null; HUR.mode='pot'; HUR.cx=null; HUR.cy=null; HUR.cpose=null; HUR.cf=0; HUR.tap=0; }   
+function huvBye(el){ HVR.mode='out'; HVR.t=0; HVR.outAt=Date.now(); HUR.mode='bye'; huvPoof(el,'hunOut'); try{ SFX.wpoof(); }catch(e){} }   
+function huvDrop(el){ if(el) try{ el.remove(); }catch(e){} hunPlayEnd(); HVR.pin=0; HUR.el=null; HUR.mode='pot'; HUR.cx=null; HUR.cy=null; HUR.cpose=null; HUR.cf=0; HUR.tap=0; }   
 function huvStage(){ try{ const st=document.getElementById('roomStage'); return st? (st.offsetWidth||0) : 0; }catch(e){ return 0; } }   
 function huvAppear(fr){   
   const W=huvStage(); let side=(fr.kind==='cy')? -1 : ((fr.x<(W||1200)/2)? 1 : -1), x=fr.x+side*HV.far; if(W>0 && (x<HV.gap || x>W-HV.gap)){ side=-side; x=fr.x+side*HV.far; }
@@ -185867,10 +185869,10 @@ function huvTick(dt){ try{
     const SE=hunSeat(), fr=hunFriend(SE[0]); if(!fr) return; huvAppear(fr); }   
   const ci=petCoatI('hunter')|0;
   if(!el || (el.parentNode!==belt && el.parentNode!==dogTopEl()) || +el.getAttribute('data-ci')!==ci){ if(el) try{ el.remove(); }catch(e){} belt.insertAdjacentHTML('beforeend', huvNodeSVG(ci)); el=document.getElementById('ro-hunter'); HUR.cx=null; HUR.cy=null; HUR.cpose=null; HUR.cf=0;
-    if(HVR.mode==='in' && HVR.t===0){ huvPoof(el,'hunIn'); try{ SFX.wpoof(); setTimeout(()=>{ try{ SFX.arf(); }catch(e){} }, 160); }catch(e){} } }
+    if(HVR.mode==='in' && HVR.t===0){ huvPoof(el,'hunIn'); HVR.pin=now; try{ SFX.wpoof(); setTimeout(()=>{ try{ SFX.arf(); }catch(e){} }, 160); }catch(e){} } else huvResume(el); }
   if(!el) return; HUR.el=el; let pose='dogsitB';
   if(HVR.mode==='in'){ HVR.t+=dt; if(HVR.t>=HV.inT){ HVR.mode='on'; HVR.t=0; if(!hunPlayStart(HUR.x, HUR.fy)) huvBye(el); } }   
-  else if(HVR.mode==='on'){
+  else if(HVR.mode==='on'){ if(HVR.pin && now-HVR.pin>=1000){ huvPoof(el,null); HVR.pin=0; }   
     if(HUR.tap>now) pose='hunHug';   
     else if(HUR.mode==='play') pose=hunPlayStep(dt);
     else if(HUR.mode==='back'){ HUR.mode='pot'; HVR.t=0; }   
@@ -185881,11 +185883,12 @@ function huvTick(dt){ try{
   if(wk && (HUR.cx!==X || HUR.cy!==Y)){ jump=HUR.cx==null || Math.abs(HUR.cx-X)>60 || Math.abs(HUR.cy-Y)>60; if(jump) wk.style.transition='none'; wk.style.transform='translate('+X+'px,'+Y+'px)'; if(jump){ void wk.getBoundingClientRect(); wk.style.transition=''; } HUR.cx=X; HUR.cy=Y; }
   const f=HUR.f||1, fl=el.querySelector('.dhFlip'); if(fl && HUR.cf!==f){ if(f>0) fl.setAttribute('transform','scale(-1,1)'); else fl.removeAttribute('transform'); HUR.cf=f; }
   const po=el.querySelector('.dhPose'); if(po && HUR.cpose!==pose){ po.setAttribute('class','dgPin dhPose '+pose); HUR.cpose=pose; }
-  if(jump || (HUR.zc=(HUR.zc|0)+1)%3===0) dogLift(el, X, HUR.fy, jump, -HVR.t);
+  if(jump || (HVR.mode==='on' && !HVR.pin && (HUR.zc=(HUR.zc|0)+1)%3===0)) dogLift(el, X, HUR.fy, jump, -HVR.t);   
 }catch(e){} }
 function huvRig(o){ o=o||{};   
   if(o.on!=null) HV.on=o.on? 1 : 0; if(o.odds!=null) HV.odds=+o.odds; if(o.wait!=null) HV.wait=+o.wait; if(o.stay!=null) HV.stay=+o.stay; if(o.roll!=null) HVR.force=o.roll? 1 : 0; if(o.show) HUR.room=null; if(o.bye && HUR.el && HUR.el.isConnected && HVR.mode==='on') huvBye(HUR.el);
   return { cv:GVT_CV, on:HV.on, odds:HV.odds, mode:HVR.mode, t:+(HVR.t||0).toFixed(2), rolls:HVR.roll|0, hits:HVR.hit|0, el:!!(HUR.el && HUR.el.isConnected), node:!!document.getElementById('ro-hunter'), room:HUR.room, hm:HUR.mode, x:HUR.x, fy:HUR.fy, f:HUR.f, pose:HUR.cpose, cls:(HUR.el && HUR.el.isConnected)? HUR.el.getAttribute('class') : null, ph:HUR.play? HUR.play.ph : null, fr:HUR.play? HUR.play.fr.kind+(HUR.play.fr.br? ':'+HUR.play.fr.br : '') : null, hug:(typeof META!=='undefined' && META && META.hunHug)||'' }; }
+if(typeof renderMenu==='function') renderMenu=(function(f){ return function(){ const r=f.apply(this, arguments); try{ if(HV.on && HUR.el && !HUR.el.isConnected && (HVR.mode==='in' || HVR.mode==='on' || HVR.mode==='out')) huvTick(0); }catch(e){} return r; }; })(renderMenu);   
 
 buildSprites(()=>{ ready=true;
   
