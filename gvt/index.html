@@ -77205,6 +77205,45 @@ function fpnProbe(){ const a=S.ftAim, sg=S.units.find(u=>u.type==='sarge' && fpn
 
 
 
+var FTZ={ on:(function(){ try{ return new URLSearchParams(location.search).get('ftz')==='0'? 0 : 1; }catch(e){ return 1; } })(), hold:10, ringR:30, log:[] };
+function ftzOn(){ return !!FTZ.on; }
+function ftzLog(a){ if(FTZ.log.length<200) FTZ.log.push([+(+S.t||0).toFixed(2)].concat(a)); }
+function ftzCam(a){ if(!a || !a.u) return; const u=a.u, z=(CCN.mom && CCN.mom.teal && CCN.mom.teal.z) || 1.2;   
+  if(ccnCam(u.x,u.y-30,z,FTZ.hold)){ a.zm=CCN_CAM.m; ftzLog(['cam',Math.round(u.x),Math.round(u.y),z]); } else ftzLog(['cam-skip']);
+  ftzWatch(a); }
+function ftzWatch(a){ setTimeout(()=>{ if(S.ftAim===a) return ftzWatch(a); ftzOut(a); }, CCN.poll); }   
+function ftzOut(a){ const M=CCN_CAM.m; if(!M || !a.zm || M!==a.zm) return; const el=(ccnNow()-M.t0)/1000; if(el<CCN.easeIn) M.t0-=(CCN.easeIn-el)*1000; M.hold=Math.max(0,Math.min(M.hold,(ccnNow()-M.t0)/1000-CCN.easeIn)); a.zm=null; ftzLog(['out']); }   
+function ftzArmed(){ const a=S.ftAim; return !!(a && a.arm && !a.on); }
+function ftzVoid(a,why){ if(S.ftAim!==a) return; S.ftAim=null; if(a.sl && CCN_SL===a.sl) ccnSlowBack('ftz'); ftzLog(['void',why]); }   
+function ftzDown(a,e){ const u=a.u; if(!u || u.dead || S.units.indexOf(u)<0){ ftzVoid(a,'gone'); return; }
+  a.moved=true; const ok=fpnStart(a,{ x:u.x, y:u.y }); if(!ok){ ftzLog(['start-fail']); return; }   
+  const w=evPosW(e), n=ftClampP(w.x,w.y-DRAG_OFF); a.fx=n.x; a.fy=n.y; fpnInk(a,n); ftzLog(['down',Math.round(n.x),Math.round(n.y)]); }   
+try{ if(typeof ftPress==='function' && !FTZ.p0){ const p0=ftPress; FTZ.p0=p0; ftPress=function(p,w,slot2){ const ok=p0.apply(this,arguments); if(ok && ftzOn() && S.ftAim) ftzCam(S.ftAim); return ok; }; } }catch(e){}
+try{ if(typeof ftUp==='function' && !FTZ.u0){ const u0=ftUp; FTZ.u0=u0; ftUp=function(){ const a=S.ftAim;   
+    if(ftzOn() && a && !a.on && !a.moved && !a.arm && a.u && !a.u.dead && S.mode==='play'){ a.arm=1; a.t0=ccnNow(); if(a.sl && CCN_SL===a.sl) a.sl.end=a.t0+RFT.slowT*1000; ftzLog(['arm']); return true; }   
+    return u0.apply(this,arguments); }; } }catch(e){}
+try{ if(typeof ftMove==='function' && !FTZ.m0){ const m0=ftMove; FTZ.m0=m0; ftMove=function(){ if(ftzArmed()) return true; return m0.apply(this,arguments); }; } }catch(e){}   
+try{ if(typeof fpnOver==='function' && !FTZ.o0){ const o0=fpnOver; FTZ.o0=o0; fpnOver=function(RM){ o0.apply(this,arguments); ftzOver(RM); }; } }catch(e){}
+function ftzOver(RM){ const a=S.ftAim; if(!a || !a.arm || a.on || !a.u || a.u.dead) return; const u=a.u, ph=RM? 0.5 : (ccnNow()%900)/900, R=FTZ.ringR;   
+  cx.save(); cx.lineCap='round'; cx.globalAlpha=0.35; cx.fillStyle=CCN.red.hex; cx.beginPath(); cx.ellipse(u.x,u.y+3,R*0.8,R*0.8*0.36,0,0,7); cx.fill();
+  cx.globalAlpha=0.95; cx.strokeStyle=CCN.red.hex; cx.lineWidth=3; cx.beginPath(); cx.ellipse(u.x,u.y+3,R,R*0.36,0,0,7); cx.stroke();
+  if(!RM){ const r2=R*(1+0.7*ph); cx.globalAlpha=0.85*(1-ph); cx.strokeStyle='#FFE0D8'; cx.lineWidth=2.2; cx.beginPath(); cx.ellipse(u.x,u.y+3,r2,r2*0.36,0,0,7); cx.stroke(); }
+  cx.restore(); }
+window.addEventListener('pointerdown', e=>{ const a=S.ftAim; if(!a || !a.arm || a.on || !ftzOn() || e.target!==cv || e.isPrimary===false || S.mode!=='play') return;   
+  const p=evPos(e); if(typeof chinBand==='function' && chinBand(p)) return;
+  const own=btnRects[a.slot2? 'tk2' : 'tk'];
+  if(own && inRect(p.x,p.y,own)){ e.stopImmediatePropagation(); ftzLog(['tap2']); ftGo('tap2'); return; }   
+  for(const k in btnRects){ if(inRect(p.x,p.y,btnRects[k])){ ftzVoid(a,'btn:'+k); return; } }   
+  e.stopImmediatePropagation(); try{ audio(); }catch(x){} ftzDown(a,e); }, { capture:true });
+function ftzRead(){ const a=S.ftAim, M=CCN_CAM.m; return { cv:GVT_CV, on:FTZ.on, arm:a? (a.arm|0) : 0, pen:a? (a.on|0) : 0, cam:{ on:CCN_CAM.on|0, z:+(CCN_CAM.z||1).toFixed(3), m:M? { fx:Math.round(M.fx), fy:Math.round(M.fy), z:M.z, hold:+M.hold.toFixed(2), mine:!!(a && a.zm===M) } : null }, ink0:(a && a.ink && a.ink[0])? [Math.round(a.ink[0].x),Math.round(a.ink[0].y)] : null, log:FTZ.log.slice(-20).map(r=>r.slice(1).join(':')) }; }
+
+
+
+
+
+
+
+
 
 
 
@@ -87743,7 +87782,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='24.11';        
+let GVT_CV='24.12';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
