@@ -72441,7 +72441,7 @@ const SARGE_WEAPONS = {
   
   
   commander: { name:'THE CLAYMORE',  unlock:0,  desc:'A steel saber and a wall of muscle — he walks in slow, blocks the first few hits, and swings back hard.' },
-  spellbook: { name:'THE SPELLBOOK', unlock:0,  desc:'An old book of spells and a little wand. He throws magic orbs that burst on a whole cluster, quicker than a bazooka and a little softer.' }   
+  spellbook: { name:'THE SPELLBOOK', unlock:75,   desc:'An old book of spells and a little wand. He throws magic orbs that burst on a whole cluster, quicker than a bazooka and a little softer.' }   
 };
 
 
@@ -72457,8 +72457,8 @@ const SARGE_ORDER=['pistol','shotgun','sniper','lightsaber','commander','spellbo
 
 
 
-const SPB_LVL=100, SPB_RNG=222, SPB_CD=1.75, SPB_DMG0=4.8, SPB_DMG_PER=0.48, SPB_R=55, SPB_SPD=280, SPB_FLICK=0.24, SPB_HEX='#B45BFF', SPB_LILAC='#E6CFFF';
-function spbOwned(){ return coopBeat(SPB_LVL); }   
+const SPB_LVL=75, SPB_RNG=222, SPB_CD=1.75, SPB_DMG0=4.8, SPB_DMG_PER=0.48, SPB_R=55, SPB_SPD=280, SPB_FLICK=0.24, SPB_HEX='#B45BFF', SPB_LILAC='#E6CFFF';
+function spbOwned(){ return (META.sargeUnlocked||[]).indexOf('spellbook')>=0; }   
 
 
 function spbCast(u,best,sw,vm,cm,wdir){
@@ -72538,6 +72538,7 @@ function spbDrawHands(u){
   cx.globalAlpha=1; cx.fillStyle='#FFFFFF'; cx.beginPath(); cx.arc(7.1,-8.7,0.9+0.5*fk,0,7); cx.fill();
   cx.restore();
 }
+
 
 function spbOpen(){
   const p=document.getElementById('milePop'); if(!p) return;
@@ -72910,7 +72911,7 @@ function csIs(u,n,sw){ if(!u || u.type!=='sarge' || u.dead) return false;
 
 
 
-function wkOwned(wk){ return wk==='pistol' || (wk==='commander'? cmdOwned() : wk==='spellbook'? spbOwned()
+function wkOwned(wk){ return wk==='pistol' || (wk==='commander'? cmdOwned()
   : (META.sargeUnlocked||[]).indexOf(wk)>=0); }
 
 
@@ -87932,7 +87933,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='24.22';        
+let GVT_CV='24.23';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -116060,7 +116061,6 @@ const COOP_MILES=[
   { lvl:85,  kind:'medal',    id:'cml85', mname:'ALMOST THERE, TOGETHER' },
   { lvl:SOUL_LVL, kind:'soul', id:'soul' },
   { lvl:CMD_BLADE_LVL, kind:'weapon', id:'blade' },
-  { lvl:SPB_LVL, kind:'weapon', id:'spellbook' },   
   { lvl:100, kind:'finale',   ref:'co10' }
 ];
 
@@ -117266,7 +117266,6 @@ function endBattle(win){
   
   
   if(plain && cmdDue)   prizes.push({ o:1, t:'THE CLAYMORE', f:'academy', a:'<img src="'+sargeWepURI('commander', dyeHex()||undefined)+'" alt="">' });   
-  if(plain && spbOwned() && !META.spbSeen) prizes.push({ o:7, t:'THE SPELLBOOK', f:'room', a:'<img src="'+sargeWepURI('spellbook', dyeHex()||undefined)+'" alt="">' });   
   if(plain && bladeDue) prizes.push({ o:7, t:"THE CLAYMORE'S BLADE", f:'room', a:'<img src="'+sargeWepURI('claymore', dyeHex()||undefined)+'" alt="">' });   
   if(evBattle() && META.ev && META.ev.ann) prizes.push({ o:7, t:(META.ev.last && META.ev.last.rk==='bone')? "THE KING'S HOARD" : 'THE SPOILS OF THE INVASION', f:'room', a:evTicketArt() });   
   
@@ -149092,7 +149091,6 @@ function crlMile(m){
   const k=m.kind, id=m.id, lvl=m.lvl|0, hex=()=>(dyeHex()||undefined), r={ lvl, kind:k, id:id||m.ref||'', name:'', line:'', card:'', pic:()=>CRL_GIFT, big:null, won:coopBeat(lvl) };
   if(k==='medal'){ const i=crlMedalIdx(m); r.name=t(m.mname); r.line=tf('A MEDAL IN %1', t('SHOULDER TO SHOULDER')); r.card=t('Beat level '+lvl+' of the campaign with a real commander beside you'); r.pic=()=>crlBadge(id, i, 'cml'); }
   else if(k==='decor'){ const d=DECOR_INFO[id]||{}; r.name=t(d.name||id); r.line=t(d.tag||''); r.card=t(d.sub||''); r.pic=()=>crlSafe(()=>lg3Pic('decor', id)); }
-  else if(k==='weapon' && id==='spellbook'){ r.name=t(SARGE_WEAPONS.spellbook.name); r.card=t('📖 THE SPELLBOOK reports to the Training Academy! Sarge throws magic orbs that burst on a whole cluster.'); r.pic=()=>'<img src="'+crlSafe(()=>sargeWepURI('spellbook', hex()))+'" alt="">'; }   
   else if(k==='weapon'){ const blade=id==='blade'; r.name=t(blade? "THE CLAYMORE'S BLADE" : SARGE_WEAPONS.commander.name); r.card=t(blade? "⚔ THE CLAYMORE'S BLADE. His sword grows into a mighty claymore!" : '⚔ SECRET CLASS UNLOCKED: THE CLAYMORE reports to the Training Academy!'); r.pic=()=>'<img src="'+crlSafe(()=>sargeWepURI(blade? 'claymore' : 'commander', hex()))+'" alt="">'; }
   else if(k==='unit'){ const bmb=id==='bomber'; r.name=t(bmb? 'THE BOMBER' : (crlSafe(()=>UDEF[id].name)||id)); r.line=t('JOINS THE FORCE'); r.card=t(bmb? 'SECRET UNIT UNLOCKED: THE BOMBER reports to the shop!' : 'JOINS THE FORCE'); r.pic=()=>bmb? '<img src="'+crlSafe(()=>sprURI('bomber', hex(), BMB_VB))+'" alt="">' : (crlSafe(()=>lg3Pic('man', id)) || CRL_GIFT); }   
   else if(k==='soul'){ r.name=t('THE SOUL OF A SOLDIER'); r.card=t('✦ THE SOUL OF A SOLDIER AWAKENS. A once-ever gift waits in your room!'); r.pic=()=>crlSafe(()=>soulMarkSVG()); }
@@ -177131,7 +177129,7 @@ function heroesHTML(){ const dye=dyeHex()||undefined, hsel=heroSel(); let h='';
   return h; }
 function fhWrackHTML(){
   const eq=META.sargeWeapon||'pistol';
-  return '<div class="sh-wrack fh-wrack">'+SARGE_ORDER.filter(wk=>(wk!=='commander' || cmdOwned()) && (wk!=='spellbook' || spbOwned())).map(wk=>{ const sab=(wk==='lightsaber');   
+  return '<div class="sh-wrack fh-wrack">'+SARGE_ORDER.filter(wk=>wk!=='commander' || cmdOwned()).map(wk=>{ const sab=(wk==='lightsaber');   
     if(!wkOwned(wk)) return '<button type="button" class="sh-wep lk" id="fhwep-'+wk+'" data-wep="'+wk+'" data-own="0" onclick="UI.fortIron(\''+wk+'\')"><img src="'+wepGlyphURI(wk)+'" alt=""><i>'+gly('lock')+'</i></button>';
     return '<button type="button" class="sh-wep'+(wk===eq?' eq':'')+(sab?' sab':'')+'" id="fhwep-'+wk+'" data-wep="'+wk+'"'+(sab?' style="--sab:'+saberHex()+'"':'')+' onclick="UI.fortWep(\''+wk+'\')"><img src="'+wepGlyphURI(sargeArtW(wk))+'" alt=""></button>'; }).join('')+'</div>'+fhWrackCapHTML(eq)+(eq==='commander' && cmdOwned()? '<button type="button" class="mbtn alt fh-philbtn" onclick="UI.fortPhilOpen()">PHILOSOPHIES</button>' : '')+(eq==='lightsaber' && sabHasSaber() && !sabRiteOwed()? '<button type="button" class="mbtn alt fh-philbtn" onclick="UI.fortCrystalOpen()">CRYSTALS</button>' : '');   
 }
@@ -177167,7 +177165,7 @@ function eqIronHTML(wk){ const eq=META.sargeWeapon||'pistol', own=wkOwned(wk), s
     +((own && wk===eq)? '<span class="fh-pflag">IN HAND</span>' : '')
     +'<span class="eq-ipic"><img src="'+wepAloneURI(sargeArtW(wk))+'" alt=""></span><span class="eq-in">'+wd.name+'</span>'
     +(own? '<span class="eq-il">'+acRankHTML('w',wk,r)+'</span>' : '<span class="eq-il" data-notr>'+gly('lock')+' '+escH(tf('LEVEL %1', wd.unlock))+'</span>')+'</button>'; }   
-function eqIronsHTML(){ const L9=SARGE_ORDER.filter(wk=>(wk!=='commander' || cmdOwned()) && (wk!=='spellbook' || spbOwned()));   
+function eqIronsHTML(){ const L9=SARGE_ORDER.filter(wk=>wk!=='commander' || cmdOwned());   
   return '<div class="eq-irons" data-n="'+L9.length+'" style="--eq-n:'+L9.length+'">'+L9.map(eqIronHTML).join('')+'</div>'; }
 function eqCapHTML(wk){ const wd=SARGE_WEAPONS[wk]||SARGE_WEAPONS.pistol;   
   return '<div class="fh-wcap eq-cap" data-fh="wcap" data-wk="'+wk+'"><b>'+wd.name+'</b>'+soulChip('w',wk)+wepDoorHTML(wk)
@@ -177234,7 +177232,7 @@ function gstTap(k){ if(GST_KEYS.indexOf(k)<0) return false; try{ audio(); }catch
 let EQT_VIEW='all';   
 const EQT_MARK={ wep:'pistol', head:'helmet', face:'mustache', chest:'vest', trim:'belt', hands:'pilotgloves', legs:'cargopants', feet:'boots', socks:'luckysocks' };   
 function eqtTypes(){ return [{ v:'wep', w:'WEAPONS' }].concat(OUTFIT_SLOTS.map(g=>({ v:g.key, w:g.rule, g:g }))); }   
-function eqtIrons(){ return SARGE_ORDER.filter(wk=>(wk!=='commander' || cmdOwned()) && (wk!=='spellbook' || spbOwned())); }   
+function eqtIrons(){ return SARGE_ORDER.filter(wk=>wk!=='commander' || cmdOwned()); }   
 function eqtShown(ids){ return ids.filter(id=>!!shopOutfitHTML(id,'UI.fortOutfit')); }   
 function eqtRail(g){ return eqtShown(OUTFIT_ORDER.filter(id=>g.ids.indexOf(id)>=0)); }
 function eqtHas(v){ if(v==='all' || v==='wep') return true; const g=OUTFIT_SLOTS.find(g9=>g9.key===v); return !!g && eqtRail(g).length>0; }   
@@ -180257,9 +180255,6 @@ function cmdSweep(){
   if(bladeOwned() && !META.bladeSeen){ META.bladeSeen=1; saveMeta();
     if(S.mode==='menu') renderMenu();
     cmdOpen(true); return true; }
-  if(spbOwned() && !META.spbSeen){ META.spbSeen=1; saveMeta();   
-    if(S.mode==='menu') renderMenu();
-    spbOpen(); return true; }
   return false;
 }
 function cmdOpen(blade){
