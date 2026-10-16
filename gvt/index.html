@@ -87932,7 +87932,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='24.21';        
+let GVT_CV='24.22';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -163647,6 +163647,35 @@ function kctToy(){ if(!kctOn()) return null;
 try{ if(typeof bossMold==='function' && !KCT.bm0){ const b0=bossMold; KCT.bm0=b0; bossMold=function(k){ if(k==='kingcroak'){ const v=kctToy(); if(v) return v; } return b0.apply(this, arguments); }; } }catch(e){}
 function kctRead(){ const rs=document.getElementById('roomStage'), g=rs? rs.querySelector('#decKingcroak') : null; return { on:KCT.on, live:kctOn(), used:KCT.used, loose:KCT.loose, miss:KCT.miss, n:KCT.n, piv:KCT.piv,
   room:g? { kct:!!g.querySelector('.kct'), armL:g.querySelectorAll('.barmL').length, gunL:g.querySelectorAll('.bgunL').length, armR:g.querySelectorAll('.barmR').length, gunR:g.querySelectorAll('.bgunR').length, hat:g.querySelectorAll('.bhat').length } : null }; }
+
+
+
+
+
+
+
+
+
+var ODL={ on:(function(){ try{ return new URLSearchParams(location.search).get('odl')==='0'? 0 : 1; }catch(e){ return 1; } })(), d:{}, q:[], busy:0, ep:0, doors:0, asks:0, out:0, tick:null, all0:null };
+const ODL_IDLE=12, ODL_BEAT=5000, ODL_SLICE=8;   
+function odlOn(){ return ODL.on===1 && typeof odeOn==='function' && odeOn(); }
+function odlStep(){ const t0=Date.now(); while(ODL.q.length && Date.now()-t0<ODL_SLICE){ const k=ODL.q.shift(), d=ODL.d[k]; if(d) d.inq=0; try{ odeMint(k); }catch(e){ ODE.miss++; } } if(ODL.q.length) setTimeout(odlStep,0); else ODL.busy=0; }
+function odlAsk(k,d){ d.asked=1; ODL.asks++; if(d.inq) return; d.inq=1; ODL.q.push(k); if(!ODL.busy){ ODL.busy=1; setTimeout(odlStep,0); } }
+function odlDoor(k){   
+  
+  const pd=Object.getOwnPropertyDescriptor(IMG,k); if(!pd || pd.get || pd.set || !pd.configurable || !pd.value) return false;
+  const d={ raw:pd.value, cur:pd.value, at:ODL.ep, asked:0, inq:0 }; ODL.d[k]=d;
+  Object.defineProperty(IMG,k,{ configurable:true, enumerable:true,
+    get:function(){ d.at=ODL.ep; if(!d.asked) odlAsk(k,d); return d.cur; },
+    set:function(n){ if(n && ODE.mine.has(n)) d.cur=n; else { d.raw=n; d.cur=n; d.asked=0; } } });
+  ODL.doors++; return true; }
+function odlBeat(){ ODL.ep++; const old=ODL.ep-ODL_IDLE;   
+  for(const k in ODL.d){ const d=ODL.d[k]; if(d.raw && d.cur!==d.raw && d.at<old){ ODE.mine.delete(d.cur); d.cur=d.raw; d.asked=0; ODL.out++; } } }
+function odlArm(){ const ks=Object.keys(IMG); for(let i=0;i<ks.length;i++) odlDoor(ks[i]); if(!ODL.tick) ODL.tick=setInterval(odlBeat, ODL_BEAT); }
+try{ if(typeof odeMintAll==='function' && !ODL.all0){ ODL.all0=odeMintAll;
+  odeMintAll=function(){ if(!odlOn()) return ODL.all0.apply(this, arguments); ODE.runs++; odlArm(); ODE.t=Date.now(); }; } }catch(e){}   
+function odlRead(){ let mint=0, plain=0, asked=0; const keys=[]; for(const k in ODL.d){ const d=ODL.d[k]; if(d.cur!==d.raw){ mint++; keys.push(k); } else plain++; if(d.asked) asked++; }
+  return { on:ODL.on, live:odlOn(), doors:ODL.doors, asks:ODL.asks, asked:asked, mint:mint, plain:plain, out:ODL.out, queue:ODL.q.length, ep:ODL.ep, keys:keys }; }
 
 
 
