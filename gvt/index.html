@@ -61442,6 +61442,7 @@ function rcDrive(f,dt,sp,gx,gy,zig){ const D=RC8, fn=rcFunnel(f,gx), pad=(f.rcSq
   if(f.rcSq>0){ f.rcSq-=dt; if(f.rcSq<=0) f.rcSq=0; }
   if(f.rcGk!==gk || f.rcBest==null || gd<f.rcBest-1){ f.rcGk=gk; f.rcBest=gd; f.rcStall=0; } else { f.rcStall=(f.rcStall||0)+dt; if(f.rcStall>2.5){ f.rcSq=3; f.rcStall=0; f.rcBest=null; } }
   f.squeeze=f.rcSq>0; }
+function rcRimSeat(f,D){ const e=W-72-D.spinR; if(f.rcCx<=e) return; f.rcCx=e; f.rcA=Math.acos(Math.max(-1,Math.min(1,(f.x-e)/D.spinR))); f.rcCy=foeBandY(f.y)-Math.sin(f.rcA)*D.spinR*0.6; }   
 function rcTick(f,dt){ if(S.bf) return; const D=RC8, sp=f.def.spd*(f.spdMul||1)*fzWalk(f)*petChillX(f)*petPoisonX(f), RV=S.cfg.terrain.river;
   if(f.def.rcDrv){   
     if(f.rcSx==null){ f.rcSx=W-D.standX-((f.foN|0)%3)*28; f.rcSt='walk'; }
@@ -61451,7 +61452,7 @@ function rcTick(f,dt){ if(S.bf) return; const D=RC8, sp=f.def.spd*(f.spdMul||1)*
   if(f.rcHiT>0){ rcHijack(f,dt,sp); return; }
   if(f.x>=W-70){ if(dt>0){ f.x-=sp*dt; rcStamp(f,-1); } return; }   
   if(!f.rcSpin && !rcDriverOf(f)) rcCut(f);
-  if(f.rcSpin){ if(f.rcCx==null){ f.rcCx=Math.max(f.x, T.x+LEAK_R+2*D.spinR+10)+D.spinR; f.rcCy=foeBandY(f.y); f.rcA=Math.PI; } if(dt<=0) return;   
+  if(f.rcSpin){ if(f.rcCx==null){ f.rcCx=Math.max(f.x, T.x+LEAK_R+2*D.spinR+10)+D.spinR; f.rcCy=foeBandY(f.y); f.rcA=Math.PI; rcRimSeat(f,D); } if(dt<=0) return;   
     f.rcA+=D.spinW*dt; const px=f.x; f.x=f.rcCx+Math.cos(f.rcA)*D.spinR; f.y=foeBandY(f.rcCy+Math.sin(f.rcA)*D.spinR*0.6); rcStamp(f,(f.x-px)>0? 1 : -1); return; }
   if(dt<=0) return;   
   if(RV && f.x<=RV.x-4) f.crossed=true;
@@ -64420,7 +64421,7 @@ function olvHoldsWalker(f){ return !!(f.def && f.def.wk7 && (f.wkPlant || f.wkFa
 const CP7={ every:10, hum:3, first:2.0, cap:4, hpX:0.5, perGen:2, genHpX:0.7 };   
 CP_SPEC[OLV7.cp]=Object.assign({}, CP, { of:'rctank', every:CP7.every, hum:CP7.hum, first:CP7.first, cap:CP7.cap, hpX:CP7.hpX });   
 function olvGiant7(L,dt){ let drv=null; for(const o of S.foes){ if(o.def && o.def.rcDrv && o.link===OLV7.rc && !o.rcGone && !o.dead && o.hp>0){ drv=o; break; } }
-  for(const f of S.foes){ if(!f.def || !f.def.rcTank || !(f.cpGen>0) || f.rc7) continue; f.rc7=1; const n=L.prints++, g=Math.min(CP.genMax, 1+Math.floor(n/CP7.perGen)); f.cpGen=g;     if(g>1){ f.hp=f.hpMax=Math.max(1,Math.round(f.hpMax*Math.pow(CP7.genHpX,g-1))); }   
+  for(const f of S.foes){ if(!f.def || !f.def.rcTank || !(f.cpGen>0) || f.rc7) continue; f.rc7=1; f.link=OLV7.rc; const n=L.prints++, g=Math.min(CP.genMax, 1+Math.floor(n/CP7.perGen)); f.cpGen=g;     if(g>1){ f.hp=f.hpMax=Math.max(1,Math.round(f.hpMax*Math.pow(CP7.genHpX,g-1))); }   
     L.printLog.push([+S.t.toFixed(2), f.id, g, +f.hpMax.toFixed(1), drv? drv.id : null]); if(L.printLog.length>40) L.printLog.shift(); }
   { const Z=oc8L(); if(Z && Z.steals>(L.steals|0)){ L.steals=Z.steals; olvB7Log(L,['steal', +S.t.toFixed(2), S.foes.filter(o=>o.def && o.def.rcTank && o.rcHiT>0).length]); } } }   
 
@@ -87511,7 +87512,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='23.90';        
+let GVT_CV='23.91';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
