@@ -72731,7 +72731,7 @@ function spbPress(){
   if(st.pad){ st.pad=null; return; }
   if(!js || st.lock>0 || !spbKnownList().some(spbReady)){ SFX.clack(); return; }
   const r=cv.getBoundingClientRect();
-  st.pad={ t:SP_PAD_T, pts:[], down:false, W:r.width, H:r.height, g:spbGuides(r.width, r.height) };
+  st.pad={ t:SP_PAD_T, pts:[], down:false, W:r.width, H:r.height, g:[] };   
   bfSfx(SFX.twink, js.x, js.y);
 }
 
@@ -72799,6 +72799,24 @@ function spbTeddyBoom(b){
   S.fx.push({ k:'flash', x:b.x, y:b.y-12, ang:0, R:RM? 18 : 34, lw:RM? 3 : 5, t:0, dur:0.18 }); for(let i=0;i<(RM? 2 : 5);i++) S.fx.push({ k:'puff', x:b.x+(i-2)*9, y:b.y-6-(i%2)*8, t:-i*0.03, dur:0.5, R:14+(i%3)*4, col:i%2? '#F6D7E6' : '#D9D4C8' });
   if(!RM) for(let j=0;j<8;j++){ const a=j/8*Math.PI*2; S.fx.push({ k:'spbx', m:'spark', x:b.x, y:b.y-10, vx:Math.cos(a)*50, vy:Math.sin(a)*34-12, t:0, dur:0.34 }); }
   if(!RM) S.shake=Math.max(S.shake||0, 0.2); bfSfx(SFX.boom, b.x, b.y); return n; }
+
+
+
+const SPB_SHAPE={ earthquake:'A ZIGZAG WITH THREE POINTS, TOP TO BOTTOM', tsunami:'A WAVE WITH THREE POINTS, ACROSS', blackhole:'A SWIRL, OUTSIDE IN', teddy:'AN INFINITY SIGN' };
+function spbTutHas(k){ return SPB_SP[k].start? spbOwned() : enhOwns(k); }
+function spbTutDue(){ const L=META.spbTut||[]; return SPB_SPELLS.find(k=>spbTutHas(k) && L.indexOf(k)<0) || null; }
+function spbSignSVG(k, anim){ const s=Math.min(300/SPB_GW[k], 170/SPB_GH[k]), P=SPB_INC.SIGNS[k](180,110,s), d=P.map((p,i)=>(i? 'L' : 'M')+p.x.toFixed(1)+' '+p.y.toFixed(1)).join(' ');
+  let L=0; for(let i=1;i<P.length;i++) L+=Math.hypot(P[i].x-P[i-1].x, P[i].y-P[i-1].y); L=Math.ceil(L)+2; const hex=SPB_SP[k].hex;
+  return '<svg class="spbtut" viewBox="0 0 360 220" width="300" height="183" aria-hidden="true"><path d="'+d+'" fill="none" stroke="'+hex+'" stroke-opacity=".55" stroke-width="5" stroke-linecap="round" stroke-dasharray="1 9"/>'
+    +'<path d="'+d+'" fill="none" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="'+L+'" stroke-dashoffset="'+(anim? L : 0)+'">'+(anim? '<animate attributeName="stroke-dashoffset" values="'+L+';0;0" keyTimes="0;0.7;1" dur="2.6s" repeatCount="indefinite"/>' : '')+'</path>'
+    +'<circle cx="'+P[0].x.toFixed(1)+'" cy="'+P[0].y.toFixed(1)+'" r="9" fill="'+hex+'" stroke="#FFFFFF" stroke-width="3"/></svg>'; }
+function spbTutOpen(k){ const p=document.getElementById('milePop'); if(!p) return;
+  p.innerHTML='<div class="mb-card"><span class="mb-band">NEW SPELL!</span><h2 class="mb-h">'+SPB_SP[k].name+'</h2>'
+    +'<span class="mb-win">'+spbSignSVG(k, !reducedMotion())+'</span>'
+    +'<span class="mb-line">'+SPB_SHAPE[k]+'</span><span class="mb-line">In battle, tap CAST and draw this sign anywhere on the glass.</span>'
+    +'<button type="button" class="mb-take gold" onclick="UI.mileTake()">OKAY</button></div>';
+  p.classList.remove('hidden'); SFX.fanfare(); }
+function spbTutSweep(){ const k=spbTutDue(); if(!k) return false; META.spbTut=(META.spbTut||[]).concat([k]); saveMeta(); if(S.mode==='menu') renderMenu(); spbTutOpen(k); return true; }   
 
 let SPB_HOOK=0;
 function spbHook(){ if(SPB_HOOK || typeof cv==='undefined' || !cv) return; SPB_HOOK=1;
@@ -88253,7 +88271,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='24.26';        
+let GVT_CV='24.27';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -180598,6 +180616,7 @@ function cmdSweep(){
   if(bladeOwned() && !META.bladeSeen){ META.bladeSeen=1; saveMeta();
     if(S.mode==='menu') renderMenu();
     cmdOpen(true); return true; }
+  if(spbTutSweep()) return true;   
   return false;
 }
 function cmdOpen(blade){
@@ -187124,6 +187143,13 @@ Object.assign(TR["de"]||(TR["de"]={}), {"CAST":"ZAUBERN","DRAW THE SIGN":"ZEICHN
 Object.assign(TR["ru"]||(TR["ru"]={}), {"CAST":"ЧАРЫ","DRAW THE SIGN":"НАРИСУЙ ЗНАК","FIZZLE":"ПШИК","BLACK HOLE":"ЧЁРНАЯ ДЫРА","TSUNAMI":"ЦУНАМИ","EARTHQUAKE":"ЗЕМЛЕТРЯСЕНИЕ","TEDDY BOMB":"МИШКА-БОМБА","SPELLBOOK":"КНИГА ЗАКЛИНАНИЙ","SPELLBOOK ROOM":"КОМНАТА КНИГИ ЗАКЛИНАНИЙ","A SWIRL, OUTSIDE IN":"СПИРАЛЬ, СНАРУЖИ ВНУТРЬ","AN INFINITY SIGN":"ЗНАК БЕСКОНЕЧНОСТИ","A SPELL FOR THE SPELLBOOK":"ЗАКЛИНАНИЕ ДЛЯ КНИГИ","Tap CAST and draw the swirl: every enemy within {0} m of Sarge is dragged into him and swallowed, each one taking the book's full damage.":"Нажми ЧАРЫ и нарисуй спираль: каждый враг в {0} м от Сарджа притянут к нему и проглочен, и каждый получает полный урон книги.","It pulls men across mines and under the train, which is their problem. Draw it wrong and it fizzles. Switch it off here and the sign does nothing.":"Она тащит врагов через мины и под поезд, это их беда. Нарисуешь неверно, и будет пшик. Выключишь здесь, и знак ничего не сделает.","Tap CAST and draw an infinity: {0} enemy soldiers turn into teddy bears and blow up {1} seconds later, each with a mortar's blast.":"Нажми ЧАРЫ и нарисуй бесконечность: {0} вражеских солдат станут плюшевыми мишками и взорвутся через {1} секунды, каждый как мина миномёта.","Heroes, bosses, machines and their Sarge are never picked, and the rest are picked at random. Draw it wrong and it fizzles.":"Героев, боссов, машины и их Сарджа не выбирают, остальных выбирают случайно. Нарисуешь неверно, и будет пшик.","PULLS EVERY MAN IN {0} M INTO SARGE":"ТЯНЕТ ВСЕХ В {0} М К САРДЖУ","DRAW THE SWIRL RIGHT OR IT FIZZLES":"РИСУЙ СПИРАЛЬ ВЕРНО, ИНАЧЕ ПШИК","{0} ENEMIES BECOME TEDDY BOMBS":"{0} ВРАГОВ СТАНУТ МИШКАМИ-БОМБАМИ","PICKED AT RANDOM":"ВЫБОР СЛУЧАЙНЫЙ"});   
 Object.assign(TR["es"]||(TR["es"]={}), {"CAST":"HECHIZO","DRAW THE SIGN":"DIBUJA EL SIGNO","FIZZLE":"PFF","BLACK HOLE":"AGUJERO NEGRO","TSUNAMI":"TSUNAMI","EARTHQUAKE":"TERREMOTO","TEDDY BOMB":"OSITO BOMBA","SPELLBOOK":"LIBRO DE HECHIZOS","SPELLBOOK ROOM":"SALA DEL LIBRO DE HECHIZOS","A SWIRL, OUTSIDE IN":"UNA ESPIRAL, DE FUERA HACIA DENTRO","AN INFINITY SIGN":"UN SIGNO DE INFINITO","A SPELL FOR THE SPELLBOOK":"UN HECHIZO PARA EL LIBRO","Tap CAST and draw the swirl: every enemy within {0} m of Sarge is dragged into him and swallowed, each one taking the book's full damage.":"Toca HECHIZO y dibuja la espiral: cada enemigo a {0} m de Sarge es arrastrado hasta él y tragado, y cada uno recibe todo el daño del libro.","It pulls men across mines and under the train, which is their problem. Draw it wrong and it fizzles. Switch it off here and the sign does nothing.":"Arrastra a los hombres sobre minas y bajo el tren, y eso es problema suyo. Si lo dibujas mal, hace pff. Apágalo aquí y el signo no hace nada.","Tap CAST and draw an infinity: {0} enemy soldiers turn into teddy bears and blow up {1} seconds later, each with a mortar's blast.":"Toca HECHIZO y dibuja un infinito: {0} soldados enemigos se vuelven ositos de peluche y estallan {1} segundos después, cada uno con la explosión de un mortero.","Heroes, bosses, machines and their Sarge are never picked, and the rest are picked at random. Draw it wrong and it fizzles.":"Nunca elige héroes, jefes, vehículos ni a su Sarge, y el resto se elige al azar. Si lo dibujas mal, hace pff.","PULLS EVERY MAN IN {0} M INTO SARGE":"ARRASTRA HACIA SARGE A TODOS A {0} M","DRAW THE SWIRL RIGHT OR IT FIZZLES":"DIBUJA BIEN LA ESPIRAL O HACE PFF","{0} ENEMIES BECOME TEDDY BOMBS":"{0} ENEMIGOS SE VUELVEN OSITOS BOMBA","PICKED AT RANDOM":"ELEGIDOS AL AZAR"});   
 Object.assign(TR["ar"]||(TR["ar"]={}), {"CAST":"تعويذة","DRAW THE SIGN":"ارسم الرمز","FIZZLE":"فشلت","BLACK HOLE":"الثقب الأسود","TSUNAMI":"تسونامي","EARTHQUAKE":"الزلزال","TEDDY BOMB":"قنبلة الدبدوب","SPELLBOOK":"كتاب التعاويذ","SPELLBOOK ROOM":"غرفة كتاب التعاويذ","A SWIRL, OUTSIDE IN":"دوامة من الخارج إلى الداخل","AN INFINITY SIGN":"علامة اللانهاية","A SPELL FOR THE SPELLBOOK":"تعويذة لكتاب التعاويذ","Tap CAST and draw the swirl: every enemy within {0} m of Sarge is dragged into him and swallowed, each one taking the book's full damage.":"اضغط تعويذة وارسم الدوامة: كل عدو على بعد {0} م من سارج يُسحب إليه ويُبتلع، وكل واحد يتلقى ضرر الكتاب كاملًا.","It pulls men across mines and under the train, which is their problem. Draw it wrong and it fizzles. Switch it off here and the sign does nothing.":"تسحب الرجال فوق الألغام وتحت القطار، وتلك مشكلتهم. إن رسمتها خطأ فشلت. أطفئها هنا ولن يفعل الرمز شيئًا.","Tap CAST and draw an infinity: {0} enemy soldiers turn into teddy bears and blow up {1} seconds later, each with a mortar's blast.":"اضغط تعويذة وارسم علامة اللانهاية: {0} من جنود العدو يتحولون إلى دببة محشوة وتنفجر بعد {1} ثانية، كل واحد بانفجار قذيفة هاون.","Heroes, bosses, machines and their Sarge are never picked, and the rest are picked at random. Draw it wrong and it fizzles.":"لا يُختار الأبطال ولا الزعماء ولا الآليات ولا سارج الخصم، والباقون يُختارون عشوائيًا. إن رسمتها خطأ فشلت.","PULLS EVERY MAN IN {0} M INTO SARGE":"تسحب كل رجل في {0} م إلى سارج","DRAW THE SWIRL RIGHT OR IT FIZZLES":"ارسم الدوامة صحيحة وإلا فشلت","{0} ENEMIES BECOME TEDDY BOMBS":"{0} أعداء يصبحون قنابل دبدوب","PICKED AT RANDOM":"يُختارون عشوائيًا"});   
+Object.assign(TR["ja"]||(TR["ja"]={}), {"NEW SPELL!":"あたらしい じゅもん！","In battle, tap CAST and draw this sign anywhere on the glass.":"たたかいで となえるを おして、この しるしを どこにでも かこう。","A ZIGZAG WITH THREE POINTS, TOP TO BOTTOM":"とがり みっつの ギザギザ、うえから したへ","A WAVE WITH THREE POINTS, ACROSS":"とがり みっつの なみ、よこに"});   
+Object.assign(TR["ko"]||(TR["ko"]={}), {"NEW SPELL!":"새 주문!","In battle, tap CAST and draw this sign anywhere on the glass.":"전투에서 시전을 누르고 화면 아무 데나 이 표식을 그려.","A ZIGZAG WITH THREE POINTS, TOP TO BOTTOM":"뾰족한 끝 세 개의 지그재그, 위에서 아래로","A WAVE WITH THREE POINTS, ACROSS":"뾰족한 끝 세 개의 물결, 가로로"});   
+Object.assign(TR["zh-Hans"]||(TR["zh-Hans"]={}), {"NEW SPELL!":"新咒语！","In battle, tap CAST and draw this sign anywhere on the glass.":"战斗中点施法，在屏幕任意处画出这个符号。","A ZIGZAG WITH THREE POINTS, TOP TO BOTTOM":"三个尖的锯齿，从上往下","A WAVE WITH THREE POINTS, ACROSS":"三个尖的波浪，横着画"});   
+Object.assign(TR["de"]||(TR["de"]={}), {"NEW SPELL!":"NEUER ZAUBER!","In battle, tap CAST and draw this sign anywhere on the glass.":"Tippe im Kampf ZAUBERN und zeichne dieses Zeichen irgendwo aufs Glas.","A ZIGZAG WITH THREE POINTS, TOP TO BOTTOM":"EIN ZICKZACK MIT DREI SPITZEN, VON OBEN NACH UNTEN","A WAVE WITH THREE POINTS, ACROSS":"EINE WELLE MIT DREI SPITZEN, QUER"});   
+Object.assign(TR["ru"]||(TR["ru"]={}), {"NEW SPELL!":"НОВОЕ ЗАКЛИНАНИЕ!","In battle, tap CAST and draw this sign anywhere on the glass.":"В бою нажми ЧАРЫ и нарисуй этот знак где угодно на экране.","A ZIGZAG WITH THREE POINTS, TOP TO BOTTOM":"ЗИГЗАГ С ТРЕМЯ ПИКАМИ, СВЕРХУ ВНИЗ","A WAVE WITH THREE POINTS, ACROSS":"ВОЛНА С ТРЕМЯ ПИКАМИ, ПОПЕРЁК"});   
+Object.assign(TR["es"]||(TR["es"]={}), {"NEW SPELL!":"¡HECHIZO NUEVO!","In battle, tap CAST and draw this sign anywhere on the glass.":"En batalla, toca HECHIZO y dibuja este signo en cualquier parte de la pantalla.","A ZIGZAG WITH THREE POINTS, TOP TO BOTTOM":"UN ZIGZAG DE TRES PUNTAS, DE ARRIBA ABAJO","A WAVE WITH THREE POINTS, ACROSS":"UNA OLA DE TRES PUNTAS, DE LADO"});   
+Object.assign(TR["ar"]||(TR["ar"]={}), {"NEW SPELL!":"تعويذة جديدة!","In battle, tap CAST and draw this sign anywhere on the glass.":"في المعركة اضغط تعويذة وارسم هذا الرمز في أي مكان على الشاشة.","A ZIGZAG WITH THREE POINTS, TOP TO BOTTOM":"خط متعرج بثلاث قمم من الأعلى إلى الأسفل","A WAVE WITH THREE POINTS, ACROSS":"موجة بثلاث قمم بالعرض"});   
 window.GVT = {
   ffi(o){ return ffiRig(o); },   
   spb2(o){ o=o||{}; const st=spbS(); if(o.grant){ for(const k of o.grant) if(!enhOwns(k)){ grantOwned('enh',k); if(!enhOn(k)){ META.enh.on.push(k); enhExclude(k); } } saveMeta(); }   
