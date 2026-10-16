@@ -87743,7 +87743,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='24.10';        
+let GVT_CV='24.11';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -163284,6 +163284,38 @@ try{ if(typeof lagDinoSVG==='function' && !ODE.ld0){ const l0=lagDinoSVG; ODE.ld
   lagDinoSVG=function(){ const v=l0.apply(this, arguments); if(ODE.on!==1 || typeof v!=='string') return v; const c=odeCut(v,'lag-army'); if(c!==v) ODE.sarge++; return c; }; } }catch(e){}
 function odeRead(){ const bg=document.getElementById('parkBg'); return { on:ODE.on, live:odeOn(), minted:ODE.minted, same:ODE.same, skip:ODE.skip, miss:ODE.miss, wide:ODE.wide, runs:ODE.runs, sarge:ODE.sarge, as:ODE.as, keys:Object.keys(ODE.keys).length,
   done:!!ODE.t, parkSarge:bg? bg.querySelectorAll('#lag-army').length : -1, parkDog:bg? bg.querySelectorAll('#lag-dog').length : -1 }; }
+
+
+
+
+
+
+
+
+var KCT={ on:(function(){ try{ return new URLSearchParams(location.search).get('kct')==='0'? 0 : 1; }catch(e){ return 1; } })(), memo:null, n:0, used:0, loose:0, miss:0, piv:null };
+function kctOn(){ return KCT.on===1 && typeof ODE!=='undefined' && ODE.on===1 && typeof lagOn==='function' && lagOn(); }
+const KCT_T=[ ['<path d="M58 74 Q44 70 36 62"','L'], ['<circle cx="36" cy="62"','L'], ['<rect x="18" y="57"','gL'], ['<rect x="30" y="62"','gL'],
+  ['<path d="M84 74 Q98 70 106 62"','R'], ['<circle cx="106" cy="62"','R'], ['<rect x="109" y="57"','gR'], ['<rect x="107.5" y="62"','gR'],
+  ['<ellipse cx="72" cy="19"','H'], ['<path d="M60 19 Q60 3 72 3 Q84 3 84 19 z"','H'], ['<path d="M72 3 q-3 6 0 12"','H'], ['<rect x="60" y="12.5"','H'] ];   
+const KCT_W={ L:v=>SMPV(58,74,'barmL',v), gL:v=>SMPV(58,74,'barmL',SMPV(32,66,'bgunL',v)), R:v=>SMPV(84,74,'barmR',v), gR:v=>SMPV(84,74,'barmR',SMPV(110,66,'bgunR',v)), H:v=>'<g class="bhat">'+v+'</g>' };   
+function kctKey(s,i){ for(let j=0;j<KCT_T.length;j++) if(s.startsWith(KCT_T[j][0],i)) return KCT_T[j][1]; return null; }
+function kctEnd(s,i){ const re=/<(\/?)[a-zA-Z][^>]*?(\/?)>/g; re.lastIndex=i; let d=0, m; while((m=re.exec(s))){ if(m[1]) d--; else if(!m[2]) d++; if(d===0) return re.lastIndex; } return -1; }   
+function kctPiv(s){ const n={ L:0, gL:0, R:0, gR:0, H:0 }, re=/<(\/?)([a-zA-Z][\w:-]*)[^>]*?(\/?)>/g; let out='', i=0, m;
+  while(true){ re.lastIndex=i; m=re.exec(s); if(!m){ out+=s.slice(i); break; } out+=s.slice(i,m.index);
+    if(m[1]){ out+=m[0]; i=re.lastIndex; continue; }
+    if(m[2]==='defs'){ const e=kctEnd(s,m.index); if(e<0) return null; out+=s.slice(m.index,e); i=e; continue; }   
+    let key=null, e=-1;
+    if(m[2]==='g'){ if(!m[3]){ e=kctEnd(s,m.index); if(e<0) return null; const q=/<([a-zA-Z][\w:-]*)\b/g; q.lastIndex=m.index+1; let f; while((f=q.exec(s)) && f.index<e){ if(f[1]!=='g'){ key=kctKey(s,f.index); break; } } } }   
+    else key=kctKey(s,m.index);
+    if(key){ if(e<0) e=m[3]? re.lastIndex : kctEnd(s,m.index); if(e<0) return null; out+=KCT_W[key](s.slice(m.index,e)); n[key]++; i=e; continue; }
+    out+=m[0]; i=re.lastIndex; }
+  KCT.piv=n; return (n.L>=4 && n.gL>=4 && n.R>=4 && n.gR>=4 && n.H>=4)? out : null; }
+function kctToy(){ if(!kctOn()) return null;
+  if(KCT.memo===null){ let v=''; try{ const s=SPRITES_SRC.kingcroakfire, al=(typeof s==='string')? lagSpr(s,'kingcroakfire',GREEN) : null; if(typeof al==='string' && al!==s){ const p=kctPiv(al); if(p){ v=p; KCT.used++; } else { v=al; KCT.loose++; } } }catch(e){ v=''; } if(!v) KCT.miss++; KCT.memo=v; }
+  return KCT.memo? '<g class="olrfig kct">'+ddcIds(KCT.memo,'kct'+(++KCT.n)+'-')+'</g>' : null; }
+try{ if(typeof bossMold==='function' && !KCT.bm0){ const b0=bossMold; KCT.bm0=b0; bossMold=function(k){ if(k==='kingcroak'){ const v=kctToy(); if(v) return v; } return b0.apply(this, arguments); }; } }catch(e){}
+function kctRead(){ const rs=document.getElementById('roomStage'), g=rs? rs.querySelector('#decKingcroak') : null; return { on:KCT.on, live:kctOn(), used:KCT.used, loose:KCT.loose, miss:KCT.miss, n:KCT.n, piv:KCT.piv,
+  room:g? { kct:!!g.querySelector('.kct'), armL:g.querySelectorAll('.barmL').length, gunL:g.querySelectorAll('.bgunL').length, armR:g.querySelectorAll('.barmR').length, gunR:g.querySelectorAll('.bgunR').length, hat:g.querySelectorAll('.bhat').length } : null }; }
 
 
 
