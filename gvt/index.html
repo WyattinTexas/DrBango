@@ -72756,8 +72756,9 @@ function spbTick(dt){
       if(d<=BH_EAT || over){ m.eat=1; S.fx.push({ k:'spbx', m:'gulp', x:f.x, y:f.y-16, tx:h.x, ty:h.y-18, t:0, dur:0.25 }); hurt(f, h.dmg, u); h.ate++; } }
     if(h.t>=BH_HOLD){ st.holes.splice(i,1); S.fx.push({ k:'ring', x:h.x, y:h.y-18, r:40, R:4, t:0, dur:0.22, col:SPB_HEX }); S.fx.push({ k:'ring', x:h.x, y:h.y-18, r:6, R:70, t:0, dur:0.3, col:'#FFFFFF', lw:2 }); bfSfx(SFX.snap,h.x,h.y); setTimeout(()=>{ try{ bfSfx(SFX.cotboom,h.x,h.y); }catch(e){} },60); } }
   for(let i=st.quakes.length-1;i>=0;i--){ const q=st.quakes[i]; q.t+=dt;   
-    while(q.n<QK_TICKS && q.t>=QK_STAG+q.n*1.0){ q.n++; for(const f of q.men){ if(!f || f.dead) continue; hurt(f, q.dmg, q.u); S.fx.push({ k:'puff', x:f.x+(Math.random()-0.5)*10, y:f.y-4, t:0, dur:0.35, R:9, col:'#C9A77A' }); } }
-    if(q.n>=QK_TICKS) st.quakes.splice(i,1); }
+    while(q.n<QK_TICKS && q.t>=QK_STAG+q.n*1.0){ q.n++; for(const f of q.men){ if(!f || f.dead) continue; hurt(f, q.dmg, q.u); f.spbWob={ t:0.42, last:0 }; S.fx.push({ k:'spbx', m:'hit', x:f.x, y:f.y-18, t:0, dur:0.18 }); } }
+    for(const f of q.men){ const w=f && f.spbWob; if(!w) continue; w.t-=dt; const off=(w.t>0 && !f.dead)? Math.sin(w.t*70)*2.6*Math.min(1,w.t/0.2) : 0; f.x+=off-w.last; w.last=off; if(w.t<=0) f.spbWob=null; }   
+    if(q.n>=QK_TICKS && !q.men.some(f=>f && f.spbWob)) st.quakes.splice(i,1); }
   for(let i=st.teddies.length-1;i>=0;i--){ const b=st.teddies[i]; b.t+=dt; if(b.t<TD_FUSE) continue; st.teddies.splice(i,1); spbTeddyBoom(b); }
   for(let i=st.waves.length-1;i>=0;i--){ const w=st.waves[i]; w.t+=dt; if(w.t<0) continue;
     if(!w.loud){ w.loud=1; bfSfx(SFX.jet, w.x, w.y); }
@@ -72820,9 +72821,9 @@ function spbGo(u, k){
     const ax=spbAxis(u), ca=Math.cos(ax), sa=Math.sin(ax), cx0=u.x+ca*QK_AHEAD, cy0=u.y+sa*QK_AHEAD, h=QK_SIDE/2, q={ u, t:0, n:0, men:[], dmg:QK_DMG*spbScale(u), x:cx0, y:cy0, a:ax };
     for(const f of TGTC(u)){ if(!f || f.dead || f.dropT>0 || f.burrow || f.jetT>0) continue; if(typeof skyAir==='function' && skyAir(f)) continue;
       const dx=f.x-cx0, dy=f.y-cy0, along=dx*ca+dy*sa, perp=-dx*sa+dy*ca; if(Math.abs(along)>h || Math.abs(perp)>h) continue;
-      q.men.push(f); if(ggCanShove(f)){ f.haltT=Math.max(f.haltT||0, QK_STAG); f.x+=(Math.random()-0.5)*6; } }   
-    st.quakes.push(q); S.fx.push({ k:'spbx', m:'quake', x:cx0, y:cy0, a:ax, t:0, dur:QK_STAG+QK_TICKS, seed:(S.t*1000)|0 });
-    if(!RM) S.shake=Math.max(S.shake||0, 0.55); bfSfx(SFX.rumble, cx0, cy0);
+      q.men.push(f); f.spbWob={ t:QK_STAG, last:0 }; if(ggCanShove(f)) f.haltT=Math.max(f.haltT||0, QK_STAG); }   
+    st.quakes.push(q); S.fx.push({ k:'spbx', m:'quake', x:cx0, y:cy0, a:ax, t:0, dur:QK_STAG+QK_TICKS+0.7, seed:(S.t*1000)|0 });
+    bfSfx(SFX.rumble, cx0, cy0);   
   } else if(k==='teddy'){
     const pool=TGTC(u).filter(f=>f && !f.dead && !(f.hp<=0) && !(f.dropT>0) && ggCanShove(f) && !spbHero(f) && !(typeof skyAir==='function' && skyAir(f)) && (S.bf || !(f.x>W-10 || f.x<-40 || f.y<-30 || f.y>WORLD_H+30)));   
     for(let n=0; n<TD_N && pool.length; n++){ const f=pool.splice(Math.floor(Math.random()*pool.length),1)[0]; const x=f.x, y=f.y;
@@ -72910,14 +72911,20 @@ function spbFx2(e,k){
     if(!RM){ for(let i=0;i<3;i++){ const q=((T*1.6+i/3)%1), rr9=R+8+46*(1-q); cx.globalAlpha=0.5*q; cx.strokeStyle=SPB_LILAC; cx.lineWidth=2; cx.beginPath(); cx.arc(e.x,e.y,rr9,0,7); cx.stroke(); }
       cx.globalAlpha=0.8; cx.strokeStyle='#E6CFFF'; cx.lineWidth=1.6; for(let i=0;i<4;i++){ const a=T*5+i*Math.PI/2; cx.beginPath(); cx.arc(e.x,e.y,R*0.7,a,a+0.9); cx.stroke(); } }
     cx.restore(); return; }
-  if(e.m==='quake'){ const T=e.t, life=e.dur, fade=T>life-0.6? Math.max(0,(life-T)/0.6) : 1, h=QK_SIDE/2, ca=Math.cos(e.a), sa=Math.sin(e.a), P=(al,pe)=>[e.x+ca*al-sa*pe, e.y+sa*al+ca*pe];   
-    let r9=(e.seed>>>0)||1; const rnd=()=>{ r9=(Math.imul(r9,1664525)+1013904223)>>>0; return r9/4294967296; }; const grow=Math.min(1, T/0.35);
-    cx.save(); cx.globalAlpha=0.16*fade; cx.fillStyle='#6B4A2A'; for(let i=0;i<7;i++){ const p=P((rnd()-0.5)*2*h*0.8,(rnd()-0.5)*2*h*0.8); cx.beginPath(); cx.ellipse(p[0],p[1],18+rnd()*22,8+rnd()*10,e.a,0,7); cx.fill(); }
-    cx.lineCap='round'; cx.lineJoin='round';
-    for(let i=0;i<9;i++){ const ang=i/9*Math.PI*2+rnd()*0.5, len=h*(0.55+rnd()*0.45)*grow; let al=0, pe=0; const pts=[P(0,0)]; for(let s9=1;s9<=5;s9++){ const d=len*s9/5, j=(rnd()-0.5)*0.7; al=Math.cos(ang+j)*d; pe=Math.sin(ang+j)*d; pts.push(P(Math.max(-h,Math.min(h,al)),Math.max(-h,Math.min(h,pe)))); }
-      cx.globalAlpha=0.55*fade; cx.strokeStyle='#3B2614'; cx.lineWidth=3.2-i%3*0.6; cx.beginPath(); pts.forEach((p,j)=>j? cx.lineTo(p[0],p[1]) : cx.moveTo(p[0],p[1])); cx.stroke();
-      cx.globalAlpha=0.35*fade; cx.strokeStyle='#E8C58A'; cx.lineWidth=1; cx.beginPath(); pts.forEach((p,j)=>j? cx.lineTo(p[0]+1,p[1]-1) : cx.moveTo(p[0]+1,p[1]-1)); cx.stroke(); }
-    if(!RM && T<QK_STAG+QK_TICKS-0.4){ const k2=(T*3)%1; for(let i=0;i<4;i++){ const p=P((rnd()-0.5)*2*h,(rnd()-0.5)*2*h); cx.globalAlpha=0.35*(1-k2)*fade; cx.fillStyle='#CDB48C'; cx.beginPath(); cx.arc(p[0],p[1]-k2*10,4+k2*8,0,7); cx.fill(); } }
+  if(e.m==='quake'){ const T=e.t, h=QK_SIDE/2, ca=Math.cos(e.a), sa=Math.sin(e.a), P=(al,pe)=>[e.x+ca*al-sa*pe, e.y+sa*al+ca*pe], RM9=reducedMotion();   
+    const ez=x=>x<=0? 0 : x>=1? 1 : 1-Math.pow(1-x,3), endT=QK_STAG+QK_TICKS-1;   
+    const nt=T<QK_STAG? 0 : Math.min(QK_TICKS, Math.floor(T-QK_STAG)+1), grow=nt===0? 0.14*ez(T/QK_STAG) : (nt-1+(RM9? 1 : ez((T-(QK_STAG+nt-1))/0.35)))/QK_TICKS;
+    const fade=T>endT+0.15? Math.max(0, 1-(T-endT-0.15)/0.55) : 1; if(fade<=0 || grow<=0) return;
+    let r9=(e.seed>>>0)||7; const rnd=()=>{ r9=(Math.imul(r9,1664525)+1013904223)>>>0; return r9/4294967296; };
+    cx.save(); cx.lineJoin='round'; cx.lineCap='round';
+    const dent=P(0,0), dr=10+26*grow; const gd=cx.createRadialGradient(dent[0],dent[1],1,dent[0],dent[1],dr); gd.addColorStop(0,'rgba(40,24,12,'+(0.42*fade)+')'); gd.addColorStop(1,'rgba(40,24,12,0)'); cx.fillStyle=gd; cx.beginPath(); cx.arc(dent[0],dent[1],dr,0,7); cx.fill();
+    const crack=(al0,pe0,ang,len,w0,depth)=>{ const N=14, pts=[]; let a=ang, al=al0, pe=pe0; for(let i=0;i<=N;i++){ pts.push([al,pe]); a+=(rnd()-0.5)*0.42; al+=Math.cos(a)*len/N; pe+=Math.sin(a)*len/N; al=Math.max(-h,Math.min(h,al)); pe=Math.max(-h,Math.min(h,pe)); }
+      const vis=Math.max(1, Math.round(N*grow)); const L=[], R=[]; for(let i=0;i<=vis;i++){ const p=pts[i], q=pts[Math.min(N,i+1)], o=pts[Math.max(0,i-1)], dx=q[0]-o[0], dy=q[1]-o[1], dd=Math.hypot(dx,dy)||1, w=w0*(1-i/(vis+1))*(0.6+0.4*grow);
+        L.push(P(p[0]-dy/dd*w/2, p[1]+dx/dd*w/2)); R.push(P(p[0]+dy/dd*w/2, p[1]-dx/dd*w/2)); }
+      const tip=P(pts[vis][0],pts[vis][1]); cx.globalAlpha=0.78*fade; cx.fillStyle='#24160B'; cx.beginPath(); L.forEach((p,i)=>i? cx.lineTo(p[0],p[1]) : cx.moveTo(p[0],p[1])); cx.lineTo(tip[0],tip[1]); for(let i=R.length-1;i>=0;i--) cx.lineTo(R[i][0],R[i][1]); cx.closePath(); cx.fill();
+      cx.globalAlpha=0.3*fade; cx.strokeStyle='#E2C08C'; cx.lineWidth=1; cx.beginPath(); L.forEach((p,i)=>i? cx.lineTo(p[0]+0.8,p[1]-0.8) : cx.moveTo(p[0]+0.8,p[1]-0.8)); cx.stroke();   
+      if(depth>0){ for(const j of [5,9]){ if(j>vis) continue; const b=pts[j]; crack(b[0],b[1], Math.atan2(pts[j+1][1]-b[1], pts[j+1][0]-b[0])+(rnd()<0.5? -0.9 : 0.9), len*0.42, w0*0.5, depth-1); } } };
+    const K=6; for(let i=0;i<K;i++) crack(0, 0, i/K*Math.PI*2+rnd()*0.6, h*(0.72+rnd()*0.28), 7, 1);
     cx.restore(); return; }
   if(e.m==='teddy'){ const k2=e.t/e.dur, bob=RM? 0 : Math.sin(e.t*14)*1.2, x=e.x, y=e.y+bob, blink=(k2>0.6 && !RM)? (Math.sin(e.t*(20+30*k2))>0) : true;   
     cx.save(); cx.globalAlpha=0.25; cx.fillStyle='#000'; cx.beginPath(); cx.ellipse(x,e.y+2,11,3.5,0,0,7); cx.fill(); cx.globalAlpha=1; cx.lineWidth=1.2; cx.strokeStyle='#4A2A14';
@@ -88322,7 +88329,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='24.32';        
+let GVT_CV='24.33';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
