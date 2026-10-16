@@ -58957,6 +58957,32 @@ function mdyuPlay(cont){
 
 
 
+const DRWU={ key:'gvt_drw', src:'drw-thedraw.mp4', poster:'drw-thedraw.jpg' };
+function drwuSeen(){ try{ return localStorage.getItem(DRWU.key)==='1'; }catch(e){ return true; } }
+function drwuMark(){ try{ localStorage.setItem(DRWU.key,'1'); }catch(e){} }
+function drwuDue(){ return !document.getElementById('drwuFilm') && !document.getElementById('mdyuFilm') && !document.getElementById('snduFilm') && !document.getElementById('stmuFilm') && S.mode==='menu' && !reducedMotion() && !drwuSeen(); }
+function drwuPlay(cont){
+  drwuMark();
+  const d=document.createElement('div'); d.id='drwuFilm'; d.setAttribute('data-notr','1');
+  d.style.cssText='position:fixed;left:0;top:0;right:0;bottom:0;z-index:2147483000;background:#000;display:flex;align-items:center;justify-content:center';
+  const v=document.createElement('video'); v.setAttribute('playsinline',''); v.setAttribute('webkit-playsinline',''); v.playsInline=true; v.preload='auto';
+  v.poster=bdPromoSrc(DRWU.poster); v.muted=!soundOn; v.src=bdPromoSrc(DRWU.src);
+  v.style.cssText='width:100%;height:100%;object-fit:contain;background:#000';
+  const x=document.createElement('button'); x.type='button'; x.className='drwuX'; x.setAttribute('aria-label','close'); x.setAttribute('data-notr','1');
+  x.style.cssText='position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);right:calc(env(safe-area-inset-right,0px) + 14px);width:48px;height:48px;border-radius:50%;border:2px solid rgba(255,255,255,0.75);background:rgba(0,0,0,0.55);color:#fff;font:bold 24px/44px Arial,sans-serif;padding:0;cursor:pointer;z-index:2';
+  x.insertAdjacentHTML('beforeend','&#10005;');
+  let done=false;
+  const end=()=>{ if(done) return; done=true; try{ v.pause(); }catch(e){} d.remove(); snduHush(false); try{ if(cont) cont(); }catch(e){} };
+  v.addEventListener('ended',end); v.addEventListener('error',end);
+  x.addEventListener('click',e=>{ e.stopPropagation(); end(); });
+  d.appendChild(v); d.appendChild(x); document.body.appendChild(d); snduHush(true);
+  try{ const p=v.play(); if(p&&p.catch) p.catch(()=>{ v.muted=true; try{ const q=v.play(); if(q&&q.catch) q.catch(end); }catch(e){ end(); } }); }catch(e){ end(); }
+  return v;
+}
+
+
+
+
 
 
 
@@ -87717,7 +87743,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='24.08';        
+let GVT_CV='24.09';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -160082,6 +160108,7 @@ function openRaidScene(id){
   RAID_CUR=raidInfo(id).k;   
   if(RAID_CUR!=='palace' && !raidDoorKey(RAID_CUR) && !ptyGuestRaid(RAID_CUR)) return;   
   if(RAID_CUR==='ice' && mdyuDue()){ mdyuPlay(()=>openRaidScene(id)); return; }   
+  if(RAID_CUR==='croak' && drwuDue()){ drwuPlay(()=>openRaidScene(id)); return; }   
   safeOnce();   
   document.getElementById('raidscene').classList.remove('hidden');   
   RAID_WARN9=0;   
