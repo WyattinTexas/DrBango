@@ -88253,7 +88253,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='24.25';        
+let GVT_CV='24.26';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -99047,7 +99047,7 @@ function startBattlefield(mapId,diffOverride,teamSize,plan,rivX){
   const hard=gaCpu || (!diffOverride && !coopLaunching && !rookie && (team===1||team===2)
     && riv.id!=='nemesis' && seats.every(st=>!st.human||st.me) && hardBotDue(team));
   if(hard) diff='hard';
-  for(const st of seats){ st.purse=BF_START; st.tagT=0; st.mir=(st.team==='you');
+  for(const st of seats){ st.purse=BF_START*ffiOpPurse(st); st.tagT=0; st.mir=(st.team==='you');    
     buildUnitTint(st.hex);
     if(map.ground==='snow'||map.ground==='deck'){ buildUnitRim(st.hex); buildUnitRim(GREEN); }   
     
@@ -103510,7 +103510,7 @@ function bfTick(dt){
   
   const otm=bf.ot?2:1;
   const boost={ you:(my<th?1.25:1), foe:(th<my?1.25:1) };
-  const inc=(BF_AI[bf.ai.diff]||{}).inc||1;        
+  const inc=((BF_AI[bf.ai.diff]||{}).inc||1)*ffiOpInc(bf);        
   
   
   
@@ -103681,7 +103681,7 @@ OpponentBrain.prototype.setDiff=function(diff){ if(BF_AI[diff]){ this.diff=diff;
 OpponentBrain.prototype.tick=function(dt){ this.cd-=dt; return this.cd<=0; };
 OpponentBrain.prototype.decide=function(view,budget){
   if(this.cd>0) return [];
-  this.cd=this.d.every;
+  this.cd=this.d.every/ffiOpRate();   
   const mine=view.units.filter(u=>u.side==='foe'), theirs=view.units.filter(u=>u.side==='you');
   const own=mine.filter(u=>u.seat===view.mySeat);        
   
@@ -103785,7 +103785,7 @@ OpponentBrain.prototype.pickSpot=function(type,theirs,mine,view){
   const ours=(mine||[]).filter(u=>u.dropT<=0);
   let focusY=WORLD_H/2;
   if(this.d.focus==='center'){
-    focusY=110+Math.random()*(WORLD_H-230);                 
+    focusY=ffiOpLaneY(this, 110+Math.random()*(WORLD_H-230));                 
   } else if(live.length){
     let best=null, bs=-1e9;
     for(const e of live){
@@ -151388,6 +151388,15 @@ function ffiCloseRect(sp){
 
 
 function ffiSafe(side){ try{ const v=parseFloat(getComputedStyle(document.documentElement).getPropertyValue(side==='r'? '--ffi-sar' : '--ffi-sal')); return (v>0)? v : 0; }catch(e){ return 0; } }
+
+
+
+
+const FFI_OP_INC=1.5;   
+function ffiOpInc(bf){ return (FFI.on && bf && bf.opener)? FFI_OP_INC : 1; }   
+function ffiOpRate(){ return (FFI.on && S.bf && S.bf.opener)? FFI_OP_INC : 1; }   
+function ffiOpPurse(st){ return (FFI.on && (typeof OP_ARM!=='undefined') && OP_ARM && st && st.team!=='you')? FFI_OP_INC : 1; }   
+function ffiOpLaneY(brain, y0){ if(!(FFI.on && S.bf && S.bf.opener && brain)) return y0; brain.ffiK=(brain.ffiK|0)+1; const half=(WORLD_H-230)/2; return (brain.ffiK%2)? 110+Math.random()*half : 110+half+Math.random()*half; }   
 
 
 function ffiBeaconHold(){ return !!(FFI.on && (TOUR.walk || TOUR.owe || FFI.walk || FFI.hint)); }
