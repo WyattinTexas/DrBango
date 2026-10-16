@@ -11526,6 +11526,13 @@
   .dhwHowl .dgLegA, .dhwHowl .dgLegB, .dhwHowl .dogHeadG, .dhwHowl .dogEarG { animation:none; }
   .dhwHowl .dfEyes, .dhwHowl .dfBrows { opacity:0; }
   .dhwHowl .dogwagG { animation-duration:2.4s; }
+  /**/
+  .starfloat.pawcount { width:120px; margin-left:-60px; text-align:center; font-size:24px; color:#FFF3C4; z-index:8; white-space:nowrap; transition:left .14s linear, top .14s linear; }
+  .starfloat.pawcount i { font-style:normal; color:#E0566F; margin-right:4px; }
+  .starfloat.pawcount.flare { color:#FFE97A; animation:pawflare 0.6s ease-out; }
+  @keyframes pawflare { 0% { transform:scale(1); } 35% { transform:scale(1.8); } 100% { transform:scale(1); } }
+  .starfloat.pawfloat { width:184px; margin-left:-92px; text-align:center; z-index:9; white-space:nowrap; }
+  @media (prefers-reduced-motion: reduce){ .starfloat.pawcount, .starfloat.pawcount.flare { animation:none; transition:none; } }
   /*
 
 */
@@ -87673,7 +87680,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='23.99';        
+let GVT_CV='24.00';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -144426,7 +144433,7 @@ function dogLift(el, x, fy, fresh, dl){
   dogZSeatEl(el, fy, fresh, dl);
 }
 function dogHomePick(p){ let hit=null, d9=1e9; for(const br of ['gb','hd']){ const C=DOGH[br]; if(!C || !C.el || C.x===null || !C.el.isConnected) continue; const fy=C.y+38, dx=Math.abs(p.x-C.x); if(dx<48 && p.y>fy-104 && p.y<fy+10 && dx<d9){ hit=br; d9=dx; } } return hit || hunPickBr(p); }       
-function dogHomeTap(br){ if(br==='hu') return hunTap();       
+function dogHomeTap(br){ pawPat(br, br==='hu'? 'hu' : 'home');     if(br==='hu') return hunTap();       
   const C=DOGH[br]; if(!C || !C.el) return;
   dogEat({ x:C.x, y:C.y+38 });
   SFX.yip(); setTimeout(()=>{ const C9=DOGH[br]; if(C9 && C9.el && C9.el.isConnected) SFX.yip(); },150);
@@ -144556,6 +144563,7 @@ function dogTap(){
   if(!hw){ SFX.yip(); setTimeout(()=>{ if(dogVisible()) SFX.yip(); },150);   
   const g9=document.getElementById('dogPat');
   if(g9){ g9.classList.remove('dogpatA'); void g9.getBoundingClientRect(); g9.classList.add('dogpatA'); } }
+  pawPat(dogLeadBreed(), 'walk');   
   const room=roomCur();
   if(META.dog.day!==todayStr()){ META.dog.day=todayStr(); META.dog.paid=[]; META.dog.home=[]; }   
   if(META.dog.paid.indexOf(room)>=0) return;   
@@ -144569,6 +144577,97 @@ function dogTap(){
     st.appendChild(f); setTimeout(()=>{ try{ f.remove(); }catch(e){} }, 1120); }
   setTimeout(()=>{ if(S.mode==='menu'){ if(hw) wfBankChip(); else renderMenu(); } }, 1250);   
 }
+
+
+
+
+
+
+
+
+
+const PAW_RUNGS=[[11,15],[27,25],[33,50],[101,102]];   
+const PAW_DAILY=1;       
+const PAW_COUNT=1;       
+const PAW_IDLE_MS=2600;  
+const PAW_UP=104;        
+const PAW_HU=[74,98];    
+const PAW_DOGS=['gb','hd','hu'];   
+const PAWC={ k:null, src:null, room:null, n:0, s:null, seen:0, raf:0, endT:0, dirty:0, rung:0, wx:null, wy:null };   
+function pawLedger(){   
+  let L=META.paw; if(!L || typeof L!=='object' || Array.isArray(L)) L=META.paw={};
+  if(typeof L.day!=='string') L.day='';
+  if(!L.n || typeof L.n!=='object' || Array.isArray(L.n)) L.n={};
+  if(!L.paid || typeof L.paid!=='object' || Array.isArray(L.paid)) L.paid={};
+  if(PAW_DAILY===1 && L.day!==todayStr()){ L.day=todayStr(); L.n={}; L.paid={}; }
+  for(const k of PAW_DOGS){ const v=Math.floor(+L.n[k]); L.n[k]=(v>0 && v<1e7)? v : 0; if(!Array.isArray(L.paid[k])) L.paid[k]=[]; }
+  return L; }
+function pawSeat(k, src){   
+  try{ if(k==='hu') return (HUR.el && HUR.el.isConnected && HUR.x!=null)? { x:HUR.x, fy:HUR.fy } : null;
+    if(src==='walk'){ if(!dogVisible()) return null; const q=dogPos(); return { x:q.x, fy:q.y }; }
+    const C=DOGH[k]; return (C && C.el && C.el.isConnected && C.x!=null)? { x:C.x, fy:C.y+38 } : null; }catch(e){ return null; } }
+function pawPat(k, src){   
+  try{ if(PAW_DOGS.indexOf(k)<0 || !META || S.mode!=='menu') return 0;
+    const L=pawLedger(), n=++L.n[k], last=PAW_RUNGS[PAW_RUNGS.length-1][0]; let w9=0, peak=false;
+    for(const r of PAW_RUNGS){ if(n<r[0] || L.paid[k].indexOf(r[0])>=0) continue;
+      L.paid[k].push(r[0]);                                                  
+      const w=starX(r[1]); META.starBank+=w; META.starsLifetime+=w; w9+=w;   
+      if(r[0]===last) peak=true; }
+    if(w9){ saveMeta(); PAWC.dirty=0; PAWC.rung=1; } else PAWC.dirty=1;    
+    const room=roomCur(), s=pawSeat(k, src);
+    if(PAWC.k!==k || PAWC.room!==room){ PAWC.wx=null; PAWC.wy=null; PAWC.s=null; }   
+    PAWC.k=k; PAWC.src=src; PAWC.room=room; PAWC.n=n; if(s){ PAWC.s=s; PAWC.seen=Date.now(); }
+    if(PAW_COUNT && PAWC.s){ const c=pawCounter(); if(c){ pawWrite(c, n); pawPlace(c, PAWC.s); c.classList.remove('tick','flare'); void c.getBoundingClientRect(); c.classList.add(w9? 'flare' : 'tick'); } }
+    if(w9){ try{ SFX.coin(); if(peak) SFX.fanfare(); }catch(e){} pawFloat(w9, PAWC.s); setTimeout(()=>{ try{ if(S.mode==='menu') wfBankChip(); }catch(e){} }, 1200); }   
+    clearTimeout(PAWC.endT); PAWC.endT=setTimeout(pawEnd, PAW_IDLE_MS);
+    if(PAW_COUNT && !PAWC.raf) PAWC.raf=requestAnimationFrame(pawFollow);
+    return w9; }catch(e){ return 0; } }
+function pawCounter(){ const st=document.getElementById('roomStage'); if(!st) return null;   
+  let c=document.getElementById('pawCount');
+  if(!c){ c=document.createElement('div'); c.id='pawCount'; c.className='starfloat run pawcount'; st.appendChild(c); PAWC.wx=null; PAWC.wy=null; pawWrite(c, PAWC.n); }
+  return c; }
+function pawWrite(c, n){ c.innerHTML='<i>♥</i>'+(n|0); }
+function pawSpot(s){   
+  if(PAWC.k==='hu'){ const d=(s.x>820)? -PAW_HU[0] : PAW_HU[0]; return { x:Math.round(Math.max(44, Math.min(916, s.x+d))), y:Math.round(Math.max(56, s.fy-PAW_HU[1])) }; }
+  return { x:Math.round(Math.max(44, Math.min(916, s.x))), y:Math.round(Math.max(56, s.fy-PAW_UP)) }; }
+function pawPlace(c, s){   
+  const q=pawSpot(s), x=q.x, y=q.y;
+  if(x===PAWC.wx && y===PAWC.wy) return;
+  const jump=PAWC.wx===null || Math.abs(x-PAWC.wx)>60 || Math.abs(y-PAWC.wy)>60;
+  if(jump) c.style.transition='none';
+  c.style.left=x+'px'; c.style.top=y+'px';
+  if(jump){ void c.getBoundingClientRect(); c.style.transition=''; }
+  PAWC.wx=x; PAWC.wy=y; }
+function pawFloat(w9, s){ const st=document.getElementById('roomStage'); if(!st || !s) return;   
+  const f=document.createElement('div'), q=pawSpot(s); f.className='starfloat big pawfloat'; f.textContent='+'+w9+'★';
+  f.style.left=Math.round(Math.max(92, Math.min(868, q.x)))+'px'; f.style.top=Math.round(Math.max(12, q.y-46))+'px';
+  st.appendChild(f); setTimeout(()=>{ try{ f.remove(); }catch(e){} }, 1120); }
+function pawFollow(){   
+  PAWC.raf=0; if(!PAWC.k) return;
+  try{ const now=Date.now();
+    if(S.mode!=='menu' || roomCur()!==PAWC.room){ pawEnd(); return; }
+    const s=pawSeat(PAWC.k, PAWC.src);
+    if(s){ PAWC.s=s; PAWC.seen=now; } else if(now-PAWC.seen>500){ pawEnd(); return; }   
+    if(PAWC.s){ const c=pawCounter(); if(c) pawPlace(c, PAWC.s); }
+  }catch(e){ return; }
+  PAWC.raf=requestAnimationFrame(pawFollow); }
+function pawEnd(){   
+  clearTimeout(PAWC.endT); PAWC.endT=0; if(PAWC.raf){ cancelAnimationFrame(PAWC.raf); PAWC.raf=0; }
+  const c=document.getElementById('pawCount');
+  if(c){ c.removeAttribute('id'); c.classList.remove('run','tick','flare'); void c.getBoundingClientRect(); setTimeout(()=>{ try{ c.remove(); }catch(e){} }, 1000); }   
+  if(PAWC.dirty){ PAWC.dirty=0; try{ saveMeta(); }catch(e){} }
+  const rung=PAWC.rung; PAWC.k=null; PAWC.src=null; PAWC.rung=0; PAWC.wx=null; PAWC.wy=null;
+  if(rung) setTimeout(()=>{ try{ if(S.mode==='menu' && !PAWC.k && roomCur()!=='attic') renderMenu(); }catch(e){} }, 700); }   
+function pawRig(o){ o=o||{};   
+  if(o.reset){ delete META.paw; saveMeta(); }
+  if(o.end) pawEnd();
+  const c=document.getElementById('pawCount'), lead=(()=>{ try{ return dogLeadBreed(); }catch(e){ return null; } })();
+  return { cv:GVT_CV, rungs:PAW_RUNGS.map(r=>r.slice()), pay:PAW_RUNGS.map(r=>starX(r[1])), daily:PAW_DAILY, show:PAW_COUNT, idle:PAW_IDLE_MS, up:PAW_UP, hu:PAW_HU.slice(),
+    ledger:META.paw? JSON.parse(JSON.stringify(META.paw)) : null, live:PAWC.k? { k:PAWC.k, src:PAWC.src, room:PAWC.room, n:PAWC.n, dirty:PAWC.dirty, rung:PAWC.rung } : null,
+    counter:c? { text:c.textContent, cls:c.className, left:c.style.left, top:c.style.top } : null,
+    seat:{ gb:pawSeat('gb','home'), hd:pawSeat('hd','home'), hu:pawSeat('hu','hu'), walk:lead? pawSeat(lead,'walk') : null, lead:lead } }; }
+setTimeout(()=>{ try{ GVT.paw=pawRig; }catch(e){} }, 0);
+
 
 
 
