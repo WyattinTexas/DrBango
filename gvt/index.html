@@ -15699,6 +15699,16 @@
   #roomModal .fortcard .ros-paint .sh-obuy span, #roomModal .fortcard .ros-paint .sh-obuy small { color:#3A2A14; text-shadow:none; }
   .fortcard .ros-paint .sh-jar.nm-lit { outline:3px solid #FFD24A; outline-offset:2px; border-radius:8px; }   /**/
   /**/
+  html.pjp-on .fortcard .ros-paint .sh-tag.wear { color:#fff; }   /**/
+  .mb-card.mbpjp { width:min(94vw,400px); }   /**/
+  .mbpjp .mb-band { text-transform:uppercase; }
+  .mbpjp .mb-win { width:min(84vw,330px); }
+  .mbpjp .pjp-men { position:relative; z-index:1; display:flex; align-items:flex-end; justify-content:center; width:100%; height:100%; }
+  .mbpjp .mb-win .pjp-men img { position:relative; flex:0 1 auto; width:auto; height:100%; max-width:38%; margin:0 -3%; object-fit:contain;
+    filter:drop-shadow(0 0 3px rgba(0,0,0,0.85)) drop-shadow(0 5px 4px rgba(0,0,0,0.5)); }   /**/
+  .mbpjp .mb-win .pjp-men img.pjp-mgunner { height:84%; z-index:1; }   /**/
+  @media (prefers-reduced-motion:reduce){ .mbpjp .mb-rays { animation:none; } }
+  /**/
   #ftnSay { position:fixed; left:50%; bottom:max(10px, env(safe-area-inset-bottom, 0px)); z-index:25; pointer-events:none; width:max-content; max-width:min(92vw,860px); box-sizing:border-box; font-family:var(--ui); opacity:0; transform:translate(-50%,10px); transition:opacity 0.24s, transform 0.24s; }
   #ftnSay.in { opacity:1; transform:translate(-50%,0); }
   #ftnSay .cm-win { align-items:center; font-size:clamp(17px,5.6vh,32px); padding:0.34em 0.72em 0.32em; }
@@ -87782,7 +87792,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='24.13';        
+let GVT_CV='24.14';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -150976,6 +150986,7 @@ function surpTutLeg(){
   const now=Date.now();
   if(surpTutFingers()) SURP.q=now;   
   if(!SURP.bt && META.dyes.length>SURP.n0) SURP.bt=now;   
+  if(SURP.bt && pjpUp()){ SURP.bt=now; SURP.q=now; return 'wait'; }   
   if(SHOP_CONFIRM){ SURP.q=now; if(SURP.bt || SHOP_CONFIRM.verb!=='dyeBuy') return 'wait'; SURP.ask=1; return (now-SHOP_CONFIRM.t<LT_POP_MS)? 'pop' : 'yes'; }   
   if(SURP.bt){ if(now-SURP.bt<LT_LOOK_MS) return 'look'; return (SURP.q<=SURP.bt || now-SURP.q>=SURP_QUIET_MS)? 'exit' : 'wait'; }   
   if(SURP.ask){ SURP.ask=0; SURP.no=1; SURP.q=now; }   
@@ -170417,6 +170428,26 @@ function surpUp(){ return rosPaintStands() && S.mode==='menu'; }
 
 
 
+const PJP={ on:(function(){ try{ return (new URLSearchParams(location.search).get('pjp')==='0')? 0 : 1; }catch(e){ return 1; } })(), men:['rifleman','mgunner','bazooka'] };   
+if(PJP.on) try{ document.documentElement.classList.add('pjp-on'); }catch(e){}   
+function pjpUp(){ return milePopUp() && !!document.querySelector('#milePop .mbpjp'); }   
+function pjpCard(id){ const a=dyeRowOf(id), p=document.getElementById('milePop'); if(!PJP.on || !a || !p || dyeIsPrize(id)) return false;   
+  p.innerHTML='<div class="mb-card mbev mbpjp" data-k="'+a.id+'">'   
+    +'<span class="mb-band" data-notr>'+escH(t('PAINT & DYE'))+'</span>'
+    +utBrow('paint')+'<h2 class="mb-h" data-notr>'+escH(t(a.name))+'</h2>'
+    +'<span class="mb-win">'+MB_RAYS+'<span class="pjp-men">'+PJP.men.map(k=>'<img class="pjp-'+k+'" src="'+sprURI(k, a.hex)+'" alt="">').join('')+'</span></span>'
+    +'<span class="mb-line" data-notr>'+escH(t(MB_LINES.dye))+'</span>'
+    +'<button type="button" class="mb-take gold" data-notr onclick="UI.rfTake()">'+escH(t('OKAY'))+'</button>'
+    +'</div>';
+  p.classList.remove('hidden');
+  SFX.fanfare(); return true; }
+
+
+
+
+
+
+
 const FWP={ raf:0, cv:null, id:null, t0:0, last:-1, W:0, H:0, dpr:1, sh:null, rm:false, n:0, inT:0 };   
 const FWP_R=54;   
 function fwpStop(){ if(FWP.raf) cancelAnimationFrame(FWP.raf); FWP.raf=0; if(FWP.cv && FWP.cv.parentNode){ const pg=FWP.cv.parentNode; pg.removeChild(FWP.cv); if(pg.classList) pg.classList.remove('fwp-on'); } FWP.cv=null; FWP.id=null; FWP.sh=null; }
@@ -182400,6 +182431,7 @@ window.UI = {
     META.starBank-=till(p); META.dyes.push(id); META.dyeOn=id; shopDyeTryClear(); SFX.coin();   
     if(META.dyeOn) buildUnitTint(dyeHex());
     saveMeta(); renderMenu(); shopRefresh(); rosPaintSync();   
+    pjpCard(id);   
   },
   
   
