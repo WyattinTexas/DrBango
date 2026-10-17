@@ -88367,7 +88367,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='24.41';        
+let GVT_CV='24.42';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -99884,10 +99884,10 @@ function pbmSegCircle(x1,y1,x2,y2,ex,ey,r){
   q=Math.sqrt(q); const t=(-b-q)/(2*a); if(t<0||t>1) return null;
   return { x:x1+dx*t, y:y1+dy*t, t:t };
 }
-let pbmCovT=null, pbmCovN=-1, pbmCovL=[];   
-function pbmCovers(){ const T=S.cfg && S.cfg.terrain; if(!T || !T.rocks){ pbmCovL=[]; return pbmCovL; } if(T!==pbmCovT || T.rocks.length!==pbmCovN || PBM.dirty){ pbmCovT=T; pbmCovN=T.rocks.length; pbmCovL=T.rocks.filter(rk=>rk.cov); pbmTwT=null; PBM.dirty=0; } return pbmCovL; }
-let pbmTwT=null, pbmTwN=-1, pbmTwL=[];   
-function pbmTowers(){ const T=S.cfg && S.cfg.terrain; if(!T || !T.props){ pbmTwL=[]; return pbmTwL; } if(T!==pbmTwT || T.props.length!==pbmTwN || PBM.dirty){ pbmTwT=T; pbmTwN=T.props.length; pbmTwL=T.props.filter(p=>p.art==='pblook'); pbmCovT=null; PBM.dirty=0; } return pbmTwL; }
+let pbmCovT=null, pbmCovN=-1, pbmCovL=[], pbmCovG=-1, PBM_GEN=0;   
+function pbmCovers(){ const T=S.cfg && S.cfg.terrain; if(!T || !T.rocks){ pbmCovL=[]; return pbmCovL; } if(PBM.dirty){ PBM.dirty=0; PBM_GEN++; } if(T!==pbmCovT || T.rocks.length!==pbmCovN || pbmCovG!==PBM_GEN){ pbmCovT=T; pbmCovN=T.rocks.length; pbmCovG=PBM_GEN; pbmCovL=T.rocks.filter(rk=>rk.cov); } return pbmCovL; }   
+let pbmTwT=null, pbmTwN=-1, pbmTwL=[], pbmTwG=-1;   
+function pbmTowers(){ const T=S.cfg && S.cfg.terrain; if(!T || !T.props){ pbmTwL=[]; return pbmTwL; } if(PBM.dirty){ PBM.dirty=0; PBM_GEN++; } if(T!==pbmTwT || T.props.length!==pbmTwN || pbmTwG!==PBM_GEN){ pbmTwT=T; pbmTwN=T.props.length; pbmTwG=PBM_GEN; pbmTwL=T.props.filter(p=>p.art==='pblook'); } return pbmTwL; }   
 function pbmTowerAt(x,y){ const L=pbmTowers(); for(let i=0;i<L.length;i++){ const p=L[i]; if(Math.hypot(x-p.x,y-p.y)<(p.r||PBM.look)) return p; } return null; }
 function pbmTall(o){ return !!(o && (o.boss || (o.def && (o.def.boss || o.def.vehicle || o.def.fly)) || o.skyDrop)); }   
 function pbmBetween(x1,y1,x2,y2,hx,hy){   
@@ -101550,6 +101550,7 @@ function applyDeploy(seat,type,x,y,relay){
     
     
     if(type==='sarge') st.sargeCd=0;
+    if(!st.human && !st.me && dfrOn()) st.purse=Math.max(0,(st.purse||0)-cost);   
   }
   else {
     
@@ -184607,6 +184608,34 @@ let last=0, ready=false;
 const SIM_STEP_S=0.05, SIM_STEPS_MAX=4, SIM_CATCH_S=SIM_STEP_S*SIM_STEPS_MAX;
 const FRAME_STATS={ frames:0, steps:0, multi:0, maxSteps:1, lagS:0 };   
 
+
+
+
+
+
+
+
+var DFR={ on:(function(){ try{ const q=/[?&]dfr=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_dfr','0'); else localStorage.removeItem('gvt_dfr'); } return localStorage.getItem('gvt_dfr')==='0'? 0 : 1; }catch(e){ return 1; } })(),
+  catchS:0.6, room:0.4, win:2000, slow60:20, settle:1500,
+  bf:null, half:0, t:[], g:[], hold:0, extra:0, cut:0, log:[] };   
+function dfrOn(){ return !!(DFR && DFR.on); }
+function dfrCatchS(){ return (dfrOn() && S.bf)? DFR.catchS : SIM_CATCH_S; }   
+function dfrSpent(t9, gap, left, d9){ if(performance.now()-t9<=DFR.room*gap*1000){ DFR.extra++; return false; } FRAME_STATS.lagS+=left*d9; FRAME_STATS.steps-=left; DFR.cut++; return true; }   
+function dfrHalf(){ return dfrOn() && !!S.bf && DFR.half===1 && DFR.bf===S.bf; }   
+function dfrTick(ts, gap){
+  if(!dfrOn() || S.mode!=='play' || !S.bf) return;
+  if(DFR.bf!==S.bf){ DFR.bf=S.bf; DFR.half=0; DFR.t.length=0; DFR.g.length=0; DFR.hold=ts+DFR.settle; return; }   
+  if(DFR.half || ts<DFR.hold || S.evHold) return;   
+  const ms=gap*1000; if(!(ms>0) || ms>250) return;   
+  DFR.t.push(ts); DFR.g.push(ms); while(DFR.t.length && ts-DFR.t[0]>DFR.win){ DFR.t.shift(); DFR.g.shift(); }
+  if(DFR.g.length<12 || ts-DFR.t[0]<DFR.win*0.9) return;   
+  let slow=0; for(let i=0;i<DFR.g.length;i++) if(DFR.g[i]>DFR.slow60) slow++;
+  if(slow*2<DFR.g.length) return;
+  DFR.t.length=0; DFR.g.length=0; DFR.half=1; DFR.log.push({ at:+(+S.t||0).toFixed(1), step:'30' });   
+}
+setTimeout(()=>{ try{ if(window.GVT && !GVT.dfr) GVT.dfr=()=>({ on:DFR.on, half:dfrHalf()? 1 : 0, dpr:cvDpr(), catchS:dfrCatchS(), extra:DFR.extra, cut:DFR.cut, log:DFR.log.slice(), frames:Object.assign({}, FRAME_STATS) }); }catch(e){} }, 0);   
+
+
 const COOP_OWE={ max:150, steps:40, ms:24 };   
 let COOP_OWE_S=0, COOP_OWE_K=null;   
 function coopOwe(gap, slow){ if(!S.coop || S.bf || S.mode!=='play' || S.evHold){ COOP_OWE_S=0; COOP_OWE_K=null; return; }
@@ -185510,10 +185539,11 @@ function frame(ts){
   if(ts-MS_SYNC_T>500){ MS_SYNC_T=ts; msPauseSync(); }   
   if((qtHeld() && qtFreezes()) || premFrozen()){ last=ts; return; }   
   if(QT.skip){ QT.skip=0; last=ts; return; }        
-  if(S.mode==='play' && odvTier()>=1 && odvHalfSkip(ts)) return;   
+  if(S.mode==='play' && (odvTier()>=1 || dfrHalf()) && odvHalfSkip(ts)) return;   
   const gap=(ts-last)/1000||0.016; last=ts; gvTick(ts, gap);   
   odfFrame(ts, gap);   
   if(S.mode==='play') odvDynTick(ts, gap);   
+  dfrTick(ts, gap);   
   const dt=Math.min(SIM_STEP_S,gap);   
   if(S.hitStop>0) S.hitStop=Math.max(0,S.hitStop-dt);   
   if(S.vflag) vflagTick(dt);                            
@@ -185535,10 +185565,11 @@ function frame(ts){
     
     
     
-    const g9=Math.min(SIM_CATCH_S,gap), n9=Math.max(1,Math.min(SIM_STEPS_MAX,Math.ceil(g9/SIM_STEP_S-0.02))), d9=g9/n9;
-    FRAME_STATS.frames++; FRAME_STATS.steps+=n9; if(n9>1) FRAME_STATS.multi++; if(n9>FRAME_STATS.maxSteps) FRAME_STATS.maxSteps=n9; if(gap>SIM_CATCH_S) FRAME_STATS.lagS+=gap-SIM_CATCH_S;
+    const c9=dfrCatchS(), g9=Math.min(c9,gap), n9=Math.max(1,Math.min(Math.round(c9/SIM_STEP_S),Math.ceil(g9/SIM_STEP_S-0.02))), d9=g9/n9;   
+    FRAME_STATS.frames++; FRAME_STATS.steps+=n9; if(n9>1) FRAME_STATS.multi++; if(n9>FRAME_STATS.maxSteps) FRAME_STATS.maxSteps=n9; if(gap>c9) FRAME_STATS.lagS+=gap-c9;
     if(ftnHolds()) ftnHeldStep(); else   
-    for(let i9=0;i9<n9;i9++){ if(S.mode!=='play' || S.evHold) break;
+    for(let i9=0,t9=performance.now();i9<n9;i9++){ if(S.mode!=='play' || S.evHold) break;
+      if(i9>=SIM_STEPS_MAX && dfrSpent(t9, gap, n9-i9, d9)) break;   
       update(d9*S.speed*S.slowmo*slow); }   
     if(S.bf && S.bf.panL===1) S.bf.panT=(S.bf.panT||0)+dt;   
     if(coach){ coach.t+=dt;
