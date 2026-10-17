@@ -13853,6 +13853,8 @@
   #comms.brief.ttb .cm-port { width:2.6em; height:2.6em; }
   .ttb-ico { display:inline-block; width:1.3em; height:1.3em; vertical-align:-0.3em; margin:0 0.04em; }   /**/
   .ttb-ico svg { display:block; width:100%; height:100%; }
+  .ttb-ico.ttb-tuck { margin-right:-0.18em; }   /**/
+  .ttb-ico.ttb-rtl.ttb-tuck { margin-right:0.04em; margin-left:-0.12em; }   /**/
   @media (min-width:1280px){ #comms.brief .cm-win { width:min(92vw,1640px); font-size:clamp(42px,3.2vw,54px); } #comms.brief .cm-txt { font-size:clamp(48px,3.5vw,60px); } }   /**/   /**/
   /*
 
@@ -85245,7 +85247,7 @@ const COMM_SKIP=' 　,.、。！？!?…·—"\'';
 function commTalk0(h, on){ if(h && h.fig && TOUR.fig) TOUR.fig.classList.toggle('talk', !!on); }   
 let COMM_RZ=0; window.addEventListener('resize', ()=>{ COMM_RZ++; });   
 function commRest(h, s){ const x=h && h.txt; if(!x) return; if(s){ x.setAttribute('data-rest', s); return; } if(!x.hasAttribute('data-rest')) return; x.removeAttribute('data-rest'); if(h.fig && h.rz!==COMM_RZ) tourSeatFig(); }   
-function commFresh(h){ commRest(h, '');     const x=h && h.txt, o=h && h.tn; if(!x || !o || !o.nodeValue) return; const n=document.createTextNode(''); if(o.parentNode===x) x.replaceChild(n, o); else x.appendChild(n); h.tn=n; x.style.visibility='hidden'; void x.offsetHeight; x.style.visibility=''; }   
+function commFresh(h){ commRest(h, ''); ttbFresh(h);     const x=h && h.txt, o=h && h.tn; if(!x || !o || !o.nodeValue) return; const n=document.createTextNode(''); if(o.parentNode===x) x.replaceChild(n, o); else x.appendChild(n); h.tn=n; x.style.visibility='hidden'; void x.offsetHeight; x.style.visibility=''; }   
 
 
 const ND_DASH=/[\u2012-\u2015\u2E3A\u2E3B\uFE58]/;
@@ -85872,13 +85874,26 @@ function coachEvent(ev,u){
 const TTB={ Z:1.7, wait:600, inMs:1200, outMs:1000, hold:2200, flash:420 };   
 const TTB_MARK='';   
 const TTB_LINES=[ "Every soldier you play costs dog tags . The stronger the soldier, the more tags you'll need to pay.", "Defend our toy box from the Tan Army, soldier!" ];
-function ttbRest(s){ return (s.indexOf(TTB_MARK)<0)? s : s.split(TTB_MARK).join('  '); }   
+function ttbRest(s){ if(s.indexOf(TTB_MARK)<0) return s; const p=s.split(TTB_MARK); let o=p[0]; for(let i=1;i<p.length;i++) o+=(TTB_TUCK.test(p[i])? TTB_ROOM.tuck : TTB_ROOM.plain)+p[i]; return o; }   
 function ttbPut(h, full, i){   
   const s=full.slice(0,i), k=s.indexOf(TTB_MARK);
   if(k<0){ if(h.ico){ try{ h.ico.remove(); h.tn2.remove(); }catch(e){} h.ico=null; h.tn2=null; } h.tn.nodeValue=s; return; }   
-  if(!h.ico || h.ico.parentNode!==h.txt){ const sp=document.createElement('span'); sp.className='ttb-ico'; sp.setAttribute('aria-hidden','true'); sp.innerHTML=lg3TagSVG(); const t2=document.createTextNode('');
+  if(!h.ico || h.ico.parentNode!==h.txt){ const sp=document.createElement('span'); sp.className='ttb-ico'+(TTB_RTLS.test(h.tn.nodeValue||'')? ' ttb-rtl' : ''); sp.setAttribute('aria-hidden','true'); sp.innerHTML=lg3TagSVG(); const t2=document.createTextNode('');
     h.txt.insertBefore(sp, h.tn.nextSibling); h.txt.insertBefore(t2, sp.nextSibling); h.ico=sp; h.tn2=t2; }
-  h.tn.nodeValue=s.slice(0,k); h.tn2.nodeValue=s.slice(k+TTB_MARK.length); }
+  h.tn.nodeValue=s.slice(0,k); h.tn2.nodeValue=s.slice(k+TTB_MARK.length); h.ico.classList.toggle('ttb-tuck', TTB_TUCK.test(h.tn2.nodeValue)); }   
+const TTB_TUCK=/^[.,;:…]/;   
+const TTB_RTLS=/[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]/;   
+let TTB_ROOM={ plain:'  ', tuck:'  ' };   
+function ttbFresh(h){ if(!h || !h.ico) return; try{ h.ico.remove(); }catch(e){} try{ if(h.tn2) h.tn2.remove(); }catch(e){} h.ico=null; h.tn2=null; }   
+function ttbRoom(h, text){   
+  try{ const x=h.txt, tn=h.tn, was=tn.nodeValue, fs=parseFloat(getComputedStyle(x).fontSize)||16, rg=document.createRange(), W=[];
+    for(const c of [' ',' ',' ',' ',' ',' ',' ']){ tn.nodeValue=c; rg.selectNodeContents(x); const w=rg.getBoundingClientRect().width; if(w>0) W.push([c,w]); } tn.nodeValue=was;
+    const run=(em)=>{ let left=em*fs, o=''; for(let g=0; g<24 && left>0.5; g++){ let best=null; for(const q of W){ if(q[1]<=left+0.5 && (!best || q[1]>best[1])) best=q; } if(!best) break; o+=best[0]; left-=best[1]; } return '\u200B'+(o||'  '); };   
+    TTB_ROOM={ plain:run(1.38), tuck:run(TTB_RTLS.test(String(text||''))? 1.22 : 1.16) }; }catch(e){} }
+function ttbFloor(h, pages){   
+  try{ const x=h.txt; if(!pages || !pages.length) return; x.style.minHeight='0px'; const cs=getComputedStyle(x), pad=(parseFloat(cs.paddingTop)||0)+(parseFloat(cs.paddingBottom)||0); let mx=0;
+    for(const p of pages){ const t=commNoDash(p); ttbPut(h, t, t.length); mx=Math.max(mx, x.getBoundingClientRect().height-pad); } ttbPut(h, '', 0);
+    if(mx>0) x.style.minHeight=mx.toFixed(2)+'px'; h.ttbFloor=+mx.toFixed(2); }catch(e){} }
 function ttbZ(z){ const T=S.bf && S.bf.ttb; return (T && T.k>0 && T.Z)? z+(T.Z-z)*T.k : z; }   
 function ttbOpen(bf, T){
   if((S.coop || (coopLaunching && COOP)) && coopHumans()>1) return false;
@@ -85886,7 +85901,7 @@ function ttbOpen(bf, T){
   h.el.classList.add('ttb');
   const band=Math.max(74, innerHeight*0.185)+8;   
   h.win.style.paddingBottom=band+'px'; let p1, p2;
-  try{ p1=commFitPages(h, tourPages(TXT(TTB_LINES[0]), 1)); p2=[]; }   
+  try{ ttbRoom(h, TXT(TTB_LINES[0])); p1=commFitPages(h, tourPages(TXT(TTB_LINES[0]), 1)); p2=[]; ttbFloor(h, p1); }       
   finally { h.win.style.paddingBottom=''; }
   const u=S.units.find(v=>v.side===bfMyTeam() && v.type!=='sarge');
   T.boxAt=p1.length; T.cost=u? (capBfCost(u.type)|0) : 0; T.p0=performance.now(); T.c0=T.p0;   
@@ -88456,7 +88471,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='24.46';        
+let GVT_CV='24.48';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
