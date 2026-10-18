@@ -88523,7 +88523,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='24.57';        
+let GVT_CV='24.58';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -143557,8 +143557,9 @@ const ROOM_SPOTS=[
   
   
   
-  { id:'bookcase', x:988, y:62, w:240, h:274, due:()=>bcrDue(), act:()=>bcrCaseTap() },
-  { id:'rocker', x:1244, y:194, w:172, h:190, due:()=>bcrDue(), act:()=>bcrRockTap() },
+  
+  { id:'bookcase', get x(){ return bcrBox('case')[0]; }, get y(){ return bcrBox('case')[1]; }, get w(){ return bcrBox('case')[2]; }, get h(){ return bcrBox('case')[3]; }, due:()=>bcrDue(), act:()=>bcrCaseTap() },
+  { id:'rocker', get x(){ return bcrBox('rocker')[0]; }, get y(){ return bcrBox('rocker')[1]; }, get w(){ return bcrBox('rocker')[2]; }, get h(){ return bcrBox('rocker')[3]; }, due:()=>bcrDue(), act:()=>bcrRockTap() },
   
   
   
@@ -155826,15 +155827,26 @@ function trcProbe(){ const M=trcM(), B=e=>{ if(!e) return null; const b=e.getBou
 
 
 
+
+
+
+
+
+
+
 const BCR={ on:(function(){ try{ const q=/[?&]bcr=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_bcr','0'); else localStorage.removeItem('gvt_bcr'); } return localStorage.getItem('gvt_bcr')==='0'? 0 : 1; }catch(e){ return 1; } })(),   
-  X0:1000, X1:1216, SIDE:12, LIP:66, FR:90, IN0:122, BOARDS:[170,224,270], BOARD:6, BASE:308, FOOT:328, SLOTS:4, CAP:12,   
-  RX:1316, RY:374, RD:[30,-12], rockMs:2900, rockDeg:6, rockPer:0.96 };   
+  HEAD:960, W:312, SIDE:12, LIP:66, FR:90, IN0:122, BOARDS:[170,224,270], BOARD:6, BASE:308, FOOT:328, SLOTS:6, CAP:18,   
+  RY:374, RK:0.92, RB:[-60,-192,124,206], GAPE:12, rockMs:2900, rockDeg:6, rockPer:0.96,   
+  lay:null, rs:0, rn:0 };   
 const BCR_WOOD={ body:'#9C6A3C', dark:'#7A5130', lit:'#B98352', back:'#5E3E22', ink:'#4A2F17', shelf:'#A87445', edge:'#D9A86E', plinth:'#3E2716', brass:'#D6AE52' };   
 const BCR_BOOKS=['#B5443A','#3E6FA8','#4F8A4A','#D8A33A','#7A4E9A','#2F8C8A','#C9693A','#8B2F3A','#E6D7B5','#46607E'];   
 const BCR_OAK={ wood:'#B97A3E', far:'#8C5A2B', lit:'#D49A58', ink:'#5A3615', cush:'#5E8A45', cushL:'#82AC62', cushInk:'#33531F' };   
 const BCR_ROCK={ raf:0, t0:0, a:0, n:0 };   
 function bcrOn(){ return BCR.on===1; }
-function bcrDue(){ try{ return roomCur()==='bedroom' && !MAPPIN && bcrOn() && xrBand()>0; }catch(e){ return false; } }   
+function bcrDue(){ try{ return roomCur()==='bedroom' && !MAPPIN && bcrOn() && exrRoomOn(); }catch(e){ return false; } }   
+function bcrLay(){ const xE=960+xrBand()+exrEast(), cx=(BCR.HEAD+xE)/2;   
+  return { xE:xE, cx:+cx.toFixed(1), X0:+(cx-BCR.W/2).toFixed(1), X1:+(cx+BCR.W/2).toFixed(1), RX:xE-BCR.GAPE-(BCR.RB[0]+BCR.RB[2]) }; }
+function bcrBox(k){ try{ const L=bcrLay(); return k==='case'? [L.X0-12, 62, BCR.W+24, 274] : [L.RX+BCR.RB[0], BCR.RY+BCR.RB[1], BCR.RB[2], BCR.RB[3]]; }catch(e){ return [0, 0, 0, 0]; } }   
 function bcrN(v){ return +(+v).toFixed(1); }
 function bcrR(x,y,w,h,f){ return '<rect x="'+bcrN(x)+'" y="'+bcrN(y)+'" width="'+bcrN(w)+'" height="'+bcrN(h)+'" '+f+'/>'; }
 function bcrHash(a,b,c){ let h=(a*73856093)^(b*19349663)^(c*83492791); h=Math.imul(h^(h>>>13), 1274126177); return ((h^(h>>>16))>>>0)/4294967296; }   
@@ -155851,56 +155863,68 @@ function bcrTrophy(t,cx,y,fh){ const fw=Math.round(fh*1.05);
     +bcrR(cx-13,y-6,26,6,'fill="'+BCR_WOOD.plinth+'" stroke="#21140A" stroke-width="1"')+bcrR(cx-6,y-4.4,12,2.2,'fill="'+BCR_WOOD.brass+'"')
     +'<image data-bcr="fig" data-k="'+escH(t[0])+'" href="'+t[1]+'" x="'+bcrN(cx-fw/2)+'" y="'+bcrN(y-6-fh)+'" width="'+fw+'" height="'+fh+'" preserveAspectRatio="xMidYMax meet"'+(t[2]? ' filter="url(#bcrGild)"' : '')+'/>'; }
 function bcrStand(cx,y){ return bcrR(cx-15,y-7,30,7,'fill="'+BCR_WOOD.plinth+'" stroke="#21140A" stroke-width="1"')+bcrR(cx-7,y-5.2,14,2.4,'fill="'+BCR_WOOD.brass+'"'); }   
-function bcrPlateSVG(){   
-  const L=signLayout(t('TROPHIES'), 150, signPt(), SIGN_LADDER), cap=+(L.pt*0.72).toFixed(1), w=+Math.max(SIGN_MINW, L.w*1.03+2*SIGN_PAD).toFixed(1), h=+(8+cap).toFixed(1), cx=(BCR.X0+BCR.X1)/2, x=+(cx-w/2).toFixed(1);
-  return '<g transform="translate(0,'+(BCR.FR+2-PLQ_TOP)+')" data-sign="bcr" data-run="'+(w-2*SIGN_PAD).toFixed(1)+'" data-ladder="'+SIGN_LADDER.join(',')+'" pointer-events="none">'+plqPlateSVG(x, w, SIGN_TOP+h)+plqTextSVG(cx, +(SIGN_TOP+4+cap).toFixed(1), L, 0)+'</g>'; }
-function bcrCaseSVG(){ const B=BCR, W=BCR_WOOD, x0=B.X0, x1=B.X1, w=x1-x0, ix0=x0+B.SIDE, ix1=x1-B.SIDE, iw=ix1-ix0, sw=iw/B.SLOTS, S=[B.BOARDS[0],B.BOARDS[1],B.BOARDS[2],B.BASE], C=[B.IN0,B.BOARDS[0]+B.BOARD,B.BOARDS[1]+B.BOARD,B.BOARDS[2]+B.BOARD], L=bcrList();   
+function bcrPlateSVG(L){   
+  const P=signLayout(t('TROPHIES'), 150, signPt(), SIGN_LADDER), cap=+(P.pt*0.72).toFixed(1), w=+Math.max(SIGN_MINW, P.w*1.03+2*SIGN_PAD).toFixed(1), h=+(8+cap).toFixed(1), cx=L.cx, x=+(cx-w/2).toFixed(1);
+  return '<g transform="translate(0,'+(BCR.FR+2-PLQ_TOP)+')" data-sign="bcr" data-run="'+(w-2*SIGN_PAD).toFixed(1)+'" data-ladder="'+SIGN_LADDER.join(',')+'" pointer-events="none">'+plqPlateSVG(x, w, SIGN_TOP+h)+plqTextSVG(cx, +(SIGN_TOP+4+cap).toFixed(1), P, 0)+'</g>'; }
+function bcrCaseSVG(Lay){ const B=BCR, W=BCR_WOOD, x0=Lay.X0, x1=Lay.X1, w=x1-x0, ix0=x0+B.SIDE, ix1=x1-B.SIDE, iw=ix1-ix0, sw=iw/B.SLOTS, S=[B.BOARDS[0],B.BOARDS[1],B.BOARDS[2],B.BASE], C=[B.IN0,B.BOARDS[0]+B.BOARD,B.BOARDS[1]+B.BOARD,B.BOARDS[2]+B.BOARD], L=bcrList(), m=B.SLOTS/2;   
   let v='<g id="ro-bookcase"><defs><filter id="bcrGild" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="0.42 0.70 0.14 0 0.10  0.34 0.57 0.11 0 0.04  0.11 0.19 0.04 0 0  0 0 0 1 0"/></filter></defs>'   
     +'<ellipse cx="'+bcrN((x0+x1)/2)+'" cy="'+B.FOOT+'" rx="'+bcrN(w/2+12)+'" ry="7" fill="#000" opacity="0.18"/>'   
     +bcrR(x0,B.FR-4,w,B.BASE-B.FR+4,'fill="'+W.body+'" stroke="'+W.ink+'" stroke-width="2.5"')   
     +bcrR(ix0,B.IN0,iw,B.BASE-B.IN0,'fill="'+W.back+'" stroke="'+W.ink+'" stroke-width="1.5"')   
     +bcrR(ix0,B.IN0,7,B.BASE-B.IN0,'fill="#000" opacity="0.16"');   
   for(let i=0;i<4;i++) v+=bcrR(ix0,C[i],iw,6,'fill="#000" opacity="0.2"');   
-  for(const b of B.BOARDS) v+=bcrR(ix0-1,b,iw+2,B.BOARD,'fill="'+W.shelf+'" stroke="'+W.ink+'" stroke-width="1.4"')+'<path d="M'+ix0+' '+bcrN(b+0.9)+' H'+ix1+'" stroke="'+W.edge+'" stroke-width="1.2" opacity="0.9"/>';   
+  for(const b of B.BOARDS) v+=bcrR(ix0-1,b,iw+2,B.BOARD,'fill="'+W.shelf+'" stroke="'+W.ink+'" stroke-width="1.4"')+'<path d="M'+bcrN(ix0)+' '+bcrN(b+0.9)+' H'+bcrN(ix1)+'" stroke="'+W.edge+'" stroke-width="1.2" opacity="0.9"/>';   
   v+=bcrR(x0-8,B.LIP,w+16,7,'fill="'+W.lit+'" stroke="'+W.ink+'" stroke-width="2"')+bcrR(x0-4,B.LIP+7,w+8,13,'fill="'+W.body+'" stroke="'+W.ink+'" stroke-width="2"')+bcrR(x0-1,B.LIP+20,w+2,4,'fill="'+W.dark+'" stroke="'+W.ink+'" stroke-width="1.2"');   
   v+=bcrR(x0-4,B.BASE,w+8,B.FOOT-B.BASE,'fill="'+W.dark+'" stroke="'+W.ink+'" stroke-width="2.5"')+bcrR(x0+6,B.BASE+6,w-12,B.FOOT-B.BASE-10,'fill="#5E3E22" opacity="0.55"');   
   let n=0;
   for(let s=0;s<4;s++){ const y=S[s], hc=y-C[s];
     for(let k=0;k<B.SLOTS;k++){ const sx=ix0+k*sw;
       if(s<3 && n<L.length){ v+=bcrTrophy(L[n++], sx+sw/2, y, hc-10); continue; }
-      if(s===0 && !L.length && (k===1 || k===2)){ if(k===1) v+=bcrStand(ix0+iw/2, y); continue; }   
+      if(s===0 && !L.length && (k===m-1 || k===m)){ if(k===m-1) v+=bcrStand(ix0+iw/2, y); continue; }   
       v+=bcrBooks(sx+0.5, y, sw-1, hc-3, s, k); } }
-  return v+bcrPlateSVG()+'</g>'; }
-function bcrRockerSVG(){ const B=BCR, O=BCR_OAK, dx=B.RD[0], dy=B.RD[1], T=(x,y)=>bcrN(x)+','+bcrN(y), P=(d,f)=>'<path d="'+d+'" '+f+'/>';
-  const FAR='fill="'+O.far+'" stroke="'+O.ink+'" stroke-width="2"', NEAR='fill="'+O.wood+'" stroke="'+O.ink+'" stroke-width="2.2"';
-  const runner=(ox,oy,f)=>P('M'+T(-66+ox,-9.9+oy)+' Q'+T(-3+ox,9+oy)+' '+T(60+ox,-8.2+oy)+' Q'+T(67+ox,-10+oy)+' '+T(65+ox,-16+oy)+' L'+T(60+ox,-15.2+oy)+' Q'+T(-3+ox,2+oy)+' '+T(-66+ox,-16.9+oy)+' Q'+T(-71+ox,-13.5+oy)+' '+T(-66+ox,-9.9+oy)+' Z', f);   
-  const leg=(ox,oy,f)=>bcrR(-47+ox,-53+oy,8,45,f);   
-  const stile=(ox,oy,f)=>P('M'+T(29+ox,-7+oy)+' L'+T(37+ox,-7+oy)+' L'+T(37+ox,-56+oy)+' L'+T(52+ox,-150+oy)+' L'+T(43+ox,-151+oy)+' L'+T(29+ox,-56+oy)+' Z', f);   
-  let v='<g id="ro-rocker"><ellipse cx="'+(B.RX+8)+'" cy="'+(B.RY+1)+'" rx="76" ry="7" fill="#000" opacity="0.18"/>'   
-    +'<g transform="translate('+B.RX+','+B.RY+')"><g class="bcr-rock">';   
-  v+=runner(dx,dy,FAR)+leg(dx,dy,FAR)+stile(dx,dy,FAR);   
-  for(const k of [0.25,0.5,0.75]) v+=P('M'+T(34+dx*k-1.7,-58+dy*k)+' L'+T(46+dx*k-1.7,-142+dy*k)+' L'+T(46+dx*k+1.7,-142+dy*k)+' L'+T(34+dx*k+1.7,-58+dy*k)+' Z', 'fill="'+O.wood+'" stroke="'+O.ink+'" stroke-width="1.4"');   
-  v+=P('M'+T(40,-140)+' Q'+T(47+dx/2,-166+dy/2)+' '+T(55+dx,-154+dy)+' L'+T(55+dx,-143+dy)+' Q'+T(47+dx/2,-153+dy/2)+' '+T(41,-129)+' Z', NEAR);   
-  v+=P('M'+T(-54,-58)+' L'+T(40,-58)+' L'+T(40+dx,-58+dy)+' L'+T(-54+dx,-58+dy)+' Z', 'fill="'+O.lit+'" stroke="'+O.ink+'" stroke-width="2"')+bcrR(-54,-58,94,9,NEAR);   
-  v+=P('M'+T(-46,-60)+' Q'+T(-49,-69)+' '+T(-40+dx*0.15,-70+dy*0.15)+' L'+T(28+dx*0.85,-70+dy*0.85)+' Q'+T(37+dx,-68+dy)+' '+T(30+dx,-60+dy)+' L'+T(32,-60)+' Z', 'fill="'+O.cush+'" stroke="'+O.cushInk+'" stroke-width="1.8"')
-    +P('M'+T(-40,-65)+' L'+T(26+dx*0.8,-65+dy*0.8), 'stroke="'+O.cushL+'" stroke-width="2.4" stroke-linecap="round" opacity="0.9"');   
-  v+=leg(0,0,NEAR)+stile(0,0,NEAR)
-    +P('M'+T(-50,-86)+' Q'+T(-6,-94)+' '+T(44,-100)+' L'+T(45,-93)+' Q'+T(-6,-87)+' '+T(-48,-80)+' Z', NEAR)+bcrR(-47,-84,6,27,NEAR)   
-    +'<circle cx="-50" cy="-84" r="4.8" fill="'+O.wood+'" stroke="'+O.ink+'" stroke-width="2"/><circle cx="-50" cy="-84" r="1.6" fill="'+O.ink+'" opacity="0.7"/>'   
-    +runner(0,0,NEAR);   
+  return v+bcrPlateSVG(Lay)+'</g>'; }
+function bcrRockerSVG(Lay){ const B=BCR, O=BCR_OAK, K=B.RK, Q=(x,h,z)=>bcrN(K*(x+0.25*z))+','+bcrN(K*(-h-0.5*z));   
+  const F=(c,w)=>'fill="'+c+'" stroke="'+O.ink+'" stroke-width="'+(w||1.8)+'" stroke-linejoin="round"', poly=(p,f)=>'<path d="M'+p.map(q=>Q(q[0],q[1],q[2])).join(' L')+' Z" '+f+'/>';
+  const hexa=(c,w,C)=>{ C=C||[O.far,O.lit,O.wood]; return poly([c[1],c[5],c[6],c[2]], F(C[0],w))+poly([c[3],c[2],c[6],c[7]], F(C[1],w))+poly([c[0],c[1],c[2],c[3]], F(C[2],w)); };   
+  const box=(x0,x1,h0,h1,z0,z1,lean,w,C)=>{ const L=lean||0; return hexa([[x0,h0,z0],[x1,h0,z0],[x1,h1,z0+L],[x0,h1,z0+L],[x0,h0,z1],[x1,h0,z1],[x1,h1,z1+L],[x0,h1,z1+L]], w, C); };   
+  const hb=z=>12*(z/62)*(z/62)+(z<-36? (-36-z)*(-36-z)/16 : 0), ZS=[]; for(let z=-44;z<=62;z+=6) ZS.push(z);   
+  const runner=x=>poly(ZS.map(z=>[x+3,hb(z)+7,z]).concat(ZS.map(z=>[x+3,hb(z),z]).reverse()), F(O.far))   
+    +poly(ZS.map(z=>[x-3,hb(z)+7,z]).concat(ZS.map(z=>[x+3,hb(z)+7,z]).reverse()), F(O.lit,1.4))   
+    +poly([[x-3,hb(-44),-44],[x+3,hb(-44),-44],[x+3,hb(-44)+7,-44],[x-3,hb(-44)+7,-44]], F(O.wood));   
+  const crest=(z,d)=>{ const X=[]; for(let x=-52;x<=52;x+=8) X.push(x); const a=x=>8*(1-(x/52)*(x/52));   
+    return poly(X.map(x=>[x,176+a(x),z]).concat(X.map(x=>[x,176+a(x),z+d]).reverse()), F(O.lit,1.4))+poly([[52,163,z],[52,163,z+d],[52,176,z+d],[52,176,z]], F(O.far))+poly(X.map(x=>[x,176+a(x),z]).concat(X.map(x=>[x,163+a(x),z]).reverse()), F(O.wood,2)); };
+  let v='<g id="ro-rocker"><ellipse cx="'+bcrN(Lay.RX+2)+'" cy="'+(B.RY-3)+'" rx="62" ry="11" fill="#000" opacity="0.18"/>'   
+    +'<g transform="translate('+bcrN(Lay.RX)+','+B.RY+')"><g class="bcr-rock">';   
+  v+=runner(-44)+runner(44);   
+  for(const x of [-26,-13,0,13,26]) v+=box(x-2,x+2,60,166,17,21,14,1.2);   
+  for(const a of [-48,40]) v+=box(a,a+8,8,54,14,22)+box(a,a+8,54,180,14,22,16);   
+  v+=crest(28,6);
+  for(const a of [-48,40]) v+=box(a,a+8,8,54,-22,-14);   
+  v+=box(-50,50,54,62,-26,26,0,2)+box(-45,45,62,68,-22,22,0,1.6,['#4A7036',O.cushL,O.cush]).replace(/stroke="#5A3615"/g,'stroke="'+O.cushInk+'"');   
+  for(const a of [-50,42]) v+=hexa([[a,100,-28],[a+8,100,-28],[a+8,106,-28],[a,106,-28],[a,110,20],[a+8,110,20],[a+8,116,20],[a,116,20]], 1.6)   
+    +box(a+1.5,a+6.5,62,100,-25,-20,0,1.4)   
+    +'<circle cx="'+Q(a+4,103,-28).split(',')[0]+'" cy="'+Q(a+4,103,-28).split(',')[1]+'" r="5.5" fill="'+O.wood+'" stroke="'+O.ink+'" stroke-width="1.8"/><circle cx="'+Q(a+4,103,-28).split(',')[0]+'" cy="'+Q(a+4,103,-28).split(',')[1]+'" r="1.8" fill="'+O.ink+'" opacity="0.7"/>';   
   return v+'</g></g></g>'; }
-function bcrRoomSVG(){ try{ return bcrDue()? bcrCaseSVG()+bcrRockerSVG() : ''; }catch(e){ return ''; } }   
+function bcrRoomSVG(){ try{ if(!bcrDue()) return ''; const L=bcrLay(); BCR.lay=L; return bcrCaseSVG(L)+bcrRockerSVG(L); }catch(e){ return ''; } }   
 function bcrCaseTap(){ try{ if(tourLive() || milePopUp()) return; }catch(e){} UI.trcOpen(); }   
 function bcrRockEl(){ return document.querySelector('#roomStage > svg #ro-rocker .bcr-rock'); }
 function bcrRockTap(){ try{ if(tourLive() || milePopUp()) return; }catch(e){} if(BCR_ROCK.raf) return; audio(); try{ SFX.creak(); }catch(e){} if(reducedMotion()) return; bcrRockGo(); }   
 function bcrRockGo(){ const R=BCR_ROCK; if(R.raf) cancelAnimationFrame(R.raf); try{ dlgHold('rocker', BCR.rockMs+400); }catch(e){} R.t0=performance.now(); R.n++;   
   const step=now=>{ R.raf=0; const el=bcrRockEl(); if(!el){ R.t0=0; R.a=0; return; } const t=Math.max(0, (now-R.t0)/1000), T=BCR.rockMs/1000;   
     if(t>=T){ el.removeAttribute('transform'); R.t0=0; R.a=0; return; }   
-    R.a=BCR.rockDeg*Math.sin(2*Math.PI*t/BCR.rockPer)*Math.pow(1-t/T, 1.2); el.setAttribute('transform', 'rotate('+R.a.toFixed(2)+')'); R.raf=requestAnimationFrame(step); };
+    R.a=BCR.rockDeg*Math.sin(2*Math.PI*t/BCR.rockPer)*Math.pow(1-t/T, 1.2); const p=R.a*Math.PI/180;   
+    el.setAttribute('transform', 'matrix(1 0 '+(0.25*p).toFixed(4)+' '+(1-0.5*p).toFixed(4)+' 0 0)'); R.raf=requestAnimationFrame(step); };
   R.raf=requestAnimationFrame(step); }
+function bcrResync(){ clearTimeout(BCR.rs); BCR.rn=0; BCR.rs=setTimeout(bcrResync0, 400); }   
+function bcrResync0(){ BCR.rs=0; try{ if(typeof S==='undefined' || S.mode!=='menu' || roomCur()!=='bedroom' || MAPPIN || document.hidden) return;
+  const svg=document.querySelector('#roomStage > svg'); if(!svg) return; const has=!!svg.querySelector('#ro-bookcase'), due=bcrDue();
+  if(due===has && (!due || (BCR.lay && Math.abs(bcrLay().xE-BCR.lay.xE)<2))) return;   
+  if(RDRAG || RZ.pan || RZ.pts.size || !roomQuiet() || !tourQuiet()){ if(++BCR.rn<120) BCR.rs=setTimeout(bcrResync0, 1000); return; }   
+  renderMenu(); }catch(e){} }   
+try{ addEventListener('resize', bcrResync); if(window.visualViewport) visualViewport.addEventListener('resize', bcrResync); }catch(e){}
 function bcrRig(o){ o=o||{}; if(o.on!=null) BCR.on=o.on? 1 : 0; if(o.rock) bcrRockGo(); if(o.tap==='case') bcrCaseTap(); if(o.tap==='rocker') bcrRockTap();   
   const svg=document.querySelector('#roomStage > svg'), el=bcrRockEl(), safe=f=>{ try{ return f(); }catch(e){ return null; } };
-  return { on:BCR.on, due:bcrDue(), list:safe(()=>bcrList().map(t=>t[0])), got:safe(()=>trcGot().length), caseEl:!!(svg && svg.querySelector('#ro-bookcase')), rockerEl:!!(svg && svg.querySelector('#ro-rocker')),
+  return { on:BCR.on, due:bcrDue(), lay:BCR.lay, now:safe(bcrLay), list:safe(()=>bcrList().map(t=>t[0])), got:safe(()=>trcGot().length), caseEl:!!(svg && svg.querySelector('#ro-bookcase')), rockerEl:!!(svg && svg.querySelector('#ro-rocker')),
     figs:svg? svg.querySelectorAll('#ro-bookcase [data-bcr="fig"]').length : 0, rock:{ on:!!BCR_ROCK.raf, a:+BCR_ROCK.a.toFixed(2), n:BCR_ROCK.n, tr:el? el.getAttribute('transform') : null },
     rows:ROOM_SPOTS.filter(r=>r.id==='bookcase' || r.id==='rocker').map(r=>[r.id, r.x, r.y, r.w, r.h, r.due? !!r.due() : true]) }; }
 setTimeout(()=>{ try{ if(window.GVT) GVT.bcr=bcrRig; }catch(e){} }, 0);
