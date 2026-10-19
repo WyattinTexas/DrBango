@@ -88668,7 +88668,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='24.67';        
+let GVT_CV='24.68';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -184821,6 +184821,40 @@ function tsnRig(o){ if(o && o.on!==undefined) TSN.on=o.on? 1 : 0;
   const bf=S.bf, t=S.cfg&&S.cfg.terrain;
   return { cv:GVT_CV, on:TSN.on, opener:!!(bf&&bf.opener), mapId:bf? bf.mapId : null, ground:t? (t.ground||'') : null, rivers:t? (t.rivers||[]).map(r=>({ x:r.x, w:r.w, bridges:(r.bridges||[]).map(b=>b.y) })) : null,
     rocks:t? (t.rocks||[]).map(r=>({ x:r.x, y:r.y, r:r.r, art:r.art||'', chain:r.chain||'' })) : null, flakes:(t&&t.flakes)? t.flakes.length : 0, duck:!!(t&&t.riverDuck), light:(typeof lightField==='function')? !!lightField() : null }; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+var APT={ on:(function(){ try{ const q=/[?&]apt=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_apt','0'); else localStorage.removeItem('gvt_apt'); } return localStorage.getItem('gvt_apt')==='0'? 0 : 1; }catch(e){ return 1; } })(),
+  T:10, N:3, GAP:4, A:[1550,237], B:[1595,369], old:{}, err:0 };   
+const APT_WAVES=[ { at:0, k:'A', men:[['mgunner',-26,-20],['mgunner',-26,20],['medic',24,0]] }, { at:APT.GAP, k:'B', men:[['rifleman',-24,-22],['rifleman',-24,22],['rifleman',22,0]] } ];   
+function aptOn(){ return APT.on===1; }
+function aptSt(bf){ bf=bf||S.bf; if(!bf || !bf.opener) return null; return bf.apt || (bf.apt={ t:0, n:0, fired:0, at:null, k:0, since:0, log:[] }); }   
+function aptLive(bf){ bf=bf||S.bf; return !!(bf && bf.opener && S.mode==='play' && !bf.resolved && !bf.ending && !COMM.brief && !COMM.say && !(typeof PREM!=='undefined' && PREM && PREM.up) && !(typeof HQS!=='undefined' && HQS && HQS.on) && !(typeof ttbHolds==='function' && ttbHolds()) && !(typeof ffrHolds==='function' && ffrHolds()) && !(typeof ftnHolds==='function' && ftnHolds())); }   
+function aptTick(dt){ const bf=S.bf, A=aptSt(bf); if(!A || !aptLive(bf)) return; A.t+=dt;
+  if(A.fired && A.k<APT_WAVES.length){ A.since+=dt; while(A.k<APT_WAVES.length && A.since>=APT_WAVES[A.k].at){ aptSpawn(bf, A, APT_WAVES[A.k]); A.k++; } } }
+function aptPlayed(seat){ const bf=S.bf, A=aptSt(bf); if(!A || seat!==bfMySeat()) return; A.n++; if(!A.fired && A.n>=APT.N && A.t<APT.T){ A.fired=1; A.at=+A.t.toFixed(3); A.since=0; A.k=0; } }   
+function aptSpawn(bf, A, w){ const me=bfMyTeam(), side=(me==='you')? 'foe' : 'you', si=bf.seats.findIndex(st=>st && st.team===side), c=APT[w.k], dir=(side==='foe')? 1 : -1, cx=(side==='foe')? c[0] : WORLD_W-c[0], cy=c[1]; let n=0;
+  for(const m of w.men){ const x=Math.round(cx+m[1]*dir), y=Math.round(cy+m[2]); const u=placeUnit(m[0], x, y, side, si>=0? si : undefined); if(!u) continue; n++;
+    S.fx.push({ k:'ring', x, y:y-6, r:56, R:15, t:0, dur:0.55, col:'rgba(230,140,110,0.95)' }); }   
+  bfSfx(SFX.blip, cx, cy); A.log.push({ k:w.k, t:+A.t.toFixed(2), n }); }
+function aptRig(o){ o=o||{}; const bf=S.bf, A=aptSt(bf); if(o.on!==undefined) APT.on=o.on? 1 : 0; if(o.reset && A){ A.t=0; A.n=0; A.fired=0; A.at=null; A.k=0; A.since=0; A.log=[]; } if(o.t!=null && A) A.t=+o.t;   
+  if(o.fire && A && !A.fired){ A.fired=1; A.at=+A.t.toFixed(3); A.since=0; A.k=0; }
+  return { cv:GVT_CV, on:APT.on, T:APT.T, N:APT.N, GAP:APT.GAP, A:APT.A.slice(), B:APT.B.slice(), opener:!!(bf&&bf.opener), live:aptLive(bf), st:A? { t:+A.t.toFixed(3), n:A.n, fired:A.fired, at:A.at, k:A.k, since:+A.since.toFixed(3), log:A.log.slice() } : null, age:bf? +(+bf.age||0).toFixed(3) : null, err:APT.err, wraps:Object.keys(APT.old) }; }
+if(aptOn()) try{
+  APT.old.bfTick=bfTick; bfTick=function(dt){ APT.old.bfTick.apply(this, arguments); try{ aptTick(dt); }catch(e){ APT.err++; } };   
+  APT.old.applyDeploy=applyDeploy; applyDeploy=function(seat,type,x,y,relay){ const u=APT.old.applyDeploy.apply(this, arguments); try{ if(u && !relay && S.bf && S.bf.opener) aptPlayed(u.seat); }catch(e){ APT.err++; } return u; };   
+}catch(e){ APT.err++; }
+
 let OP_ARM=0;              
 function startOpener(){ OP_ARM=1; try{ startBattlefield(OPENER_MAP, null, 1, null, ARMIES.find(a=>a.id==='tan')||ARMIES[2]); } finally { OP_ARM=0; } }   
 function titleClickEat(){   
@@ -188746,6 +188780,7 @@ window.GVT = {
   fzb(o){ return fzbRig(o); },   
   otp(o){ return otpRig(o); },   
   xbi(o){ return xbiRig(o); },
+  apt(o){ return aptRig(o); },   
   tsn(o){ return tsnRig(o); },   
   night(v){ NW_PIN=(v===undefined||v===null)? null : (v? 1 : 0); if(roomOpenNow()) renderMenu(); return { pin:NW_PIN, night:roomNight(), from:NW_NIGHT[0], to:NW_NIGHT[1], tick:!!NW_TICK }; },   
   dogFreeze(on){ DOGRIG.frozen=on?1:0; DOG_LAST=0; return DOGRIG.frozen; },
