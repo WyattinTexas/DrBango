@@ -88626,7 +88626,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='24.65';        
+let GVT_CV='24.66';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -134409,7 +134409,7 @@ function gravPlanks(){
   while((m=re.exec(sh))){ const r=/<rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)" rx="3"/.exec(m[2]); if(r) out.push({ id:m[1], x0:+r[1], x1:+r[1]+ +r[3], y:+r[2], hold:GRAV_HOLD }); }
   return (GRAV_PLANKS=out);
 }
-const GRAV_SURF={ get bedroom(){ const h=DECOR_SPOTS.helmet, f9=DECOR_SPOTS.flashlight, m9=DECOR_SPOTS.steadmedal; return gravPlanks().concat([{ id:'bed', x0:702+BED_DX, x1:910+BED_DX, y:240, hold:76 }, { id:'nail', x0:h.x, x1:h.x+h.w, y:h.y+h.h, hold:6 }, vtcSill(), { id:'flrest', x0:f9.x, x1:f9.x+f9.w, y:f9.y+f9.h, hold:6 }, { id:'mdhook', x0:m9.x, x1:m9.x+m9.w, y:m9.y+m9.h, hold:6 }]); } };           
+const GRAV_SURF={ get bedroom(){ const h=DECOR_SPOTS.helmet, f9=DECOR_SPOTS.flashlight, m9=DECOR_SPOTS.steadmedal; return gravPlanks().concat(bcrSurfOf()  , [{ id:'bed', x0:702+BED_DX, x1:910+BED_DX, y:240, hold:76 }, { id:'nail', x0:h.x, x1:h.x+h.w, y:h.y+h.h, hold:6 }, vtcSill(), { id:'flrest', x0:f9.x, x1:f9.x+f9.w, y:f9.y+f9.h, hold:6 }, { id:'mdhook', x0:m9.x, x1:m9.x+m9.w, y:m9.y+m9.h, hold:6 }]); } };           
 function gravFeetOff(k, base){ return GRAV_FEET[k]!==undefined? GRAV_FEET[k] : base.h; }
 function gravExempt(k){ return k==='bubbleman'   || k==='witch'   || (!!HW_BY[k] && HW_BY[k].layer!=='floor') || (XM19_FORGET.indexOf(k)>=0 && roomCur()!=='bedroom')   || (!!XM_BY[k] && XM_BY[k].layer!=='floor') ||       rideIs(k) || k==='lakerod' || k==='bfrod' || k==='gooddog' || k==='hook' || k==='magicbone' || k==='rave'   || k==='gensshelf'   || (k!=='robot' && !/^vt\d$/.test(k) && RDRAG_DECOR.indexOf(k)<0) || (k==='soccer' && !!SOC_FLY) || GRAV_FALLING.has(k); }   
 function seamY(room, x){   
@@ -143661,6 +143661,7 @@ const ROOM_SPOTS=[
   
   
   
+  
   { id:'bookcase', get x(){ return bcrBox('case')[0]; }, get y(){ return bcrBox('case')[1]; }, get w(){ return bcrBox('case')[2]; }, get h(){ return bcrBox('case')[3]; }, due:()=>bcrDue(), act:()=>bcrCaseTap() },
   { id:'rocker', get x(){ return bcrBox('rocker')[0]; }, get y(){ return bcrBox('rocker')[1]; }, get w(){ return bcrBox('rocker')[2]; }, get h(){ return bcrBox('rocker')[3]; }, due:()=>bcrDue(), act:()=>bcrRockTap() },
   
@@ -143859,7 +143860,7 @@ function abtBallSeat(k, r){
   if(ABT4_LIVE) ABT4_LIVE[k]={ r, s }; return s; }
 function abtBallPaint(k){ if(ABT4_LIVE) delete ABT4_LIVE[k]; }   
 function rpMap(){ const r=roomCur(); const m=META.roomPosR||(META.roomPosR={}); return m[r]||(m[r]={}); }
-function rpXY(k){ const r=roomCur(); const m=META.roomPosR && META.roomPosR[r]; const v=m && m[k]; if(v && v.length===2) return xrPull(k, v);   
+function rpXY(k){ if(META.bcr && META.bcr[k]){ const b9=bcrHeldXY(k); if(b9) return b9; }     const r=roomCur(); const m=META.roomPosR && META.roomPosR[r]; const v=m && m[k]; if(v && v.length===2) return xrPull(k, v);   
   if((k==='soccer' || k==='football') && !MAPPIN && ABT4_CAND && ABT4_CAND[r]){ const s9=abtBallSeat(k, r), b9=DECOR_SPOTS[k]; if(s9 && b9) return [s9[0]-b9.x, s9[1]-b9.y]; }   
   const t=(r==='winter' && MAPPIN)? null : DECOR_SEAT_R[r], b=t && t[k], sp=b && DECOR_SPOTS[k]; return sp? [b[0]-sp.x, b[1]-sp.y] : [0,0]; }   
 function rpTf(k, dx, dy){   
@@ -144562,6 +144563,7 @@ function gravRobotBase(){ return { x:robHomeX()-34, y:214, w:216, h:214 }; }
 function gravPark(k, base, dx, dy, opt){
   opt=opt||{};
   const L=gravExempt(k)? null : gravLand(k, base, dx, dy);
+  bcrHoldAt(k, base, dx, dy, L);   
   if(!L || !L.falls){   
     if(dx||dy) rpMap()[k]=[dx, dy]; else delete rpMap()[k];   
     saveMeta(); SFX.blip();
@@ -145936,6 +145938,7 @@ function rdragEnd(e){
   if(d.k===CHEST_DOOR && d.dx!==undefined){ tcmPark(d); return; }   
   if(d.play) return;   
   if(d.dx!==undefined){
+    bcrLift(d.k);   
     if(xh2Drop(d)) return;   
     if(dogDropHit(d)){ dogFeed(d); return; }   
     if(chestDropHit(d)){ chestSwallow(d); return; }   
@@ -155966,14 +155969,23 @@ function trcProbe(){ const M=trcM(), B=e=>{ if(!e) return null; const b=e.getBou
 
 
 
+
+
+
+
+
+
+
+
+
 const BCR={ on:(function(){ try{ const q=/[?&]bcr=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_bcr','0'); else localStorage.removeItem('gvt_bcr'); } return localStorage.getItem('gvt_bcr')==='0'? 0 : 1; }catch(e){ return 1; } })(),   
-  HEAD:960, W:312, SIDE:12, LIP:66, FR:90, IN0:122, BOARDS:[170,224,270], BOARD:6, BASE:308, FOOT:328, SLOTS:6, CAP:18,   
+  HEAD:960, W:312, SIDE:12, LIP:66, FR:90, IN0:96, SURF:[163,236,308], BOARD:6, HOLD:12, BASE:308, FOOT:328,   
   RY:374, RK:0.92, RB:[-60,-192,124,206], GAPE:12, rockMs:2900, rockDeg:6, rockPer:0.96,   
   lay:null, rs:0, rn:0 };   
 const BCR_WOOD={ body:'#9C6A3C', dark:'#7A5130', lit:'#B98352', back:'#5E3E22', ink:'#4A2F17', shelf:'#A87445', edge:'#D9A86E', plinth:'#3E2716', brass:'#D6AE52' };   
-const BCR_BOOKS=['#B5443A','#3E6FA8','#4F8A4A','#D8A33A','#7A4E9A','#2F8C8A','#C9693A','#8B2F3A','#E6D7B5','#46607E'];   
 const BCR_OAK={ wood:'#B97A3E', far:'#8C5A2B', lit:'#D49A58', ink:'#5A3615', cush:'#5E8A45', cushL:'#82AC62', cushInk:'#33531F' };   
 const BCR_ROCK={ raf:0, t0:0, a:0, n:0 };   
+const BCR_WALK=['hwcat','zombie','witch','bubbleman','robot'];   
 function bcrOn(){ return BCR.on===1; }
 function bcrDue(){ try{ return roomCur()==='bedroom' && !MAPPIN && bcrOn() && exrRoomOn(); }catch(e){ return false; } }   
 function bcrLay(){ const xE=960+xrBand()+exrEast(), cx=(BCR.HEAD+xE)/2;   
@@ -155981,40 +155993,20 @@ function bcrLay(){ const xE=960+xrBand()+exrEast(), cx=(BCR.HEAD+xE)/2;
 function bcrBox(k){ try{ const L=bcrLay(); return k==='case'? [L.X0-12, 62, BCR.W+24, 274] : [L.RX+BCR.RB[0], BCR.RY+BCR.RB[1], BCR.RB[2], BCR.RB[3]]; }catch(e){ return [0, 0, 0, 0]; } }   
 function bcrN(v){ return +(+v).toFixed(1); }
 function bcrR(x,y,w,h,f){ return '<rect x="'+bcrN(x)+'" y="'+bcrN(y)+'" width="'+bcrN(w)+'" height="'+bcrN(h)+'" '+f+'/>'; }
-function bcrHash(a,b,c){ let h=(a*73856093)^(b*19349663)^(c*83492791); h=Math.imul(h^(h>>>13), 1274126177); return ((h^(h>>>16))>>>0)/4294967296; }   
-function bcrList(){ const L=trcGot().map(k=>[k, trcFigURI(k), HEROES.indexOf(k)>=0 || trcIsW(k) || trcIsG(k)]); const H=Array.isArray(META.hrdTro)? META.hrdTro : [];
-  if(H.length){ const u=hrdTroURI(); H.forEach(r=>L.push(['hrd:'+String(r[0]), u, true])); } return L.slice(0, BCR.CAP); }   
-function bcrBooks(x,y,w,hMax,s,k){ let o='', cx=x+1;   
-  for(let i=0;i<9 && cx<x+w-5;i++){ const bw=5+Math.floor(bcrHash(s,k,i)*4.5), bh=Math.min(hMax, Math.round(hMax*0.62+bcrHash(k,i,s)*hMax*0.36)), col=BCR_BOOKS[Math.floor(bcrHash(i,s,k)*BCR_BOOKS.length)], ww=Math.min(bw, x+w-cx-0.5); if(ww<4) break;
-    const b=bcrR(cx,y-bh,ww,bh,'fill="'+col+'" stroke="#2E1C10" stroke-width="1.2"')+(bcrHash(k,s,i)>0.35? bcrR(cx+0.8,y-bh+4,ww-1.6,2.2,'fill="#F3DFA6" opacity="0.8"') : '');   
-    if(i>1 && cx+ww+9>=x+w && bcrHash(s,i,7)>0.45){ o+='<g transform="rotate(-14 '+bcrN(cx)+' '+y+')">'+b+'</g>'; break; }   
-    o+=b; cx+=ww+0.6; }
-  return o; }
-function bcrTrophy(t,cx,y,fh){ const fw=Math.round(fh*1.05);   
-  return '<ellipse cx="'+bcrN(cx)+'" cy="'+bcrN(y-fh*0.55)+'" rx="'+bcrN(fw*0.62)+'" ry="'+bcrN(fh*0.56)+'" fill="#FFD98A" opacity="0.13"/>'
-    +bcrR(cx-13,y-6,26,6,'fill="'+BCR_WOOD.plinth+'" stroke="#21140A" stroke-width="1"')+bcrR(cx-6,y-4.4,12,2.2,'fill="'+BCR_WOOD.brass+'"')
-    +'<image data-bcr="fig" data-k="'+escH(t[0])+'" href="'+t[1]+'" x="'+bcrN(cx-fw/2)+'" y="'+bcrN(y-6-fh)+'" width="'+fw+'" height="'+fh+'" preserveAspectRatio="xMidYMax meet"'+(t[2]? ' filter="url(#bcrGild)"' : '')+'/>'; }
-function bcrStand(cx,y){ return bcrR(cx-15,y-7,30,7,'fill="'+BCR_WOOD.plinth+'" stroke="#21140A" stroke-width="1"')+bcrR(cx-7,y-5.2,14,2.4,'fill="'+BCR_WOOD.brass+'"'); }   
-function bcrPlateSVG(L){   
-  const P=signLayout(t('TROPHIES'), 150, signPt(), SIGN_LADDER), cap=+(P.pt*0.72).toFixed(1), w=+Math.max(SIGN_MINW, P.w*1.03+2*SIGN_PAD).toFixed(1), h=+(8+cap).toFixed(1), cx=L.cx, x=+(cx-w/2).toFixed(1);
-  return '<g transform="translate(0,'+(BCR.FR+2-PLQ_TOP)+')" data-sign="bcr" data-run="'+(w-2*SIGN_PAD).toFixed(1)+'" data-ladder="'+SIGN_LADDER.join(',')+'" pointer-events="none">'+plqPlateSVG(x, w, SIGN_TOP+h)+plqTextSVG(cx, +(SIGN_TOP+4+cap).toFixed(1), P, 0)+'</g>'; }
-function bcrCaseSVG(Lay){ const B=BCR, W=BCR_WOOD, x0=Lay.X0, x1=Lay.X1, w=x1-x0, ix0=x0+B.SIDE, ix1=x1-B.SIDE, iw=ix1-ix0, sw=iw/B.SLOTS, S=[B.BOARDS[0],B.BOARDS[1],B.BOARDS[2],B.BASE], C=[B.IN0,B.BOARDS[0]+B.BOARD,B.BOARDS[1]+B.BOARD,B.BOARDS[2]+B.BOARD], L=bcrList(), m=B.SLOTS/2;   
-  let v='<g id="ro-bookcase"><defs><filter id="bcrGild" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="0.42 0.70 0.14 0 0.10  0.34 0.57 0.11 0 0.04  0.11 0.19 0.04 0 0  0 0 0 1 0"/></filter></defs>'   
+function bcrCaseSVG(Lay){ const B=BCR, W=BCR_WOOD, x0=Lay.X0, x1=Lay.X1, w=x1-x0, ix0=x0+B.SIDE, ix1=x1-B.SIDE, iw=ix1-ix0, C=[B.IN0, B.SURF[0]+B.BOARD, B.SURF[1]+B.BOARD];   
+  let v='<g id="ro-bookcase">'
     +'<ellipse cx="'+bcrN((x0+x1)/2)+'" cy="'+B.FOOT+'" rx="'+bcrN(w/2+12)+'" ry="7" fill="#000" opacity="0.18"/>'   
     +bcrR(x0,B.FR-4,w,B.BASE-B.FR+4,'fill="'+W.body+'" stroke="'+W.ink+'" stroke-width="2.5"')   
-    +bcrR(ix0,B.IN0,iw,B.BASE-B.IN0,'fill="'+W.back+'" stroke="'+W.ink+'" stroke-width="1.5"')   
-    +bcrR(ix0,B.IN0,7,B.BASE-B.IN0,'fill="#000" opacity="0.16"');   
-  for(let i=0;i<4;i++) v+=bcrR(ix0,C[i],iw,6,'fill="#000" opacity="0.2"');   
-  for(const b of B.BOARDS) v+=bcrR(ix0-1,b,iw+2,B.BOARD,'fill="'+W.shelf+'" stroke="'+W.ink+'" stroke-width="1.4"')+'<path d="M'+bcrN(ix0)+' '+bcrN(b+0.9)+' H'+bcrN(ix1)+'" stroke="'+W.edge+'" stroke-width="1.2" opacity="0.9"/>';   
+    +bcrR(ix0,B.IN0,iw,B.BASE-B.IN0,'fill="'+W.back+'" stroke="'+W.ink+'" stroke-width="1.5"');   
+  for(let i=1;i<6;i++) v+='<path d="M'+bcrN(ix0+iw*i/6)+' '+B.IN0+' V'+B.BASE+'" stroke="'+W.ink+'" stroke-width="1" opacity="0.35"/>';   
+  for(let i=0;i<3;i++) v+='<ellipse cx="'+bcrN((ix0+ix1)/2)+'" cy="'+bcrN(C[i]+(B.SURF[i]-C[i])*0.42)+'" rx="'+bcrN(iw*0.4)+'" ry="'+bcrN((B.SURF[i]-C[i])*0.46)+'" fill="#FFD98A" opacity="0.09"/>';   
+  v+=bcrR(ix0,B.IN0,7,B.BASE-B.IN0,'fill="#000" opacity="0.16"');   
+  for(let i=0;i<3;i++) v+=bcrR(ix0,C[i],iw,6,'fill="#000" opacity="0.2"');   
+  for(let i=0;i<2;i++){ const b=B.SURF[i]; v+=bcrR(ix0-1,b,iw+2,B.BOARD,'fill="'+W.shelf+'" stroke="'+W.ink+'" stroke-width="1.4"')+'<path d="M'+bcrN(ix0)+' '+bcrN(b+0.9)+' H'+bcrN(ix1)+'" stroke="'+W.edge+'" stroke-width="1.2" opacity="0.9"/>'; }   
   v+=bcrR(x0-8,B.LIP,w+16,7,'fill="'+W.lit+'" stroke="'+W.ink+'" stroke-width="2"')+bcrR(x0-4,B.LIP+7,w+8,13,'fill="'+W.body+'" stroke="'+W.ink+'" stroke-width="2"')+bcrR(x0-1,B.LIP+20,w+2,4,'fill="'+W.dark+'" stroke="'+W.ink+'" stroke-width="1.2"');   
-  v+=bcrR(x0-4,B.BASE,w+8,B.FOOT-B.BASE,'fill="'+W.dark+'" stroke="'+W.ink+'" stroke-width="2.5"')+bcrR(x0+6,B.BASE+6,w-12,B.FOOT-B.BASE-10,'fill="#5E3E22" opacity="0.55"');   
-  let n=0;
-  for(let s=0;s<4;s++){ const y=S[s], hc=y-C[s];
-    for(let k=0;k<B.SLOTS;k++){ const sx=ix0+k*sw;
-      if(s<3 && n<L.length){ v+=bcrTrophy(L[n++], sx+sw/2, y, hc-10); continue; }
-      if(s===0 && !L.length && (k===m-1 || k===m)){ if(k===m-1) v+=bcrStand(ix0+iw/2, y); continue; }   
-      v+=bcrBooks(sx+0.5, y, sw-1, hc-3, s, k); } }
-  return v+bcrPlateSVG(Lay)+'</g>'; }
+  v+=bcrR(x0-4,B.BASE,w+8,B.FOOT-B.BASE,'fill="'+W.dark+'" stroke="'+W.ink+'" stroke-width="2.5"')+bcrR(x0+6,B.BASE+6,w-12,B.FOOT-B.BASE-10,'fill="#5E3E22" opacity="0.55"')   
+    +'<path d="M'+bcrN(ix0)+' '+bcrN(B.BASE+0.9)+' H'+bcrN(ix1)+'" stroke="'+W.edge+'" stroke-width="1.2" opacity="0.9"/>';   
+  return v+'</g>'; }
 function bcrRockerSVG(Lay){ const B=BCR, O=BCR_OAK, K=B.RK, Q=(x,h,z)=>bcrN(K*(x+0.25*z))+','+bcrN(K*(-h-0.5*z));   
   const F=(c,w)=>'fill="'+c+'" stroke="'+O.ink+'" stroke-width="'+(w||1.8)+'" stroke-linejoin="round"', poly=(p,f)=>'<path d="M'+p.map(q=>Q(q[0],q[1],q[2])).join(' L')+' Z" '+f+'/>';
   const hexa=(c,w,C)=>{ C=C||[O.far,O.lit,O.wood]; return poly([c[1],c[5],c[6],c[2]], F(C[0],w))+poly([c[3],c[2],c[6],c[7]], F(C[1],w))+poly([c[0],c[1],c[2],c[3]], F(C[2],w)); };   
@@ -156038,7 +156030,20 @@ function bcrRockerSVG(Lay){ const B=BCR, O=BCR_OAK, K=B.RK, Q=(x,h,z)=>bcrN(K*(x
     +'<circle cx="'+Q(a+4,103,-28).split(',')[0]+'" cy="'+Q(a+4,103,-28).split(',')[1]+'" r="5.5" fill="'+O.wood+'" stroke="'+O.ink+'" stroke-width="1.8"/><circle cx="'+Q(a+4,103,-28).split(',')[0]+'" cy="'+Q(a+4,103,-28).split(',')[1]+'" r="1.8" fill="'+O.ink+'" opacity="0.7"/>';   
   return v+'</g></g></g>'; }
 function bcrRoomSVG(){ try{ if(!bcrDue()) return ''; const L=bcrLay(); BCR.lay=L; return bcrCaseSVG(L)+bcrRockerSVG(L); }catch(e){ return ''; } }   
-function bcrCaseTap(){ try{ if(tourLive() || milePopUp()) return; }catch(e){} UI.trcOpen(); }   
+function bcrSurfOf(){ try{ if(!bcrDue()) return []; const L=bcrLay(), a=L.X0+BCR.SIDE+2, b=L.X1-BCR.SIDE-2; const sm=(typeof RN_SEAM==='number')? RN_SEAM : 316; return BCR.SURF.map((y, i)=>({ id:'bcr'+i, x0:a, x1:b, y:y, hold:(i<2)? BCR.HOLD : Math.max(1, Math.min(BCR.HOLD, sm-y-1)) })); }catch(e){ return []; } }   
+function bcrHoldable(k){ return chestFloorToy(k) && BCR_WALK.indexOf(k)<0; }   
+function bcrHeldXY(k){ try{ const o=META.bcr && META.bcr[k]; if(!Array.isArray(o) || o.length!==2 || !bcrDue()) return null; const b=DECOR_SPOTS[k], s=o[0], u=+o[1];   
+    if(!b || !(s>=0 && s<BCR.SURF.length && s===(s|0)) || !isFinite(u)) return null; const L=bcrLay(), h=BCR.W/2-BCR.SIDE-2, c=L.cx+Math.max(-h, Math.min(h, u));
+    return [Math.round(c-(b.x+b.w/2)), Math.round(BCR.SURF[s]-(b.y+gravFeetOff(k, b)))]; }catch(e){ return null; } }   
+function bcrHoldAt(k, base, dx, dy, L){ try{ const m=META.bcr, on=!!L && /^bcr[0-2]$/.test(String(L.on)) && bcrHoldable(k);   
+    if(!on){ if(m && typeof m==='object' && m[k]) delete m[k]; return; }
+    const s=+String(L.on).slice(3), Ly=bcrLay(), cx=base.x+base.w/2+dx, o=(m && typeof m==='object' && !Array.isArray(m))? m : (META.bcr={});
+    delete o[k]; o[k]=[s, Math.round((cx-Ly.cx)*10)/10]; bcrSaid(cx, BCR.SURF[s]-base.h);   
+    if(!L.falls){ const d2=Math.round(BCR.SURF[s]-(base.y+gravFeetOff(k, base))); if(d2!==dy) rdragApply(k, dx, d2); } }catch(e){} }   
+function bcrLift(k){ try{ const m=META.bcr; if(m && typeof m==='object' && m[k]) delete m[k]; }catch(e){} }   
+function bcrSaid(cx, top){ try{ const st=document.getElementById('roomStage'); if(!st || S.mode!=='menu') return; const f=document.createElement('div'); f.className='starfloat big'; f.textContent=t('ON THE SHELF');   
+    f.style.left=Math.round(cx-130)+'px'; f.style.top=Math.round(top-40)+'px'; f.style.width='260px'; f.style.textAlign='center'; f.style.whiteSpace='nowrap'; st.appendChild(f); setTimeout(()=>{ try{ f.remove(); }catch(e){} }, 1160); }catch(e){} }
+function bcrCaseTap(){ try{ if(tourLive() || milePopUp()) return; }catch(e){} audio(); try{ SFX.thock(); }catch(e){} chestOpen(); }   
 function bcrRockEl(){ return document.querySelector('#roomStage > svg #ro-rocker .bcr-rock'); }
 function bcrRockTap(){ try{ if(tourLive() || milePopUp()) return; }catch(e){} if(BCR_ROCK.raf) return; audio(); try{ SFX.creak(); }catch(e){} if(reducedMotion()) return; bcrRockGo(); }   
 function bcrRockGo(){ const R=BCR_ROCK; if(R.raf) cancelAnimationFrame(R.raf); try{ dlgHold('rocker', BCR.rockMs+400); }catch(e){} R.t0=performance.now(); R.n++;   
@@ -156055,9 +156060,9 @@ function bcrResync0(){ BCR.rs=0; try{ if(typeof S==='undefined' || S.mode!=='men
   renderMenu(); }catch(e){} }   
 try{ addEventListener('resize', bcrResync); if(window.visualViewport) visualViewport.addEventListener('resize', bcrResync); }catch(e){}
 function bcrRig(o){ o=o||{}; if(o.on!=null) BCR.on=o.on? 1 : 0; if(o.rock) bcrRockGo(); if(o.tap==='case') bcrCaseTap(); if(o.tap==='rocker') bcrRockTap();   
-  const svg=document.querySelector('#roomStage > svg'), el=bcrRockEl(), safe=f=>{ try{ return f(); }catch(e){ return null; } };
-  return { on:BCR.on, due:bcrDue(), lay:BCR.lay, now:safe(bcrLay), list:safe(()=>bcrList().map(t=>t[0])), got:safe(()=>trcGot().length), caseEl:!!(svg && svg.querySelector('#ro-bookcase')), rockerEl:!!(svg && svg.querySelector('#ro-rocker')),
-    figs:svg? svg.querySelectorAll('#ro-bookcase [data-bcr="fig"]').length : 0, rock:{ on:!!BCR_ROCK.raf, a:+BCR_ROCK.a.toFixed(2), n:BCR_ROCK.n, tr:el? el.getAttribute('transform') : null },
+  const svg=document.querySelector('#roomStage > svg'), el=bcrRockEl(), safe=f=>{ try{ return f(); }catch(e){ return null; } }, held={}; try{ const m=META.bcr; if(m && typeof m==='object') for(const k in m) held[k]=Array.isArray(m[k])? m[k].slice() : m[k]; }catch(e){}
+  return { on:BCR.on, due:bcrDue(), lay:BCR.lay, now:safe(bcrLay), caseEl:!!(svg && svg.querySelector('#ro-bookcase')), rockerEl:!!(svg && svg.querySelector('#ro-rocker')), surf:safe(bcrSurfOf), held:held,
+    seats:safe(()=>Object.keys(held).map(k=>[k, rpXY(k), bcrHeldXY(k)])), rock:{ on:!!BCR_ROCK.raf, a:+BCR_ROCK.a.toFixed(2), n:BCR_ROCK.n, tr:el? el.getAttribute('transform') : null },
     rows:ROOM_SPOTS.filter(r=>r.id==='bookcase' || r.id==='rocker').map(r=>[r.id, r.x, r.y, r.w, r.h, r.due? !!r.due() : true]) }; }
 setTimeout(()=>{ try{ if(window.GVT) GVT.bcr=bcrRig; }catch(e){} }, 0);
 
