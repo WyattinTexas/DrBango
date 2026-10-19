@@ -88802,7 +88802,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='24.96';        
+let GVT_CV='24.97';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -185508,6 +185508,40 @@ if(aptOn()) try{
 
 
 
+var BAL={ on:(function(){ try{ const q=/[?&]bal=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_bal','0'); else localStorage.removeItem('gvt_bal'); } return localStorage.getItem('gvt_bal')==='0'? 0 : 1; }catch(e){ return 1; } })(),
+  reach:1, six:1, X:0.95, N6:6, C:[1640,303], old:{}, err:0 };   
+const BAL_TWIN={ tanrifle:'rifleman', tanmg:'mgunner', crawler:'mgunner', tanbazooka:'bazooka', tangrenadier:'grenadier', tanflame:'flame', tancommando:'commando' };   
+const BAL_WAVE={ at:0, k:'C', men:[['sarge',-28,0],['bazooka',24,-22],['rifleman',24,22]] };   
+function balOn(){ return BAL.on===1; }
+function balCamp(){ return !S.bf && (S.levelN|0)>0 && !S.park && !S.raid && !S.hrd && !!S.tanBase; }   
+function balTwinRng(f){ const d=f && f.def, tw=d && BAL_TWIN[f.type]; if(!tw || !(d.rng>0)) return 0; const u=UDEF[tw]; return (u && u.rng>0 && u.rng<9000)? u.rng*BAL.X : 0; }   
+function balReach(f, r){ if(!BAL.reach || !balCamp()) return r; const t=balTwinRng(f); if(!t) return r; return r+(t-f.def.rng)*(f.rngAura||1)*(f.rngX||1); }   
+function balSix(A){ if(!BAL.six || !A || A.f6 || !(A.n>=BAL.N6) || !(A.t<APT.T)) return; A.f6=1; A.at6=+A.t.toFixed(3); }   
+function balTick(bf, A){ if(!BAL.six || !A || !A.f6 || A.k6 || !aptLive(bf)) return; A.k6=1; aptSpawn(bf, A, BAL_WAVE); }   
+function balRig(o){ o=o||{}; if(o.on!==undefined) BAL.on=o.on? 1 : 0; if(o.reach!==undefined) BAL.reach=o.reach? 1 : 0; if(o.six!==undefined) BAL.six=o.six? 1 : 0;   
+  const bf=S.bf, A=(typeof aptSt==='function')? aptSt(bf) : null;
+  const foes=(S.foes||[]).filter(f=>f && f.def && !f.dead).map(f=>({ id:f.id, t:f.type, x:Math.round(f.x), y:Math.round(f.y), rng:+frng(f).toFixed(2), row:+(f.def.rng||0), twin:+balTwinRng(f).toFixed(2), add:+(f.rngAdd||0), aura:+(f.rngAura||1).toFixed(3) }));
+  return { cv:GVT_CV, on:BAL.on, reach:BAL.reach, six:BAL.six, X:BAL.X, N6:BAL.N6, C:BAL.C.slice(), camp:balCamp(), lvl:S.levelN|0, bf:!!bf, opener:!!(bf&&bf.opener), st:A? { n:A.n, t:+A.t.toFixed(3), fired:A.fired, f6:A.f6|0, at6:(A.at6==null)? null : A.at6, k6:A.k6|0, log:A.log.slice() } : null, foes, err:BAL.err, wraps:Object.keys(BAL.old) }; }
+if(balOn()) try{
+  BAL.old.frng=frng; frng=function(f){ const r=BAL.old.frng.apply(this, arguments); try{ return balReach(f, r); }catch(e){ BAL.err++; return r; } };   
+  if(typeof aptOn==='function' && aptOn() && typeof aptPlayed==='function' && typeof aptTick==='function'){ APT.C=BAL.C.slice();   
+    BAL.old.aptPlayed=aptPlayed; aptPlayed=function(seat){ BAL.old.aptPlayed.apply(this, arguments); try{ const A=aptSt(S.bf); if(A && seat===bfMySeat()) balSix(A); }catch(e){ BAL.err++; } };
+    BAL.old.aptTick=aptTick; aptTick=function(dt){ BAL.old.aptTick.apply(this, arguments); try{ const bf=S.bf; balTick(bf, aptSt(bf)); }catch(e){ BAL.err++; } }; }
+}catch(e){ BAL.err++; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 var MCL={ on:(function(){ try{ const q=/[?&]mcl=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_mcl','0'); else localStorage.removeItem('gvt_mcl'); } return localStorage.getItem('gvt_mcl')==='0'? 0 : 1; }catch(e){ return 1; } })(),
   id:'mcol', crit:0.01, barWait:250, barMax:20000, tm:0, old:{}, err:0 };   
 var MCLRITE={ sel:null, done:false };
@@ -190242,6 +190276,7 @@ window.GVT = {
   otp(o){ return otpRig(o); },   
   xbi(o){ return xbiRig(o); },
   apt(o){ return aptRig(o); },   
+  bal(o){ return balRig(o); },   
   tsn(o){ return tsnRig(o); },   
   tro(o){ return troRig(o); },   
   mfs(o){ return mfsRig(o); },   
