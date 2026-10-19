@@ -88626,7 +88626,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='24.63';        
+let GVT_CV='24.64';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -164894,6 +164894,31 @@ if(lfsOn()) try{
   LFS.old.mgCatchPaint=mgCatchPaint; mgCatchPaint=function(LINE){ const v=LFS.old.mgCatchPaint.apply(this, arguments); const o='<g transform="translate(95,40) scale(0.55)">'+DSHOE_ART+'<circle id="wlMouthM" cx="67" cy="27" r="0.1" fill="none"/></g>', A=LFS_ART.line;
     return v.indexOf(o)<0? v : v.split(o).join('<g transform="'+A.shoe+'">'+lfsImg('shoeAir')+'</g><circle id="wlMouthM" cx="'+A.mouth[0]+'" cy="'+A.mouth[1]+'" r="0.1" fill="none"/>'); };   
 }catch(e){ LFS.err++; }
+
+
+
+
+
+
+
+
+
+var LCB={ on:(function(){ try{ const q=/[?&]lcb=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_lcb','0'); else localStorage.removeItem('gvt_lcb'); } return localStorage.getItem('gvt_lcb')==='0'? 0 : 1; }catch(e){ return 1; } })(), dips:0, old:{}, err:0 };
+function lcbOn(){ return LCB.on===1 && typeof lfsOn==='function' && lfsOn(); }
+function lcbPailIn(P, x, y, ap){ return !!P && x>=P.x-ap && x<=P.x+P.w+ap && y>=P.y-ap && y<=P.y+P.h+ap; }   
+function lcbRead(){ const r={ on:LCB.on, lfs:(typeof LFS!=='undefined')? LFS.on : null, dips:LCB.dips, err:LCB.err, wraps:Object.keys(LCB.old) }; try{ r.baited=META.baited? 1 : 0; r.bait=decorOn('bait')? 1 : 0; r.room=roomCur(); }catch(e){} return r; }
+
+if(lcbOn()) try{
+  LCB.old.lfsState=lfsState; lfsState=function(pole){ const st=LCB.old.lfsState.apply(this, arguments); st.bucket=decorOn('bait'); return st; };   
+  LCB.old.wlUp=wlUp; wlUp=function(e){ if(WLDRAG.on && WLDRAG.moved && META.baited && decorOn('bait') && wlHit('pkBait')){ WLDRAG.on=0; wlHome(); LCB.dips++; UI.decorTap('bait'); return; } return LCB.old.wlUp.apply(this, arguments); };   
+  LCB.old.bfishDrop=bfishDrop; bfishDrop=function(base, dx, dy, fp){ const B=LFS.box.western, P=B && B.pail;
+    if(P && bfishRodDue() && META.baited && decorOn('bait') && Math.hypot(dx,dy)>=LFS_MOVE){ const ap=Math.max(8, bfishPadU()/2), cx=base.x+base.w/2+dx, cy=base.y+base.h/2+dy; if((fp && lcbPailIn(P,fp.x,fp.y,ap)) || lcbPailIn(P,cx,cy,ap)){ rdragApply('bfrod', 0, 0); LCB.dips++; UI.bfishPailTap(); return; } }   
+    return LCB.old.bfishDrop.apply(this, arguments); };
+  LCB.old.lakeDrop=lakeDrop; lakeDrop=function(base, dx, dy){ const B=LFS.box.winter, P=B && B.pail;
+    if(P && wfLive() && META.baited && decorOn('bait')){ const cx=base.x+base.w/2+dx, cy=base.y+base.h/2+dy; if(lcbPailIn(P,cx,cy,8)){ rdragApply('lakerod', 0, 0); LCB.dips++; lfsPailTap(); return; } }   
+    return LCB.old.lakeDrop.apply(this, arguments); };
+  LCB.old.bfishSpots=bfishSpots; bfishSpots=function(){ let s=LCB.old.bfishSpots.apply(this, arguments); const B=LFS.box.western, P=B && B.pail; if(P && bfishRodDue() && META.baited && decorOn('bait') && s.indexOf('dspot-bfpail')<0) s+=lfsSpot('dspot-bfpail', P, 'UI.bfishPailTap()'); return s; };   
+}catch(e){ LCB.err++; }
 
 
 
