@@ -88668,7 +88668,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='24.69';        
+let GVT_CV='24.70';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -151990,6 +151990,45 @@ function ffiRig(o){ o=o||{}; if(o.on!=null){ FFI.on=o.on? 1 : 0; try{ document.d
 
 
 
+
+
+
+var TRO={ on:(function(){ try{ const m=/[?&]tro=([01])/.exec(location.search||''); if(m){ if(m[1]==='0') localStorage.setItem('gvt_tro','0'); else localStorage.removeItem('gvt_tro'); } return localStorage.getItem('gvt_tro')==='0'? 0 : 1; }catch(e){ return 1; } })(), lit:0, seats:0, err:0, old:{} };   
+const TRO_KEY='room';   
+function troOn(){ return !!TRO.on; }
+function troWhole(){ const b=COMM.brief; return !!(troOn() && b && b.kind==='tour' && b.lits && !b.lits[b.i|0]); }   
+function troLight(){   
+  if(TOUR.dim && TOUR.lit===TRO_KEY) return;
+  tourDark();
+  const NS='http://www.w3.org/2000/svg';
+  const dim=document.createElementNS(NS,'svg'); dim.id='tourDim'; dim.setAttribute('class','tro');
+  const p=document.createElementNS(NS,'path'); p.setAttribute('fill','rgba(0,0,0,'+TOUR_DIM_A+')'); p.setAttribute('fill-rule','evenodd'); p.setAttribute('d', tourDimPath([])); dim.appendChild(p);
+  document.body.appendChild(dim); TOUR.dim=dim; TOUR.ring=null; TOUR.lit=TRO_KEY; TOUR.pt=null; TRO.lit++;   
+  window.addEventListener('resize', tourSeat); window.addEventListener('orientationchange', tourSeat);
+  void dim.getBoundingClientRect(); dim.classList.add('in');
+  tourWatch();   
+}
+function troRig(o){ o=o||{}; if(o.on!=null){ TRO.on=o.on? 1 : 0; } if(o.light){ try{ tourPageLight(); }catch(e){ TRO.err++; } }   
+  const d=TOUR.dim, pth=d? (d.firstChild? d.firstChild.getAttribute('d') : null) : null, b=COMM.brief;
+  return { on:TRO.on, key:TRO_KEY, whole:!!(d && TOUR.lit===TRO_KEY), dim:!!d, tro:!!(d && d.classList && d.classList.contains('tro')), inCls:!!(d && d.classList && d.classList.contains('in')), ring:!!TOUR.ring, lit:TOUR.lit, pt:TOUR.pt, path:pth, holes:pth? (pth.split('M').length-2) : null,
+    page:b? { kind:b.kind, i:b.i|0, n:b.pages? b.pages.length : 0, light:(b.lits? b.lits[b.i|0] : undefined)||null, text:String(b.pages? b.pages[b.i|0] : '').slice(0,60) } : null, up:TOUR.up|0, lits:TRO.lit, seats:TRO.seats, err:TRO.err,
+    wraps:{ tourPageLight:tourPageLight!==TRO.old.tourPageLight && !!TRO.old.tourPageLight, tourSeat:tourSeat!==TRO.old.tourSeat && !!TRO.old.tourSeat } };
+}
+TRO.old.tourPageLight=tourPageLight; tourPageLight=function(){   
+  if(troWhole()){ try{ troLight(); }catch(e){ TRO.err++; } return; }
+  return TRO.old.tourPageLight.apply(this, arguments);
+};
+TRO.old.tourSeat=tourSeat; tourSeat=function(){   
+  if(TOUR.dim && TOUR.lit===TRO_KEY){ try{ TOUR.dim.firstChild.setAttribute('d', tourDimPath([])); TRO.seats++; }catch(e){ TRO.err++; } return; }
+  return TRO.old.tourSeat.apply(this, arguments);
+};
+
+
+
+
+
+
+
 const LT_I=9, LT_DOOR='lab', LT_AFTER=2, LAB_TUT_SEC=(FTN.on? 9 : 8)  , LT_TICK_MS=250, LT_REST_MS=5000, LT_LOOK_MS=2600, LT_POP_MS=500;   
 const LT_LINES=["This is Floop's lab. He makes our army stronger!", "Here are %1★. Buy the bazooka's long-range rockets!"];   
 let LTUT={ on:0, leg:'', tid:0, hand:null, dim:null, ring:null, t:0, seq:0, noT:0, at:null, out:0 };       
@@ -188865,6 +188904,7 @@ window.GVT = {
   xbi(o){ return xbiRig(o); },
   apt(o){ return aptRig(o); },   
   tsn(o){ return tsnRig(o); },   
+  tro(o){ return troRig(o); },   
   night(v){ NW_PIN=(v===undefined||v===null)? null : (v? 1 : 0); if(roomOpenNow()) renderMenu(); return { pin:NW_PIN, night:roomNight(), from:NW_NIGHT[0], to:NW_NIGHT[1], tick:!!NW_TICK }; },   
   dogFreeze(on){ DOGRIG.frozen=on?1:0; DOG_LAST=0; return DOGRIG.frozen; },
   dogStep(s){ if(!DOGT) dogArm(); let r=Math.max(0,+s||0);
