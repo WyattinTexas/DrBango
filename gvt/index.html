@@ -55215,6 +55215,34 @@ META.stripeSeen=Array.isArray(META.stripeSeen)? META.stripeSeen.slice() : [];
 
 
 
+
+
+
+
+
+var LSV={ on:(function(){ try{ const m=/[?&]lsv=([01])/.exec(location.search||''); if(m){ if(m[1]==='0') localStorage.setItem('gvt_lsv','0'); else localStorage.removeItem('gvt_lsv'); } return localStorage.getItem('gvt_lsv')==='0'? 0 : 1; }catch(e){ return 1; } })(), ids:['thegrab','fullsquad'], at:{}, paid:[], prem:{}, calls:{ u:0, grant:0, ticket:0, tell:0, prem:0 }, err:0, old:{} };   
+function lsvOn(){ return !!LSV.on; }
+function lsvShelved(id){ return lsvOn() && LSV.ids.indexOf(id)>=0; }   
+(function(){ if(!lsvOn()) return; try{ const L=META.lab, E=META.enh;   
+  const give=id=>{ if(E.own.indexOf(id)<0){ E.own.push(id); if(E.on.indexOf(id)<0) E.on.push(id); enhExclude(id); LSV.paid.push(id); } };   
+  if(L && E && L.job && LSV.ids.indexOf(L.job)>=0){ give(L.job); L.job=null; L.due=0; L.span=0; if(L.boom===2) L.boom=1; }   
+  if(L && E && Array.isArray(L.park)){ const p9=L.park.filter(q=>!(Array.isArray(q) && LSV.ids.indexOf(q[0])>=0)); if(p9.length!==L.park.length){ L.park.forEach(q=>{ if(Array.isArray(q) && LSV.ids.indexOf(q[0])>=0) give(q[0]); }); if(p9.length) L.park=p9; else delete L.park; } }   
+  const at=LSV.ids.map(id=>[id, ENH_ORDER.indexOf(id)]).filter(p=>p[1]>=0).sort((a,b)=>b[1]-a[1]); for(const p of at){ LSV.at[p[0]]=p[1]; ENH_ORDER.splice(p[1],1); } }catch(e){ LSV.err++; } })();   
+LSV.old.enhU=enhU; enhU=function(u,id){ if(lsvShelved(id)){ LSV.calls.u++; return false; } return LSV.old.enhU(u,id); };   
+LSV.old.trophyGrant=trophyGrant; trophyGrant=function(id){ if(lsvShelved(id)){ LSV.calls.grant++; return false; } return LSV.old.trophyGrant(id); };   
+LSV.old.olvGrabWin=olvGrabWin; olvGrabWin=function(plain,prizes){ const n0=Array.isArray(prizes)? prizes.length : 0, r=LSV.old.olvGrabWin(plain,prizes);   
+  if(lsvShelved('thegrab') && Array.isArray(prizes)){ for(let i=prizes.length-1;i>=n0;i--){ const p=prizes[i]; if(p && p.t===ENH_INFO.thegrab.name){ prizes.splice(i,1); LSV.calls.ticket++; } } } return r; };
+LSV.old.avmTell=avmTell; avmTell=function(){ try{ if(AVM_LAND && lsvShelved(AVM_LAND)){ AVM_LAND=null; LSV.calls.tell++; return false; } }catch(e){ LSV.err++; } return LSV.old.avmTell(); };   
+function lsvPremCut(){ try{ for(const k of Object.keys(PREM_CLIP)){ const c=PREM_CLIP[k]; if(c && lsvShelved(c.id)){ LSV.prem[k]=c; delete PREM_CLIP[k]; LSV.calls.prem++; } } }catch(e){ LSV.err++; } }   
+function lsvRig(){ const ids=['thegrab','fullsquad'], m=f=>ids.reduce((o,id)=>{ try{ o[id]=f(id); }catch(e){ o[id]=null; } return o; },{});   
+  return { cv:GVT_CV, on:LSV.on, ids:LSV.ids.slice(), at:Object.assign({},LSV.at), paid:LSV.paid.slice(), n:ENH_ORDER.length, order:m(id=>ENH_ORDER.indexOf(id)), own:m(enhOwns), sw:m(enhOn), shelved:m(lsvShelved), sold:m(labSold),
+    prem:{ bfjeep:!!PREM_CLIP.bfjeep, cut:Object.keys(LSV.prem) }, calls:Object.assign({},LSV.calls), err:LSV.err, count:enhOwnCount(), owned:(META.enh.own||[]).length,
+    wraps:{ enhU:enhU!==LSV.old.enhU, trophyGrant:trophyGrant!==LSV.old.trophyGrant, olvGrabWin:olvGrabWin!==LSV.old.olvGrabWin, avmTell:avmTell!==LSV.old.avmTell } }; }
+
+
+
+
+
 (function(){ const e=(META.ev&&typeof META.ev==='object')? META.ev : {}, L=(e.last&&typeof e.last==='object')? e.last : null, c=(e.claimPend&&typeof e.claimPend==='object')? e.claimPend : null;
   META.ev={ wk:String(e.wk||''), played:e.played|0, won:e.won|0,
     last:L? { wk:String(L.wk||''), won:L.won?1:0, drop:(typeof L.drop==='string'&&L.drop)? L.drop : null, blade:L.blade?1:0, owed:L.owed?1:0, full:L.full?1:0, stars:L.stars|0 } : null };
@@ -81221,6 +81249,7 @@ function qtKnock(){ if(SHAKE) return; if(THEME.want){ THEME.want=false; themeTry
 const PREM_ON=true;            
 const PREM_LAND_MS=0;         
 const PREM_CLIP={ bazooka:{ id:'longtube', end:2.8 }, rifleman:{ id:'rifleman' }, mgunner:{ id:'mgunner' }, sarge:{ id:'sarge' }, mortar:{ id:'mortar' }, medic:{ id:'medic' }, minesweeper:{ id:'bigbangers', end:4 }, flame:{ id:'jetboots' }, radioman:{ id:'aerial', end:2.4 }, commando:{ id:'stormcoil' }, spy:{ id:'intelligence' }, jane:{ id:'janehk' }, kingcroak:{ id:'dragonflysight' }, bfjeep:{ id:'fullsquad' }, bftank:{ id:'impeng' }, dogfighter:{ id:'aces' } };                           
+lsvPremCut();   
 const PREM_HOLD_MS=5000;       
 const PREM_GUARD_MS=200;       
 const PREM_SC=1.2;             
@@ -88738,7 +88767,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='24.90';        
+let GVT_CV='24.91';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -116808,7 +116837,7 @@ const vehFullPlated = ()=>VEH_ORDER.filter(k=>((META.vehUp||{})[k]|0)>=VEH_TIERS
 const coopLevelCount = ()=>(META.coopLevels||[]).length;
 const sargeHas = w=>((META.sargeUnlocked||[]).indexOf(w)>=0?1:0);
 const sabColCount = ()=>(META.sabColOwned||[]).length;
-const enhOwnCount = ()=>((META.enh&&META.enh.own)||[]).length;
+const enhOwnCount = ()=>((META.enh&&META.enh.own)||[]).filter(id=>!lsvShelved(id)).length;   
 
 
 const arsenalScore = ()=>Math.min(3,(META.sargeUnlocked||[]).length)+Math.min(SABER_COLORS.length,sabColCount())+Math.min(ENH_ORDER.length,enhOwnCount());
@@ -190070,6 +190099,7 @@ window.GVT = {
   rcs(o){ return rcsRig(o); },   
   hsl(o){ return hslRig(o); },   
   mpp(o){ return mppRig(o); },   
+  lsv(o){ return lsvRig(o); },   
   night(v){ NW_PIN=(v===undefined||v===null)? null : (v? 1 : 0); if(roomOpenNow()) renderMenu(); return { pin:NW_PIN, night:roomNight(), from:NW_NIGHT[0], to:NW_NIGHT[1], tick:!!NW_TICK }; },   
   dogFreeze(on){ DOGRIG.frozen=on?1:0; DOG_LAST=0; return DOGRIG.frozen; },
   dogStep(s){ if(!DOGT) dogArm(); let r=Math.max(0,+s||0);
