@@ -12179,7 +12179,8 @@
   /**/
   .dec-plane.travel > ellipse:first-of-type { animation:wpshade 0.75s linear forwards; }
   @keyframes wpshade { from { opacity:0.25; } to { opacity:0; } }
-  #wpfly { position:absolute; left:0; top:0; width:960px; height:600px; overflow:hidden; pointer-events:none; }   /**/
+  #wpfly { position:absolute; left:0; top:0; width:960px; height:600px; overflow:hidden; pointer-events:none; }
+html.tfh-on #wpfly { z-index:40; }   /**/   /**/
   #wpfly .wps { position:absolute; left:0; top:0; width:0; height:0; transform-origin:0 0; }   /**/
   #wpfly .wpa { position:absolute; left:-60px; top:-31px; width:116px; height:64px; transform-origin:60px 31px; will-change:transform, opacity; }   /**/
   #wpfly .wpa svg { display:block; width:116px; height:64px; overflow:visible; }
@@ -88625,7 +88626,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='24.61';        
+let GVT_CV='24.62';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -151791,15 +151792,25 @@ function ftnRig(o){ o=o||{}; if(o.on!=null){ FTN.on=o.on? 1 : 0; try{ document.d
 
 
 
-const TFH={ on:(function(){ try{ const m=/[?&]tfh=([01])/.exec(location.search||''); if(m){ if(m[1]==='0') localStorage.setItem('gvt_tfh','0'); else localStorage.removeItem('gvt_tfh'); } return localStorage.getItem('gvt_tfh')==='0'? 0 : 1; }catch(e){ return 1; } })(), skips:0, skipT:0 };   
+
+
+
+
+const TFH={ on:(function(){ try{ const m=/[?&]tfh=([01])/.exec(location.search||''); if(m){ if(m[1]==='0') localStorage.setItem('gvt_tfh','0'); else localStorage.removeItem('gvt_tfh'); } return localStorage.getItem('gvt_tfh')==='0'? 0 : 1; }catch(e){ return 1; } })(), skips:0, skipT:0, oneTap:0, oneTapT:0 };   
+try{ document.documentElement.classList.toggle('tfh-on', !!TFH.on); }catch(e){}   
 function tfhOn(){ return !!TFH.on; }
 function tfhSkip(){   
   try{ if(window.GVT && !GVT.tfh) GVT.tfh=tfhRig; }catch(e){}   
   if(!tfhOn() || (META.tour|0)!==ROS_I || !tourDue()) return false;
   META.tour=ROS_I+1; saveMeta(); TFH.skips++; TFH.skipT=Date.now(); return true; }
-function tfhRig(o){ o=o||{}; if(o.on!=null) TFH.on=o.on? 1 : 0;   
-  const L=META.lab||{}; return { cv:GVT_CV, on:TFH.on, skips:TFH.skips, skipT:TFH.skipT, tour:META.tour|0, tut:L.tut|0, surpTut:META.surpTut, gearTut:META.gearTut, planeIn:META.planeIn, labDue:labTutDue(), chain:ftnCh(), fxt:FXT.on? (FXT.leg||'-') : '', tlt:TLT.on? (TLT.leg||'-') : '', ltut:LTUT.on? (LTUT.leg||'-') : '',
-    surp:(typeof SURP!=='undefined' && SURP.on)? (SURP.leg||'-') : '', ffg5:(typeof FFG5!=='undefined' && FFG5.on)? (FFG5.leg||'-') : '', ftt:(typeof FTT!=='undefined')? { leg:FTT.leg, stop:FTT.stop, said:FTT.said, done:Object.keys(FTT.done||{}).filter(k=>FTT.done[k]) } : null, helm:outfitOwns('helmet'), tube:enhOwns('longtube') }; }
+function tfhCardX(e){   
+  if(!tfhOn() || !FXT.on || !fxOwnCard() || !(fxHelmHis() || FXT.free)) return; const t=e.target; if(!t || !t.closest || !t.closest(FX_SEAT.card)) return;
+  e.stopPropagation(); e.preventDefault(); TFH.oneTap++; TFH.oneTapT=Date.now(); UI.fortClose(); }
+window.addEventListener('click', tfhCardX, true);
+function tfhRig(o){ o=o||{}; if(o.on!=null){ TFH.on=o.on? 1 : 0; try{ document.documentElement.classList.toggle('tfh-on', !!TFH.on); }catch(e){} }   
+  const L=META.lab||{}, wf=document.getElementById('wpfly'); return { cv:GVT_CV, on:TFH.on, skips:TFH.skips, skipT:TFH.skipT, oneTap:TFH.oneTap, oneTapT:TFH.oneTapT, tour:META.tour|0, tut:L.tut|0, surpTut:META.surpTut, gearTut:META.gearTut, planeIn:META.planeIn, labDue:labTutDue(), chain:ftnCh(), fxt:FXT.on? (FXT.leg||'-') : '', tlt:TLT.on? (TLT.leg||'-') : '', ltut:LTUT.on? (LTUT.leg||'-') : '',
+    surp:(typeof SURP!=='undefined' && SURP.on)? (SURP.leg||'-') : '', ffg5:(typeof FFG5!=='undefined' && FFG5.on)? (FFG5.leg||'-') : '', ftt:(typeof FTT!=='undefined')? { leg:FTT.leg, stop:FTT.stop, said:FTT.said, done:Object.keys(FTT.done||{}).filter(k=>FTT.done[k]) } : null, helm:outfitOwns('helmet'), tube:enhOwns('longtube'),
+    closeLit:(typeof FFI!=='undefined')? (FFI.closeLit|0) : null, closeWalk:(typeof FFI!=='undefined')? (FFI.walk|0) : null, wpfly:wf? { z:getComputedStyle(wf).zIndex, cls:wf.className } : null }; }
 
 
 
@@ -151828,6 +151839,7 @@ function ffiOn(){ return !!FFI.on; }
 function ffiClose(i){ return !!(FFI.on && i===TOUR_STOPS.length); }   
 
 function ffiCloseWalk(){   
+  if(tfhOn()){ FFI.walk=0; FFI.closeLit=0; return false; }    
   if(!FFI.on || S.mode!=='menu' || roomCur()!=='bedroom') return false;
   const sp=document.getElementById('rspot-'+TE_DOOR); if(!sp) return false;   
   const k=++FFI.seq; FFI.walk=1; FFI.closeLit=1;
