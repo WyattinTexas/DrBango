@@ -88738,7 +88738,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='24.85';        
+let GVT_CV='24.86';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -185628,6 +185628,36 @@ function mclRig(o){ o=o||{};
     rite:(el && !el.classList.contains('hidden'))? { h1:(el.querySelector('.so-h1')||{}).textContent||null, sub:(el.querySelector('.so-sub')||{}).textContent||null, conf:(el.querySelector('.so-conf')||{}).textContent||null, cards:el.querySelectorAll('.so-grid .so-card').length, go:!!el.querySelector('.so-go'), later:!!el.querySelector('.so-later'), champ:!!el.querySelector('.so-champ') } : null,
     wraps:{ critChance:w('critChance'), seyX:w('seyX'), usCrit:w('usCrit'), rsaGrants:w('rsaGrants'), rsaLands:w('rsaLands'), checkAch:w('checkAch') } }; }
 
+
+
+
+
+
+
+
+
+
+var MCLG={ re:/^fz:([a-z0-9_,]{2,200})$/, wait:250, max:20000, tm:0, n:0, last:null, err:0 };
+function mclgIds(note){ const m=MCLG.re.exec(String(note||'').trim()); if(!m) return null; const ids=fzbIds(), out=[]; for(const k of m[1].split(',')) if(k && ids.indexOf(k)>=0 && out.indexOf(k)<0) out.push(k); return out.length? out : null; }   
+function mclgFill(ids){ const L=fzbLed(); let n=0; for(const k of ids) if(!L.own[k]){ L.own[k]=1; n++; } return n; }   
+function mclgArm(){ if(MCLG.tm) return false; const t0=Date.now();
+  const tick=()=>{ MCLG.tm=0; try{ if(!mclOwed() || mclRiteIsOpen() || Date.now()-t0>MCLG.max) return; if(S.mode!=='menu' || !roomQuiet()){ MCLG.tm=setTimeout(tick, MCLG.wait); return; } mclRiteOpen(); }catch(e){ MCLG.err++; } };
+  MCLG.tm=setTimeout(tick, MCLG.wait); return true; }   
+function mclgTake(g){   
+  const id=g.id|0, ids=mclgIds(g.note); if(!(id>0) || !ids) return false;
+  if(id<=(META.giftLast|0)){ giftClaim(id); return false; }   
+  META.giftLast=id; const n=mclgFill(ids); const d0=fzbLed().done|0; saveMeta(); giftClaim(id);
+  let paid=false; try{ if(!d0 && fzbAll()){ fzbComplete(); paid=!!(fzbLed().done|0); } }catch(e){ MCLG.err++; }   
+  try{ checkAch(); }catch(e){ MCLG.err++; } saveMeta();
+  MCLG.n+=n; MCLG.last={ id:id, ids:ids, n:n, paid:paid, t:Date.now() };
+  if(S.mode==='menu'){ try{ renderMenu(); }catch(e){} mclgArm(); }   
+  return true; }
+if(mclLive()){ MCL.old.giftAdopt=giftAdopt; giftAdopt=function(d){ const g=d&&d.ok&&d.gift; if(g && mclgIds(g.note)) return mclgTake(g); return MCL.old.giftAdopt.apply(this, arguments); }; }   
+function mclgRig(o){ o=o||{}; let took=null; if(o.gift) took=giftAdopt({ ok:true, gift:o.gift }); if(o.arm) mclgArm(); const L=(META.fz && typeof META.fz==='object')? fzbLed() : { own:{}, done:0 }, mp=document.getElementById('milePop');   
+  return { cv:GVT_CV, on:MCL.on, wrap:!!MCL.old.giftAdopt && giftAdopt!==MCL.old.giftAdopt, took:took, ids:(o.note!==undefined)? mclgIds(o.note) : null, count:mclCount(), goal:fzbIds().length, done:L.done|0, shotclaw:!!enhOwns('shotclaw'), stars:META.starBank|0,
+    giftLast:META.giftLast|0, giftPend:META.giftPend|0, giftNote:META.giftNote||'', has:mclHas(), owed:mclOwed(), open:mclRiteIsOpen(), key:mclKey(), n:MCLG.n, last:MCLG.last, tm:!!MCLG.tm, err:MCLG.err,
+    milePop:!!(mp && !mp.classList.contains('hidden')), band:(mp && mp.querySelector('.mb-band'))? mp.querySelector('.mb-band').textContent : null, line:(mp && mp.querySelector('.mb-line'))? mp.querySelector('.mb-line').textContent : null, decor:(META.decor && Array.isArray(META.decor.own))? META.decor.own.slice() : [] }; }
+
 let OP_ARM=0;              
 function startOpener(){ OP_ARM=1; try{ startBattlefield(OPENER_MAP, null, 1, null, ARMIES.find(a=>a.id==='tan')||ARMIES[2]); } finally { OP_ARM=0; } }   
 function titleClickEat(){   
@@ -190046,6 +190076,7 @@ window.GVT = {
     return { set:DECOR_HALLOW.slice(), own:DECOR_HALLOW.filter(decOwns), out:DECOR_HALLOW.filter(decorOn), cap:CHEST_CAP, allN:DECOR_ALL_N, on:halloweenOn(), night:roomNight(), led:(META.hw? { at:META.hw.at, cap:META.hw.cap } : null), due:hwDue(), next:hwNext(), step:HW_STEP, rung:hwRung(), capStars:HW_CAP_STARS }; },   
   fzb(o){ return fzbRig(o); },   
   mcl(o){ return mclRig(o); },   
+  mclg(o){ return mclgRig(o); },   
   otp(o){ return otpRig(o); },   
   xbi(o){ return xbiRig(o); },
   apt(o){ return aptRig(o); },   
