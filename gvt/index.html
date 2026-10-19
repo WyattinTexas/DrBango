@@ -88738,7 +88738,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='24.89';        
+let GVT_CV='24.90';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -152356,6 +152356,34 @@ TRO.old.tourSeat=tourSeat; tourSeat=function(){
   if(TOUR.dim && TOUR.lit===TRO_KEY){ try{ TOUR.dim.firstChild.setAttribute('d', tourDimPath([])); TRO.seats++; }catch(e){ TRO.err++; } return; }
   return TRO.old.tourSeat.apply(this, arguments);
 };
+
+
+
+
+
+
+
+
+
+
+var TFT={ on:(function(){ try{ const m=/[?&]tft=([01])/.exec(location.search||''); if(m){ if(m[1]==='0') localStorage.setItem('gvt_tft','0'); else localStorage.removeItem('gvt_tft'); } return localStorage.getItem('gvt_tft')==='0'? 0 : 1; }catch(e){ return 1; } })(),
+  holdMs:800, until:0, door:null, ptr:new Set(), arms:0, eats:0, held:0, err:0, old:{} };   
+function tftOn(){ return !!TFT.on; }
+function tftHolds(){ return !!(TFT.on && TFT.until && Date.now()<TFT.until && S.mode==='menu' && !COOP && !S.coop && roomCur()==='bedroom'); }   
+function tftArm(){ TFT.until=Date.now()+TFT.holdMs; TFT.door=(FFI.on && FFI.closeLit)? TE_DOOR : null; TFT.arms++; if(TFT.ptr.size){ TFT.eats++; titleClickEat(); } }   
+function tftDown(e){ TFT.ptr.add(e.pointerId); if(!tftHolds()) return; const t=e.target; if(tourSeatOf(t) && !tourSeatLive(t)){ TFT.held++; titleClickEat(); } }   
+function tftUp(e){ TFT.ptr.delete(e.pointerId); }
+window.addEventListener('pointerdown', tftDown, true); window.addEventListener('pointerup', tftUp, true); window.addEventListener('pointercancel', tftUp, true);
+function tftRig(o){ o=o||{}; if(o.on!=null) TFT.on=o.on? 1 : 0; if(o.holdMs!=null) TFT.holdMs=+o.holdMs||0;   
+  return { on:TFT.on, holdMs:TFT.holdMs, holding:tftHolds(), left:TFT.until? Math.max(0, TFT.until-Date.now()) : 0, door:TFT.door, down:TFT.ptr.size, arms:TFT.arms, eats:TFT.eats, held:TFT.held, err:TFT.err, tour:META.tour|0, line:tourLineOn(),
+    wraps:{ tourFinish:!!TFT.old.tourFinish && tourFinish!==TFT.old.tourFinish, tourLineOn:!!TFT.old.tourLineOn && tourLineOn!==TFT.old.tourLineOn, tourSeatLive:!!TFT.old.tourSeatLive && tourSeatLive!==TFT.old.tourSeatLive } }; }
+TFT.old.tourFinish=tourFinish; tourFinish=function(){   
+  if(TFT.on){ try{ tftArm(); }catch(e){ TFT.err++; } }
+  return TFT.old.tourFinish.apply(this, arguments);
+};
+TFT.old.tourLineOn=tourLineOn; tourLineOn=function(){ return TFT.old.tourLineOn.apply(this, arguments) || tftHolds(); };   
+TFT.old.tourSeatLive=tourSeatLive; tourSeatLive=function(t){ if(TFT.old.tourSeatLive.apply(this, arguments)) return true; return !!(TFT.door && tftHolds() && !TFT.old.tourLineOn() && t && t.closest && t.closest('#rspot-'+TFT.door+', #rtag-'+TFT.door)); };   
+setTimeout(()=>{ try{ if(window.GVT && !GVT.tft) GVT.tft=tftRig; }catch(e){} }, 0);   
 
 
 
