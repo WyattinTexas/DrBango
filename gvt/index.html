@@ -88675,7 +88675,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='24.74';        
+let GVT_CV='24.75';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -140521,6 +140521,26 @@ const DECOR_SPOTS={
 };
 for(const r of HW_SET) DECOR_SPOTS[r.id]=r.spot;
 for(const r of XM_SET) DECOR_SPOTS[r.id]=r.spot;   
+
+
+
+
+
+
+var RCS={ on:(function(){ try{ const m=/[?&]rcs=([01])/.exec(location.search||''); if(m){ if(m[1]==='0') localStorage.setItem('gvt_rcs','0'); else localStorage.removeItem('gvt_rcs'); } return localStorage.getItem('gvt_rcs')==='0'? 0 : 1; }catch(e){ return 1; } })(), NEW:{ tx:392, ty:362, x:350, y:338 }, OLD:{ tx:166, ty:574, x:126, y:548 }, parks:0, err:0, old:{} };   
+function rcsOn(){ return !!RCS.on; }
+function rcsSeat(){ const s=rcsOn()? RCS.NEW : RCS.OLD; try{ DECOR_SPOTS.racecar.x=s.x; DECOR_SPOTS.racecar.y=s.y; }catch(e){ RCS.err++; } return s; }   
+function rcsRig(o){ o=o||{}; if(o.on!=null){ RCS.on=o.on? 1 : 0; rcsSeat(); try{ if(S.mode==='menu') renderMenu(); }catch(e){ RCS.err++; } }   
+  const el=document.getElementById('decRacer'), m=el? /translate\(([-\d.]+),([-\d.]+)\)/.exec(el.getAttribute('transform')||'') : null, a=document.getElementById('dspot-racecar');
+  return { on:RCS.on, spot:{ x:DECOR_SPOTS.racecar.x, y:DECOR_SPOTS.racecar.y, w:DECOR_SPOTS.racecar.w, h:DECOR_SPOTS.racecar.h }, park:m? [+m[1], +m[2]] : null, anchor:a? [parseFloat(a.style.left), parseFloat(a.style.top)] : null, parks:RCS.parks, err:RCS.err, wrapped:racecarSVG!==RCS.old.racecarSVG && !!RCS.old.racecarSVG };
+}
+rcsSeat();
+RCS.old.racecarSVG=racecarSVG; racecarSVG=function(){   
+  let s=RCS.old.racecarSVG.apply(this, arguments);
+  if(rcsOn()){ const k='translate('+RCS.OLD.tx+','+RCS.OLD.ty+') scale(0.88)'; if(s.indexOf(k)>=0){ s=s.replace(k, 'translate('+RCS.NEW.tx+','+RCS.NEW.ty+') scale(0.88)'); RCS.parks++; } else RCS.err++; }
+  return s;
+};
+
 function decorSpots(){
   let s=hwSpotsUnder()+xmSpotsUnder();   
   for(const id in DECOR_SPOTS){
@@ -189202,6 +189222,7 @@ window.GVT = {
   apt(o){ return aptRig(o); },   
   tsn(o){ return tsnRig(o); },   
   tro(o){ return troRig(o); },   
+  rcs(o){ return rcsRig(o); },   
   hsl(o){ return hslRig(o); },   
   mpp(o){ return mppRig(o); },   
   night(v){ NW_PIN=(v===undefined||v===null)? null : (v? 1 : 0); if(roomOpenNow()) renderMenu(); return { pin:NW_PIN, night:roomNight(), from:NW_NIGHT[0], to:NW_NIGHT[1], tick:!!NW_TICK }; },   
