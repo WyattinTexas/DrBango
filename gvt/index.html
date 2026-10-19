@@ -88668,7 +88668,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='24.68';        
+let GVT_CV='24.69';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -185914,6 +185914,89 @@ function ppvLadder(){ const out={ men:{}, heroes:{}, irons:{}, sarge:{} }, R=[0,
   const row=(kind,k)=>{ const o={}; for(const r of R){ try{ const F=ppvFive(kind,k,r); o[r]={ vals0:F.vals0, vals1:F.vals1, moved:F.moved, delta:F.delta }; }catch(e){ o[r]={ err:String(e).slice(0,160) }; } } return o; };
   for(const k of US_MEN) out.men[k]=row('u',k); for(const k of HEROES) out.heroes[k]=row('u',k); out.sarge=row('u','sarge'); for(const wk of SARGE_ORDER) if(wkOwned(wk)) out.irons[wk]=row('w',wk); return out; }
 PPV.read=ppvRead; PPV.five=ppvFive; PPV.ladder=ppvLadder; PPV.open9=ppvOpen; PPV.close=ppvClose; PPV.go=ppvGo;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+var TBO={ on:(function(){ try{ const q=/[?&]tbo=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_tbo','0'); else localStorage.removeItem('gvt_tbo'); } return localStorage.getItem('gvt_tbo')==='0'? 0 : 1; }catch(e){ return 1; } })(), lights:['rave'], old:{}, err:0, buys:0, log:[] };
+function tboOn(){ return TBO.on===1; }
+function tboMoved(id){ return tboOn() && (rugIs(id) || TBO.lights.indexOf(id)>=0); }   
+function tboPage(id){ return rugIs(id)? 'rugs' : 'lights'; }
+function tboIds(page){ return page==='rugs'? RUG_SKINS.slice() : page==='lights'? TBO.lights.slice() : []; }
+function tboPageIs(k){ return k==='rugs' || k==='lights'; }
+function tboRugOn(id){ return rdecList('bedroom').indexOf(id)>=0; }   
+function tboNewIs(id){ return chestNew().indexOf(id)>=0; }   
+function tboNewWaiting(){ return chestNew().filter(tboMoved); }   
+function tboSeeNew(page){ const fresh=tboIds(page).filter(tboNewIs); if(!fresh.length) return; for(const id of fresh) chestNewDrop(id); saveMeta(); if(S.mode==='menu') renderMenu(); }   
+function tboOut(id){   
+  const l=META.rdec.bedroom||(META.rdec.bedroom=[]); if(l.indexOf(id)<0) l.push(id); if(rugIs(id)) rugSolo(l, id); if(TBO.lights.indexOf(id)>=0 && META.raveOff) delete META.raveOff;
+  chestNewDrop(id); if(Array.isArray(META.rdecSeen) && META.rdecSeen.indexOf(id)<0) META.rdecSeen.push(id); }
+function tboTabHTML(k, w, on, id){ return '<button type="button" class="wpap-tab'+(on? ' on' : '')+'" id="'+id+'" onclick="UI.wpapTab(\''+k+'\')">'+w+'</button>'; }
+function tboHeadHTML(){ const ks=wpapSeasons(), c=(WPAP_TAB==='curt'), z=(WPAP_TAB==='season'), r=(WPAP_TAB==='rugs'), g=(WPAP_TAB==='lights');   
+  return '<div class="tc-head wpap-head" id="wpapHead"><span class="wpap-tabs tbo-tabs">'+tboTabHTML('wall','WALLPAPERS',!(c||z||r||g),'wpapTabWall')+tboTabHTML('curt','CURTAINS',c,'wpapTabCurt')+tboTabHTML('rugs','RUGS',r,'wpapTabRugs')+tboTabHTML('lights','LIGHTS',g,'wpapTabLights')
+    +(ks.length? tboTabHTML('season',WPAP_SEASON_NAME[ks[0]],z,'wpapTabSeason') : '')+'</span><span class="tc-count" id="wpapStars">'+META.starBank+'★</span></div>'; }
+function tboRugCardHTML(id){ const own=decOwns(id), on=own && tboRugOn(id), st=trStocked(id), sale=!own && st, lock=!own && !st, inf=DECOR_INFO[id], cost=DECOR_COST[id]|0;   
+  return '<div class="sh-dbox"><button type="button" class="sh-dec wpap-c tbo-c tbo-rug'+(own? ' own' : '')+(on? ' on' : '')+(lock? ' lock' : '')+'" id="shdcc-'+id+'" onclick="UI.tboPick(\''+id+'\')">'
+    +(tboNewIs(id)? '<span class="sh-new">NEW!</span>' : '')+'<span class="sh-dwin">'+decShopArt(id)+'</span><span class="sh-dn">'+inf.name+'</span>'
+    +(lock? '<span class="sh-dlk">'+gly('lock')+' IN STOCK AT COMMANDER LEVEL '+trLvl(id)+'</span>' : '')
+    +(on? '<span class="sh-dstamp">ON THE FLOOR</span>' : sale? '<span class="sh-dprice'+((META.starBank|0)<cost? ' shpoor' : '')+'">'+cost+'★</span>' : '')+'</button></div>'; }
+function tboLightOn(id){ return decOwns(id) && decorOn(id) && !META.raveOff; }   
+function tboLightCardHTML(id){ const own=decOwns(id), on=tboLightOn(id), st=trStocked(id), sale=!own && st, lock=!own && !st, inf=DECOR_INFO[id], cost=DECOR_COST[id]|0;
+  return '<div class="sh-dbox"><button type="button" class="sh-dec wpap-c tbo-c tbo-light'+(own? ' own' : '')+(on? ' on' : '')+(lock? ' lock' : '')+'" id="shdcc-'+id+'" onclick="UI.tboPick(\''+id+'\')">'
+    +(tboNewIs(id)? '<span class="sh-new">NEW!</span>' : '')+'<span class="sh-dwin">'+decShopArt(id)+'</span><span class="sh-dn">'+inf.name+'</span>'
+    +(lock? '<span class="sh-dlk">'+gly('lock')+' IN STOCK AT COMMANDER LEVEL '+trLvl(id)+'</span>' : '')
+    +(own? '<span class="sh-dstamp'+(on? '' : ' off')+'">'+(on? 'LIGHTS ON' : 'LIGHTS OFF')+'</span>' : sale? '<span class="sh-dprice'+((META.starBank|0)<cost? ' shpoor' : '')+'">'+cost+'★</span>' : '')+'</button></div>'; }
+function tboGridHTML(){ return '<div class="wpap-grid tbo-grid">'+tboIds(WPAP_TAB).map(WPAP_TAB==='rugs'? tboRugCardHTML : tboLightCardHTML).join('')+'</div>'; }
+function tboSeat(){ try{ const r=document.querySelector('#roomModal .wpap-tabs.tbo-tabs'), t9=r && r.querySelector('.wpap-tab.on'); if(!r || !t9) return; const a=t9.offsetLeft-r.offsetLeft, b=a+t9.offsetWidth; if(a<r.scrollLeft+8 || b>r.scrollLeft+r.clientWidth-34) r.scrollLeft=Math.max(0, a-Math.round((r.clientWidth-t9.offsetWidth)/2)); }catch(e){} }   
+function tboOpenPage(page){ shopCardClose(); WPAP_TAB=page; xbeWpapFrom(); roomModal(wpapHTML(), 'medalhall wpapcard', xbeWpapBk()); tboSeat(); tboSeeNew(page); }   
+function tboRead(){ const r={ on:TBO.on, err:TBO.err, buys:TBO.buys, wraps:Object.keys(TBO.old), moved:RUG_SKINS.concat(TBO.lights).filter(tboMoved), tab:WPAP_TAB, waiting:tboNewWaiting(), floor:rdecList('bedroom').slice(), raveOff:META.raveOff|0, stars:META.starBank, log:TBO.log.slice(-20) };
+  try{ r.chest={ stands:chestStands(), gallery:CHEST_GALLERY().filter(chestShows).length, sale:chestSaleN(), tabs:[...document.querySelectorAll('#tcTabs .tc-tab')].map(b=>b.textContent.trim()), foot:[...document.querySelectorAll('#roomModal .tc-foot button')].map(b=>b.textContent.replace(/\s+/g,' ').trim()), cards:document.querySelectorAll('#roomModal .tc-grid .sh-dec').length }; }catch(e){}
+  try{ r.page={ stands:wpapStands(), tabs:[...document.querySelectorAll('#roomModal .wpap-tabs .wpap-tab')].map(b=>b.textContent.trim()+(b.classList.contains('on')? '*' : '')), cards:[...document.querySelectorAll('#roomModal .wpap-grid .sh-dec')].map(b=>({ id:b.id, on:b.classList.contains('on'), own:b.classList.contains('own'), lock:b.classList.contains('lock'), stamp:(b.querySelector('.sh-dstamp')||{}).textContent||'', price:(b.querySelector('.sh-dprice')||{}).textContent||'', nw:!!b.querySelector('.sh-new'), fresh:b.classList.contains('fresh') })) }; }catch(e){}
+  return r; }
+if(tboOn()) try{
+  for(const L9 of [['ar',{"LIGHTS":"الأضواء","DECORATE":"زيّن الغرفة","ON THE FLOOR":"على الأرض","LIGHTS ON":"الأضواء مضاءة","LIGHTS OFF":"الأضواء مطفأة"}],
+    ['ja',{"LIGHTS":"ライト","DECORATE":"もようがえ","ON THE FLOOR":"ゆかに しいてる","LIGHTS ON":"ライト オン","LIGHTS OFF":"ライト オフ"}],
+    ['ko',{"LIGHTS":"조명","DECORATE":"꾸미기","ON THE FLOOR":"바닥에 깔려 있어","LIGHTS ON":"조명 켜짐","LIGHTS OFF":"조명 꺼짐"}],
+    ['zh-Hans',{"LIGHTS":"灯光","DECORATE":"装饰房间","ON THE FLOOR":"铺在地上","LIGHTS ON":"灯已开","LIGHTS OFF":"灯已关"}],
+    ['de',{"LIGHTS":"LICHTER","DECORATE":"DEKORIEREN","ON THE FLOOR":"AUF DEM BODEN","LIGHTS ON":"LICHT AN","LIGHTS OFF":"LICHT AUS"}],
+    ['ru',{"LIGHTS":"СВЕТ","DECORATE":"УКРАСИТЬ","ON THE FLOOR":"НА ПОЛУ","LIGHTS ON":"СВЕТ ВКЛЮЧЁН","LIGHTS OFF":"СВЕТ ВЫКЛЮЧЕН"}],
+    ['es',{"LIGHTS":"LUCES","DECORATE":"DECORAR","ON THE FLOOR":"EN EL SUELO","LIGHTS ON":"LUCES ENCENDIDAS","LIGHTS OFF":"LUCES APAGADAS"}]]) Object.assign(TR[L9[0]]||(TR[L9[0]]={}), L9[1]);   
+  { const st=document.createElement('style'); st.id='tboCss'; st.textContent=
+    '.rmcard.wpapcard .wpap-tabs.tbo-tabs{ flex:1 1 auto; min-width:0; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; -webkit-overflow-scrolling:touch; overscroll-behavior-x:contain; padding:8px 34px 8px 2px; margin:-8px 0 -8px -2px; -webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 34px),transparent); mask-image:linear-gradient(90deg,#000 calc(100% - 34px),transparent); }'
+    +'.rmcard.wpapcard .wpap-tabs.tbo-tabs::-webkit-scrollbar{ display:none; } .rmcard.wpapcard .tbo-tabs .wpap-tab{ flex:0 0 auto; } .rmcard.wpapcard #wpapStars{ flex:0 0 auto; }'
+    +'#tcWpap{ position:relative; } #tcWpap .tbo-fnew{ top:-9px; left:auto; right:-10px; }';   
+    document.head.appendChild(st); }
+  TBO.old.chestShows=chestShows; chestShows=function(id){ return !tboMoved(id) && TBO.old.chestShows(id); };   
+  TBO.old.chestHTML=chestHTML; chestHTML=function(){ const h=TBO.old.chestHTML(); return h.replace('onclick="UI.wpapOpen()">WALLPAPERS</button>', 'onclick="UI.wpapOpen()">DECORATE'+(tboNewWaiting().length? '<span class="sh-new tbo-fnew">NEW!</span>' : '')+'</button>'); };   
+  TBO.old.chestOpen=chestOpen; chestOpen=function(){ const keep=tboNewWaiting(); TBO.old.chestOpen(); if(keep.length){ for(const id of keep) chestNewAdd(id); saveMeta(); if(S.mode==='menu') renderMenu(); } };   
+  TBO.old.chestSpot=chestSpot; chestSpot=function(id){ if(tboMoved(id) && (!wpapStands() || WPAP_TAB!==tboPage(id))) tboOpenPage(tboPage(id)); return TBO.old.chestSpot(id); };   
+  TBO.old.wpapHTML=wpapHTML; wpapHTML=function(){ if(tboPageIs(WPAP_TAB)) return tboHeadHTML()+tboGridHTML(); const h=TBO.old.wpapHTML(); const cut='★</span></div>'; const i=h.indexOf(cut); return (i>=0)? tboHeadHTML()+h.slice(i+cut.length) : h; };   
+  TBO.old.wpapOpen=wpapOpen; wpapOpen=function(tab){ if(tboPageIs(tab)){ tboOpenPage(tab); return; } const r=TBO.old.wpapOpen(tab); tboSeat(); return r; };
+  TBO.old.wpapSync=wpapSync; wpapSync=function(){ TBO.old.wpapSync(); tboSeat(); };
+  TBO.old.uiWpapOpen=UI.wpapOpen; UI.wpapOpen=function(){ const w=tboNewWaiting()[0]; if(!w) return TBO.old.uiWpapOpen.call(UI); audio(); SFX.blip(); tboOpenPage(tboPage(w)); try{ TBO.old.chestSpot(w); }catch(e){} };   
+  TBO.old.uiWpapTab=UI.wpapTab; UI.wpapTab=function(k){ if(!tboPageIs(k)) return TBO.old.uiWpapTab.call(UI, k); if(!wpapStands()) return; SFX.blip(); if(WPAP_TAB===k) return; WPAP_TAB=k; wpapSync(); const sc=document.querySelector('#roomModal .rmback'); if(sc) sc.scrollTop=0; tboSeeNew(k); };
+  TBO.old.uiDecorBuy=UI.decorBuy; UI.decorBuy=function(id, g9){ const own0=decOwns(id); const r=TBO.old.uiDecorBuy.call(UI, id, g9); const bought=!own0 && decOwns(id);   
+    if(tboMoved(id) && bought){ TBO.buys++; tboOut(id); saveMeta(); if(S.mode==='menu') renderMenu(); if(wpapStands()){ SFX.thock(); setTimeout(()=>SFX.coin(), 120); if(rugIs(id)) setTimeout(()=>{ try{ if(decorOn(id)) decorReact(id); }catch(e){} }, 620); } }
+    if(wpapStands() && (own0 || bought)) wpapSync(); return r; };   
+  UI.tboPick=function(id){ if(!tboMoved(id)) return; audio();   
+    if(decOwns(id)){ if(rugIs(id)){ UI.decorBuy(id, 'c'); return; }   
+      if(decorOn(id)){ raveTap(); wpapSync(); return; }   
+      tboOut(id); saveMeta(); renderMenu(); wpapSync(); SFX.blip(); return; }   
+    UI.decorBuy(id, 'c'); };   
+}catch(e){ TBO.err++; try{ TBO.log.push(String(e && e.message || e).slice(0,160)); }catch(e2){} }
+setTimeout(()=>{ try{ if(window.GVT && !GVT.tbo) GVT.tbo=tboRead; }catch(e){} }, 0);   
 
 
 
