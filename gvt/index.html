@@ -88625,7 +88625,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='24.60';        
+let GVT_CV='24.61';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -151137,6 +151137,7 @@ function tourTick(){
   if(tourQuiet() && !LAB_TAP && !PINTRO.up){ if(labTutDue()) labTutDeal(); else if(planeIntroDue()) planeIntroDeal(); else tourDeal(); }   
 }
 function tourDeal(){   
+  if(tfhSkip()) return;   
   const i=META.tour|0, ffc=ffiClose(i), lines=ffc? [FFI_CLOSE] : TOUR_LINES[i]; if(!lines) return; FFI.closeLit=ffc? 1 : 0;   
   const P=[]; lines.forEach((x,k)=>{ const s=(x.indexOf('%1')>=0)? tf(x, String(DYE_BASE)) : TXT(x); tourPages(s).forEach(p=>P.push({ p, k })); });   
   if(!P.length) return;
@@ -151682,7 +151683,7 @@ function ftnHeldStep(){ ttbTick(); ffrLeakTick(); }
 function ftnCh(){ return !!(FTN.on && TLT.on && FTN.ch && FTN.ch===TLT.tid); }   
 function ftnLabNow(){ return ftnCh() && (META.tour|0)===1 && (fortSceneOpen() || tlfLab()); }   
 function ftnChainGo(){   
-  if(!FTN.on || !tlfOn() || !tourDue() || (META.tour|0)!==1 || COOP || S.coop || S.mode!=='menu' || !fortSceneOpen()) return false;
+  if(tfhOn() || !FTN.on || !tlfOn() || !tourDue() || (META.tour|0)!==1 || COOP || S.coop || S.mode!=='menu' || !fortSceneOpen()) return false;    
   clearInterval(FXT.tid); FXT.tid=0; FXT.on=0; FXT.leg=''; FXT.seq++; FXT.at=null; fxSay(null); fxTutPieces();   
   tlfArm(); if(!TLT.on) return false;
   FTN.ch=TLT.tid; FTN.rosRead=0; FTN.pan=0; return true; }
@@ -151782,6 +151783,23 @@ function ftnRig(o){ o=o||{}; if(o.on!=null){ FTN.on=o.on? 1 : 0; try{ document.d
   const L=META.lab||{};
   return { cv:GVT_CV, on:FTN.on, ch:ftnCh(), labNow:ftnLabNow(), holds:ftnHolds(), tlt:TLT.on? (TLT.leg||'-') : '', ltut:LTUT.on? (LTUT.leg||'-') : '', fxt:FXT.on? (FXT.leg||'-') : '', tour:META.tour|0, tut:L.tut|0, job:L.job||null, his:enhOwns('longtube'),
     told:Array.isArray(L.told) && L.told.indexOf('longtube')>=0, owed:ftnOwed(), say:FTN.sayK, pan:FTN.pan, panning:!!FTN.panRaf, rosRead:FTN.rosRead, rdy:FTN.rdy, oweT:!!FTN.oweT, sec:LAB_TUT_SEC, open:SHOP.labOpen||null }; }
+
+
+
+
+
+
+
+
+const TFH={ on:(function(){ try{ const m=/[?&]tfh=([01])/.exec(location.search||''); if(m){ if(m[1]==='0') localStorage.setItem('gvt_tfh','0'); else localStorage.removeItem('gvt_tfh'); } return localStorage.getItem('gvt_tfh')==='0'? 0 : 1; }catch(e){ return 1; } })(), skips:0, skipT:0 };   
+function tfhOn(){ return !!TFH.on; }
+function tfhSkip(){   
+  try{ if(window.GVT && !GVT.tfh) GVT.tfh=tfhRig; }catch(e){}   
+  if(!tfhOn() || (META.tour|0)!==ROS_I || !tourDue()) return false;
+  META.tour=ROS_I+1; saveMeta(); TFH.skips++; TFH.skipT=Date.now(); return true; }
+function tfhRig(o){ o=o||{}; if(o.on!=null) TFH.on=o.on? 1 : 0;   
+  const L=META.lab||{}; return { cv:GVT_CV, on:TFH.on, skips:TFH.skips, skipT:TFH.skipT, tour:META.tour|0, tut:L.tut|0, surpTut:META.surpTut, gearTut:META.gearTut, planeIn:META.planeIn, labDue:labTutDue(), chain:ftnCh(), fxt:FXT.on? (FXT.leg||'-') : '', tlt:TLT.on? (TLT.leg||'-') : '', ltut:LTUT.on? (LTUT.leg||'-') : '',
+    surp:(typeof SURP!=='undefined' && SURP.on)? (SURP.leg||'-') : '', ffg5:(typeof FFG5!=='undefined' && FFG5.on)? (FFG5.leg||'-') : '', ftt:(typeof FTT!=='undefined')? { leg:FTT.leg, stop:FTT.stop, said:FTT.said, done:Object.keys(FTT.done||{}).filter(k=>FTT.done[k]) } : null, helm:outfitOwns('helmet'), tube:enhOwns('longtube') }; }
 
 
 
@@ -151920,7 +151938,7 @@ const LT_LINES=["This is Floop's lab. He makes our army stronger!", "Here are %1
 let LTUT={ on:0, leg:'', tid:0, hand:null, dim:null, ring:null, t:0, seq:0, noT:0, at:null, out:0 };       
 const LT_OUT_MS=1200;   
 const LT_SEAT={ tile:'#fsBp, #shmd-longtube', ask:'#shConfirm .shc-yes', ready:'#fsTake, #shmd-longtube', exit:'#toyshop .sh-x' };   
-function labTutDue(){ return tourDue() && ((META.tour|0)===LT_AFTER || ftnLabNow()) && (META.lab.tut|0)<2; }       
+function labTutDue(){ return !tfhOn() && tourDue() && ((META.tour|0)===LT_AFTER || ftnLabNow()) && (META.lab.tut|0)<2; }           
 function labTutSkip(){ return (META.lab.tut|0)===0 && (labRank()>0 || !!META.lab.job); }   
 function labTutSpan(){ const r=labRank(), t=META.lab.tut|0; if(r===0) return LAB_TUT_SEC/3600;     return labHoursAt(r-(((t===1 || t===2) && enhOwns('longtube'))? 1 : 0)); }   
 function labTutDeal(){   
