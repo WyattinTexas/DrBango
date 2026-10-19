@@ -88675,7 +88675,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='24.75';        
+let GVT_CV='24.76';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -152118,6 +152118,38 @@ TRO.old.tourSeat=tourSeat; tourSeat=function(){
 
 
 
+
+var HGT={ on:(function(){ try{ const m=/[?&]hgt=([01])/.exec(location.search||''); if(m){ if(m[1]==='0') localStorage.setItem('gvt_hgt','0'); else localStorage.removeItem('gvt_hgt'); } return localStorage.getItem('gvt_hgt')==='0'? 0 : 1; }catch(e){ return 1; } })(), cut:{ lens:1, emg:1 }, calls:{ motor:0, emgCut:0, lens:0, door:0 }, err:0, old:{} };   
+const HGT_EMG_OPEN='<div class="sh-decbig sh-emgbig">';   
+function hgtOn(){ return !!HGT.on; }
+function hgtCut(k){ return hgtOn() && !!HGT.cut[k]; }   
+function hgtRig(o){ o=o||{}; if(o.on!=null){ HGT.on=o.on? 1 : 0; } if(o.lens!=null){ HGT.cut.lens=o.lens? 1 : 0; } if(o.emg!=null){ HGT.cut.emg=o.emg? 1 : 0; }   
+  const q=k=>{ try{ return !!document.querySelector(k); }catch(e){ return null; } }, m=document.getElementById('shMotor'), l=m? m.lastElementChild : null;
+  return { on:HGT.on, cut:{ lens:HGT.cut.lens, emg:HGT.cut.emg }, calls:{ motor:HGT.calls.motor, emgCut:HGT.calls.emgCut, lens:HGT.calls.lens, door:HGT.calls.door }, err:HGT.err,
+    wraps:{ shopMotorHTML:shopMotorHTML!==HGT.old.shopMotorHTML && !!HGT.old.shopMotorHTML, shopLensHTML:shopLensHTML!==HGT.old.shopLensHTML && !!HGT.old.shopLensHTML, nmSurpAt:nmSurpAt!==HGT.old.nmSurpAt && !!HGT.old.nmSurpAt },
+    dom:{ store:SHOP.store, open:shopIsOpen(), motor:!!m, stand:q('#shLensStand'), crate:q('#shlens'), lensSlot:q('#shMotor .sh-declens'), fly:q('#shLensFly'), emg:q('#shpk-emg'), emgBig:q('#shMotor .sh-emgbig'), bank:q('#shMotor .sh-bank'), rail:q('#shMotor .sh-rail'), bays:m? m.querySelectorAll('.sh-bays > *').length : 0, last:l? (l.id||String(l.className||l.tagName)) : null },
+    doors:{ lens:nmSurpAt('lens','lens'), emg:nmSurpAt('emg','emg'), jet:nmSurpAt('jet','jet'), ride:nmSurpAt('ride','bfjeep') } };
+}
+HGT.old.shopMotorHTML=shopMotorHTML; shopMotorHTML=function(){   
+  let h=HGT.old.shopMotorHTML.apply(this, arguments); HGT.calls.motor++;
+  if(hgtCut('emg') && typeof h==='string'){ try{ const i=h.indexOf(HGT_EMG_OPEN); if(i>=0){ const j=h.indexOf('</div>', i+HGT_EMG_OPEN.length); if(j>=0){ h=h.slice(0,i)+h.slice(j+6); HGT.calls.emgCut++; } } }catch(e){ HGT.err++; } }
+  return h;
+};
+HGT.old.shopLensHTML=shopLensHTML; shopLensHTML=function(){   
+  HGT.calls.lens++; if(hgtCut('lens')) return '';
+  return HGT.old.shopLensHTML.apply(this, arguments);
+};
+HGT.old.nmSurpAt=nmSurpAt; nmSurpAt=function(k,id){   
+  HGT.calls.door++; if((k==='lens' && hgtCut('lens')) || (k==='emg' && hgtCut('emg'))) return null;
+  return HGT.old.nmSurpAt.apply(this, arguments);
+};
+
+
+
+
+
+
+
 const LT_I=9, LT_DOOR='lab', LT_AFTER=2, LAB_TUT_SEC=(FTN.on? 9 : 8)  , LT_TICK_MS=250, LT_REST_MS=5000, LT_LOOK_MS=2600, LT_POP_MS=500;   
 const LT_LINES=["This is Floop's lab. He makes our army stronger!", "Here are %1★. Buy the bazooka's long-range rockets!"];   
 let LTUT={ on:0, leg:'', tid:0, hand:null, dim:null, ring:null, t:0, seq:0, noT:0, at:null, out:0 };       
@@ -189222,6 +189254,7 @@ window.GVT = {
   apt(o){ return aptRig(o); },   
   tsn(o){ return tsnRig(o); },   
   tro(o){ return troRig(o); },   
+  hgt(o){ return hgtRig(o); },   
   rcs(o){ return rcsRig(o); },   
   hsl(o){ return hslRig(o); },   
   mpp(o){ return mppRig(o); },   
