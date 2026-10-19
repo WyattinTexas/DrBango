@@ -88626,7 +88626,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='24.64';        
+let GVT_CV='24.65';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -185510,6 +185510,149 @@ function bwhRig(o){ o=o||{}; if(o.on!=null) BWH.on=o.on? 1 : 0; if(o.call) bwhCa
     v:V? { kind:V.kind, on:V.on, ph:V.ph, x:+(V.x||0).toFixed(1), y:+(V.y||0).toFixed(1), fx:V.fx, sc:+(V.sc||0).toFixed(3), pose:V.pose, rm:V.rm, el:!!(V.el && V.el.isConnected), inTop:!!(V.el && V.el.parentNode && V.el.parentNode.id==='dogTop'), sash:V.sash? +V.sash.a.toFixed(3) : null, why:V.why||null, cls:V.el? (V.el.getAttribute('class')||'') : null, op:V.el? V.el.style.opacity : null } : null,
     sash:!!(w && w.querySelector('#bwh-sash')), mull:(function(){ const m=w && w.querySelector('path[d^="M815 60"]'); return m? (m.getAttribute('style')||'') : null; })(), birds:Object.keys(BWH_BIRDS).map(k=>[k, BWH_BIRDS[k].k]) }; }
 setTimeout(()=>{ try{ if(window.GVT) GVT.bwh=bwhRig; }catch(e){} }, 0);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+var FNX={ on:(function(){ try{ const q=/[?&]fnx=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_fnx','0'); else localStorage.removeItem('gvt_fnx'); } return localStorage.getItem('gvt_fnx')==='0'? 0 : 1; }catch(e){ return 1; } })(),
+  mute:0, anim:0, log:[] };
+const FNX_AREAS=['outfitter','heroes','pets'];   
+const FNX_PLANK=[1916,396];   
+const FNX_MARK='<svg viewBox="0 0 20 20" focusable="false" aria-hidden="true"><path d="M8 4.7 Q8 3 10 3 Q12 3 12 4.7 L11.25 11.4 Q11.1 12.6 10 12.6 Q8.9 12.6 8.75 11.4 Z" fill="#FFF6E6" stroke="#B89C74" stroke-opacity=".55" stroke-width=".6" stroke-linejoin="round"/><circle cx="10" cy="15.75" r="1.9" fill="#FFF6E6" stroke="#B89C74" stroke-opacity=".55" stroke-width=".6"/></svg>';   
+function fnxOn(){ return !!FNX.on; }
+function fnxLog(a){ if(FNX.log.length<120) FNX.log.push(a); }
+
+function fnxIrons(){ if(!FNX.on) return []; const L=Array.isArray(META.sargeSeen)? META.sargeSeen : [], U=Array.isArray(META.sargeUnlocked)? META.sargeUnlocked : []; return eqtIrons().filter(wk=>U.indexOf(wk)>=0 && wkOwned(wk) && L.indexOf(wk)<0); }   
+function fnxDealt(id){ try{ return OUTFIT_ORDER.indexOf(id)>=0 && !!OUTFIT_INFO[id] && !!shopOutfitHTML(id,'UI.fortOutfit'); }catch(e){ return false; } }   
+function fnxPieces(){ if(!FNX.on) return []; const L=META.rackSeen; if(!Array.isArray(L)) return []; const own=(META.outfit && Array.isArray(META.outfit.own))? META.outfit.own : [];
+  const c=own.concat(rackForSale()); return c.filter((id,i)=>c.indexOf(id)===i && L.indexOf(id)<0 && fnxDealt(id)); }   
+function fnxGearHere(){ return !!(typeof LCH==='object' && LCH.on && typeof FHG==='object' && FHG.on); }   
+function fnxGear(){ if(!FNX.on || !fnxGearHere()) return []; const L=Array.isArray(META.gearSeen)? META.gearSeen : []; return (META.gearUnlocked||[]).filter(g=>!!SARGE_GEAR[g] && L.indexOf(g)<0); }
+function fnxHeroes(){ if(!FNX.on) return []; const s=heroSel(); return HEROES.filter(k=>unitOwned(k) && k!==s && freshIs('hero',k)); }   
+function fnxPets(){ if(!FNX.on) return []; const s=petSel(); return PET_ORDER.filter(k=>petOwns(k) && k!==s && freshIs('pet',k)); }
+function fnxArea(id){ if(!FNX.on) return 0; return id==='outfitter'? fnxIrons().length+fnxPieces().length : id==='heroes'? fnxHeroes().length : id==='pets'? fnxPets().length : id==='hangar'? fnxGear().length : 0; }
+function fnxAny(){ return FNX_AREAS.some(a=>fnxArea(a)>0) || fnxArea('hangar')>0; }
+function fnxIs(k,id){ return k==='iron'? fnxIrons().indexOf(id)>=0 : k==='piece'? fnxPieces().indexOf(id)>=0 : k==='gear'? fnxGear().indexOf(id)>=0 : k==='hero'? fnxHeroes().indexOf(id)>=0 : k==='pet'? fnxPets().indexOf(id)>=0 : false; }
+function fnxTabNews(v){ const I=fnxIrons(), P=fnxPieces(); if(v==='all') return I.length+P.length; if(v==='wep') return I.length; const g=OUTFIT_SLOTS.find(g9=>g9.key===v); return g? P.filter(id=>g.ids.indexOf(id)>=0).length : 0; }   
+function fnxSee(k,id){ if(k==='iron'){ if(!Array.isArray(META.sargeSeen)) META.sargeSeen=[]; if(META.sargeSeen.indexOf(id)<0) META.sargeSeen.push(id); }   
+  else if(k==='piece'){ if(!Array.isArray(META.rackSeen)) META.rackSeen=[]; if(META.rackSeen.indexOf(id)<0) META.rackSeen.push(id); }
+  else if(k==='gear'){ if(!Array.isArray(META.gearSeen)) META.gearSeen=[]; if(META.gearSeen.indexOf(id)<0) META.gearSeen.push(id); }
+  else return false;
+  saveMeta(); fnxLog('see:'+k+':'+id); return true; }
+
+function fnxBadge(cls,tag){ return '<span class="fnx-b'+(cls? ' '+cls : '')+'"'+(tag? ' data-fnx="'+tag+'"' : '')+' data-notr aria-hidden="true">'+FNX_MARK+'</span>'; }
+function fnxIn(h,attr,badge){ const i=h.indexOf(attr); if(i<0) return h; const j=h.indexOf('>',i); return (j<0)? h : h.slice(0,j+1)+badge+h.slice(j+1); }   
+function fnxPlankSVG(){ return '<g class="fnx-g" data-fnx="gear:jetpack" transform="translate('+FNX_PLANK[0]+' '+FNX_PLANK[1]+')"><g class="fnx-gi">'   
+  +'<ellipse cx="0.8" cy="2.6" rx="12.6" ry="12.2" fill="#000" opacity=".24"/><circle r="12" fill="#D93A26"/><ellipse cx="0" cy="-4.6" rx="9.4" ry="6.2" fill="#FF8467" opacity=".62"/>'
+  +'<path d="M-10.6 5.6 A12 12 0 0 0 10.6 5.6 A13.5 9 0 0 1 -10.6 5.6 Z" fill="#9E2216" opacity=".38"/><circle r="12" fill="none" stroke="#8C1A10" stroke-opacity=".55" stroke-width=".85"/>'
+  +'<g transform="translate(-10.4 -10.6) scale(1.04)">'+FNX_MARK.replace(/^<svg[^>]*>/,'').replace(/<\/svg>$/,'')+'</g></g></g>'; }
+
+function fnxCard(tab,h){ if(!FNX.on || typeof h!=='string') return h;
+  if(tab==='outfitter'){ fnxIrons().forEach(wk=>{ h=fnxIn(h,'id="fhwep-'+wk+'"',fnxBadge('fnx-card','iron:'+wk)); });
+    fnxPieces().forEach(id=>{ h=fnxIn(h,'id="shof-'+id+'"',fnxBadge('fnx-card','piece:'+id)); });
+    ['all','wep'].concat(OUTFIT_SLOTS.map(g=>g.key)).forEach(v=>{ if(fnxTabNews(v)>0) h=fnxIn(h,'id="eqtTab-'+v+'"',fnxBadge('fnx-tab','tab:'+v)); }); }
+  else if(tab==='heroes') fnxHeroes().forEach(k=>{ const at='" data-k="'+k+'" onclick="UI.hcarTap('; h=h.replace(at,' fnx-new'+at); h=fnxIn(h,at,fnxBadge('fnx-card','hero:'+k)); });   
+  else if(tab==='pets') fnxPets().forEach(k=>{ const at='" data-pet="'+k+'" onclick="UI.petTap('; h=h.replace(at,' fnx-new'+at); h=fnxIn(h,at,fnxBadge('fnx-card','pet:'+k)); });
+  return h; }
+
+function fnxPill(id,h){ const n=fnxArea(id), picks=(META.pendingPicks|0)>0;
+  h=h.split('<span class="ftnew" data-notr>⚔</span>').join(''); if(id!=='promotions') h=h.replace('<span class="fh-pill alarm">','<span class="fh-pill">');
+  if(!(n>0)) return h; if(!picks) h=h.replace('<span class="fh-pill">','<span class="fh-pill alarm">');
+  const i=h.lastIndexOf('</span>'); return (i<0)? h : h.slice(0,i)+fnxBadge('ftnew fnx-sign','area:'+id)+h.slice(i); }
+function fnxSignsSync(){ FNX_AREAS.forEach(a=>{ if(document.getElementById('fhHot-'+a)) fhPillWrite(a); }); }   
+
+function fnxEastHTML(){ return '<button type="button" class="fnx-east" id="fnxEast" data-notr aria-label="HANGAR" onclick="fnxPanEast(event)"><svg class="fnx-arrow" viewBox="0 0 54 38" aria-hidden="true">'
+  +'<path d="M3 9.5 Q3 6 6.5 6 H34 L49 19 L34 32 H6.5 Q3 32 3 28.5 Z" fill="#6e5130"/><path d="M3 9.5 Q3 6 6.5 6 H34 L44.2 14.8 H3 Z" fill="#8A6A42"/><path d="M3 23.4 H43.6 L34 32 H6.5 Q3 32 3 28.5 Z" fill="#54391F"/>'
+  +'<path d="M3 9.5 Q3 6 6.5 6 H34 L49 19 L34 32 H6.5 Q3 32 3 28.5 Z" fill="none" stroke="#3E2A14" stroke-opacity=".55" stroke-width="1.1" stroke-linejoin="round"/>'
+  +'<path d="M17 12 L25 19 L17 26" fill="none" stroke="#EDEADF" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9.5" cy="19" r="1.6" fill="#2a2013" opacity=".7"/></svg>'+fnxBadge('fnx-eb','')+'</button>'; }
+function fnxCueSync(){ if(!FNX.on) return null; const sc=document.getElementById('fortscene'); if(!sc || !fortSceneOpen()) return null;
+  const g=document.querySelector('#fortBg .fnx-g[data-fnx="gear:jetpack"]'); let b=document.getElementById('fnxEast');
+  if(!g){ if(b) b.remove(); return null; }
+  if(!b){ sc.insertAdjacentHTML('beforeend', fnxEastHTML()); b=document.getElementById('fnxEast'); if(!b) return null; }
+  const r=g.getBoundingClientRect(), W=window.innerWidth||document.documentElement.clientWidth, off=!(r.width>0) || r.right>W-2;
+  b.classList.toggle('on', off); if(off && r.height>0){ const sr=sc.getBoundingClientRect(), y=Math.max(70, Math.min((sr.height||window.innerHeight)-60, r.top+r.height/2-sr.top)); b.style.top=(y-19).toFixed(1)+'px'; }
+  return off; }
+function fnxPanEast(e){ if(e && e.stopPropagation) e.stopPropagation(); if(!fortSceneOpen() || typeof FXR!=='object' || !(FXR.e>0)) return false; try{ audio(); SFX.blip(); }catch(e9){}
+  const x0=FXR.x, x1=FXR.e, T=reducedMotion()? 0 : 520, t0=performance.now(), run=++FNX.anim;
+  const step=now=>{ if(run!==FNX.anim || !fortSceneOpen()) return; const u=T? Math.min(1,(now-t0)/T) : 1, k=1-Math.pow(1-u,3); FXR.x=x0+(x1-x0)*k; exrFortPan(); if(u<1) requestAnimationFrame(step); };
+  if(T) requestAnimationFrame(step); else step(t0); return true; }
+
+function fnxAfter(a0){ try{
+  document.querySelectorAll('[data-fnx]').forEach(el=>{ const t=el.getAttribute('data-fnx')||'', i=t.indexOf(':'); if(i<0) return; const k=t.slice(0,i), id=t.slice(i+1);
+    if(k==='tab'){ if(!(fnxTabNews(id)>0)) el.remove(); } else if(k==='area'){   } else if(!fnxIs(k,id)) el.remove(); });
+  document.querySelectorAll('.fnx-new').forEach(c=>{ if(!c.querySelector('[data-fnx]')) c.classList.remove('fnx-new'); });   
+  fnxSignsSync(); fnxCueSync();
+  if(a0 && !fortNews() && S.mode==='menu') renderMenu();   
+}catch(e){ fnxLog('after-err:'+String(e && e.message || e).slice(0,80)); } }
+function fnxTap(k,id,fn,self,args){ const was=FNX.on && fnxIs(k,id), a0=was && fortNews(); if(was) fnxSee(k,id); const r=fn.apply(self,args); if(was) fnxAfter(a0); return r; }   
+
+try{ if(typeof fortNews==='function' && !FNX.n0){ const n0=fortNews; FNX.n0=n0; fortNews=function(){ if(!FNX.on) return n0.apply(this,arguments); return FNX.mute? false : fnxAny(); }; } }catch(e){}   
+try{ const r9=ROOM_SPOTS.filter(q=>q.id==='fort')[0]; if(r9 && !FNX.c0){ const c0=r9.cls; FNX.c0=c0; r9.cls=function(){ if(!FNX.on) return c0.apply(this,arguments); return fortNews()? 'alarm' : ((META.pendingPicks|0)>0? 'gold' : ''); }; } }catch(e){}   
+try{ if(typeof fortPillHTML==='function' && !FNX.p0){ const p0=fortPillHTML; FNX.p0=p0; fortPillHTML=function(id,lab){ const h=p0.apply(this,arguments); return FNX.on? fnxPill(id,h) : h; }; } }catch(e){}
+try{ if(typeof fhPillCoin==='function' && !FNX.k0){ const k0=fhPillCoin; FNX.k0=k0; fhPillCoin=function(id,n){ const r=k0.apply(this,arguments); if(FNX.on && id==='promotions'){ const pk=(META.pendingPicks|0)>0; FNX_AREAS.forEach(a=>{ const p=document.querySelector('#fhHot-'+a+' .fh-pill'); if(p) p.classList.toggle('alarm', !pk && fnxArea(a)>0); }); } return r; }; } }catch(e){}   
+try{ if(typeof fortHTML==='function' && !FNX.h0){ const h0=fortHTML; FNX.h0=h0; fortHTML=function(tab){ if(!FNX.on) return h0.apply(this,arguments);
+    const q=(FORT_TABS.some(t9=>t9[0]===tab)? tab : 'roster')==='outfitter'; if(!q){ const h9=h0.apply(this,arguments); return fnxCard(FORT_TAB, h9); }   
+    const s0=Array.isArray(META.sargeSeen)? META.sargeSeen : [], g0=Array.isArray(META.gearSeen)? META.gearSeen : [], r0=META.rackSeen; let h;
+    META.sargeSeen=s0.slice(); META.gearSeen=g0.slice(); if(Array.isArray(r0)) META.rackSeen=r0.slice(); FNX.mute=1;   
+    try{ h=h0.apply(this,arguments); } finally { FNX.mute=0;
+      const dI=eqtIrons(); META.sargeSeen=s0.concat((META.sargeUnlocked||[]).filter((w,i,a)=>a.indexOf(w)===i && s0.indexOf(w)<0 && (dI.indexOf(w)<0 || !wkOwned(w))));   
+      if(fnxGearHere()) META.gearSeen=g0;   
+      if(Array.isArray(r0)){ const c=((META.outfit && Array.isArray(META.outfit.own))? META.outfit.own : []).concat(rackForSale()); META.rackSeen=r0.concat(c.filter((id,i)=>c.indexOf(id)===i && r0.indexOf(id)<0 && !fnxDealt(id))); }   
+      saveMeta(); }
+    return fnxCard('outfitter', h); }; } }catch(e){}
+try{ if(typeof fhgArt==='function' && !FNX.g0){ const g0=fhgArt; FNX.g0=g0; fhgArt=function(){ let v=g0.apply(this,arguments); if(FNX.on && fnxGear().length && typeof v==='string'){ const i=v.lastIndexOf('</g>'); if(i>=0) v=v.slice(0,i)+fnxPlankSVG()+v.slice(i); } return v; }; } }catch(e){}   
+try{ if(typeof shopJetHTML==='function' && !FNX.j0){ const j0=shopJetHTML; FNX.j0=j0; shopJetHTML=function(){ const h=j0.apply(this,arguments); return (FNX.on && fnxGear().indexOf('jetpack')>=0 && typeof h==='string')? fnxIn(h,'id="shjp"',fnxBadge('fnx-card fnx-crate','gear:jetpack')) : h; }; } }catch(e){}   
+try{ if(typeof fortSceneLayout==='function' && !FNX.l0){ const l0=fortSceneLayout; FNX.l0=l0; fortSceneLayout=function(){ const r=l0.apply(this,arguments); if(FNX.on) fnxCueSync(); return r; }; } }catch(e){}   
+try{ if(typeof exrFortPan==='function' && !FNX.x0){ const x0=exrFortPan; FNX.x0=x0; exrFortPan=function(bg){ const r=x0.apply(this,arguments); if(FNX.on && document.getElementById('fnxEast')) fnxCueSync(); return r; }; } }catch(e){}   
+try{ if(typeof UI==='object' && UI){
+  if(typeof UI.fortWep==='function' && !FNX.w0){ const w0=UI.fortWep; FNX.w0=w0; UI.fortWep=function(wk){ return fnxTap('iron',wk,w0,this,arguments); }; }   
+  if(typeof UI.fortOutfit==='function' && !FNX.o0){ const o0=UI.fortOutfit; FNX.o0=o0; UI.fortOutfit=function(id){ return fnxTap('piece',id,o0,this,arguments); }; }   
+  if(typeof UI.jetShelf==='function' && !FNX.s0){ const s0=UI.jetShelf; FNX.s0=s0; UI.jetShelf=function(){ return fnxTap('gear','jetpack',s0,this,arguments); }; }   
+  if(typeof UI.heroCmd==='function' && !FNX.c1){ const c1=UI.heroCmd; FNX.c1=c1; UI.heroCmd=function(k){ const was=FNX.on && fnxIs('hero',k), a0=was && fortNews(); const r=c1.apply(this,arguments); if(was) fnxAfter(a0); return r; }; }   
+  if(typeof UI.petTap==='function' && !FNX.t0){ const t0=UI.petTap; FNX.t0=t0; UI.petTap=function(k){ const was=FNX.on && fnxIs('pet',k), a0=was && fortNews(); const r=t0.apply(this,arguments); if(was) fnxAfter(a0); return r; }; }   
+} }catch(e){}
+
+(function(){ try{ if(document.getElementById('fnxCss')) return; const st=document.createElement('style'); st.id='fnxCss'; st.textContent=''
+  +'.fnx-b{position:absolute;z-index:4;box-sizing:border-box;width:1.42em;height:1.42em;padding:0;margin:0;border-radius:50%;display:flex;align-items:center;justify-content:center;line-height:0;pointer-events:none;'
+  +'background:#E2452F;background-image:linear-gradient(180deg,#FF8A6C 0%,#F2563C 36%,#DA3B27 64%,#B12818 100%);border:.075em solid rgba(140,26,16,.55);'
+  +'box-shadow:inset 0 .1em 0 rgba(255,222,204,.6),inset 0 -.13em 0 rgba(110,18,8,.32),0 .1em .3em rgba(0,0,0,.42);animation:fnxBeat 1.8s ease-in-out infinite;transform-origin:50% 50%;}'
+  +'.fnx-b svg{display:block;width:78%;height:78%;overflow:visible;}'
+  +'@keyframes fnxBeat{0%,70%,100%{transform:scale(1);}80%{transform:scale(1.17);}89%{transform:scale(.96);}}'
+  +'.fh-pill .ftnew.fnx-b{right:-.8em;top:-.72em;font-size:1em;line-height:0;padding:0;border-radius:50%;color:inherit;text-shadow:none;background:#E2452F linear-gradient(180deg,#FF8A6C 0%,#F2563C 36%,#DA3B27 64%,#B12818 100%);border:.075em solid rgba(140,26,16,.55);'
+  +'box-shadow:inset 0 .1em 0 rgba(255,222,204,.6),inset 0 -.13em 0 rgba(110,18,8,.32),0 .1em .3em rgba(0,0,0,.42);}'    
+  +'.fnx-b.fnx-card{font-size:15px;top:-8px;right:-8px;}'
+  +'.sh-ofit > .fnx-b.fnx-card{top:-13px;right:-9px;z-index:5;}'    
+  +'.accard > .fnx-b.fnx-card{top:-10px;right:-10px;}'
+  +'.accard.hgray.fnx-new{opacity:1;}'
+  +'.fnx-b.fnx-crate{top:-9px;right:-9px;font-size:17px;}'
+  +'#eqtTabs{padding-top:8px;}#eqtTabs .tc-tab{position:relative;}'    
+  +'.fnx-b.fnx-tab{font-size:11.5px;top:-7px;right:-8px;}'
+  +'.fnx-east{position:absolute;right:calc(4px + env(safe-area-inset-right));top:45%;z-index:7;width:58px;height:44px;border:0;margin:0;padding:3px 4px 3px 0;background:none;cursor:pointer;display:none;-webkit-tap-highlight-color:transparent;}'
+  +'.fnx-east.on{display:block;}'
+  +'.fnx-east .fnx-arrow{display:block;width:54px;height:38px;filter:drop-shadow(0 2px 2px rgba(0,0,0,.45));animation:fnxNudge 1.8s ease-in-out infinite;}'
+  +'.fnx-east .fnx-b.fnx-eb{font-size:13px;top:-5px;right:2px;}'
+  +'@keyframes fnxNudge{0%,62%,100%{transform:translateX(0);}76%{transform:translateX(5px);}88%{transform:translateX(-1px);}}'
+  +'.fnx-g .fnx-gi{transform-box:fill-box;transform-origin:50% 50%;animation:fnxBeat 1.8s ease-in-out infinite;}'
+  +'@media (prefers-reduced-motion: reduce){.fnx-b,.fnx-gi,.fnx-g .fnx-gi,.fnx-east .fnx-arrow{animation:none!important;}}';
+  (document.head||document.documentElement).appendChild(st); }catch(e){} })();
+function fnxRead(){ const q=s=>Array.from(document.querySelectorAll(s)), R=e=>{ if(!e) return null; const r=e.getBoundingClientRect(); return [+r.left.toFixed(1),+r.top.toFixed(1),+r.width.toFixed(1),+r.height.toFixed(1)]; }, tag=document.getElementById('rtag-fort'), cue=document.getElementById('fnxEast');
+  return { cv:GVT_CV, on:FNX.on, gearHere:fnxGearHere(), irons:fnxIrons(), pieces:fnxPieces(), gear:fnxGear(), heroes:fnxHeroes(), pets:fnxPets(), any:fortNews(),
+    areas:{ outfitter:fnxArea('outfitter'), heroes:fnxArea('heroes'), pets:fnxArea('pets'), hangar:fnxArea('hangar') },
+    hq:tag? { text:tag.textContent.replace(/\s+/g,' ').trim(), cls:tag.className } : null,
+    signs:Object.fromEntries(FORT_TABS.map(t9=>{ const p=document.querySelector('#fhHot-'+t9[0]+' .fh-pill'); return [t9[0], p? { cls:p.className, bang:!!p.querySelector('.fnx-b'), tag:!!p.querySelector('.ftnew:not(.fnx-b)'), r:R(p), b:R(p.querySelector('.fnx-b')) } : null]; })),
+    badges:q('[data-fnx]').map(e=>({ t:e.getAttribute('data-fnx'), r:R(e) })), plank:R(document.querySelector('#fortBg .fnx-g')), cue:cue? { on:cue.classList.contains('on'), r:R(cue) } : null,
+    fxr:(typeof FXR==='object')? { x:+(+FXR.x||0).toFixed(1), e:+(+FXR.e||0).toFixed(1) } : null, ledgers:{ sargeSeen:(META.sargeSeen||[]).slice(), gearSeen:(META.gearSeen||[]).slice(), rackSeen:(META.rackSeen||[]).length }, log:FNX.log.slice(-30) }; }
+setTimeout(()=>{ try{ if(window.GVT && !GVT.fnx) GVT.fnx=fnxRead; }catch(e){} }, 0);
 
 
 
