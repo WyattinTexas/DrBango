@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.122.0';
+const BUILD = 'STARSPELL v0.122.1';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -2004,9 +2004,16 @@ function ssDoor(scene, dark, w, h) {
 const DOOR_ART = () => !!(ART && SSART.ready && SSART.img.hbtn);
 const DOOR_INK = (dark) => (dark ? '#ffe3a0' : '#fff7e2');
 const DOOR_INK2 = (dark) => (dark ? '#e3c98e' : '#fff0c4');
-// the keyline — a burnt umber edge on the gold, a deeper one on the bronze
+// the keyline — a burnt umber edge on the gold, a deeper one on the bronze.
+// v0.122.1: it is a tight dense SHADOW halo, never setStroke — v0.122.0's
+// stroked labels reached Skylar's iPhone (10/20) with every door word and
+// sub-line BLANK while desktop Chrome and WebKit drew them; no other Text in
+// the game was ever stroked, and the shadow is the bake every label on his
+// device has always drawn. The padding gives the halo room inside the canvas.
 function ssDoorInk(t, dark, size) {
-  return t.setStroke(dark ? '#2a1204' : '#5b2408', Math.max(1, size * (dark ? 0.12 : 0.16)));
+  const blur = size * (dark ? 0.1 : 0.12), pad = Math.ceil(blur);
+  return t.setPadding(pad, 0, pad, 0)
+    .setShadow(0, Math.max(1, size * 0.05), dark ? 'rgba(42,18,4,1)' : 'rgba(91,36,8,1)', blur);
 }
 
 function ssStarfield(scene, count) {
