@@ -461,7 +461,11 @@ function ssLoadArt() {
   // lane they raced the boot: on a cold phone load the wordmark, the biggest
   // file, landed last — after the opening had already dealt live text.)
   // Asked for first so the browser serves them first.
-  const soft = ['nightsky', 'title'];
+  // …and the home doors (the 10/15 home-buttons round, Skylar's 10/20
+  // verdict: B3 Gold Face v3) — the meadow's column is the first thing an
+  // open shows, so they ride the same bounded wait; absent, ssDoor falls
+  // back to the shared painted button
+  const soft = ['nightsky', 'title', 'hbtn', 'hbtndark'];
   const softP = Promise.all(soft.map((n) => new Promise((res) => {
     const im = new Image();
     im.onload = () => { SSART.img[n] = im; res(true); };
@@ -1956,6 +1960,53 @@ function ssBtn(scene, dark, w, h) {
   c.drawImage(img, cs, cs, mx, my, CW, CH, W - 2 * CW, H - 2 * CH);
   t.refresh();
   return key;
+}
+
+/* THE HOME DOORS (the 10/15 home-buttons round; Skylar's verdict 10/20: B3
+   Gold Face, frame v3 — a gold slab, a plum rim under a gold hairline, a
+   gilded swirl at each end; NEW GAME wears the bronze cut). The doors only:
+   every other button in the game keeps ssBtn's frame. A THREE-slice, not a
+   nine: the frame scales uniformly by height, the two end caps (swirl and
+   rounded end, ~34.5% of the painting each) keep its aspect exactly, and
+   the plain middle of the slab is mirror-tiled at the cap scale (alternate
+   tiles flipped, so the speckle and the bevel join seamlessly at every cut)
+   — never stretched, which smeared the gold dust into dashes. Absent the
+   art, the door is ssBtn's button, as before. */
+function ssDoor(scene, dark, w, h) {
+  const base = dark ? 'hbtndark' : 'hbtn';
+  const img = ART && SSART.ready && SSART.img[base];
+  if (!img) return ssBtn(scene, dark, w, h);
+  const key = base + '@' + w + 'x' + h;
+  if (scene.textures.exists(key)) return key;
+  const R = ssTexRes(scene);
+  const W = Math.round(w * R), H = Math.round(h * R);      // integer device px (see ssBtn)
+  const t = scene.textures.createCanvas(key, W, H);
+  const c = t.context;
+  const sw = img.width, sh = img.height, s = H / sh;
+  const cs = Math.round(sw * 0.345);                         // source cap: the swirl + the rounded end
+  const CW = Math.min(Math.round(cs * s), Math.floor(W * 0.45));
+  const mx = sw - 2 * cs;
+  c.drawImage(img, 0, 0, cs, sh, 0, 0, CW, H);
+  c.drawImage(img, sw - cs, 0, cs, sh, W - CW, 0, CW, H);
+  const tw = Math.max(1, Math.round(mx * s));
+  for (let x = CW, i = 0; x < W - CW; x += tw, i++) {
+    const dw = Math.min(tw, W - CW - x), sW = (dw / tw) * mx;
+    c.save();
+    if (i % 2) { c.translate(x + dw, 0); c.scale(-1, 1); c.drawImage(img, cs + mx - sW, 0, sW, sh, 0, 0, dw, H); }
+    else c.drawImage(img, cs, 0, sW, sh, x, 0, dw, H);
+    c.restore();
+  }
+  t.refresh();
+  return key;
+}
+// Label inks for the doors: on the gold slab a cream label needs a plum
+// keyline to read (the mock Skylar picked from: light letters, dark edge)
+const DOOR_ART = () => !!(ART && SSART.ready && SSART.img.hbtn);
+const DOOR_INK = (dark) => (dark ? '#ffe3a0' : '#fff7e2');
+const DOOR_INK2 = (dark) => (dark ? '#e3c98e' : '#fff0c4');
+// the keyline — a burnt umber edge on the gold, a deeper one on the bronze
+function ssDoorInk(t, dark, size) {
+  return t.setStroke(dark ? '#2a1204' : '#5b2408', Math.max(1, size * (dark ? 0.12 : 0.16)));
 }
 
 function ssStarfield(scene, count) {
@@ -6974,14 +7025,24 @@ class Home extends Phaser.Scene {
     this.rowBtns = {};
     this.menuRows = [];
     for (const r of rows) {
-      const b = ui(this.add.image(l.x(0), l.y(r.y), ssBtn(this, r.dark, 300, r.h)).setDisplaySize(l.u(300), l.u(r.h)).setInteractive({ useHandCursor: true }));
+      const b = ui(this.add.image(l.x(0), l.y(r.y), ssDoor(this, r.dark, 300, r.h)).setDisplaySize(l.u(300), l.u(r.h)).setInteractive({ useHandCursor: true }));
       const live = !!r.sub;
-      const lab = ui(ssTxt(this, l.x(0), l.y(r.y - (live ? 9 : 0)), r.label, l.u(16), r.dark ? '#9fb0e8' : BTN_INK()).setOrigin(0.5));
+      const door = DOOR_ART();
+      const lab = ui(ssTxt(this, l.x(0), l.y(r.y - (live ? 9 : 0)), r.label, l.u(16), door ? DOOR_INK(r.dark) : r.dark ? '#9fb0e8' : BTN_INK()).setOrigin(0.5));
+      if (door) {
+        // the swirls own ~58 units at each end: the few long labels (fr/es
+        // CONTINUE, fr NEW GAME) shrink to the slab's clear middle rather
+        // than run over the gold curls
+        const room = l.u(172);
+        if (lab.width > room) lab.setFontSize(Math.floor(l.u(16) * room / lab.width) + 'px');
+        ssDoorInk(lab, r.dark, l.u(16));
+      }
       lab.rowY = r.y;
       if (r.sub !== undefined) {
         // a slot for live information (campaign progress, friends online):
         // hidden and empty until there is something to say
-        const sub = ui(ssTxt(this, l.x(0), l.y(r.y + 13), r.sub, l.u(10), r.dark ? '#5a6390' : BTN_INK2(), 'italic').setOrigin(0.5).setVisible(live));
+        const sub = ui(ssTxt(this, l.x(0), l.y(r.y + 13), r.sub, l.u(10), door ? DOOR_INK2(r.dark) : r.dark ? '#5a6390' : BTN_INK2(), 'italic').setOrigin(0.5).setVisible(live));
+        if (door) ssDoorInk(sub, r.dark, l.u(10));
         this.rowSubs[r.key] = sub;
       }
       if (r.key) { this.rowBtns[r.key] = b; this.rowLabels[r.key] = lab; }
@@ -6991,6 +7052,8 @@ class Home extends Phaser.Scene {
         // They ride the label through every reflow (layoutMenu, setRowSub).
         lab.vsGlyphs = [-1, 1].map((sgn) => ui(this.add.image(l.x(0) + sgn * (lab.width / 2 + l.u(15)), l.y(r.y), vsSwordsTex(this))
           .setDisplaySize(l.u(14), l.u(14)).setAlpha(0.9)));
+        // on the gold door the pale blades vanish — they take the keyline's umber
+        if (door) for (const g of lab.vsGlyphs) g.setTint(0x5b2408).setAlpha(1);
       }
       this.menuRows.push({ key: r.key, b, lab, sub: this.rowSubs[r.key] });
       b.on('pointerdown', () => { if (this.busy() || (r.key === 'campaign' && !this.campAlive)) return; SFX.ensure(); this.bloomBtn = b; r.fn(); });
@@ -7073,7 +7136,7 @@ class Home extends Phaser.Scene {
        suspends a climb, and the sub-line must follow (the door itself is
        always rendered; only its line changes) */
     this.refreshEndDoor = (snap) => {
-      this.setRowSub('endless', this.endRow(), BTN_INK2(), snap);
+      this.setRowSub('endless', this.endRow(), DOOR_ART() ? DOOR_INK2(false) : BTN_INK2(), snap);
     };
     this.refreshCampDoor(true);
     // Profile chip — the stargazer's name, up in the corner on the same line as
