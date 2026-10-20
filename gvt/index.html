@@ -57998,7 +57998,7 @@ function ckHpFrac(u){
 }
 function ckSpawn(k,u,dx,dy){   
   const west=!!(S.bf && u.side==='foe');
-  const WW=S.bf? WORLD_W : W, HH=S.bf? H : WORLD_H;   
+  const WW=S.bf? WORLD_W : W, HH=(S.bf && !DCN.on)? H : WORLD_H;   
   const x=Math.max(30, Math.min(WW-30, u.x-(west? -dx : dx))), y=Math.max(40, Math.min(HH-24, u.y+dy));
   const c=S.bf? placeUnit(k,x,y,u.side,u.seat) : placeUnit(k,x,y);
   if(!c) return null;
@@ -88802,7 +88802,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='24.97';        
+let GVT_CV='24.98';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -108930,12 +108930,54 @@ function kbAllyBrain(u,dt){
   if(hbsRide(u,P)) return false;   
   kbAllyRideStep(u,dt,P); u.marching=false; return true;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+const DCN={ on:1, step:8, max:24 };   
+let DCN_GRID=null;   
+function dcnGrid(){ const M=DCN.max|0; if(DCN_GRID && DCN_GRID.m===M) return DCN_GRID.g; const g=[]; for(let i=-M;i<=M;i++) for(let j=-M;j<=M;j++){ const r=i*i+j*j; if(r>0 && r<=M*M) g.push([i,j,r]); } g.sort((a,b)=>(a[2]-b[2]) || (a[0]-b[0]) || (a[1]-b[1])); DCN_GRID={ m:M, g }; return g; }
+function dcnXY(u,dx,dy){ const west=!!(S.bf && u.side==='foe'); return [u.x-(west? -dx : dx), u.y+dy]; }   
+function dcnSegSeg(ax,ay,bx,by,cx,cy,dx,dy){ const o=(px,py,qx,qy,rx,ry)=>(qx-px)*(ry-py)-(qy-py)*(rx-px), d1=o(cx,cy,dx,dy,ax,ay), d2=o(cx,cy,dx,dy,bx,by), d3=o(ax,ay,bx,by,cx,cy), d4=o(ax,ay,bx,by,dx,dy);
+  if(((d1>0 && d2<0) || (d1<0 && d2>0)) && ((d3>0 && d4<0) || (d3<0 && d4>0))) return 0;
+  return Math.min(segDist(ax,ay,cx,cy,dx,dy), segDist(bx,by,cx,cy,dx,dy), segDist(cx,cy,ax,ay,bx,by), segDist(dx,dy,ax,ay,bx,by)); }   
+function dcnGround(x,y){ const T=S.cfg.terrain;   
+  for(const rv of (T.rivers||[])){ if(rv.dry) continue; if(x>rv.x-16 && x<rv.x+rv.w+16 && y>(rv.y0!=null?rv.y0:56)-16 && y<(rv.y1!=null?rv.y1:WORLD_H-56)+16) return false; }
+  for(const rk of (T.rocks||[])){ if(Math.hypot(rk.x-x,rk.y-y)<rk.r+14) return false; }
+  for(const p of (T.ponds||[])){ const nx=(x-p.x)/(p.rx+12), ny=(y-p.y)/(p.ry+12); if(nx*nx+ny*ny<1) return false; }
+  for(const bl of (T.balls||[])){ if(Math.abs(x-bl.x)<bl.r+16 && y>bl.y0-bl.r-16 && y<bl.y1+bl.r+16) return false; }
+  for(const p of (T.pits||[])){ if(Math.hypot(p.x-x,p.y-y)<p.r+14) return false; }
+  for(const g of (T.gaps||[])){ if(Math.abs(x-g.x)<g.w/2+14 && y>g.y0-14 && y<g.y1+14) return false; }
+  return true; }
+function dcnFit(u,st){   
+  if(!DCN.on || !S.bf || !u || !st.length || !S.cfg || !S.cfg.terrain) return [0,0];
+  const B=prfMap(), T=S.cfg.terrain; let r0=0; for(const s of st) r0=Math.max(r0, Math.hypot(s[1],s[2]));
+  const rl=(T.rail && T.rail.ban) || [], R9=r0+DCN.max*DCN.step*Math.SQRT2+TRK_BAN+1, sg=[]; let kd=1e9;   
+  for(const pl of rl){ const P=pl.pts||[]; for(let i=0;i<P.length-1;i++){ const d=segDist(u.x,u.y,P[i][0],P[i][1],P[i+1][0],P[i+1][1]); if(d<kd) kd=d; if(d<R9) sg.push(P[i],P[i+1]); } }
+  const ok=(x,y)=>{ if(x<B.x0 || x>B.x1 || y<B.y0 || y>B.y1 || !dcnGround(x,y)) return false;   
+    for(let i=0;i<sg.length;i+=2){ const a=sg[i], b=sg[i+1]; if((kd>=TRK_BAN? dcnSegSeg(u.x,u.y,x,y,a[0],a[1],b[0],b[1]) : segDist(x,y,a[0],a[1],b[0],b[1]))<TRK_BAN) return false; }   
+    return true; };
+  const fits=(sx,sy)=>st.every(s=>{ const p=dcnXY(u,s[1]+sx,s[2]+sy); return ok(p[0],p[1]); });
+  if(fits(0,0)) return [0,0];
+  for(const c of dcnGrid()){ const sx=c[0]*DCN.step, sy=c[1]*DCN.step; if(fits(sx,sy)){ tdLog(u,'dcn',[sx,sy]); return [sx,sy]; } }
+  return [0,0]; }
+
 function kbCourtSpawn(k,u,dx,dy,col){ const c=ckSpawn(k,u,dx,dy); if(!c) return null; c.kbOf=u.id; c.kbGait0=c.gait; ckArrive(c,col); tdLog(u,'court',k); return c; }   
 function kbCourtIn(u){   
   if(u.kbCourt) return 0; u.kbCourt=1;
   const tk=kbTkOf(u); let n=0; const ha9=haOn(u);       
-  if(tk.indexOf('guard')>=0 || tk.indexOf('guard2')>=0){ const nG=(tk.indexOf('guard2')>=0)? KB_ROY_BAT_ALLY : KB_ROY_FILE_ALLY; for(let i=0;i<nG;i++){ if(ha9){ const s9=haSeat(i); if(haArm(kbCourtSpawn('kbcannon',u,s9[0],s9[1],KB_ALLY_SLEEVE))) n++; }     else if(kbCourtSpawn('kbguard',u,36*(i+1),((i%2)? 1 : -1)*10*((i>>1)+1),KB_ALLY_SLEEVE)) n++; } }
-  if(tk.indexOf('battery')>=0){ for(let i=0;i<KB_BAT_N_ALLY;i++){ const c9=kbCourtSpawn('kbcannon',u,60,(i? 1 : -1)*44, ha9? KB_ALLY_SLEEVE : '#ffffff'); if(c9){ n++; if(ha9) haArm(c9); } } }    
+  const st9=[];    
+  if(tk.indexOf('guard')>=0 || tk.indexOf('guard2')>=0){ const nG=(tk.indexOf('guard2')>=0)? KB_ROY_BAT_ALLY : KB_ROY_FILE_ALLY; for(let i=0;i<nG;i++){ if(ha9){ const s9=haSeat(i); st9.push(['kbcannon',s9[0],s9[1],KB_ALLY_SLEEVE,1]); }     else st9.push(['kbguard',36*(i+1),((i%2)? 1 : -1)*10*((i>>1)+1),KB_ALLY_SLEEVE,0]); } }
+  if(tk.indexOf('battery')>=0){ for(let i=0;i<KB_BAT_N_ALLY;i++) st9.push(['kbcannon',60,(i? 1 : -1)*44, ha9? KB_ALLY_SLEEVE : '#ffffff', ha9? 1 : 0]); }    
+  { const sh9=dcnFit(u,st9); for(const s9 of st9){ const c9=kbCourtSpawn(s9[0],u,s9[1]+sh9[0],s9[2]+sh9[1],s9[3]); if(c9){ n++; if(s9[4]) haArm(c9); } } }    
   if(ha9 && n) haTell(u);    
   if(!S.bf || heroMine(u) || u.coopHM){ if(u.kbLine==null) u.kbLine=(Math.random()<0.5)? 1 : 0; commSayAs(bearSpeaker(), u.kbLine? 'Bon appétit!' : 'EN GARDE!', {rank:3,hz:KB_HZ});     }   
   return n;
