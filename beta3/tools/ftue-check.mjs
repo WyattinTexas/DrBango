@@ -71,7 +71,8 @@ for (const [lang, d] of Object.entries(FTUE)) {
   ok(lang + ': 16 legal tiles, ' + vow + ' vowels, target "' + w + '" on board and in the dictionary', probs.length === 0, probs.join(' · '));
 }
 ok('the es board teaches a digraph tile', FTUE.es.board.some((t) => ['ch', 'll', 'rr'].includes(t)));
-const gate = (gameSrc.match(/const ftue = [\s\S]*?&& !deep && !bypassed;/) || [''])[0];
+// (the first night, live: graft 4's held quick fight joins the doors — `&& !qck`)
+const gate = (gameSrc.match(/const ftue = [\s\S]*?&& !deep && !bypassed(?: && !qck)?;/) || [''])[0];
 ok('the gate excludes every door from the source', !!gate
   && ['!entry', '!DEMO', "'vsdemo'", "'frdemo'", "'botduel'", "'daily'", "'quick'", "'endless'", "'lab'", "'mpuid'", '!deep', '!bypassed'].every((t) => gate.includes(t)),
   'gate len ' + gate.length);
@@ -222,12 +223,16 @@ ok('it can never block a tap (no input) and floats above the board',
 ok('the tip rests OFF the letter it points at', await ev(`(() => { const b = ${B}, h = b.ftueHand;
   return Math.abs(h.x - b.slotPos(9).x) >= b.tileSize * 0.22 })()`) === true);   // 0.22: the push animation dips the tip inward
 await shot('hand-first');
-// the player wanders: a letter off the road — the finger backs away, waits
-ok('a wandering tap is welcomed: the finger backs off and waits',
-  await tapUntil(`${B}.board[5].c`, `window.__ssftue.point === 'wait' && ${B}.sel.length === 1`));
-ok('…visibly faded, still present', await until(`(() => { const h = ${B}.ftueHand; return !!h && h.alpha <= 0.6 })()`, 8000));
-ok('undoing the wander brings the finger back to the road',
-  await tapUntil(`${B}.board[5].c`, `window.__ssftue.point === 'slot:9' && ${B}.sel.length === 0`));
+// the player wanders: a letter off the road. THE FIRST NIGHT (F5-GUIDED,
+// live from the first-night integration) supersedes v0.75's welcome: under
+// the hand the board is NOT free — the wander is REFUSED (a wiggle, nothing
+// spent) and the finger insists where it stands
+ok('a wandering tap is refused under the hand (THE LOCK): nothing selected, the finger stays on the road',
+  await tapUntil(`${B}.board[5].c`, `window.__f5guide && window.__f5guide.refused >= 1 && ${B}.sel.length === 0`)
+  && await ev(`window.__ssftue.point === 'slot:9' && !!${B}.ftueHand`) === true);
+ok('…the hand keeps full voice (no back-off under the lock)', await ev(`(() => { const h = ${B}.ftueHand; return !!h && h.alpha > 0.6 })()`) === true);
+ok('undoing nothing: the finger is still on the road',
+  await ev(`window.__ssftue.point === 'slot:9' && ${B}.sel.length === 0`) === true);
 // the walk: S → T → A → R, the player performing every real tap
 ok('S taken — the finger glides to T', await tapUntil(`${B}.board[9].c`, `window.__ssftue.point === 'slot:7' && ${B}.sel.length === 1`));
 ok('the right half is pointed at from the left (mirrored, room on every phone)',
@@ -240,10 +245,12 @@ ok('the word stands — the finger moves to CAST and pushes',
 ok('CAST is lit with its damage preview', await ev(`/^CAST \\d+$/.test(${B}.castT.text)`) === true);
 await shot('hand-cast');
 ok('the player casts — for real', await tapUntil(`${B}.castB`, `${B}.run.words === 1`));
-ok('its lessons taught, the finger bows out for good',
-  await until(`${B}.ftueHand === null && window.__ssftue.state === 'done'`, 10000));
+// THE FIRST NIGHT: the hand no longer bows out at the first cast — it walks
+// the script (word 2 forges the orange); first5-check owns the whole script
+ok('the first word cast, the hand STAYS and walks the script (F5-GUIDED)',
+  await until(`!!${B}.ftueHand && ${B}.ftueGone === false && !!${B}.f5G && ${B}.f5G.idx >= 1 && window.__ssftue.state === 'guide'`, 10000));
 await sleep(1600);
-ok('…and never returns after the refill', await ev(`${B}.ftueHand === null && ${B}.ftueGone === true`) === true);
+ok('…and asks for the scripted second word after the refill', await ev(`!!${B}.ftueHand && window.__ssftue.word === ${B}.f5G.words[1].join('')`) === true);
 
 /* ================= §5 COMPLETION & GRADUATION ================= */
 console.log('— §5 the first game runs to its end —');

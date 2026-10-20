@@ -1886,6 +1886,377 @@ function ssSigilPlayedBefore(p) {
    1 = down forever); it drops here when the first game ENDS by any door —
    endRun (win or loss) and goHome (the back-arrow abandon) both call it. */
 function ssFtuePending() { return !!SS.prof && SS.prof.ftue === 0; }
+/* ---- F5 GRAFTS (batch ss-2026-10-07-first-night, card 02) ----------------
+   The seven grafts every critic converged on, ruled in 8/8 by Skylar 10/7.
+   Tagged F5-GRAFT-<n> at every seam so the later integration card can walk
+   them. These helpers are the shared kit; the seams live where they bite. */
+/* F5-GRAFT-2: no dead taps — a tap during a scripted beat always answers
+   with a spark at the fingertip, even inside a skip-arm window. */
+function ssF5TapSpark(scene, x, y) {
+  if (!scene.textures.exists('spark4')) return;
+  for (let i = 0; i < 5; i++) {
+    const a = Math.random() * Math.PI * 2, d = 10 + Math.random() * 26;
+    const s = scene.add.image(x, y, 'spark4').setScrollFactor(0).setDepth(940)
+      .setScale(0.5 + Math.random() * 0.5).setAlpha(0.9).setBlendMode('ADD');
+    scene.tweens.add({ targets: s, x: x + Math.cos(a) * d, y: y + Math.sin(a) * d, alpha: 0, scale: 0.1, duration: 320 + Math.random() * 140, ease: 'Quad.easeOut', onComplete: () => s.destroy() });
+  }
+}
+/* F5-GRAFT-7: the first ceremony cannot hard-cut before ~1.5s — taps
+   accelerate the stagger, never cut it. Ceremonies built by cards 04-06
+   (the star-write, the first lighting) gate their skip on this; every
+   later ceremony keeps the shipped 380ms arm. */
+const SS_F5_CEREMONY_FLOOR_MS = 1500;
+function ssF5SkipFloor(scene, startedAt) { return scene.time.now - startedAt >= SS_F5_CEREMONY_FLOOR_MS; }
+/* F5-GRAFT-3: tomorrow INSIDE the window — the slot. Called at the second
+   fell of the first night (the ruled place); card 06 (THE LIT SKY) fills
+   it with the real cue. An empty slot draws nothing — the beat script
+   already carries the hook, which is this graft's whole job. */
+/* ---- F5-CARD-06: THE LIT SKY (verdict 6: the tomorrow-driver) -----------
+   The fell doesn't scatter the constellation to die — its stars rise and
+   seat at the zenith, permanently: written to the profile, drawn on every
+   boot thereafter. Scope per the ruling: the MARK and its payoffs only —
+   the dark-world opening lost to LEANS IN and is not here. THE SEATS are
+   the integration card's warned "new design work": authored here for the
+   14 beasts a quick-5 night can meet (the full 26-chart stays a data fill,
+   not a rework). Layout units: x in l.x() half-widths, y in l.y() rows;
+   minis draw at scroll-factor 0 so the meadow, the climb and the battle
+   all wear the same kept sky. */
+const SS_F5_SEATS = {
+  draco: [0, 52],
+  vulpes: [-130, 96], lepus: [-62, 70], serpens: [8, 98], cancer: [78, 68], corvus: [146, 96],
+  ursa: [-150, 150], aranea: [-78, 132], delphinus: [-8, 156], columba: [64, 132], lacerta: [136, 152],
+  cygnus: [-110, 192], pavo: [-20, 198], aquila: [72, 192],
+};
+const SS_F5_SEAT_SC = 0.22;
+const SS_F5_STRINGS = {
+  en: { returns: ' · returns to the sky', lit: 'constellations lit · %1 of 26' },
+  // FIRST NIGHT, LIVE: drafts, like the lesson prompt table below
+  es: { returns: ' · vuelve al cielo', lit: 'constelaciones encendidas · %1 de 26' },
+  fr: { returns: ' · retourne au ciel', lit: 'constellations allumées · %1 sur 26' },
+  pt: { returns: ' · volta ao céu', lit: 'constelações acesas · %1 de 26' },
+  de: { returns: ' · kehrt an den Himmel zurück', lit: 'Sternbilder entzündet · %1 von 26' },
+};
+/* FIRST NIGHT, LIVE (the v0.6.0 integration note: "mint the lit flag WITH
+   the first-open decision so no veteran meadow changes on update day"): the
+   lit sky belongs to the first night and to every later run of a player
+   whose first open WAS it (SS.prof.f5night, minted in ftueOpen — a LOCAL
+   profile field, never sync()'d, like f5lit). A veteran never lights. */
+function ssF5LitOwner(scene) { return !!((scene && scene.f5Night) || (SS.prof && SS.prof.f5night)); }
+function ssF5LitList() { try { return (SS.prof && SS.prof.f5lit) || []; } catch (e) { return []; } }
+function ssF5DrawMini(scene, id, alpha, depth) {
+  const seat = SS_F5_SEATS[id], b = SS_BEASTS[id];
+  if (!seat || !b || !scene.textures.exists('dot')) return [];
+  const l = scene.L || (scene.L = ssLayout(scene)), sc = SS_F5_SEAT_SC, cx = l.x(seat[0]), cy = l.y(seat[1]);
+  const items = [];
+  /* F5-FIX1-02: every mark item carries a census tag, so the harness can
+     prove the fight view clean (and the rite/ledger/meadow still lit) */
+  const g = scene.add.graphics().setScrollFactor(0).setDepth(depth).setAlpha(alpha).setData('f5mark', id);
+  g.lineStyle(l.u(1), 0xd9b96a, 0.75);
+  for (const [a, b2] of b.edges) {
+    g.moveTo(cx + l.u(b.stars[a][0] * sc), cy + l.u(b.stars[a][1] * sc));
+    g.lineTo(cx + l.u(b.stars[b2][0] * sc), cy + l.u(b.stars[b2][1] * sc));
+  }
+  g.strokePath();
+  items.push(g);
+  for (const [sx, sy] of b.stars) {
+    items.push(scene.add.image(cx + l.u(sx * sc), cy + l.u(sy * sc), 'dot').setScrollFactor(0)
+      .setDepth(depth + 1).setScale(0.5).setTint(0xffe9a8).setAlpha(alpha).setBlendMode('ADD').setData('f5mark', id));
+  }
+  return items;
+}
+/* every boot wears the kept sky — the morning-after proof */
+function ssF5DrawLitSky(scene) {
+  for (const id of ssF5LitList()) {
+    const items = ssF5DrawMini(scene, id, 0, 5);
+    items.forEach((o, k) => {
+      scene.tweens.add({ targets: o, alpha: k === 0 ? 0.34 : 0.48, duration: 900, delay: 300 });
+      if (k > 0) scene.tweens.add({ targets: o, alpha: 0.3, delay: 1600 + (k * 211) % 900, duration: 1400 + (k * 97) % 800, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    });
+  }
+}
+function ssF5TomorrowCue(scene) {
+  window.__f5tomorrow = (window.__f5tomorrow | 0) + 1;
+  /* the graft-3 slot, filled: before 5:00 the kept marks pulse once and
+     the dark seats ghost beside them — what you light, the sky keeps;
+     more waits. Wordless. */
+  try {
+    const l = scene.L, lit = ssF5LitList();
+    for (const id of Object.keys(SS_F5_SEATS)) {
+      if (lit.includes(id)) {
+        const items = ssF5DrawMini(scene, id, 0.85, 925);
+        items.forEach((o) => scene.tweens.add({ targets: o, alpha: 0, delay: 1500, duration: 700, onComplete: () => o.destroy() }));
+      } else {
+        const seat = SS_F5_SEATS[id];
+        const d = scene.add.image(l.x(seat[0]), l.y(seat[1]), 'dot').setScrollFactor(0).setDepth(924).setScale(0.6).setTint(0x8a90b8).setAlpha(0).setBlendMode('ADD');
+        scene.tweens.add({ targets: d, alpha: 0.28, duration: 420, yoyo: true, hold: 900, onComplete: () => d.destroy() });
+      }
+    }
+  } catch (e) { /* the slot never breaks the fell */ }
+}
+/* ---- F5-CARD-04: THE SKY LEANS IN — the rig's authored letters ----------
+   The fight-1 refill queue (the page's own M·O·N·S beat: MOON free, the
+   board secretly dense) and the skill-floor drop (no 5+ by cast 5 → the
+   queue deals the near-assembled word). en is the VALIDATED tongue — the
+   harness's density gate proves ≥3 findable words at 4/5/6 after the rig
+   lands; the other four are drafts that MUST pass the same validator plus
+   native review at integration (the page's "single highest-leverage
+   missing piece"). */
+/* F5-GUIDED (card ss-2026-10-09-first5-script/02): the rig now carries EVERY
+   refill of the scripted first fight, so the three guided words land on the
+   same letters for every player. en, index order of the emptied cells:
+     after STAR  (cells 0·4·7·9)      m o n s        → MOONS stands (the page's own beat)
+     after MOONS (cells 0·3·4·7·9)    s k y r e      → the forged ORANGE lands first, on the S at cell 0
+     after SKY   (cells 0·3·4)        n o s          → the free board (density-gated by the suite)
+   Other tongues are drafts in the same shape (validated against their
+   dictionaries by the suite's simulation; native review at integration).
+   F5-SCRYGATE (card 03): the rig carries the SCRIPTED SCRY's redeal too —
+   the sixteen letters that rain in when the gate's tap sweeps the board
+   (scry → fillBoard walks the queue first), so the board after the lesson
+   is the same for every player (en: the night's own letters, dense by the
+   suite's gate — 16 cells, index order; the other tongues' sixteen are
+   their curated deals' density-proven sets, drafts for native review).
+   F5-BLUE (card 04): THE BLUE LESSON's two refills ride the same queue —
+   after the forge word (en TONIGHT: cells 1·5·6·7·8·10·11) the BLUE's own
+   letter lands FIRST (the lowest emptied cell takes the pending tier), then
+   the six beside it; after the blue word (en HALO: cells 1·2·4·5) four more
+   (d·a·w·n) so the board the hand leaves is the same for every player
+   (density-gated by the suite; card 05 may re-author its own refill).
+   F5-GREEN (card 05): the blue word's refill is now THE GREEN WORD's own
+   letters (en d·a·w·n → DAWN, es LUNA, fr LUNE, pt AMOR, de TAU — "Tau" IS
+   dew): the beast's strike lands right after the blue showcase, the dew is
+   pinned onto the lowest plain cell holding the green word's first letter
+   (f5GreenCell), and the word starts on it; the LAST line of each rig is
+   the refill after the green word, so the free board the hand finally
+   leaves is the same for every player (density-gated by the suite). */
+const SS_F5_RIG = {
+  en: ['m', 'o', 'n', 's', 's', 'k', 'y', 'r', 'e', 'n', 'o', 's',
+    's', 't', 'a', 'r', 'l', 'i', 'g', 'h', 't', 'e', 'n', 'o', 'd', 'e', 'a', 'm',
+    'h', 'o', 'n', 'i', 'g', 't', 'e', 'd', 'a', 'w', 'n',
+    'o', 'p', 'a', 'l'],
+  es: ['m', 'a', 'r', 'e', 's', 'l', 'o', 'n', 't', 'a', 'e', 'r',
+    'n', 'o', 'c', 't', 'e', 's', 'o', 'l', 'a', 'n', 'i', 'm', 'a', 'r', 'e', 'd',
+    'h', 'e', 's', 't', 'i', 'n', 'o', 'l', 'u', 'n', 'a',
+    'o', 'r', 'a', 's'],
+  fr: ['l', 'u', 'n', 'e', 's', 'l', 'a', 'o', 't', 'e', 'n', 's',
+    'p', 'a', 'l', 'o', 'n', 'e', 's', 'i', 'u', 'r', 't', 'a', 'e', 'm', 'o', 'd',
+    'h', 'l', 'e', 's', 'i', 't', 'e', 'l', 'u', 'n', 'e',
+    'a', 'c', 'e', 's'],
+  pt: ['c', 'a', 's', 'a', 's', 'l', 'e', 'o', 'r', 'a', 't', 'n',
+    'm', 'e', 'c', 'o', 'a', 'l', 'u', 'r', 's', 'i', 't', 'e', 'a', 'd', 'o', 'n',
+    'l', 'a', 'e', 's', 't', 'r', 'e', 'm', 'a', 'r',
+    's', 'u', 'l', 'e'],
+  de: ['s', 't', 'e', 'r', 'n', 'e', 'a', 's', 't', 'r', 'n', 'i', 'e',
+    's', 'o', 'm', 'a', 'd', 'e', 'n', 'i', 'o', 'r', 't', 'u', 'n', 'e', 'l', 'h',
+    'm', 'e', 'r', 't', 'a', 'e', 'l', 'l', 'i', 'e', 'd',
+    'a', 'u', 'l'],
+};
+/* F5-GUIDED: the script after the deal's own word — word 2 is 5 (de: 6)
+   letters, so it FORGES the orange (the live rule: 5+ letters → tier 1, +6
+   on its letter, landing with the next refill in the lowest emptied cell);
+   word 3 STARTS on the orange tile (the pointed tile is the first tap) and
+   is 3 letters, so at LEN_MULT 1.0 the hit's extra is EXACTLY the +6 the
+   lesson line promised. `orange` = which authored word uses it.
+   F5-BLUE (card 04): after THE SCRY GATE (which stands between word 3 and
+   word 4) the script goes on — word 4 is 7 letters, so the live forge rule
+   drops the BLUE (7+ letters → tier 2: the WHOLE word ×1.5, nothing on the
+   letter itself) with the next refill; word 5 STARTS on the blue tile and
+   is short, so the hit is EXACTLY plain × 1.5 (en HALO: 8 → 12; pt LUA:
+   4 → 6) — the showcase can say the number and the rule in one breath.
+   `blue` = which authored word uses it.
+   F5-GREEN (card 05): the blue word's own tick is THE STRIKE (the fuse
+   6 → 0): the beast's blow lands slowly, the dew blooms on the green
+   word's first letter (the live rule: a landed strike leaves one plain
+   tile green — pinned here, so every player gets the same cell), and word
+   6 STARTS on the green: its heal is EXACTLY ♥DEW_HEAL (the dew pays its
+   heal per green tile, not by word length), shown coming BACK on the
+   player's own bar. `green` = which authored word uses it. en DAWN (the
+   night's answer), es LUNA, fr LUNE, pt AMOR, de TAU ("Tau" = dew). */
+const SS_F5_GUIDE = {
+  en: { words: [['m', 'o', 'o', 'n', 's'], ['s', 'k', 'y'], ['t', 'o', 'n', 'i', 'g', 'h', 't'], ['h', 'a', 'l', 'o'], ['d', 'a', 'w', 'n']], orange: 1, blue: 3, green: 4 },
+  es: { words: [['m', 'a', 'r', 'e', 's'], ['s', 'o', 'l'], ['d', 'e', 's', 't', 'i', 'n', 'o'], ['h', 'a', 'l', 'o'], ['l', 'u', 'n', 'a']], orange: 1, blue: 3, green: 4 },
+  fr: { words: [['l', 'u', 'n', 'e', 's'], ['s', 'o', 'l'], ['e', 't', 'o', 'i', 'l', 'e', 's'], ['h', 'a', 'l', 'o'], ['l', 'u', 'n', 'e']], orange: 1, blue: 3, green: 4 },
+  pt: { words: [['c', 'a', 'l', 'm', 'a'], ['s', 'o', 'l'], ['e', 's', 't', 'r', 'e', 'l', 'a'], ['l', 'u', 'a'], ['a', 'm', 'o', 'r']], orange: 1, blue: 3, green: 4 },
+  de: { words: [['s', 't', 'e', 'r', 'n', 'e'], ['n', 'e', 'u'], ['l', 'a', 't', 'e', 'r', 'n', 'e'], ['m', 'o', 'n', 'd'], ['t', 'a', 'u']], orange: 1, blue: 3, green: 4 },
+};
+const SS_F5_GUIDE_SETTLE_MS = 750;   // the refill's bounce (420 + ≤90ms) before the hand moves on
+const SS_F5_POINT_MS = 2600;         // the look at the orange tile before the hand asks for it
+const SS_F5_SHOW_MS = 3600;          // the damage showcase's dwell
+const SS_F5_SHOW_FLOOR_MS = 900;     // a tap lets the showcase go only after this (the ceremony-floor grammar)
+const SS_F5_SHOW_VEIL = 0.42;        // the light veil under the showcase (the scry gate's is 0.66)
+/* F5-SCRYGATE (card ss-2026-10-09-first5-script/03): THE SCRY GATE's dials.
+   The gate rises on the script's own beat (the orange showcase let go, n·o·s
+   settled — the fuse at 2 on the first night's five-cast timer), so no first
+   night ever skips it; the reveal after the tap is HELD: the fuse's step
+   2 → 1 shown big in the pill's own words, Skylar's cost line beneath, the
+   finger on the pill, until the dwell or a tap past the floor lets go. */
+const SS_F5_SCRY_REVEAL_MS = 900;    // after the tap: the fresh board rains in, then the reveal rises (the OLD reading, big)
+const SS_F5_SCRY_STEP_MS = 700;      // the reveal has stood this long when the count STEPS (the pill + the big line together)
+const SS_F5_SCRY_SHOW_MS = 4200;     // the reveal's dwell, from the step
+const SS_F5_SCRY_FLOOR_MS = 1400;    // a tap lets the reveal go only after this (from the step — the ceremony-floor grammar)
+/* F5-BLUE (card ss-2026-10-09-first5-script/04): THE BLUE LESSON's dials.
+   The blue showcase carries two lines (the hit, then the orange/blue
+   difference in one breath), so it dwells longer than the orange's; the
+   floor and the veil are the showcase's own. SS_F5_BLUE_MULT is wordDamage's
+   starMult written out for the showcase's "×1.5" — the suite's simulation
+   proves the authored blue word's hit is EXACTLY plain × this. */
+const SS_F5_BLUE_SHOW_MS = 4600;     // the blue showcase's dwell (two lines to read)
+const SS_F5_BLUE_MULT = 1.5;         // the blue tile's rule (wordDamage: `if (s.tier === 2) starMult = 1.5`)
+/* F5-GREEN (card ss-2026-10-09-first5-script/05): THE STRIKE's and THE
+   MEND's dials. Skylar (10/09): "the beast attacks the player. It needs to
+   slow down and show the damage it does to the player. Then it should give
+   us a green tile … explain how that gives you health back. Really slow it
+   down and show the player that using the green tile heals you." The strike
+   itself is the live beat (the crimson number lingers ≥ 2 s, flies 780 ms,
+   the bar drains 560 ms — v0.107.0) HELD under a veil with the hit line, the
+   YOU row lifted into the light, the pill kept at its alarm until the lift;
+   the second line and the hand on the bar come when the bar has drained;
+   the dwell counts from there. The mend mirrors it upward in green: the
+   "♥ +6" lingers, flies to the bar, the bar RISES, then the dwell. */
+const SS_F5_STRIKE_SHOW_MS = 3200;   // the strike beat's dwell, from the bar's drain
+const SS_F5_STRIKE_FLOOR_MS = 900;   // a tap lets the strike beat go only after this (from the drain — the ceremony-floor grammar)
+const SS_F5_STRIKE_DEW_MS = 260;     // the dew's own beat after the lift (the live 260 after a landed blow)
+const SS_F5_MEND_LINGER_MS = 1800;   // the "♥ +6" stands readable before it flies to the bar
+const SS_F5_MEND_FLY_MS = 780;       // its flight to the bar (the strike's own)
+const SS_F5_MEND_RISE_MS = 640;      // the player bar's rise
+const SS_F5_MEND_SHOW_MS = 4200;     // the mend's dwell, from the rise (two lines to read)
+/* ---- F5-CARD-05: THE TEACHING SCRIPTS — Skylar's verdict-1 notes, with
+   verdict 5 (WORDS ARE FINE) paying the copy. Ground truth held against the
+   shipping code: the special tiles ARE orange (+6, tier 1), blue (×1.5,
+   tier 2) and green (the dew, heals ♥6, tier 3) — exactly as Skylar
+   remembered — and the gray/black tile is the bosses' BLACKOUT curse
+   (tileblk, pays nothing). ONE declared table, shortest true sentence
+   each, en-first; the ×5 translation at integration is mechanical. Every
+   prompt fires ONCE per run, waits ~8s or one tap, pauses nothing —
+   except SCRY: F5-FIX1-03 (Skylar's 10/08 verdict) turned that one from a
+   footnote into THE SCRY LESSON, a forced two-beat gate (f5ScryGateUp
+   below) — the gate line first, the cost line after the tap has shown it. */
+const SS_F5_PROMPTS = {
+  en: {
+    tile1: 'An orange tile pays +6 extra.',
+    tile2: 'A blue tile makes the whole word ×1.5.',
+    tile3: 'A green dew tile heals ♥6 when cast.',
+    ink: 'An inked tile spells, but pays nothing.',
+    scry: 'Stuck? SCRY deals a fresh board',
+    scryCost: 'Using SCRY makes the beast attack one turn earlier',
+    orangeHit: 'That orange tile added +{x} — {d} damage, not {p}.',   /* F5-GUIDED: {x} the extra, {d} the hit, {p} the plain hit */
+    blueHit: 'That blue tile made the WHOLE word ×{m} — {d} damage, not {p}.',   /* F5-BLUE: {m} the rule's multiplier, {d} the hit, {p} the plain hit */
+    blueVsOrange: 'Orange adds +6 to one tile. Blue multiplies the whole word.',   /* F5-BLUE: the difference, said once under the number (one line per text) */
+    strikeHit: 'The beast struck YOU — {a} damage.',   /* F5-GREEN: under the crimson number, {a} the blow */
+    strikeBar: 'Your health fell {b} → {c}.',   /* F5-GREEN: under the YOU row once the bar has drained */
+    greenHeal: 'That green tile healed you ♥{h} — {b} → {c}.',   /* F5-GREEN: {h} the heal, {b} → {c} the bar */
+    greenVsRest: 'Orange and blue hurt the beast. Green heals YOU.',   /* F5-GREEN: the family told apart, one line */
+  },
+  /* FIRST NIGHT, LIVE: the ×4 translation the table was built for — DRAFTS
+     in the shipped tongues' own vocabulary (es ficha/bestia · fr tuile/bête ·
+     pt peça/fera · de Stein/Bestie, SCRY kept as the button says it); a
+     native read before the store build is still owed. Same keys, same
+     placeholders; a missing key falls back to English line by line. */
+  es: {
+    tile1: 'Una ficha naranja paga +6 extra.',
+    tile2: 'Una ficha azul hace la palabra entera ×1.5.',
+    tile3: 'Una ficha verde de rocío te cura ♥6 al lanzarla.',
+    ink: 'Una ficha entintada deletrea, pero no paga nada.',
+    scry: '¿Atascado? SCRY reparte un tablero nuevo',
+    scryCost: 'Usar SCRY hace que la bestia ataque un turno antes',
+    orangeHit: 'Esa ficha naranja sumó +{x}: {d} de daño, no {p}.',
+    blueHit: 'Esa ficha azul hizo TODA la palabra ×{m}: {d} de daño, no {p}.',
+    blueVsOrange: 'El naranja suma +6 a una ficha. El azul multiplica la palabra.',
+    strikeHit: 'La bestia TE golpeó: {a} de daño.',
+    strikeBar: 'Tu vida bajó {b} → {c}.',
+    greenHeal: 'Esa ficha verde te curó ♥{h}: {b} → {c}.',
+    greenVsRest: 'Naranja y azul hieren a la bestia. El verde TE cura.',
+  },
+  fr: {
+    tile1: 'Une tuile orange rapporte +6 de plus.',
+    tile2: 'Une tuile bleue rend tout le mot ×1.5.',
+    tile3: 'Une tuile verte de rosée te soigne de ♥6.',
+    ink: 'Une tuile encrée épelle, mais ne rapporte rien.',
+    scry: 'Bloqué ? SCRY redistribue le plateau',
+    scryCost: 'Utiliser SCRY fait frapper la bête un tour plus tôt',
+    orangeHit: 'Cette tuile orange a ajouté +{x} : {d} dégâts, pas {p}.',
+    blueHit: 'Cette tuile bleue a rendu TOUT le mot ×{m} : {d} dégâts, pas {p}.',
+    blueVsOrange: 'L\'orange ajoute +6 à une tuile. Le bleu multiplie le mot.',
+    strikeHit: 'La bête T\'A frappé : {a} dégâts.',
+    strikeBar: 'Ta vie est tombée de {b} → {c}.',
+    greenHeal: 'Cette tuile verte t\'a soigné de ♥{h} : {b} → {c}.',
+    greenVsRest: 'L\'orange et le bleu blessent la bête. Le vert TE soigne.',
+  },
+  pt: {
+    tile1: 'Uma peça laranja paga +6 extra.',
+    tile2: 'Uma peça azul faz a palavra inteira ×1.5.',
+    tile3: 'Uma peça verde de orvalho cura ♥6 ao ser lançada.',
+    ink: 'Uma peça manchada soletra, mas não paga nada.',
+    scry: 'Travou? SCRY dá um tabuleiro novo',
+    scryCost: 'Usar SCRY faz a fera atacar um turno antes',
+    orangeHit: 'Essa peça laranja somou +{x}: {d} de dano, não {p}.',
+    blueHit: 'Essa peça azul fez a palavra TODA ×{m}: {d} de dano, não {p}.',
+    blueVsOrange: 'O laranja soma +6 a uma peça. O azul multiplica a palavra.',
+    strikeHit: 'A fera atingiu VOCÊ: {a} de dano.',
+    strikeBar: 'Sua vida caiu {b} → {c}.',
+    greenHeal: 'Essa peça verde curou você ♥{h}: {b} → {c}.',
+    greenVsRest: 'Laranja e azul ferem a fera. O verde cura VOCÊ.',
+  },
+  de: {
+    tile1: 'Ein oranger Stein zahlt +6 extra.',
+    tile2: 'Ein blauer Stein macht das ganze Wort ×1.5.',
+    tile3: 'Ein grüner Taustein heilt dich um ♥6.',
+    ink: 'Ein Tintenstein buchstabiert, zahlt aber nichts.',
+    scry: 'Fest? SCRY gibt ein neues Brett',
+    scryCost: 'SCRY lässt die Bestie einen Zug früher zuschlagen',
+    orangeHit: 'Der orange Stein gab +{x}: {d} Schaden, nicht {p}.',
+    blueHit: 'Der blaue Stein machte das GANZE Wort ×{m}: {d} statt {p}.',
+    blueVsOrange: 'Orange gibt einem Stein +6. Blau vervielfacht das Wort.',
+    strikeHit: 'Die Bestie traf DICH: {a} Schaden.',
+    strikeBar: 'Dein Leben fiel {b} → {c}.',
+    greenHeal: 'Der grüne Stein heilte dich ♥{h}: {b} → {c}.',
+    greenVsRest: 'Orange und Blau treffen die Bestie. Grün heilt DICH.',
+  },
+};
+/* the one prompt frame (F5-FIX1-03 pulled it out of ssF5Prompt so the scry
+   gate speaks in the same voice): dark plate, gold rim, cream italic. The
+   caller owns position, depth and life. */
+function ssF5Frame(scene, str) {
+  const l = scene.L;
+  const t = ssTxt(scene, 0, 0, str, l.u(14.5), '#f3e5b4', 'italic').setOrigin(0.5);
+  // FIRST NIGHT, LIVE: one line per text — a long tongue's line shrinks to
+  // the frame rather than run off a narrow phone (the doors' own law)
+  const room = Math.min(l.W, l.u(390)) - l.u(40);
+  if (t.width > room) t.setFontSize(Math.floor(l.u(14.5) * room / t.width) + 'px');
+  const w = t.width + l.u(28), h = t.height + l.u(18);
+  const g = scene.add.graphics();
+  g.fillStyle(0x15131f, 0.93); g.fillRoundedRect(-w / 2, -h / 2, w, h, l.u(9));
+  g.lineStyle(l.u(1.3), 0xd9b96a, 0.55); g.strokeRoundedRect(-w / 2, -h / 2, w, h, l.u(9));
+  const c = scene.add.container(0, 0, [g, t]);
+  c.f5W = w; c.f5H = h;
+  return c;
+}
+function ssF5Prompt(scene, key, x, y) {
+  const seen = scene.f5Prompted || (scene.f5Prompted = {});
+  if (seen[key] || !scene.scene.isActive()) return;
+  seen[key] = 1;
+  window.__f5prompt = Object.assign(window.__f5prompt || {}, { [key]: ((window.__f5prompt || {})[key] | 0) + 1 });
+  const l = scene.L;
+  const str = (SS_F5_PROMPTS[PACK.lang] || SS_F5_PROMPTS.en)[key] || SS_F5_PROMPTS.en[key];
+  const c = ssF5Frame(scene, str).setDepth(950).setAlpha(0).setScale(0.92);
+  const w = c.f5W, h = c.f5H;
+  c.setPosition(Math.max(w / 2 + l.u(6), Math.min(l.W - w / 2 - l.u(6), x)),
+    Math.max(h / 2 + l.u(6), Math.min(l.H - h / 2 - l.u(6), y)));
+  scene.tweens.add({ targets: c, alpha: 1, scale: 1, duration: 220, ease: 'Back.easeOut' });
+  const close = () => { if (!c.active) return; scene.tweens.add({ targets: c, alpha: 0, duration: 240, onComplete: () => { if (c.active) c.destroy(); } }); };
+  scene.time.delayedCall(8000, close);
+  scene.time.delayedCall(500, () => scene.input.once('pointerdown', close));   // taps accelerate
+}
+const SS_F5_FLOOR = { en: ['m', 'o', 'o', 'n', 's'], es: ['l', 'u', 'n', 'a', 's'], fr: ['l', 'u', 'n', 'e', 's'], pt: ['c', 'a', 's', 'a', 's'], de: ['s', 't', 'e', 'r', 'n', 'e'] };
+/* F5-BLUE (card 04): VULPES 30 → 84 hp. The scripted night now lands FIVE
+   guided words on the first beast (en: STAR 5 · MOONS 9 · SKY 16 · TONIGHT
+   21 · HALO 12 = 63) and the blue showcase must hold with the beast still
+   standing (a felled beast skips the lesson — beastDeath takes the plain
+   road); 84 leaves 21 after the blue word in en (30–38 in the other
+   tongues), room for card 05's strike and green word before the ember
+   minute. Was 1.1 (33 hp, "strikes in 1 cast" at a sliver — the 10/7
+   page's §IV tuning, superseded by the script). The suite's simulation
+   reads this constant. */
+const SS_F5_EMBER_MULT = 2.8;
 function ssFtueDone() {
   if (SS.prof && SS.prof.ftue !== 1) { SS.prof.ftue = 1; SS.save(); DIAG('ftue: done'); }
 }
@@ -2223,6 +2594,26 @@ function ssVeilStars(scene, items, count, depth) {
    Spec: SKY-DESIGN.md · demo: ascent.html (curve ported 1:1).
    ============================================================ */
 const ASC = { DIP_MS: 260, TOTAL_MS: 2600, DESCEND_MS: 1150 };
+/* F5-STRAIGHT (Skylar 10/9, straight into the night): the ms into the shipped
+   rise at which the camera first reaches p — the first open's lean resumes
+   the ride from there (the title stands at the intro's 0.92: ~1790ms in,
+   ~810ms of climb, overshoot and settle left), so every frame after the tap
+   is the rise the game always made. The riser is sized to that tail plus
+   the crossfade so its swell lands just before the arrival chime. */
+function ssF5LeanFrom(p) { for (let ms = 0; ms <= ASC.TOTAL_MS; ms += 2) if (ssAscentP(ms) >= p) return ms; return ASC.TOTAL_MS; }
+const SS_F5_LEAN_RISER_S = 1.3;
+/* the stardust a word comes apart into (dissolveTitle's recipe), fixed to
+   the frame so it can rise off the zenith wordmark */
+function ssF5Stardust(scene, b, n) {
+  const em = scene.add.particles(0, 0, 'dot', {
+    speed: { min: 8, max: 60 }, lifespan: { min: 700, max: 1500 }, gravityY: -30,
+    scale: { start: 0.55, end: 0 }, alpha: { start: 0.9, end: 0 },
+    blendMode: 'ADD', tint: [0xf3e5b4, 0xffe9c9, 0xcfd8ff], emitting: false,
+  }).setScrollFactor(0).setDepth(612);
+  for (let k = 0; k < n; k++) em.emitParticleAt(b.x + Math.random() * b.width, b.y + b.height * 0.15 + Math.random() * b.height * 0.7);
+  scene.time.delayedCall(1700, () => { if (em.active) em.destroy(); });
+  return em;
+}
 const ssReduceMotion = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
 // dip → rise → settle with overshoot; p: 0 = meadow, 1 = zenith
 function ssAscentP(ms) {
@@ -6770,6 +7161,10 @@ class Home extends Phaser.Scene {
     this.dailyGlow = null;   // …and so did the daily door's ember (idleTweens runs before the column is built)
     this.leaving = false;    // the crest's pop-then-profile in flight (see the crest; busy() reads it)
     this.ftueBare = false;   // the wordless first open re-arms it below if owed
+    /* F5-STRAIGHT (Skylar 10/9, straight into the night): the first open's
+       own state — the standing title, the pending lean — dies with the open;
+       the post-fight restart (entry 'battle') must boot the meadow clean */
+    this.f5Straight = false; this.f5TitleFx = null; this.f5Lean = null;
 
     // Everything at the meadow (showcase, title, buttons, chip, footer) is a
     // full frame's work on a slow phone, and a descent-by-create (the dawn
@@ -6791,12 +7186,18 @@ class Home extends Phaser.Scene {
        hands boot to lab.js, ?mpuid is a harness identity); every excluded
        boot behaves exactly as it always did. ?ftue=1 forces the flow (the
        dev seam, ?dawn's pattern); ?ftue=0 stands it down. */
+    /* F5-GRAFT-4: the run must survive a pocket. A held quick fight (an app
+       killed mid-run) outranks every open, the first included — the player
+       relaunches into the fight they were standing in, never into a replayed
+       intro over an orphaned run. The door itself rides the boot chain below. */
+    const qck = (!entry && !deep && !DEMO && !bypassed && QS.get('vsdemo') !== '1' && !QS.get('frdemo')
+      && !QS.get('botduel') && QS.get('lab') !== '1' && !QS.get('mpuid')) ? this.quickCheckpoint() : null;
     const ftue = (ssFtuePending() || QS.get('ftue') === '1') && QS.get('ftue') !== '0'
       && !entry && !DEMO && QS.get('vsdemo') !== '1' && !QS.get('frdemo') && !QS.get('botduel')
       && QS.get('daily') !== '1' && QS.get('quick') !== '1' && QS.get('endless') !== '1'
-      && QS.get('lab') !== '1' && !QS.get('mpuid') && !deep && !bypassed;
+      && QS.get('lab') !== '1' && !QS.get('mpuid') && !deep && !bypassed && !qck;
     window.__ssftue = { on: ftue, state: ftue ? 'gate' : 'off' };   // headless verification reads this
-    const intro = !entry && !INTRO_SEEN && !DEMO && QS.get('vsdemo') !== '1' && !QS.get('frdemo') && !QS.get('botduel') && QS.get('daily') !== '1' && QS.get('quick') !== '1' && !deep && !bypassed;
+    const intro = !entry && !INTRO_SEEN && !DEMO && QS.get('vsdemo') !== '1' && !QS.get('frdemo') && !QS.get('botduel') && QS.get('daily') !== '1' && QS.get('quick') !== '1' && !deep && !bypassed && !qck /* F5-GRAFT-4 */;
     if (ftue) this.ftueOpen(l, intro);
     else if (entry) this.time.delayedCall(0, () => { if (this.sys.isActive()) this.buildMeadowUi(l); });
     else if (intro) this.playIntro(l);
@@ -6808,11 +7209,20 @@ class Home extends Phaser.Scene {
     this.time.addEvent({ delay: 1000, loop: true, callback: () => this.updateDailyChip() });
 
     this.input.once('pointerdown', () => SFX.ensure());
+    /* F5-GRAFT-2: no dead taps during the scripted open — the skip/advance
+       arms exactly as shipped (the launching tap must never skip its own
+       ride), but the answer is never silence: every tap sparks where the
+       finger landed. */
+    this.input.on('pointerdown', (p) => { if (this.f5Straight && (this.introPlaying || this.ascending)) ssF5TapSpark(this, p.x, p.y); });   // FIRST NIGHT, LIVE: the first open's taps only
+    /* F5-STRAIGHT: the first open never rests on the grass, so the title night
+       draws no marks (the stray-signs law, extended) — the meadow after the
+       first game is a fresh create and wears them as before */
+    if (!this.f5Straight) ssF5DrawLitSky(this);   /* F5-CARD-06: the meadow wears the kept sky — the morning-after proof */
     this.events.on('ss-achproxy', (def) => ssAchToast(this, def));
 
     // crickets sing while we stand in the grass — at dawn, the birds do.
     // During the intro we're still up at the zenith; they start on landing.
-    if (!this.introPlaying) { SFX.crickets(!this.isDawn); SFX.birds(this.isDawn); }
+    if (!this.introPlaying && !this.f5Straight /* F5-STRAIGHT: no crickets at the zenith */) { SFX.crickets(!this.isDawn); SFX.birds(this.isDawn); }
     this.events.once('shutdown', () => { SFX.crickets(false); SFX.birds(false); });
 
     // the ascent puts this scene to SLEEP, not to rest — returning from battle
@@ -6866,6 +7276,16 @@ class Home extends Phaser.Scene {
       // the door knocks until the meadow is free — a one-shot call landing
       // mid-intro was eaten by busy() and stranded the boot on the meadow
       const knock = () => { if (this.busy()) { this.time.delayedCall(250, knock); return; } this.startMode(mode); };
+      this.time.delayedCall(400, knock);
+    } else if (qck) {
+      /* F5-GRAFT-4: the held fight relaunches — same knock pattern as the
+         QS doors. A held FIGHT 1 of the first night brings the finger back
+         (its lessons replay on the curated board, checkpoint semantics are
+         fight-start); any later fight resumes plain. */
+      const knock = () => {
+        if (this.busy()) { this.time.delayedCall(250, knock); return; }
+        this.beginAscent({ mode: 'quick', resume: qck, ascended: true, ftue: qck.ftue && !(qck.fightIdx | 0) ? 1 : 0 });
+      };
       this.time.delayedCall(400, knock);
     }
   }
@@ -6996,7 +7416,9 @@ class Home extends Phaser.Scene {
         this.tweens.add({ targets: sp, angle: 360, duration: 36000 + Math.random() * 20000, repeat: -1 });
         const bx = sp.scaleX, by = sp.scaleY;
         const flash = () => {
-          if (!sp.active || !this.sys.isActive()) return;
+          // FIRST NIGHT, LIVE: the first open stands at the zenith with the
+          // meadow chrome dark — the glints rest until the meadow's restart
+          if (!sp.active || !this.sys.isActive() || this.f5Straight) return;
           const k = 1.35 + Math.random() * 0.5, d = 260 + Math.random() * 240;
           this.tweens.add({
             targets: sp, duration: d, yoyo: true, ease: 'Sine.easeInOut',
@@ -7483,6 +7905,7 @@ class Home extends Phaser.Scene {
     if (ssReduceMotion()) {
       // gentle: open on the grass under a lifting veil. introPlaying never
       // sticks on this path, so create() starts the crickets as usual.
+      if (this.f5Straight) this.f5StandTitle(l);   /* F5-STRAIGHT: the first open stands at the zenith under the veil, not on the grass */
       DIAG('intro: reduce-motion → veil fade');
       const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setScrollFactor(0).setDepth(650);
       this.tweens.add({ targets: veil, alpha: 0, duration: 700, onComplete: () => veil.destroy() });
@@ -7562,6 +7985,26 @@ class Home extends Phaser.Scene {
           onComplete: () => finish(skipped),
         });
       };
+      /* F5-STRAIGHT (Skylar 10/9): on the first open the camera never comes
+         down. The landed word STANDS at the zenith and the night waits for
+         the hand (f5Lure); the tap leans the sky the rest of the way into
+         the fight (ftueRise). A tap mid-condense snaps the landing — the
+         runway rule: the first tap counts wherever it lands. */
+      const stand = (skipped) => {
+        if (!this.introPlaying) return;
+        this.introPlaying = false;
+        for (const tm of timers) tm.remove(false);
+        if (this.introSkipFn) { this.input.off('pointerdown', this.introSkipFn); this.introSkipFn = null; }
+        if (skipped) {   // mid-condense: snap the word landed, sweep a half-bloomed flourish
+          this.tweens.killTweensOf([t, glow]);
+          t.setAlpha(1).setScale(bs.sx, bs.sy); glow.setAlpha(0.18 * ga);   /* F5-PAINTED */
+          for (const fx of this.introFx) if (fx && fx.active) { this.tweens.killTweensOf(fx); fx.destroy(); }
+          this.introFx = [];
+        }
+        this.f5TitleFx = { t, glow, em };   // the lean takes them apart (f5LeanTitle)
+        window.__ssintro = 'stands';
+        DIAG('intro stands at the zenith' + (skipped ? ' (SKIPPED)' : '') + ' — straight into the night');
+      };
       // the show, beats overlapping like weather: a star streaks while the boot
       // veil is still lifting, the word condenses and LANDS (scale settles with
       // a Back overshoot into a swell of light and kicked stardust), a second
@@ -7595,12 +8038,13 @@ class Home extends Phaser.Scene {
         for (let k = 0; k < 42; k++) em.emitParticleAt(b.x + Math.random() * b.width, b.y + b.height * 0.2 + Math.random() * b.height * 0.6);
       });
       at(1000, () => ssShootingStar(this));
-      at(1350, () => settle(1000, false));
+      at(1350, () => (this.f5Straight ? stand(false) : settle(1000, false)));   /* F5-STRAIGHT: the descent begins here on every other boot */
       at(300, () => {
         if (!this.introPlaying) return;
         this.input.on('pointerdown', this.introSkipFn = () => {
           if (!this.introPlaying) return;
           for (const tm of timers) tm.remove(false);
+          if (this.f5Straight) { stand(true); return; }
           settle(Math.max(240, 340 * this.introP), true);
         });
       });
@@ -7628,10 +8072,16 @@ class Home extends Phaser.Scene {
      meadow's own doors offer tomorrow. */
   ftueOpen(l, intro) {
     this.ftueBare = true;                 // buildMeadowUi builds bare; onWake restarts on it
-    DIAG('ftue: first open');
+    /* F5-STRAIGHT (Skylar 10/9): "it shouldn't transition to the meadow. It
+       should just transition right into the tutorial game from that night
+       screen" — the first open never comes down: the title stands at the
+       zenith, the lure asks there, the tap leans the sky into the fight. */
+    this.f5Straight = true;
+    if (SS.prof && !SS.prof.f5night) { SS.prof.f5night = 1; SS.save(); }   // FIRST NIGHT, LIVE: this device's first open WAS the first night (ssF5LitOwner)
+    DIAG('ftue: first open (straight into the night)');
     window.__ssftue.state = 'open';
-    if (intro) this.playIntro(l);         // the default cinematic, over the bare meadow
-    else this.buildMeadowUi(l);           // a mid-open restart: no second cinematic
+    if (intro) this.playIntro(l);         // the default cinematic, standing at its landing (F5-STRAIGHT)
+    else { this.buildMeadowUi(l); this.f5StandTitle(l); }   // a mid-open restart: no second cinematic — the title simply stands
     /* the rise follows the open by itself — nobody is asked to tap. A poll,
        not a hook: one waiter covers the settle, a tap-skip, the
        reduce-motion veil AND the intro's own catch-fallback. */
@@ -7639,15 +8089,72 @@ class Home extends Phaser.Scene {
       delay: 350, loop: true, callback: () => {
         if (this.introPlaying || this.ascending || this.descending || this.arrived) return;
         if (this.ftueWait) { this.ftueWait.remove(false); this.ftueWait = null; }
-        this.time.delayedCall(850, () => this.ftueRise());
+        /* F5-CARD-03 (verdict 8: LURE TAP — HEAR THE RISE): the standing
+           title (F5-STRAIGHT; the settled meadow, before 10/9) asks with
+           ONE FIREFLY instead of rising unasked. The
+           player's tap — anywhere — launches the ascent and arms the audio
+           in the same gesture, so the riser and the arrival chime are heard
+           on a true first open for the first time in the game's history.
+           Reduced motion keeps the shipped 850ms auto-rise untouched. */
+        if (ssReduceMotion()) { this.time.delayedCall(850, () => this.ftueRise()); return; }
+        this.f5Lure(l);
       },
     });
+  }
+  /* F5-CARD-03: one firefly asks. It breathes the hand's own gold push-ring;
+     the ladder is the page's own graft — ring at once, a brighter pulse at
+     2.5s, and a 5s fallback auto-rise (silent, exactly the shipped open) so
+     a watcher who never taps is never stranded. Zero words. */
+  f5Lure(l) {
+    if (this.f5LureOn || this.ascending || this.arrived || !this.scene.isActive()) return;
+    this.f5LureOn = true;
+    window.__ssftue.state = 'lure';
+    DIAG('ftue: lure');
+    /* F5-STRAIGHT: at the zenith the firefly asks UNDER the standing wordmark,
+       fixed to the frame (the meadow seat is a world away below it) */
+    const zen = !!this.f5TitleFx;
+    const cx = zen ? l.W / 2 : l.x(0), cy = zen ? Math.round(l.H * 0.6) : l.y(470);
+    const items = [];
+    const fly = this.add.image(cx, cy, 'spark4').setScale(0.9).setAlpha(0).setDepth(560).setBlendMode('ADD').setTint(0xffe9a8).setData('f5lure', 1);
+    if (zen) fly.setScrollFactor(0);
+    items.push(fly);
+    this.tweens.add({ targets: fly, alpha: 0.95, duration: 500 });
+    this.tweens.add({ targets: fly, scale: 1.3, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    this.tweens.add({ targets: fly, y: cy - l.u(14), duration: 1700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    const ringK = ssFxTex(this, 'ring', 0xffe9a8);
+    const breathe = (big) => {
+      if (!this.f5LureOn || !this.scene.isActive()) return;
+      const ring = this.add.image(cx, fly.y, ringK).setDisplaySize(l.u(30), l.u(30)).setAlpha(big ? 0.9 : 0.7).setDepth(559).setBlendMode('ADD');
+      if (zen) ring.setScrollFactor(0);
+      this.tweens.add({ targets: ring, displayWidth: l.u(big ? 124 : 88), displayHeight: l.u(big ? 124 : 88), alpha: 0, duration: big ? 1000 : 850, ease: 'Sine.easeOut', onComplete: () => ring.destroy() });
+    };
+    breathe(false);
+    const ringT = this.time.addEvent({ delay: 1200, loop: true, callback: () => breathe(false) });
+    const launch = (p) => {
+      if (!this.f5LureOn) return;
+      this.f5LureOn = false;
+      SFX.ensure();                       // the same gesture wakes the sound
+      if (p) ssF5TapSpark(this, p.x, p.y);
+      ringT.remove(false);
+      if (fallT) fallT.remove(false);
+      this.input.off('pointerdown', launch);
+      window.__ssftue.state = 'lured';
+      for (const o of items) { this.tweens.killTweensOf(o); this.tweens.add({ targets: o, alpha: 0, duration: 260, onComplete: () => o.destroy() }); }
+      this.ftueRise();
+    };
+    this.input.on('pointerdown', launch);
+    const fallT = this.time.delayedCall(5000, () => launch(null));
   }
   ftueRise() {
     if (!this.ftueBare || this.ascending || this.arrived || !this.scene.isActive()) return;
     if (this.busy()) { this.time.delayedCall(400, () => this.ftueRise()); return; }
     DIAG('ftue: rise');
     window.__ssftue.state = 'rise';
+    /* F5-STRAIGHT: from the standing title the sky has only the last of the
+       climb left. The shipped rise RESUMES from the frame it is already on
+       (ssF5LeanFrom), the word coming apart into stardust as the night leans
+       in — every frame after the tap is the rise the game always made. */
+    if (this.f5TitleFx) { this.f5Lean = { from: ssF5LeanFrom(this.introP) }; this.f5LeanTitle(); }
     this.beginAscent({ mode: 'quick', resume: null, ascended: true, ftue: 1 });
   }
   /* THE TUTORIAL DOOR (v0.124.0, Skylar 10/29) — the settings sheet's
@@ -7666,6 +8173,44 @@ class Home extends Phaser.Scene {
     DIAG('ftue: replay (the settings door)');
     window.__ssftue = Object.assign(window.__ssftue || {}, { state: 'rise', replay: 1 });
     this.beginAscent({ mode: 'quick', resume: null, ascended: true, ftue: 1 });
+  }
+  /* F5-STRAIGHT: the title standing at the zenith with no cinematic — the
+     reduce-motion open and a mid-open restart (rotation) stand here instead
+     of on the grass; playIntro's own landing hands off through stand(). */
+  f5StandTitle(l) {
+    if (this.f5TitleFx) return;
+    this.introP = 0.92;                   // the intro's own zenith shade
+    this.sky.setP(this.introP, 0);
+    this.sky.grain.setVisible(false);
+    for (const o of this.uiItems) { this.tweens.killTweensOf(o); o.setAlpha(0); }
+    const tk = ssTitleTex(this);
+    const tScale = Math.min(1, 384 / tk.w);
+    const t = this.add.image(l.W / 2, l.H * 0.4, tk.key)
+      .setDisplaySize(l.u(tk.w * tScale), l.u(tk.h * tScale)).setScrollFactor(0).setDepth(610);
+    const glow = this.add.image(t.x, t.y, 'glowbig').setScale(l.u(2.1)).setTint(0xf3e5b4)
+      .setBlendMode('ADD').setScrollFactor(0).setDepth(605).setAlpha(0.18 * (this.sky && this.sky.art ? 0.55 : 1));   /* F5-PAINTED: the halo whispers over the painted night (playIntro's ga) */
+    this.f5TitleFx = { t, glow, em: null };
+    window.__ssintro = 'stands';
+    DIAG('ftue: the title stands at the zenith (no cinematic)');
+  }
+  /* F5-STRAIGHT: the wordmark comes apart where it stands — the shipped
+     dissolve's own recipe (dissolveTitle), played on the ZENITH word, since
+     the meadow's title is a world away below the frame. Reduced motion
+     fades it under the veil instead. */
+  f5LeanTitle() {
+    const fx = this.f5TitleFx; this.f5TitleFx = null;
+    if (!fx) return;
+    const { t, glow, em } = fx;
+    const quick = ssReduceMotion();
+    if (!quick && t.active) {
+      ssF5Stardust(this, t.getBounds(), 46);
+      this.tweens.add({ targets: t, scaleX: t.scaleX * 1.05, scaleY: t.scaleY * 1.05, duration: 420, ease: 'Sine.easeOut' });
+    }
+    for (const o of [t, glow]) if (o && o.active) {
+      this.tweens.killTweensOf(o);
+      this.tweens.add({ targets: o, alpha: 0, duration: quick ? 200 : 420, ease: 'Sine.easeIn', onComplete: () => { if (o.active) o.destroy(); } });
+    }
+    if (em && em.active) this.time.delayedCall(1200, () => { if (em.active) em.destroy(); });
   }
 
   /* the DAILY door's herald, every second while the meadow stands and on
@@ -8910,6 +9455,14 @@ class Home extends Phaser.Scene {
     if (!SS_ACTS[ck.actIdx]) ck.actIdx = Math.min(SS_ACTS.length - 1, Math.floor(ck.fightIdx / 5));
     return ck;
   }
+  /* F5-GRAFT-4: the held quick fight — validated the campaign way, plus the
+     seed that rebuilds the identical fight list (the endless eseed law). */
+  quickCheckpoint() {
+    let ck = null;
+    try { ck = JSON.parse(localStorage.getItem('beta3.quickck')); } catch (e) { return null; }
+    if (!ck || typeof ck !== 'object' || typeof ck.fightIdx !== 'number' || !(ck.fightIdx >= 0) || !Number.isFinite(ck.qseed)) return null;
+    return ck;
+  }
   busy() { return this.ascending || this.descending || this.introPlaying || SS_RITE.busy || this.leaving; }
   startMode(mode) {
     if (this.busy()) return;
@@ -8932,7 +9485,7 @@ class Home extends Phaser.Scene {
     DIAG('ascent begin (' + data.mode + ')');
     try {
       const l = ssLayout(this);
-      SFX.crickets(false); SFX.birds(false); SFX.riser();
+      SFX.crickets(false); SFX.birds(false); SFX.riser(this.f5Lean ? SS_F5_LEAN_RISER_S : undefined);   /* F5-STRAIGHT: the sweep sized to the lean */
       this.sky.scatterFlies();
       for (const o of this.uiItems) this.tweens.killTweensOf(o);
       if (this.flare) this.flare.sleep();
@@ -8962,6 +9515,8 @@ class Home extends Phaser.Scene {
       PERF.start('ascent', this);
       this.ascentStart = this.time.now;
       this.skipAt = null; this.lastP = 0; this.lastT = this.time.now;
+      /* F5-STRAIGHT: resume the ride at the frame the standing title is on */
+      if (this.f5Lean) { this.ascentStart -= this.f5Lean.from; this.lastP = this.introP; this.f5Lean = null; }
       // arm the tap-to-skip only after the launching tap has fully cleared —
       // Phaser delivers the button's own pointerdown to scene listeners added
       // during dispatch, so arming immediately made every real tap self-skip
@@ -8979,7 +9534,7 @@ class Home extends Phaser.Scene {
   dissolveTitle() {
     if (ssReduceMotion()) return;
     this.time.delayedCall(340, () => {
-      if (!this.ascending || this.arrived || !this.titleT) return;
+      if (!this.ascending || this.arrived || !this.titleT || this.f5Straight /* F5-STRAIGHT: the lean dissolves the zenith word instead */) return;
       const b = this.titleT.getBounds();
       const em = this.add.particles(0, 0, 'dot', {
         speed: { min: 8, max: 60 }, lifespan: { min: 700, max: 1500 }, gravityY: -30,
@@ -9106,6 +9661,14 @@ class Battle extends Phaser.Scene {
   constructor() { super('battle'); }
   init(data) {
     this.mode = data.mode || 'quick'; this.resume = data.resume || null; this.ascended = !!data.ascended; this.ftue = !!data.ftue;
+    /* THE FIRST NIGHT, LIVE (first-night integration): every F5 beat that
+       the sandbox ran on ANY quick run — the lesson prompts, the planted
+       glow, the fight-2 ink taste, the rig + kind bag, the cue rungs, the
+       stall glint + scry gate, the split refusal, the pocket checkpoint, the
+       lit sky's rite — rides THIS flag: the stranger's first night only (the
+       FTUE run, or its pocketed resume past fight 1). A returning player's
+       quick run is the shipped quick run, beat for beat. */
+    this.f5Night = this.mode === 'quick' && (this.ftue || !!(this.resume && this.resume.ftue) || QS.get('f5night') === '1' /* dev seam: any quick run plays the night's grafts (?ftue=1's pattern) */);
     // THE KEPT HUNT (v0.114.0): the daily's own resume — the whole position a
     // closed hunt left standing. Null on a fresh run (and on every other
     // mode). startFight consumes it ONCE, for the fight the hunt was left on;
@@ -9178,7 +9741,12 @@ class Battle extends Phaser.Scene {
     // daily: same-language hunters share one seeded sky; the pack salt keeps
     // a language switch from replaying today's English board with new letters
     if (this.mode === 'daily') setSeed(SSNET.dayKey() ^ ssPackSeed(PACK.lang));
-    else setSeed(Math.floor(Math.random() * 1e9));
+    else if (this.mode === 'quick') {
+      /* F5-GRAFT-4: the quick run's draws ride a KEPT seed, so a pocketed
+         phone rebuilds the identical fight list on resume (the eseed law). */
+      this.qseed = this.resume && Number.isFinite(this.resume.qseed) ? this.resume.qseed : Math.floor(Math.random() * 1e9);
+      setSeed(this.qseed);
+    } else setSeed(Math.floor(Math.random() * 1e9));
     this.fights = [];
     let planSeed;
     if (this.mode === 'campaign') {
@@ -9217,6 +9785,32 @@ class Battle extends Phaser.Scene {
       const pool = court ? [...court.kings] : [...SS_QUICK_POOL];
       for (let i = 0; i < 4; i++) this.fights.push({ id: pool.splice(Math.floor(rng() * pool.length), 1)[0], actIdx: 0, mult: court ? court.mults[i] : 1 + i * 0.12, atkAdd: court ? 0 : Math.floor(i / 2), umbral: false });
       this.fights.push({ id: court ? court.crown : SS_QUICK_BOSS, actIdx: 0, mult: 1, atkAdd: 0, umbral: false });
+      /* F5-GRAFT-1 (pin fight one): the first night's fight 1 is VULPES,
+         every day of the week — "the 2.5× dice roll is the cheapest bug on
+         this page." The four splice rolls above are BURNED exactly as stock
+         (the draw-order law: the board's deal never moves); the pin only
+         rearranges what they chose. Tuning lands with THE EMBER MINUTE
+         (card 04); the pin itself is this line's whole job. */
+      if (this.ftue) {
+        const vi = this.fights.findIndex((f) => f.id === 'vulpes');
+        if (vi > 0 && vi < 4) { this.fights[vi].id = this.fights[0].id; this.fights[0].id = 'vulpes'; }
+        else if (vi < 0) this.fights[0].id = 'vulpes';
+        /* F5-CARD-04: THE EMBER MINUTE's tuning — 33 hp, atk 8, so
+           "strikes in 1 cast" always arrives with the beast at a sliver:
+           race it or eat it, manufactured on day one at stakes of 8. */
+        this.fights[0].mult = SS_F5_EMBER_MULT;
+        this.fights[0].atkAdd = 0;
+        /* F5-SCRYGATE (card 03): the first night's VULPES runs a longer
+           fuse through beastFor's tcut door, so after the three guided
+           casts the scripted scry has a step to SHOW (the one cast
+           earlier, literally). F5-BLUE (card 04): SIX casts now (timer
+           4 → 6): STAR·MOONS·SKY leave 3, the scry steps it 3 → 2 in the
+           light, the forge word 2 → 1 (the ember alarm wakes as the blue
+           lands), and the blue word's own tick 1 → 0 IS the strike — the
+           beat card 05 scripts, delivered by the mechanic right after the
+           blue showcase lets go. */
+        this.fights[0].tcut = -2;
+      }
       planSeed = Math.floor(rng() * 1e9);       // daily: seeded stream → every hunter shares the schedule
     }
     /* THE DYING NAMES (v0.110.0): the curse ladder — one letter per fight,
@@ -9258,7 +9852,7 @@ class Battle extends Phaser.Scene {
       sigils: this.resume.sigils || [], words: this.resume.words | 0, longest: this.resume.longest || '',
       totalDmg: this.resume.totalDmg | 0, scried: !!this.resume.scried, featherUsed: !!this.resume.featherUsed,
       letters: this.resume.letters | 0, bigHit: this.resume.bigHit | 0,
-      playMs: ssClockInherit(this.resume, this.mode === 'endless' ? 'beta3.endless' : 'beta3.campaign'),
+      playMs: ssClockInherit(this.resume, this.mode === 'endless' ? 'beta3.endless' : this.mode === 'quick' ? 'beta3.quickck' /* F5-GRAFT-4 */ : 'beta3.campaign'),
       overkill: this.resume.overkill | 0, tiers: this.resume.tiers || {},
       // THE FRONTIER already taken this climb (v0.77.0; the gate re-seats
       // it v0.115.0) — a resumed climb re-reads the ledger but never
@@ -9329,9 +9923,33 @@ class Battle extends Phaser.Scene {
     DIAG('battle create ' + Math.round(tEnd - tCr) + 'ms (sky ' + Math.round(tSky - tCr) +
       ' · state ' + Math.round(tState - tSky) + ' · ui ' + Math.round(tUi - tState) + ' · fight ' + Math.round(tEnd - tUi) + ')');
 
+    this.f5G = null;   /* F5-GUIDED: the script's state dies with the scene (stale-ref law) — reset BEFORE the hand builds it */
     if (this.ftue) this.ftueStart();   // the first open: curated deal landed above; the finger follows
 
     if (DEMO) this.demoTimer = this.time.addEvent({ delay: 1400, loop: true, callback: () => this.demoStep() });
+    /* F5-CARD-04: THE SKY LEANS IN — the rig. Fight 1's refills ride the
+       authored queue; after it drains, the KIND BAG (f5Kind) fades
+       100→50→0% by fight 4. The run's cue rungs start unfired. */
+    this.f5Queue = []; this.f5Rungs = null;   // FIRST NIGHT, LIVE: a veteran's run carries neither (f5Kind/f5CastBeats stand down)
+    if (this.f5Night) { this.f5Queue = this.ftue ? (SS_F5_RIG[PACK.lang] || SS_F5_RIG.en).slice() : []; this.f5Rungs = {}; }
+    // the once-a-run lessons are once a RUN (the scene object outlives it)
+    this.f5Prompted = {}; this.f5InkTaught = false; this.f5Encored = false; this.f5Floored = false;
+    /* F5-FIX1-02: THE STRAY SIGNS (Skylar's circled verdict, 10/08) — the
+       battle NO LONGER wears the kept sky: the fight view owns no standing
+       marks, at boot or across fells (they crowded the YOU bar and the
+       quick-play corner). The marks' homes stand untouched: the meadow
+       (the morning-after proof), the fell's own rite, the second-fell
+       tomorrow cue, the end screen's ledger. */
+    this.f5SeatMarks = [];
+    /* F5-FIX1-03: THE SCRY LESSON's gate (null = down) and the pill hold —
+       while the hold is up, updateBars leaves the strikes pill saying the
+       OLD count so the lesson can show the step down on its own beat (the
+       hpShown/hpHold grammar, applied to the fuse). */
+    this.f5ScryGate = null; this.f5PillHold = 0;
+    /* F5-GRAFT-5: feed the stalled speller — the stall clock. Any tap
+       anywhere re-arms it; the glint itself fires from update(). */
+    this.f5LastTap = 0; this.f5Glinted = false;
+    this.input.on('pointerdown', () => { this.f5LastTap = this.time.now; this.f5Glinted = false; });
     this.input.on('pointerdown', () => SFX.ensure());
     this.game.events.on('ss-ach', this.onAch, this);
     this.events.once('shutdown', () => { this.clockPersist(); this.game.events.off('ss-ach', this.onAch, this); });
@@ -9355,6 +9973,236 @@ class Battle extends Phaser.Scene {
     // the visible+focused gates above already hold for it (hard mode's
     // 10s, or THE FALLING SKY's 12s — this.strikeMs is the one truth)
     if (this.strikeMs) this.hardTick(dt);
+    /* F5-GRAFT-5: feed the stalled speller — 10s without a tap in free play
+       (first night's quick run, finger retired or absent, nothing staged)
+       lands ONE viable-tile glint. Wordless, once per stall, invisible to
+       anyone who doesn't need it; the demo solver is nobody's student. */
+    if (this.f5Night && !DEMO && this.state === 'pick' && !this.sel.length
+      && (!this.ftue || this.ftueGone) && !this.f5ScryGate) {
+      if (!this.f5LastTap) this.f5LastTap = this.time.now;
+      else if (!this.f5Glinted && this.time.now - this.f5LastTap > 10000) {
+        this.f5Glinted = true;
+        /* F5-FIX1-03: THE SCRY LESSON (Skylar's 10/08 verdict) — the first
+           honest stall of the night TAKES THE HAND: the screen grays out,
+           SCRY alone stays lit, and the player must use it; the cost is
+           shown on the pill after the tap, then said. Once a night
+           (SS.prof.f5scry; the stage's refresh-restart replays it on a
+           fresh open). Deferred — falling back to the old glint + ribbon,
+           the lesson still owed — while the fuse sits at 1 (the step down
+           would be a strike, not a lesson) or a comet charge would make
+           the scry free (a free scry can't teach the price). */
+        if (!(SS.prof && SS.prof.f5scry) && this.beast && this.beast.hpNow > 0 && this.beast.count > 1
+          && !(this.hasSigil('comet') && (this.cometLeft | 0) > 0)) {
+          this.f5ScryGateUp();
+        } else {
+          const best = this.bestWord();
+          if (best && best.length) this.f5Glint(this.board[best[0]]);
+          /* F5-CARD-05: the stall is also SCRY's honest moment — the player
+             who is stuck is the one the button exists for. */
+          ssF5Prompt(this, 'scry', this.L.x(-150), this.L.y(706));
+        }
+      }
+      /* F5-CARD-04: the rescue's second rung — 30s of stall brings the
+         gesture back once (the best word's tiles glint in walking order). */
+      else if (!this.f5Encored && this.time.now - this.f5LastTap > 30000) { this.f5Encored = true; this.f5Encore(); }
+    }
+  }
+  /* F5-CARD-04: THE KIND BAG. Fades 100→50→0% by fight 4. Statistically
+     invisible kindness: a drawn letter may be traded for a second draw when
+     the first would hurt the board — a 3rd+ duplicate, or a rare consonant
+     while the board is starved of the working set. No dictionary scan, no
+     hitch; the authored queue carries the real density, this keeps the bag
+     from undoing it. FOR SKYLAR (dial): the fade table and the working set. */
+  f5Kind(ch) {
+    if (this.mode !== 'quick' || !this.f5Rungs) return ch;
+    const p = [1, 1, 0.5][this.run.fightIdx | 0] || 0;
+    if (!p || rng() >= p) return ch;
+    const counts = {};
+    for (const s of this.board) if (s) counts[s.ch] = (counts[s.ch] | 0) + 1;
+    const dup = (counts[ch] | 0) >= 2;
+    const rare = 'jqxzvwk'.includes(ch) && !VOWELS.includes(ch);
+    if (!dup && !rare) return ch;
+    let alt = rpick(BAG);
+    alt = PACK.digraph[alt] || alt;
+    if ((counts[alt] | 0) >= 2) alt = rpick(['r', 's', 't', 'l', 'n', 'e']);
+    return alt;
+  }
+  /* F5-CARD-04: the cast's leaning-in beats — called from tryCast on every
+     quick-run cast, AFTER the run tallies moved. */
+  f5CastBeats(word, letters) {
+    if (this.mode !== 'quick' || !this.f5Rungs) return;
+    /* THE WORD WRITTEN IN STARS — the first cast of the first night hangs
+       as new stars threaded gold beside the beast, holds one breath, then
+       collapses toward the blow. A parallel overlay: the shipped cast path
+       (the hottest function in the game, per the critic) is untouched. */
+    if (this.ftue && this.run.words === 1) this.f5StarWrite(word);
+    /* THE LADDER OF CUES — each new length rung pays a one-shot sky cue:
+       a shooting star at 5+, the sky swelling at 6+, gold rain at 7+. */
+    if (letters >= 5 && !this.f5Rungs[5]) { this.f5Rungs[5] = 1; this.f5Cue5(); }
+    if (letters >= 6 && !this.f5Rungs[6]) { this.f5Rungs[6] = 1; this.f5Cue6(); }
+    if (letters >= 7 && !this.f5Rungs[7]) { this.f5Rungs[7] = 1; this.f5Cue7(); }
+    /* THE SKILL FLOOR — no 5+ by cast 4 means the ladder would never fire
+       for the bottom half: the next refill deals the floor word nearly
+       assembled (en validated; other tongues integration-gated). */
+    if (this.ftue && this.run.words === 4 && !this.f5Rungs[5] && !this.f5Floored) {
+      this.f5Floored = true;
+      this.f5Queue.push(...(SS_F5_FLOOR[PACK.lang] || SS_F5_FLOOR.en));
+    }
+  }
+  f5StarWrite(word) {
+    window.__f5starwrite = (window.__f5starwrite | 0) + 1;
+    if (!this.textures.exists('spark4')) return;
+    const l = this.L, n = word.length;
+    const cx = l.x(0), cy = l.y(206);                  // beside the beast's ground
+    const items = [];
+    const pts = [];
+    for (let k = 0; k < n; k++) {
+      const x = cx + l.u(-((n - 1) * 34) / 2 + k * 34 + (k % 2 ? 6 : -6)), y = cy + l.u(k % 2 ? 14 : -10);
+      pts.push({ x, y });
+      const st = this.add.image(x, y, 'spark4').setScale(0).setAlpha(0).setDepth(560).setBlendMode('ADD').setTint(0xffe9a8);
+      items.push(st);
+      this.tweens.add({ targets: st, scale: 1.1, alpha: 0.95, delay: 120 + k * 90, duration: 220, ease: 'Back.easeOut' });
+    }
+    const g = this.add.graphics().setDepth(559).setAlpha(0);
+    g.lineStyle(l.u(1.6), 0xd9b96a, 0.8);
+    for (let k = 1; k < n; k++) { g.moveTo(pts[k - 1].x, pts[k - 1].y); g.lineTo(pts[k].x, pts[k].y); }
+    g.strokePath();
+    items.push(g);
+    this.tweens.add({ targets: g, alpha: 0.7, delay: 160 + n * 90, duration: 240 });
+    this.time.delayedCall(1050, () => {               // one breath, then the collapse
+      for (const o of items) {
+        this.tweens.killTweensOf(o);
+        this.tweens.add({ targets: o, x: cx, y: cy + l.u(26), alpha: 0, scale: 0.1, duration: 330, ease: 'Quad.easeIn', onComplete: () => o.destroy() });
+      }
+    });
+  }
+  f5Cue5() {   // a shooting star crosses the upper sky
+    window.__f5ladder5 = 1;
+    if (!this.textures.exists('spark4')) return;
+    const l = this.L;
+    const st = this.add.image(l.x(-170), l.y(90), 'spark4').setScale(1.2).setAlpha(0).setDepth(558).setBlendMode('ADD');
+    this.tweens.add({ targets: st, alpha: 0.95, duration: 120 });
+    this.tweens.add({ targets: st, x: l.x(150), y: l.y(150), duration: 900, ease: 'Sine.easeIn', onComplete: () => st.destroy() });
+    for (let k = 1; k <= 5; k++) this.time.delayedCall(k * 140, () => {
+      if (!st.scene) return;
+      const tr = this.add.image(st.x, st.y, 'spark4').setScale(0.6).setAlpha(0.5).setDepth(557).setBlendMode('ADD');
+      this.tweens.add({ targets: tr, alpha: 0, scale: 0.1, duration: 420, onComplete: () => tr.destroy() });
+    });
+  }
+  f5Cue6() {   // the sky itself swells — one additive breath across the top
+    window.__f5ladder6 = 1;
+    if (!this.textures.exists('glowbig')) { return; }
+    const l = this.L;
+    const sw = this.add.image(l.x(0), l.y(110), 'glowbig').setDisplaySize(l.u(520), l.u(240))
+      .setTint(0x7fe9c3).setAlpha(0).setDepth(556).setBlendMode('ADD');
+    this.tweens.add({ targets: sw, alpha: 0.32, duration: 520, yoyo: true, ease: 'Sine.easeInOut', onComplete: () => sw.destroy() });
+  }
+  f5Cue7() {   // gold rain across the zenith
+    window.__f5ladder7 = 1;
+    if (!this.starBurst) return;
+    const l = this.L;
+    for (let k = 0; k < 7; k++) this.time.delayedCall(k * 70, () => this.starBurst.emitParticleAt(l.x(-150 + k * 50), l.y(80 + (k % 3) * 24), 6));
+  }
+  /* F5-CARD-04: the idle rescue's second rung — at 30s the gesture returns
+     once: the best word's tiles glint in walking order (the ghost hand's
+     lesson without its sprite). Once per run. */
+  f5Encore() {
+    window.__f5encore = (window.__f5encore | 0) + 1;
+    const best = this.bestWord();
+    if (!best || !best.length) return;
+    best.forEach((bi, k) => this.time.delayedCall(k * 180, () => { if (this.board[bi]) this.f5Glint(this.board[bi]); }));
+  }
+  /* F5-CARD-06: THE FIRST LIGHTING / the converge. The felled beast's own
+     chart rises from the battle ground and seats at the zenith, written to
+     the profile forever. FTUE first fell = the full rite (~2.6s, nameplate,
+     the graft-7 law: taps ACCELERATE the stagger — timeScale, never a cut —
+     and the 1.5s floor holds by construction); every later first-species
+     fell = a ~600ms converge inside the shipped beat (the page's own scope
+     cut that saves the M). Returns the ms the fell flow should hold. */
+  f5LightSky(id) {
+    if (!SS_F5_SEATS[id] || !SS_BEASTS[id] || !this.textures.exists('dot')) return 0;
+    const lit = SS.prof.f5lit = SS.prof.f5lit || [];
+    if (lit.includes(id)) return 0;
+    lit.push(id); SS.save();
+    window.__f5lit = (window.__f5lit || []).concat(id);
+    const l = this.L, b = SS_BEASTS[id], seat = SS_F5_SEATS[id];
+    const first = this.ftue && lit.length === 1;
+    const sc = SS_F5_SEAT_SC, cx = l.x(seat[0]), cy = l.y(seat[1]);
+    const from = { x: l.x(0), y: l.y(206) };
+    const tws = [];
+    const stars = b.stars.map(([sx, sy], k) => {
+      const d = this.add.image(from.x + l.u(sx * 0.5), from.y + l.u(sy * 0.5), 'dot')
+        .setScrollFactor(0).setDepth(930).setScale(0.85).setTint(0xffe9a8).setAlpha(0).setBlendMode('ADD');
+      tws.push(this.tweens.add({
+        targets: d, alpha: 0.95, x: cx + l.u(sx * sc), y: cy + l.u(sy * sc), scale: 0.5,
+        delay: (first ? 260 : 60) + k * (first ? 95 : 16), duration: first ? 900 : 420, ease: 'Sine.easeInOut',
+      }));
+      return d;
+    });
+    const total = first ? 260 + b.stars.length * 95 + 1500 : 600;
+    this.time.delayedCall(Math.max(400, total - 500), () => {
+      if (!this.scene.isActive()) return;
+      stars.forEach((d) => this.tweens.add({ targets: d, alpha: 0, duration: 420, onComplete: () => { if (d.active) d.destroy(); } }));
+      const items = ssF5DrawMini(this, id, 0, 920);   // the mark takes the seat for the fell's beat
+      /* F5-FIX1-02: tracked — the next fight (or the run's end) sweeps it;
+         the PROFILE keeps the permanence, the fight view stays clean */
+      this.f5SeatMarks = (this.f5SeatMarks || []).concat(items);
+      items.forEach((o, k) => this.tweens.add({ targets: o, alpha: k === 0 ? 0.4 : 0.55, duration: 600 }));
+    });
+    if (first) {
+      const t = ssTxt(this, l.x(0), cy + l.u(36), b.name + ((SS_F5_STRINGS[PACK.lang] || SS_F5_STRINGS.en).returns), l.u(15), '#f3e5b4', 'italic')
+        .setOrigin(0.5).setDepth(931).setAlpha(0).setScrollFactor(0).setShadow(0, 0, '#0a0d1c', l.u(8), true, true);
+      this.tweens.add({ targets: t, alpha: 0.95, delay: total - 900, duration: 420 });
+      this.tweens.add({ targets: t, alpha: 0, delay: total + 1200, duration: 500, onComplete: () => t.destroy() });
+      const accel = () => tws.forEach((tw) => { if (tw && tw.isPlaying()) tw.timeScale = 2.2; });
+      this.input.on('pointerdown', accel);
+      this.time.delayedCall(total + 300, () => this.input.off('pointerdown', accel));
+      return Math.max(SS_F5_CEREMONY_FLOOR_MS, total - 500);
+    }
+    return 300;   // the converge rides mostly inside the shipped 1150ms beat
+  }
+  /* F5-FIX1-02: the seated mark leaves before the next beat owns the sky —
+     called at startFight (the new constellation assembles under a clean
+     zenith) and at endRun (the ledger below redraws the kept marks as the
+     end screen's ONE source). The rite itself is untouched. */
+  f5ClearSeatMarks() {
+    const ms = this.f5SeatMarks;
+    if (!ms || !ms.length) return;
+    this.f5SeatMarks = [];
+    for (const o of ms) {
+      if (!o || !o.active) continue;
+      this.tweens.add({ targets: o, alpha: 0, duration: 240, onComplete: () => { if (o.active) o.destroy(); } });
+    }
+  }
+  /* F5-CARD-06: the graduation ache — the kept marks stand, the dark seats
+     ghost for a breath, and one ledger line names the pictured next. */
+  f5Ledger() {
+    window.__f5ledger = (window.__f5ledger | 0) + 1;
+    const l = this.L, lit = ssF5LitList();
+    for (const id of lit) ssF5DrawMini(this, id, 0.5, 920);
+    for (const id of Object.keys(SS_F5_SEATS)) {
+      if (lit.includes(id)) continue;
+      const seat = SS_F5_SEATS[id];
+      const d = this.add.image(l.x(seat[0]), l.y(seat[1]), 'dot').setScrollFactor(0).setDepth(919).setScale(0.6).setTint(0x8a90b8).setAlpha(0).setBlendMode('ADD');
+      this.tweens.add({ targets: d, alpha: 0.26, duration: 420, yoyo: true, hold: 1100, onComplete: () => d.destroy() });
+    }
+    const line = ssTxt(this, l.x(0), l.y(224), (SS_F5_STRINGS[PACK.lang] || SS_F5_STRINGS.en).lit.replace('%1', String(lit.length)), l.u(13), '#b9b3d0', 'italic')
+      .setOrigin(0.5).setDepth(921).setAlpha(0).setScrollFactor(0).setShadow(0, 0, '#0a0d1c', l.u(8), true, true);
+    this.tweens.add({ targets: line, alpha: 0.9, duration: 420 });
+    this.tweens.add({ targets: line, alpha: 0, delay: 4200, duration: 600, onComplete: () => line.destroy() });
+  }
+  /* F5-GRAFT-5: one glint — a single breath of scale and one spark on a
+     tile that starts a real word. No copy, no arrow, no repeat. */
+  f5Glint(t) {
+    if (!t || !t.c || !t.c.scene) return;
+    window.__f5glint = (window.__f5glint | 0) + 1;
+    const c = t.c, s0 = c.scaleX;
+    this.tweens.add({ targets: c, scaleX: s0 * 1.14, scaleY: s0 * 1.14, duration: 260, yoyo: true, ease: 'Sine.easeInOut', onComplete: () => c.setScale(s0) });
+    if (this.textures.exists('spark4')) {
+      const sp = this.add.image(0, -this.L.u(16), 'spark4').setScale(0.8).setAlpha(0.95).setBlendMode('ADD');
+      c.add(sp);
+      this.tweens.add({ targets: sp, y: -this.L.u(34), alpha: 0, scale: 0.2, duration: 620, ease: 'Quad.easeOut', onComplete: () => sp.destroy() });
+    }
   }
   /* ---- THE STRIKE CLOCK (v0.70.0; generalized v0.110.0) ----
      One engine, two flags: hard mode dials it to SS_HARD.strikeMs, THE
@@ -9468,6 +10316,7 @@ class Battle extends Phaser.Scene {
     // back-arrow abandon — completes the first open for good; the woken
     // (or re-created) meadow builds its full chrome
     if (this.ftue) ssFtueDone();
+    if (this.mode === 'quick') localStorage.removeItem('beta3.quickck');   /* F5-GRAFT-4: the back-arrow abandon is a door, not a pocket */
     const h = this.scene.get('home');
     if (!data.dawn && h && h.sys.isSleeping()) { this.scene.wake('home', data); this.scene.stop(); }
     else this.scene.start('home', data);
@@ -9527,9 +10376,9 @@ class Battle extends Phaser.Scene {
 
     // the row's four pieces are named so THE CLEAR GATE (v0.116.0) can hide
     // the whole YOU row while the level card stands
-    this.youT = txt(l.x(-190), l.y(68), 'YOU', 12, '#c9b676').setOrigin(0, 0.5);
+    this.youT = txt(l.x(-190), l.y(68), 'YOU', 12, '#c9b676').setOrigin(0, 0.5);   /* F5-GREEN: kept — the row rises into the light for the strike and the mend (f5BarLift) */
     // framed troughs + gradient fills; progress is a setCrop in the draw fns
-    this.hpTrough = this.add.image(l.x(-152), l.y(68), 'bartrough').setOrigin(0, 0.5).setDisplaySize(l.u(254), l.u(15));
+    this.hpTrough = this.add.image(l.x(-152), l.y(68), 'bartrough').setOrigin(0, 0.5).setDisplaySize(l.u(254), l.u(15));   /* F5-GREEN: kept, as above */
     this.hpBar = this.add.image(l.x(-150), l.y(68), 'barfill-gold').setOrigin(0, 0.5).setDisplaySize(l.u(250), l.u(9));
     this.hpT = txt(l.x(190), l.y(68), '', 12).setOrigin(1, 0.5);
     // what the player bar SHOWS — trails run.hp while a strike's number is in
@@ -9588,9 +10437,11 @@ class Battle extends Phaser.Scene {
     // scry + hint wear the painted dark button (aspect-correct via ssBtn), same
     // as the home screen's LEADERBOARD/PROFILE — no more bare dev rectangles
     this.scryB = this.add.image(l.x(-150), l.y(766), ssBtn(this, true, 100, 50)).setDisplaySize(l.u(100), l.u(50)).setInteractive({ useHandCursor: true });
+    // F5-FIX1-03: the label is kept (scryT) so the lesson can lift button
+    // and letters together above the gate's veil
     this.scryT = txt(l.x(-150), l.y(766), 'SCRY ↻', 14, '#9fb0e8').setOrigin(0.5);
     this.scryPips = [];   // COMET TRAIL's charge pips, built by updateScryPips
-    this.scryB.on('pointerdown', () => this.scry());
+    this.scryB.on('pointerdown', () => this.f5ScryTap());
     this.hintB = this.add.image(l.x(-62), l.y(766), ssBtn(this, true, 50, 50)).setDisplaySize(l.u(50), l.u(50)).setInteractive({ useHandCursor: true }).setVisible(false);
     this.hintT = txt(l.x(-62), l.y(766), '◉', 18, '#d7b45c').setOrigin(0.5).setVisible(false);
     this.hintB.on('pointerdown', () => this.useHint());
@@ -9712,6 +10563,17 @@ class Battle extends Phaser.Scene {
     const deal = ssFtueDeal(PACK.lang);
     this.ftueWord = deal.word;
     this.ftueGone = false; this.ftueAt = null;
+    /* F5-GUIDED: the script — the deal's own word, then the authored words
+       (a tongue without an entry plays the old one-word hand) */
+    const guide = SS_F5_GUIDE[PACK.lang] || null;
+    /* F5-BLUE: `orange` / `blue` are WORD indices (the cell each tile lands
+       on is read at its point beat into `pointAt`); the scry gate stands
+       before word index `scryAt`, once (`scried`) */
+    this.f5G = guide ? { words: [deal.word, ...guide.words], idx: 0, orange: guide.orange + 1, blue: guide.blue != null ? guide.blue + 1 : -1, scryAt: guide.orange + 2, scried: false, pointAt: null, green: guide.green != null ? guide.green + 1 : -1, strike: null, beat: 'word', pose: null, poseN: 0, show: null, cont: null, waits: 0 } : null;   /* F5-GREEN: `green` the word index, `strike` the held beat */
+    window.__f5guide = {
+      lang: PACK.lang, words: (this.f5G ? this.f5G.words : [deal.word]).map((w) => w.join('')), orange: this.f5G ? this.f5G.orange : null, blue: this.f5G ? this.f5G.blue : null, green: this.f5G ? this.f5G.green : null, scryAt: this.f5G ? this.f5G.scryAt : null, scried: 0,
+      beat: this.f5G ? 'word' : 'none', idx: 0, refused: 0, castRefused: 0, scryRefused: 0, orangeCell: null, blueCell: null, greenCell: null, pointed: 0, show: null, shown: 0, released: 0, holdMs: 0, ended: 0,
+    };
     window.__ssftue = Object.assign(window.__ssftue || {}, {
       state: 'board', word: deal.word.join(''), deal: this.board.map((s) => (s ? s.ch : '')).join(' '), point: null,
     });
@@ -9762,18 +10624,35 @@ class Battle extends Phaser.Scene {
   // WHATEVER valid word the player built off the road. Otherwise it waits.
   ftueGoal() {
     if (this.ftueGone || this.state === 'end') return null;
+    const g = this.f5G;   /* F5-GUIDED: the script's own seats come first */
+    if (g) {
+      if (g.beat === 'show' || g.beat === 'reveal' || g.beat === 'strike') return g.pose ? 'pose' : 'wait';   /* F5-SCRYGATE: the reveal points like the showcase — F5-GREEN: the strike too */
+      if (g.beat === 'cast') return 'wait';
+      if (g.beat === 'scry') return 'scry';   /* F5-SCRYGATE: the one lit door */
+      if (g.beat === 'point') return g.pointAt;   /* F5-BLUE: the pointed cell (the orange's, then the blue's) */
+    }
     const tt = this.ftueWord;
     const onRoad = this.sel.length < tt.length
       && this.sel.every((bi, k) => this.board[bi] && this.board[bi].ch === tt[k]);
     if (onRoad) {
       const need = tt[this.sel.length];
+      /* F5-GUIDED: the orange word asks for the ORANGE tile itself when its
+         letter matches — never a plain twin of it. F5-BLUE: the blue word
+         asks for the BLUE the same way (de: MOND's m stands twice, plain at
+         2 and blue at 3 — the finger must name the blue). */
+      const pref = g ? (g.idx === g.orange ? 1 : g.idx === g.blue ? 2 : g.idx === g.green ? 3 : 0) : 0;   /* F5-GREEN: the green word asks for the dew tile itself */
+      if (pref) for (let i = 0; i < 16; i++) {
+        const s = this.board[i];
+        if (s && s.c.active && !s.blk && s.tier === pref && s.ch === need && this.sel.indexOf(i) < 0) return i;
+      }
       for (let i = 0; i < 16; i++) {
         const s = this.board[i];
         if (s && s.c.active && !s.blk && s.ch === need && this.sel.indexOf(i) < 0) return i;
       }
     }
     const word = this.currentWord();
-    if (this.sel.length >= 2 && WORDSET.has(word)) return 'cast';
+    /* F5-GUIDED: under the hand, CAST lights only for the WHOLE guided word */
+    if (this.sel.length >= 2 && WORDSET.has(word) && (!g || word === tt.join(''))) return 'cast';
     return 'wait';
   }
   ftueRepoint(snap) {
@@ -9781,7 +10660,7 @@ class Battle extends Phaser.Scene {
     if (!h || !h.active || this.ftueGone) return;
     const goal = this.ftueGoal();
     if (goal === null) { this.ftueRetire(false); return; }
-    const key = typeof goal === 'number' ? 'slot:' + goal : goal;
+    const key = typeof goal === 'number' ? 'slot:' + goal : goal === 'pose' ? 'pose:' + (this.f5G ? this.f5G.poseN : 0) : goal;   /* F5-GUIDED */
     if (window.__ssftue) window.__ssftue.point = key;
     if (key === this.ftueAt) return;
     this.ftueAt = key;
@@ -9790,6 +10669,8 @@ class Battle extends Phaser.Scene {
     // CAST is approached MIRRORED, from the label's left, so the glove
     // never covers the damage preview it is pointing the player at
     if (goal === 'cast') pose = { x: this.castB.x - l.u(58), y: this.castB.y - l.u(10), flip: true, dip: 9 };
+    else if (goal === 'scry') pose = { x: this.scryB.x + l.u(30), y: this.scryB.y - l.u(8), flip: false, dip: 8 };   /* F5-SCRYGATE: the tip on SCRY, the glove to its right */
+    else if (goal === 'pose') pose = Object.assign({}, this.f5G.pose);   /* F5-GUIDED: the showcase's number */
     else if (goal === 'wait') pose = { x: h.x, y: Math.min(h.y, l.y(700)) - l.u(44), flip: h.flipX, faded: true };
     else {
       const p = this.slotPos(goal);
@@ -9847,6 +10728,509 @@ class Battle extends Phaser.Scene {
     }
   }
 
+  /* ---- F5-GUIDED (card ss-2026-10-09-first5-script/02): THE GUIDED HAND, ORANGE
+     Skylar (10/09): "after you put in your first word, it lets you type in
+     whatever word you want, but we really need to still have the finger
+     telling the player to type what word we want. We need it to be a word
+     that lets them get an orange tile on the next turn. Then, when the
+     player has an orange tile, we also need to use the finger to get them
+     to build a word with the orange tile and really show how it's doing
+     extra damage to the beast. This should all still be scripted, so
+     everyone gets the same tutorial."
+     The finger no longer retires at the first cast; it walks a SCRIPT:
+       word 1 (the deal's own, STAR) → word 2 (MOONS: 5 letters, so the
+       live forge rule drops the ORANGE with the refill) → THE POINT (the
+       hand rests on the orange tile while the +6 line speaks) → word 3
+       (SKY: it STARTS on the orange, so the pointed tile is the first tap;
+       3 letters, so the extra is exactly +6) → THE SHOWCASE (the hit lands
+       and the bar drains as shipped, then the flow HOLDS: a light veil,
+       the orange tile with its +6, "16 damage, not 10", the hand on the
+       number; the dwell or a tap after the floor lets go) → THE SCRY GATE
+       (card 03, f5GuideScry) → F5-BLUE (card 04): word 4 (TONIGHT: 7
+       letters, so the forge rule drops the BLUE with the refill) → THE
+       POINT on the blue (the ×1.5 line) → word 5 (HALO: STARTS on the
+       blue, pays exactly plain × 1.5) → THE SHOWCASE again (the blue tile,
+       "×1.5", "12 damage, not 8", the orange/blue difference in one line)
+       → the refill and the strike (card 05's beat) → the hand retires for
+       good and the night is the player's.
+     Under the hand the board is NOT free: a tile off the road, CAST before
+     the word stands, and SCRY are refused — a wiggle, no sound, nothing
+     spent; un-weaving your own tiles stays allowed. The stall glint, the
+     encore and the scry gate already yield while the finger stands
+     (`ftueGone`), so the next lesson begins only after the hand lets go. */
+  f5GuideLocked() { return !!(this.ftue && !this.ftueGone && this.f5G && this.f5G.beat !== 'free'); }
+  // what a tap under the hand may do: the pointed orange (which starts the
+  // orange word at once) or the very tile the finger is on
+  f5GuideAllows(i) {
+    const g = this.f5G;
+    if (g.beat === 'point') { if (i !== g.pointAt) return false; this.f5GuideBeat('word'); }   /* F5-BLUE: the pointed cell */
+    if (g.beat !== 'word') return false;
+    return this.ftueGoal() === i;
+  }
+  f5GuideRefuse(what) {
+    const l = this.L, b = window.__f5guide;
+    const wig = (o) => {
+      if (!o || !o.active || o.f5Wig) return;
+      o.f5Wig = true;
+      const x0 = o.x;
+      this.tweens.add({ targets: o, x: x0 + l.u(5), duration: 50, yoyo: true, repeat: 3, onComplete: () => { o.setX(x0); o.f5Wig = false; } });
+    };
+    if (what === 'cast') { if (b) b.castRefused++; wig(this.castB); }
+    else if (what === 'scry') { if (b) b.scryRefused++; wig(this.scryB); }
+    else { if (b) b.refused++; if (this.board[what]) wig(this.board[what].c); }
+    // …and the hand insists: its push starts over where it stands
+    this.ftueAt = null; this.ftueRepoint(true);
+  }
+  f5GuideBeat(beat) {
+    const g = this.f5G; if (!g) return;
+    g.beat = beat;
+    const b = window.__f5guide; if (b) { b.beat = beat; b.idx = g.idx; }
+    if (window.__ssftue) window.__ssftue.state = beat === 'word' ? (g.idx ? 'guide' : 'board') : beat === 'point' ? (g.idx === g.green ? 'green' : g.idx === g.blue ? 'blue' : 'orange') : beat;   /* F5-BLUE: the blue's own point — F5-GREEN: the green's */
+    this.ftueAt = null;   // the hand re-reads its goal at once
+    this.ftueRepoint();
+  }
+  // the guided cast flies (tryCast, after the damage is known): the last
+  // word arms the showcase with the hit, the same hit with the orange read
+  // as plain glass, and the difference between them
+  f5GuideCast(word, tiles, dmg) {
+    const g = this.f5G;
+    /* F5-BLUE: a showcase for the ORANGE word (tier 1: +6 on its letter) and
+       for the BLUE word (tier 2: the whole word ×1.5) — the plain hit is the
+       same tiles with that tile read as plain glass. Every other guided word
+       flies plain (g.show stays null, so the cast path never parks). */
+    g.show = null;
+    const kind = g.idx === g.orange ? 1 : g.idx === g.blue ? 2 : g.idx === g.green ? 3 : 0;   /* F5-GREEN: the green word (tier 3: the dew heals ♥DEW_HEAL) arms THE MEND */
+    if (kind) {
+      const ot = tiles.find((s) => s.tier === kind && !s.blk);
+      if (ot) {
+        const plain = this.wordDamage(tiles.map((s) => (s.tier === kind ? Object.assign({}, s, { tier: 0 }) : s)));
+        g.show = { word, dmg, plain, extra: dmg - plain, ch: ot.ch, tier: kind };
+        if (kind === 3) Object.assign(g.show, { heal: DEW_HEAL * tiles.filter((s) => s.tier === 3 && !s.blk).length, healed: 0, before: this.run.hp, after: this.run.hp, hold: 0 });   /* F5-GREEN: the heal the impact will pay (shown on the showcase's beat) */
+        if (window.__f5guide) window.__f5guide.show = Object.assign({}, g.show);
+      }
+    }
+    this.f5GuideBeat('cast');
+    DIAG('f5 guide: cast ' + word + ' for ' + dmg + (g.show ? ' (plain ' + g.show.plain + ', ' + (kind === 3 ? 'green ♥' + g.show.heal : kind === 2 ? 'blue ×' + SS_F5_BLUE_MULT : 'orange +' + g.show.extra) + ')' : ''));
+  }
+  // the refill of a guided cast has been dealt: once it has settled and the
+  // board is the player's again, the next beat
+  f5GuideRefill() {
+    const g = this.f5G; if (!g || g.beat !== 'cast') return;
+    g.waits = 0;
+    const tick = () => {
+      if (this.f5G !== g || this.ftueGone || !this.sys.isActive()) return;
+      if (g.beat !== 'cast') return;   /* F5-GREEN: the strike beat took the baton (it re-arms the settle at its lift) */
+      if (this.state !== 'pick') { if (++g.waits < 60) this.time.delayedCall(250, tick); else this.f5GuideEnd(false); return; }
+      this.f5GuideNext();
+    };
+    this.time.delayedCall(SS_F5_GUIDE_SETTLE_MS, tick);
+  }
+  f5GuideNext() {
+    const g = this.f5G;
+    /* F5-SCRYGATE: THE SCRY GATE stands between the orange word and the
+       forge word — once (F5-BLUE: the lift resumes the script through
+       f5GuideScried, which marks it so the gate never rises twice) */
+    if (g.idx + 1 === g.scryAt && !g.scried) { this.f5GuideScry(); return; }
+    g.idx++;
+    if (g.idx >= g.words.length) { this.f5GuideEnd(true); return; }   /* F5-BLUE: the script is spent — the hand lets go, happily */
+    this.ftueWord = g.words[g.idx];
+    if (window.__ssftue) window.__ssftue.word = this.ftueWord.join('');
+    /* THE POINT: the special tile the last word forged, found where it
+       landed — the orange (word 2's) or, F5-BLUE, the blue (word 4's): the
+       hand rests on it while its own lesson line speaks, then asks for it */
+    const kind = g.idx === g.orange ? 1 : g.idx === g.blue ? 2 : g.idx === g.green ? 3 : 0;   /* F5-GREEN: the dew (word 6's), where the strike left it */
+    if (kind) {
+      let oi = -1;
+      for (let i = 0; i < 16; i++) { const s = this.board[i]; if (s && s.tier === kind && !s.blk && s.c.active && s.ch === this.ftueWord[0]) { oi = i; break; } }
+      if (oi < 0) { DIAG('f5 guide: no ' + (kind === 3 ? 'green' : kind === 2 ? 'blue' : 'orange') + ' on the board — the hand lets go'); this.f5GuideEnd(false); return; }
+      g.pointAt = oi;
+      const b = window.__f5guide; if (b) { b[kind === 3 ? 'greenCell' : kind === 2 ? 'blueCell' : 'orangeCell'] = oi; b.pointed++; }
+      this.f5GuideBeat('point');
+      ssF5Prompt(this, 'tile' + kind, this.L.x(0), this.L.y(374));   // spawnTile's own call already spoke — the dedupe keeps it one (F5-GREEN: dewTile's, for the green)
+      DIAG('f5 guide: the ' + (kind === 3 ? 'green' : kind === 2 ? 'blue' : 'orange') + ' at ' + oi);
+      this.time.delayedCall(SS_F5_POINT_MS, () => { if (this.f5G === g && g.beat === 'point') this.f5GuideBeat('word'); });
+      return;
+    }
+    this.f5GuideBeat('word');
+  }
+  // THE SHOWCASE — from beastHit, the moment the bar's drain settles; the
+  // cast path parked its continuation (the refill, the beast's count) in
+  // g.cont, so the whole fight waits on this beat
+  f5GuideShow() {
+    const g = this.f5G;
+    if (!g || !g.show || !g.cont || g.beat !== 'cast' || !this.sys.isActive()) return;
+    const l = this.L, sh = g.show;
+    if (sh.tier === 3) { this.f5MendShow(g); return; }   /* F5-GREEN: THE MEND — the heal shown coming back on the player's bar */
+    /* F5-BLUE: the showcase speaks for the orange (tier 1, "+6") and the blue
+       (tier 2, "×1.5") alike — the tile as it stood, the number in the tile's
+       own voice, the hit line; the blue adds the one line that keeps the two
+       apart (one line per text — the iOS bake law) and dwells longer. */
+    const tier = sh.tier || 1, blue = tier === 2;
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setDepth(900).setInteractive();
+    this.tweens.add({ targets: veil, alpha: SS_F5_SHOW_VEIL, duration: 260 });
+    const c = this.add.container(l.x(0), l.y(468)).setDepth(950).setAlpha(0).setScale(0.92);   // the hit number's own seat
+    c.setData('f5show', tier);
+    // the thing itself: the tile, its letter and its chip, as it stood on the board
+    const ts = l.u(46), k = 46 / 78;
+    const glow = this.add.image(-l.u(62), 0, 'dot').setScale(ts / 9).setAlpha(0.3).setTint(SS_TIER_GLOW[tier]).setBlendMode('ADD');
+    const tile = this.add.container(-l.u(62), 0, [
+      this.add.image(0, 0, 'tile' + tier).setDisplaySize(ts, ts),
+      this.add.image(0, -l.u(2 * k), ssGlyph(this, sh.ch, SS_TILE_INK[tier])).setDisplaySize(l.u(64 * k), l.u(48 * k)),
+      this.add.image(l.u(24 * k), l.u(21 * k), ssGlyphVal(this, this.tileChip(sh.ch, tier), SS_TILE_VINK[tier])).setDisplaySize(l.u(30 * k), l.u(20 * k)),
+    ]);
+    // the number, in the tile's own voice: the orange's "+6", the blue's "×1.5"
+    const plus = ssTxt(this, -l.u(30), 0, blue ? '×' + SS_F5_BLUE_MULT : '+' + sh.extra, l.u(38), blue ? '#9fd8ff' : '#ffb457').setOrigin(0, 0.5)
+      .setShadow(0, 0, blue ? '#1d4a66' : '#7a3a08', l.u(10), true, true);
+    const P = SS_F5_PROMPTS[PACK.lang] || SS_F5_PROMPTS.en;
+    const str = (blue ? (P.blueHit || SS_F5_PROMPTS.en.blueHit) : (P.orangeHit || SS_F5_PROMPTS.en.orangeHit))
+      .replace('{m}', SS_F5_BLUE_MULT).replace('{x}', sh.extra).replace('{d}', sh.dmg).replace('{p}', sh.plain);
+    const line = ssF5Frame(this, str).setPosition(0, l.u(52));
+    c.add([glow, tile, plus, line]);
+    if (blue) {
+      // …and the difference, in one breath, right under the hit line
+      const vs = ssF5Frame(this, P.blueVsOrange || SS_F5_PROMPTS.en.blueVsOrange).setAlpha(0);
+      vs.setPosition(0, l.u(52) + line.f5H / 2 + l.u(8) + vs.f5H / 2);
+      c.add(vs);
+      this.tweens.add({ targets: vs, alpha: 1, duration: 260, delay: 700 });
+    }
+    this.tweens.add({ targets: c, alpha: 1, scale: 1, duration: 220, ease: 'Back.easeOut' });
+    this.tweens.add({ targets: glow, alpha: 0.55, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    // the hand points at the number (above the veil for the beat)
+    g.pose = { x: c.x + plus.x + plus.width + l.u(8), y: c.y + l.u(8), flip: false, dip: 7 };
+    g.poseN = (g.poseN | 0) + 1;
+    const h = this.ftueHand; if (h && h.active) h.setDepth(960);
+    g.showObjs = { veil, c }; g.shownAt = this.time.now;
+    this.f5GuideBeat('show');
+    const b = window.__f5guide; if (b) { b.shown++; b.shownAt = Date.now(); b.showTier = tier; }
+    SFX.forge();
+    DIAG('f5 guide: showcase ' + sh.dmg + ' vs plain ' + sh.plain + (blue ? ' (blue ×' + SS_F5_BLUE_MULT + ')' : ' (orange +' + sh.extra + ')'));
+    const release = () => { if (g.tapFn) { this.input.off('pointerdown', g.tapFn); g.tapFn = null; } this.f5GuideRelease(); };
+    const dwell = this.time.delayedCall(blue ? SS_F5_BLUE_SHOW_MS : SS_F5_SHOW_MS, release);
+    this.time.delayedCall(SS_F5_SHOW_FLOOR_MS, () => {
+      if (this.f5G !== g || g.beat !== 'show') return;
+      g.tapFn = () => { dwell.remove(false); release(); };   // taps accelerate, past the floor
+      this.input.once('pointerdown', g.tapFn);
+    });
+  }
+  f5GuideRelease() {
+    const g = this.f5G; if (!g || g.beat !== 'show') return;
+    const b = window.__f5guide; if (b) { b.released++; b.holdMs = Math.round(this.time.now - g.shownAt); }
+    const { veil, c } = g.showObjs;
+    this.tweens.add({ targets: c, alpha: 0, duration: 260, onComplete: () => { if (c.active) c.destroy(); } });
+    this.tweens.add({ targets: veil, alpha: 0, duration: 300, onComplete: () => { if (veil.active) veil.destroy(); } });
+    /* F5-GREEN: the mend's own objects fade with it and the YOU row goes home */
+    for (const o of g.showObjs.extra || []) if (o && o.active) this.tweens.add({ targets: o, alpha: 0, duration: 260, onComplete: () => { if (o.active) o.destroy(); } });
+    if (g.showObjs.bar) this.f5BarLift(false);
+    g.show = null; g.showObjs = null; g.pose = null;   /* F5-BLUE: a spent showcase never parks the next cast */
+    const cont = g.cont; g.cont = null;
+    /* F5-SCRYGATE: the hand STAYS past the showcase — the parked continuation
+       (n·o·s, the beast's count) runs under the 'cast' beat, so the refill's
+       settle brings f5GuideNext → the words are spent → THE SCRY GATE */
+    this.f5GuideBeat('cast');
+    if (cont) cont(); else this.f5GuideEnd(true);   // the refill + the beast's count, exactly as the shipped cast path runs them
+    DIAG('f5 guide: released — the scry gate waits on the refill');
+  }
+  /* F5-SCRYGATE (card ss-2026-10-09-first5-script/03): THE SCRY GATE on the
+     script's own beat. Skylar (10/09): "when the player clicks Scry, That
+     they have to click it. It should gray out the rest of the screen and
+     pretty much just highlight Scry, because we don't want them to ever
+     bypass clicking Scry (or else they won't know what the mechanic does
+     and how it makes the beast attack one turn earlier)." The three guided
+     words are spent, n·o·s has settled, VULPES stands at a sliver with the
+     fuse at 2 (the first night's five-cast timer): the gate rises with the
+     finger on SCRY. The stall-born gate (f5ScryGateUp from update()) is the
+     SAME door, so a tongue without a script still meets it at its first
+     honest stall. No room for the step (the beast felled, the fuse at 1, a
+     free scry, a gate already up) → the hand lets go as before. */
+  f5GuideScry() {
+    const g = this.f5G; if (!g) return;
+    const room = this.beast && this.beast.hpNow > 0 && this.beast.count > 1 && this.state === 'pick'
+      && !this.f5ScryGate && !(this.hasSigil('comet') && (this.cometLeft | 0) > 0);
+    if (!room) { DIAG('f5 guide: no room for the scry gate — the hand lets go'); this.f5GuideEnd(true); return; }
+    this.f5GuideBeat('scry');
+    this.f5ScryGateUp(true);
+    DIAG('f5 guide: the scry gate (count ' + this.beast.count + ')');
+  }
+  /* ---- F5-BLUE (card ss-2026-10-09-first5-script/04): THE BLUE LESSON.
+     Skylar (10/09): "We also wanted it to be scripted, so we show the player
+     what the blue tile does. We'll need the finger for that and whatever
+     prompts the blue tile to pop up. It should build a word using the blue
+     tile and really highlight the damage and what the blue tile does,
+     because the blue tile can be confusing from the orange tile."
+     The gate has lifted: the hand STAYS and the script goes on — word 4
+     (en TONIGHT) is 7 letters, so the live forge rule drops the BLUE with
+     its refill (the authored letter, the lowest emptied cell), the fuse
+     ticks 2 → 1 under it; THE POINT rests the hand on the blue while "A
+     blue tile makes the whole word ×1.5." speaks; word 5 (HALO) STARTS on
+     the blue and pays EXACTLY plain × 1.5 (8 → 12); the showcase HOLDS the
+     fight with the blue tile, "×1.5", "12 damage, not 8" and the one line
+     that keeps orange and blue apart; the release runs the parked refill
+     and the beast's count — 1 → 0, the strike (card 05's beat, by the
+     mechanic) — and the hand retires once that refill has settled. */
+  f5GuideScried() {
+    const g = this.f5G; if (!g) return;
+    g.scried = true; g.pose = null;
+    const b = window.__f5guide; if (b) b.scried = (b.scried | 0) + 1;
+    const h = this.ftueHand; if (h && h.active) h.setDepth(62);   // back under the lesson frames (the gate raised it)
+    if (g.idx + 1 >= g.words.length) { this.f5GuideEnd(true); return; }   // nothing more authored — the hand lets go as before
+    this.f5GuideBeat('cast');
+    this.f5GuideRefill();   // the settle, then f5GuideNext → the forge word
+    DIAG('f5 guide: the gate lifted — the blue lesson');
+  }
+  // the hand lets go: happily at the end of the script, quietly if the
+  // beast fell early or the board ran out of road
+  f5GuideEnd(happy) {
+    const g = this.f5G; if (!g) return;
+    g.beat = 'free';
+    if (g.tapFn) { this.input.off('pointerdown', g.tapFn); g.tapFn = null; }
+    /* F5-GREEN: belts — a hand that lets go mid-beat (the beast felled, the
+       road run out) never leaves the pill held, the player bar held, the
+       row lifted or a veil standing */
+    if (g.strike && g.strike.armed && !g.strike.lifted) { this.f5PillHold = 0; if (g.strike.objs) this.f5StrikeLift(g.strike, 'end'); else this.updateBars(); }
+    if (g.show && g.show.hold) { g.show.hold = 0; this.hpHold = Math.max(0, (this.hpHold | 0) - 1); this.updateBars(); }
+    if (g.showObjs) { for (const o of [g.showObjs.veil, g.showObjs.c, ...(g.showObjs.extra || [])]) if (o && o.active) o.destroy(); if (g.showObjs.bar) this.f5BarLift(false); g.showObjs = null; }
+    const b = window.__f5guide; if (b) { b.beat = 'free'; b.ended++; }
+    this.f5G = null;
+    if (!this.ftueGone) this.ftueRetire(happy);
+    this.f5LastTap = this.time.now; this.f5Glinted = false;   // the stall clock starts fresh from the release
+  }
+
+  /* ---- F5-GREEN (card ss-2026-10-09-first5-script/05): THE BEAST STRIKES,
+     THE GREEN MENDS. Skylar (10/09): "at some point, the beast attacks the
+     player. It needs to slow down and show the damage it does to the
+     player. Then it should give us a green tile, which will also need to
+     be scripted so the player has a word that uses the green tile, and
+     then explain how that gives you health back. Really slow it down and
+     show the player that using the green tile heals you."
+     The blue word's own tick (1 → 0) is the strike, by the mechanic. The
+     cast's continuation arms THE STRIKE beat before tickEnemy: the pill is
+     HELD at its alarm ("strikes in 1 cast") through the pounce, the blow
+     lands as live (never lethal under the script), and the fight HOLDS: a
+     veil, the crimson number LIT above it lingering its full two seconds,
+     "The beast struck YOU — 8 damage." beneath, the YOU row lifted into
+     the light, the hand on the number; the number flies, the bar DRAINS,
+     then "Your health fell 50 → 42." and the hand onto the bar; the dwell
+     or a tap past the floor lifts the veil, the pill re-arms in the clear
+     (the cool pulse), and the dew blooms on the authored cell — the green
+     word's first letter. THE POINT rests the hand on the green while "A
+     green dew tile heals ♥6 when cast." speaks; the green word STARTS on
+     it; at impact the heal is paid in truth while the bar HOLDS; when the
+     beast's bar has drained the fight HOLDS again on THE MEND: the green
+     tile with its ♥6 chip, "♥ +6" LIT at the number's seat lingering, then
+     flying up to the bar — which RISES 42 → 48 in the light — "That green
+     tile healed you ♥6 — 42 → 48." and "Orange and blue hurt the beast.
+     Green heals YOU.", the hand onto the bar; the dwell lets go, the
+     refill and the fuse run as live, and the hand retires for good. */
+  f5StrikeArm() {
+    const g = this.f5G;
+    if (!g || g.beat !== 'cast' || g.strike || !this.beast || this.beast.hpNow <= 0 || this.beast.count !== 1) return;
+    if (this.hasSigil('shield') && (this.shieldLeft | 0) > 0) return;   // a blocked strike has nothing to show
+    g.strike = { armed: 1 };
+    this.f5PillHold = 1;   // the alarm stands through the pounce — the pill steps to its re-arm at the lift
+    this.f5GuideBeat('strike');
+    const b = window.__f5strike = window.__f5strike || {};
+    b.armed = (b.armed | 0) + 1; b.pillHeld = 1;
+    DIAG('f5 strike: armed (the blue word\'s own tick)');
+  }
+  // the green word's first letter, on the lowest plain cell — where the dew is pinned
+  f5GreenCell() {
+    const g = this.f5G, w = g && g.green >= 0 ? g.words[g.green] : null;
+    if (!w) return undefined;
+    for (let i = 0; i < 16; i++) { const s = this.board[i]; if (s && s.tier === 0 && !s.blk && s.c.active && s.ch === w[0]) return i; }
+    return undefined;
+  }
+  // the YOU row rises above the veil for the beats that are about it (home at 0 — the scry reveal's grammar)
+  f5BarLift(up) {
+    [this.youT, this.hpTrough, this.hpBar, this.hpT].forEach((o, k) => { if (o && o.active) o.setDepth(up ? 905 + k : 0); });
+  }
+  f5StrikeShow(s, nT, done) {
+    const g = this.f5G, l = this.L;
+    if (!g || g.strike !== s || !this.sys.isActive()) { done(); return; }
+    s.done = done; s.after = this.run.hp; s.shownAt = this.time.now;
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setDepth(900).setInteractive();
+    this.tweens.add({ targets: veil, alpha: SS_F5_SHOW_VEIL, duration: 260 });
+    this.f5BarLift(true);
+    // the hit, said — under the crimson number at its own seat
+    const P = SS_F5_PROMPTS[PACK.lang] || SS_F5_PROMPTS.en;
+    const c = this.add.container(l.x(0), l.y(468)).setDepth(950).setAlpha(0).setScale(0.92);
+    c.setData('f5strike', 1);
+    c.add(ssF5Frame(this, (P.strikeHit || SS_F5_PROMPTS.en.strikeHit).replace('{a}', s.hit)).setPosition(0, l.u(52)));
+    this.tweens.add({ targets: c, alpha: 1, scale: 1, duration: 220, delay: 300, ease: 'Back.easeOut' });
+    // the hand on the number (above the veil for the beat)
+    g.pose = { x: l.x(0) + (nT && nT.active ? nT.width / 2 : l.u(26)) + l.u(8), y: l.y(468) + l.u(8), flip: false, dip: 7 };
+    g.poseN = (g.poseN | 0) + 1;
+    const h = this.ftueHand; if (h && h.active) h.setDepth(960);
+    this.ftueAt = null; this.ftueRepoint();
+    s.objs = { veil, c };
+    const b = window.__f5strike = window.__f5strike || {};
+    b.shown = (b.shown | 0) + 1; b.hit = s.hit; b.before = s.before; b.after = s.after; b.shownAt = Date.now();
+    DIAG('f5 strike: held — ' + s.hit + ' (' + s.before + ' → ' + s.after + ')');
+  }
+  f5StrikeLanded(s) {
+    const g = this.f5G, l = this.L;
+    if (!g || g.strike !== s || !s.objs || s.lifted || !this.sys.isActive()) return;
+    s.landedAt = this.time.now;
+    // the bar has drained: the health, said — under the YOU row, in the light
+    const P = SS_F5_PROMPTS[PACK.lang] || SS_F5_PROMPTS.en;
+    const f = ssF5Frame(this, (P.strikeBar || SS_F5_PROMPTS.en.strikeBar).replace('{b}', s.before).replace('{c}', s.after)).setDepth(950).setAlpha(0);
+    f.setData('f5strike', 2);
+    f.setPosition(Math.max(f.f5W / 2 + l.u(6), Math.min(l.W - f.f5W / 2 - l.u(6), l.x(0))), l.y(68) + l.u(34));
+    this.tweens.add({ targets: f, alpha: 1, duration: 260, ease: 'Sine.easeOut' });
+    s.objs.bar = f;
+    SFX.tick();
+    // the hand onto the bar's number
+    g.pose = { x: l.x(190) - this.hpT.width - l.u(2), y: l.y(68) - l.u(6), flip: true, dip: 7 };
+    g.poseN = (g.poseN | 0) + 1;
+    this.ftueAt = null; this.ftueRepoint();
+    const b = window.__f5strike = window.__f5strike || {};
+    b.landed = (b.landed | 0) + 1; b.landedAt = Date.now();
+    const release = (how) => { if (s.tapFn) { this.input.off('pointerdown', s.tapFn); s.tapFn = null; } this.f5StrikeLift(s, how); };
+    const dwell = this.time.delayedCall(SS_F5_STRIKE_SHOW_MS, () => release('dwell'));
+    this.time.delayedCall(SS_F5_STRIKE_FLOOR_MS, () => {
+      if (s.lifted || this.f5G !== g || !this.sys.isActive()) return;
+      s.tapFn = () => { dwell.remove(false); release('tap'); };   // taps accelerate, past the floor
+      this.input.once('pointerdown', s.tapFn);
+    });
+    DIAG('f5 strike: the bar drained — ' + s.before + ' → ' + s.after);
+  }
+  f5StrikeLift(s, how) {
+    if (s.lifted) return;
+    s.lifted = true;
+    const g = this.f5G;
+    if (s.tapFn) { this.input.off('pointerdown', s.tapFn); s.tapFn = null; }
+    const b = window.__f5strike = window.__f5strike || {};
+    b.released = how; b.holdMs = Math.round(this.time.now - (s.landedAt || s.shownAt || this.time.now)); b.lifted = (b.lifted | 0) + 1;
+    const o = s.objs || {};
+    for (const it of [o.c, o.bar, o.veil]) if (it && it.active) this.tweens.add({ targets: it, alpha: 0, duration: 260, onComplete: () => { if (it.active) it.destroy(); } });
+    this.f5BarLift(false);
+    this.f5PillHold = 0; b.pillHeld = 0;
+    this.updateBars();   // the pill re-arms in the clear — the cool pulse, the alarm gone
+    if (g && g.strike === s) { g.pose = null; this.f5GuideBeat('cast'); }
+    const done = s.done; s.done = null;
+    if (done) done();   // the fight is the player's again (state pick)
+    if (how === 'end') return;
+    // the dew, on the authored cell — then the script goes on to THE POINT
+    this.time.delayedCall(SS_F5_STRIKE_DEW_MS, () => {
+      if (this.state === 'end' || !this.sys.isActive()) return;
+      const at = this.f5G === g ? this.f5GreenCell() : undefined;
+      const i = this.dewTile(at);
+      b.dewAt = i;
+      if (this.f5G === g && g.beat === 'cast') this.f5GuideRefill();   // the settle → f5GuideNext → the green's point
+      DIAG('f5 strike: lifted (' + how + '), the dew at ' + i);
+    });
+  }
+  // THE MEND — from f5GuideShow, when the beast's bar has drained: the heal
+  // (already paid in truth at the impact, the bar held) shown coming BACK
+  f5MendShow(g) {
+    const l = this.L, sh = g.show;
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setDepth(900).setInteractive();
+    this.tweens.add({ targets: veil, alpha: SS_F5_SHOW_VEIL, duration: 260 });
+    this.f5BarLift(true);
+    const c = this.add.container(l.x(0), l.y(468)).setDepth(950).setAlpha(0).setScale(0.92);   // the hit number's own seat
+    c.setData('f5show', 3);
+    // the thing itself: the green tile, its letter and its ♥ chip, as it stood on the board
+    const ts = l.u(46), k = 46 / 78;
+    const glow = this.add.image(-l.u(62), 0, 'dot').setScale(ts / 9).setAlpha(0.3).setTint(SS_TIER_GLOW[3]).setBlendMode('ADD');
+    const tile = this.add.container(-l.u(62), 0, [
+      this.add.image(0, 0, 'tile3').setDisplaySize(ts, ts),
+      this.add.image(0, -l.u(2 * k), ssGlyph(this, sh.ch, SS_TILE_INK[3])).setDisplaySize(l.u(64 * k), l.u(48 * k)),
+      this.add.image(l.u(24 * k), l.u(21 * k), ssGlyphVal(this, this.tileChip(sh.ch, 3), SS_TILE_VINK[3])).setDisplaySize(l.u(30 * k), l.u(20 * k)),
+    ]);
+    const P = SS_F5_PROMPTS[PACK.lang] || SS_F5_PROMPTS.en;
+    const line = ssF5Frame(this, (P.greenHeal || SS_F5_PROMPTS.en.greenHeal).replace('{h}', sh.healed).replace('{b}', sh.before).replace('{c}', sh.after)).setPosition(0, l.u(52));
+    const vs = ssF5Frame(this, P.greenVsRest || SS_F5_PROMPTS.en.greenVsRest).setAlpha(0);
+    vs.setPosition(0, l.u(52) + line.f5H / 2 + l.u(8) + vs.f5H / 2);
+    c.add([glow, tile, line, vs]);
+    this.tweens.add({ targets: c, alpha: 1, scale: 1, duration: 220, ease: 'Back.easeOut' });
+    this.tweens.add({ targets: glow, alpha: 0.55, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    this.tweens.add({ targets: vs, alpha: 1, duration: 260, delay: 700 });
+    // the number, in green, LIT at the seat the orange's "+6" and the blue's
+    // "×1.5" stood — it lingers, then flies to the bar (the strike's road, upward)
+    const nT = ssTxt(this, l.x(0) - l.u(30), l.y(468), '♥ +' + sh.healed, l.u(44), '#9fe87a').setOrigin(0, 0.5).setDepth(952)
+      .setShadow(0, 0, '#1f5a2a', l.u(12), true, true);
+    nT.setScale(0.2).setAlpha(0);
+    this.tweens.add({ targets: nT, scale: 1.15, alpha: 1, duration: 120, ease: 'Back.easeOut' });
+    this.tweens.add({ targets: nT, scale: 1, delay: 120, duration: 110 });
+    const breath = ssReduceMotion() ? null
+      : this.tweens.add({ targets: nT, scale: 1.05, delay: 260, duration: 620, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    // the hand points at the number (above the veil for the beat)
+    g.pose = { x: nT.x + nT.width + l.u(8), y: l.y(468) + l.u(8), flip: false, dip: 7 };
+    g.poseN = (g.poseN | 0) + 1;
+    const h = this.ftueHand; if (h && h.active) h.setDepth(960);
+    g.showObjs = { veil, c, extra: [nT], bar: true }; g.shownAt = this.time.now;
+    this.f5GuideBeat('show');
+    const b = window.__f5guide; if (b) { b.shown++; b.shownAt = Date.now(); b.showTier = 3; }
+    const m = window.__f5mend = window.__f5mend || {};
+    m.shown = (m.shown | 0) + 1; m.heal = sh.healed; m.before = sh.before; m.after = sh.after; m.shownAt = Date.now();
+    SFX.dew();
+    DIAG('f5 mend: showcase ♥' + sh.healed + ' (' + sh.before + ' → ' + sh.after + ')');
+    const start = { x: nT.x, y: nT.y }, dst = { x: l.x(-25), y: l.y(68) }, pt = { t: 0 };
+    this.tweens.add({
+      targets: pt, t: 1, delay: SS_F5_MEND_LINGER_MS, duration: SS_F5_MEND_FLY_MS, ease: 'Cubic.easeIn',
+      onStart: () => { if (breath) breath.stop(); nT.setScale(1); if (this.f5G === g) { g.pose = null; this.ftueAt = null; this.ftueRepoint(); } },
+      onUpdate: () => {
+        nT.x = start.x + (dst.x - start.x) * pt.t;
+        nT.y = start.y + (dst.y - start.y) * pt.t;
+        nT.setScale(1 - pt.t * 0.45);
+      },
+      onComplete: () => {
+        if (g.showObjs && g.showObjs.extra) g.showObjs.extra = g.showObjs.extra.filter((o) => o !== nT);
+        nT.destroy();
+        this.f5MendRise(g);
+      },
+    });
+  }
+  // the number has landed on the bar: the health comes BACK in the light — a
+  // green slice over the gain, the bar rising, the numeral counting up, the
+  // live "♥ +6 ♥" drifting off the bar's end, the hand onto the number
+  f5MendRise(g) {
+    const l = this.L, sh = g.show;
+    if (!sh || this.f5G !== g || g.beat !== 'show' || !this.sys.isActive()) return;
+    this.starBurst.emitParticleAt(l.x(-25), l.y(68), 4);
+    SFX.dew();
+    const from = this.hpShown.v, to = Math.max(0, this.run.hp);
+    const f0 = clamp(from / this.run.hpMax, 0, 1), f1 = clamp(to / this.run.hpMax, 0, 1);
+    if (f1 - f0 > 0.004) {
+      const slice = this.add.rectangle(this.hpBar.x + this.hpBar.displayWidth * f0, this.hpBar.y, this.hpBar.displayWidth * (f1 - f0), this.hpBar.displayHeight, 0xa8e88a, 0.6)
+        .setOrigin(0, 0.5).setDepth(909);
+      this.tweens.add({ targets: slice, alpha: 0, delay: 500, duration: 900, ease: 'Sine.easeIn', onComplete: () => slice.destroy() });
+    }
+    this.tweens.killTweensOf(this.hpBar);
+    this.hpBar.setAlpha(1);
+    this.tweens.add({ targets: this.hpBar, alpha: 0.55, duration: 90, yoyo: true });
+    const ht = ssTxt(this, l.x(-150), l.y(94), '♥ +' + sh.healed + ' ♥', l.u(16), '#9fe87a').setOrigin(0.5).setDepth(909)
+      .setShadow(0, 0, '#2a7a3a', l.u(8), true, true);
+    this.tweens.add({ targets: ht, alpha: 0, y: l.y(74), delay: 1600, duration: 450, onComplete: () => ht.destroy() });
+    this.tweens.killTweensOf(this.hpShown);
+    this.tweens.add({
+      targets: this.hpShown, v: to, duration: SS_F5_MEND_RISE_MS, ease: 'Sine.easeOut',
+      onUpdate: () => this.drawPhp(),
+      onComplete: () => {
+        if (sh.hold) { sh.hold = 0; this.hpHold = Math.max(0, (this.hpHold | 0) - 1); }
+        const free = !(this.hpHold | 0) && !this.hitPend.length;
+        this.hpShown.v = free ? Math.max(0, this.run.hp) : to;
+        this.drawPhp();
+        if (this.f5G !== g || g.beat !== 'show') return;
+        sh.risenAt = this.time.now;
+        const m = window.__f5mend = window.__f5mend || {};
+        m.risen = (m.risen | 0) + 1; m.risenAt = Date.now(); m.shown2 = Math.round(this.hpShown.v);
+        // the hand onto the bar's number
+        g.pose = { x: l.x(190) - this.hpT.width - l.u(2), y: l.y(68) - l.u(6), flip: true, dip: 7 };
+        g.poseN = (g.poseN | 0) + 1;
+        this.ftueAt = null; this.ftueRepoint();
+        // the dwell from the rise; a tap past the floor lets go
+        const release = () => { if (g.tapFn) { this.input.off('pointerdown', g.tapFn); g.tapFn = null; } this.f5GuideRelease(); };
+        const dwell = this.time.delayedCall(SS_F5_MEND_SHOW_MS, release);
+        this.time.delayedCall(SS_F5_SHOW_FLOOR_MS, () => {
+          if (this.f5G !== g || g.beat !== 'show') return;
+          g.tapFn = () => { dwell.remove(false); release(); };   // taps accelerate, past the floor
+          this.input.once('pointerdown', g.tapFn);
+        });
+        DIAG('f5 mend: the bar rose — ' + sh.before + ' → ' + sh.after);
+      },
+    });
+  }
+
   // ---------- board ----------
   boardVowels() { return this.board.filter((s) => s && VOWELS.includes(s.ch[0])).length; }
   fillBoard(initial) {
@@ -9865,10 +11249,16 @@ class Battle extends Phaser.Scene {
       if (this.skyAsh[i]) continue;
       let ch;
       if (deal) ch = deal[i];
-      else {
+      else if (this.f5Queue && this.f5Queue.length) {
+        /* F5-CARD-04: the rigged refill — authored letters land first (the
+           fight-1 density, then any skill-floor drop), then the bag. */
+        ch = this.f5Queue.shift();
+        ch = PACK.digraph[ch] || ch;
+      } else {
         ch = rpick(BAG);
         if (this.boardVowels() < 5 && !VOWELS.includes(ch)) ch = rpick(['a', 'e', 'i', 'o', 'u']);
         ch = PACK.digraph[ch] || ch;
+        ch = this.f5Kind(ch);   /* F5-CARD-04: the kind bag, fading by fight */
       }
       // the pending queue (v0.66.0): each empty slot takes one owed bonus
       // tile — GILDED DAWN's start (one gilded; two; two stars at its
@@ -9917,6 +11307,11 @@ class Battle extends Phaser.Scene {
     c.on('pointerdown', () => this.tapTile(i));
     this.boardC.add(c);
     this.board[i] = { ch, tier, blk: cursed, c, img, letter, val, glow, leaf };
+    /* F5-CARD-05: a special tile's FIRST arrival teaches itself — one
+       prompt, above the board, once per run (ssF5Prompt dedupes). */
+    if (this.f5Night && (tier === 1 || tier === 2)) {
+      this.time.delayedCall(460, () => { if (this.scene.isActive()) ssF5Prompt(this, 'tile' + tier, this.L.x(0), this.L.y(374)); });   /* F5-GUIDED: seated under the strikes pill (was 352, over it) */
+    }
     this.tweens.add({ targets: c, y: p.y, duration: initial ? 550 : 420, ease: 'Bounce.easeOut', delay: initial ? i * 45 : Math.random() * 90 });
   }
   /* THE ASHEN BOARD's cooling cell (v0.110.0): where a cast star stood, its
@@ -10008,6 +11403,8 @@ class Battle extends Phaser.Scene {
     if (!open.includes(i)) return -1;
     s.tier = 3;
     SFX.dew();
+    /* F5-CARD-05: the dew's first bloom explains itself */
+    if (this.f5Night) this.time.delayedCall(520, () => { if (this.scene.isActive()) ssF5Prompt(this, 'tile3', this.L.x(0), this.L.y(374)); });   /* F5-GUIDED: one lesson seat, under the pill */
     // the settle: green glass crossfades in under cooling inks, the chip
     // turns to ♥6, a soft glow blooms and three droplets sink onto the face
     const g = this.add.image(0, 0, 'tile3').setDisplaySize(this.tileSize, this.tileSize).setAlpha(0);
@@ -10177,6 +11574,9 @@ class Battle extends Phaser.Scene {
     if (!s || !s.c.active || s.blk) return;
     const l = this.L;
     s.blk = true;
+    /* F5-CARD-05: the first inked tile explains itself (rides BOTH the
+       scripted fight-2 taste and DRACO's real volley — whichever first) */
+    if (this.f5Night) this.time.delayedCall(560, () => { if (this.scene.isActive()) ssF5Prompt(this, 'ink', l.x(0), l.y(374)); });   /* F5-GUIDED: one lesson seat, under the pill */
     // blackout wins: a gilded or forged letter is simply dark now
     s.tier = 0;
     if (s.glow) {
@@ -10222,6 +11622,7 @@ class Battle extends Phaser.Scene {
     if (this.purifyArmed) { this.purifyTile(i); return; }
     const k = this.sel.indexOf(i);
     if (k >= 0) { this.unselectFrom(k); return; }
+    if (this.f5GuideLocked() && !this.f5GuideAllows(i)) { this.f5GuideRefuse(i); return; }   /* F5-GUIDED: only the finger's tile */
     if (this.sel.length >= 8) return;
     this.sel.push(i);
     this.board[i].c.setAlpha(0.28);
@@ -10246,7 +11647,10 @@ class Battle extends Phaser.Scene {
     // THE LONG ROAD (v0.109.0): the weave stays free, but a word below the
     // sky's floor reads exactly as an invalid one — the button dims, the
     // worth is withheld — and the button's own seat says why (CAST 5+)
-    const valid = n >= 2 && word.length >= this.castMinLen() && WORDSET.has(word);
+    /* F5-GUIDED: under the hand the button waits for the WHOLE guided word
+       (MOON is a word; MOONS is the lesson) */
+    const guided = this.f5GuideLocked() && this.f5G.beat === 'word' && word !== this.ftueWord.join('');
+    const valid = n >= 2 && word.length >= this.castMinLen() && WORDSET.has(word) && !guided;
     const sz = l.u(44), gap = l.u(6);
     const w = n * sz + (n - 1) * gap;
     this.sel.forEach((bi, k) => {
@@ -10448,6 +11852,21 @@ class Battle extends Phaser.Scene {
     // fight the hunt was left on; every fight after is dealt fresh.
     const R = this.dresume; this.dresume = null;
     const f = this.fights[this.run.fightIdx];
+    this.f5ClearSeatMarks();   /* F5-FIX1-02: the last fell's mark yields the zenith */
+    /* F5-CARD-05: THE PLANTED GLOW — any special tile fight 1 never taught
+       opens fight 2 planted (the page's own beat: "one planted gilded tile
+       — the glow you now know how to chase"); and by fight 3 the SCRY
+       prompt has fired even for a player who never stalled. */
+    if (this.f5Night) {
+      const seen = this.f5Prompted || {};
+      if (this.run.fightIdx >= 1) {
+        if (!seen.tile1) this.pending.push(1);
+        if (!seen.tile2) this.pending.push(2);
+      }
+      if (this.run.fightIdx >= 2 && !seen.scry) {
+        this.time.delayedCall(2600, () => { if (this.scene.isActive() && this.state === 'pick') ssF5Prompt(this, 'scry', l.x(-150), l.y(706)); });
+      }
+    }
     // the endless climb's rungs ring the moment they are REACHED (v0.68.0):
     // award() is idempotent, so a resumed climb settles up quietly
     if (this.mode === 'endless') {
@@ -10605,33 +12024,40 @@ class Battle extends Phaser.Scene {
     this.drawPhp();
     this.drawEhp();
     const alive = this.beast.hpNow > 0;
-    this.strikeT.setText(alive ? SS_T(this.beast.count === 1 ? 'strikeIn1' : 'strikeIn', this.beast.count) : '');
-    this.strikeT.setColor(this.beast.count === 1 && alive ? '#ff8a70' : '#e6a2a2');
-    this.strikeRib.setAlpha(this.strikeT.text ? 0.9 : 0);
-    if (this.strikeT.text) {
-      this.strikeRib.setDisplaySize(this.strikeT.width + l.u(30), l.u(22));
-      this.strikeGlow.setDisplaySize(this.strikeT.width + l.u(70), l.u(52));
+    /* F5-FIX1-03: while THE SCRY LESSON holds the pill (f5PillHold), the
+       whole fuse voice — text, color, alarm, pulse, telegraph — keeps the
+       OLD count; the lesson releases the hold on its own beat and calls
+       back in, so the player WATCHES the number step down under the raised
+       pill (the hpShown/hpHold grammar, applied to the fuse). */
+    if (!this.f5PillHold) {
+      this.strikeT.setText(alive ? SS_T(this.beast.count === 1 ? 'strikeIn1' : 'strikeIn', this.beast.count) : '');
+      this.strikeT.setColor(this.beast.count === 1 && alive ? '#ff8a70' : '#e6a2a2');
+      this.strikeRib.setAlpha(this.strikeT.text ? 0.9 : 0);
+      if (this.strikeT.text) {
+        this.strikeRib.setDisplaySize(this.strikeT.width + l.u(30), l.u(22));
+        this.strikeGlow.setDisplaySize(this.strikeT.width + l.u(70), l.u(52));
+      }
+      // the count-1 alarm: while the NEXT cast is the strike, an ember glow
+      // breathes behind the ribbon — killed on any other count so a fresh
+      // fight or a re-armed fuse never inherits it
+      const alarm = alive && this.beast.count === 1;
+      if (alarm && !this.strikeAlarm) {
+        this.strikeGlow.setAlpha(0.18);
+        this.strikeAlarm = this.tweens.add({ targets: this.strikeGlow, alpha: 0.6, duration: 520, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      } else if (!alarm && this.strikeAlarm) {
+        this.strikeAlarm.remove(); this.strikeAlarm = null;
+        this.strikeGlow.setAlpha(0);
+      }
+      // the fuse is FELT: any change of the counter pops the ribbon — hot when
+      // it burns down a step, cool when the beast re-arms after striking. The
+      // null sentinel keeps a fight's first paint (and a cleared line) quiet.
+      const cnt = alive ? this.beast.count : null;
+      if (cnt !== null && this._strikeCnt !== null && cnt !== this._strikeCnt) this.strikePulse(cnt < this._strikeCnt);
+      this._strikeCnt = cnt;
+      // telegraph: the constellation charges as the strike counter fills
+      if (this.beastFx) this.beastFx.setThreat(alive
+        ? (this.beast.timer - this.beast.count) / Math.max(1, this.beast.timer - 1) : 0);
     }
-    // the count-1 alarm: while the NEXT cast is the strike, an ember glow
-    // breathes behind the ribbon — killed on any other count so a fresh
-    // fight or a re-armed fuse never inherits it
-    const alarm = alive && this.beast.count === 1;
-    if (alarm && !this.strikeAlarm) {
-      this.strikeGlow.setAlpha(0.18);
-      this.strikeAlarm = this.tweens.add({ targets: this.strikeGlow, alpha: 0.6, duration: 520, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-    } else if (!alarm && this.strikeAlarm) {
-      this.strikeAlarm.remove(); this.strikeAlarm = null;
-      this.strikeGlow.setAlpha(0);
-    }
-    // the fuse is FELT: any change of the counter pops the ribbon — hot when
-    // it burns down a step, cool when the beast re-arms after striking. The
-    // null sentinel keeps a fight's first paint (and a cleared line) quiet.
-    const cnt = alive ? this.beast.count : null;
-    if (cnt !== null && this._strikeCnt !== null && cnt !== this._strikeCnt) this.strikePulse(cnt < this._strikeCnt);
-    this._strikeCnt = cnt;
-    // telegraph: the constellation charges as the strike counter fills
-    if (this.beastFx) this.beastFx.setThreat(alive
-      ? (this.beast.timer - this.beast.count) / Math.max(1, this.beast.timer - 1) : 0);
     // while a damage number is in flight the tally animation owns the counter
     if (!this.scoreAnim) this.scoreT.setText(String(this.runScore()));
   }
@@ -10673,7 +12099,7 @@ class Battle extends Phaser.Scene {
     f0 = clamp(f0, 0, 1); f1 = clamp(f1, 0, 1);
     if (f0 - f1 < 0.004) return;
     const g = this.add.rectangle(bar.x + bar.displayWidth * f1, bar.y, bar.displayWidth * (f0 - f1), bar.displayHeight, tint, 0.5)
-      .setOrigin(0, 0.5).setDepth(30);
+      .setOrigin(0, 0.5).setDepth(bar.depth > 30 ? bar.depth + 1 : 30);   /* F5-GREEN: a bar lifted into the light keeps its ghost with it */
     this.tweens.add({ targets: g, alpha: 0, duration: 700, ease: 'Sine.easeIn', onComplete: () => g.destroy() });
     this.tweens.killTweensOf(bar);
     bar.setAlpha(1);
@@ -10718,18 +12144,61 @@ class Battle extends Phaser.Scene {
     if (this.state !== 'pick') return;
     const word = this.currentWord();
     const l = this.L;
+    /* F5-GUIDED: under the hand, CAST flies only for the whole guided word */
+    if (this.f5GuideLocked() && word !== this.ftueWord.join('')) { this.f5GuideRefuse('cast'); return; }
     // THE LONG ROAD (v0.109.0): a word under the sky's floor is refused in
     // the very grammar an invalid word uses — shake, wiggle, nothing spent
     if (this.sel.length < 2 || word.length < this.castMinLen() || !WORDSET.has(word)) {
+      /* F5-GRAFT-6: split the refusal grammar — the most frequent negative
+         event of a stranger's first night stops being ambiguous, still with
+         zero words. A REAL word below the floor (or a single tile) BOUNCES
+         HOME — the board takes its letters back, gently. A word the sky has
+         never heard CRUMBLES TO DUST where it stands. Nothing is spent. */
+      const tooShort = this.sel.length < 2 || (WORDSET.has(word) && word.length < this.castMinLen());
       SFX.invalid();
-      this.cameras.main.shake(120, 0.004);
-      this.tweens.add({ targets: this.lineC, x: this.lineC.x + l.u(8), duration: 50, yoyo: true, repeat: 3, onComplete: () => this.lineC.setX(l.x(0)) });
+      if (!this.f5Night) {   // FIRST NIGHT, LIVE: a returning player's refusal keeps the shipped one grammar
+        this.cameras.main.shake(120, 0.004);
+        this.tweens.add({ targets: this.lineC, x: this.lineC.x + l.u(8), duration: 50, yoyo: true, repeat: 3, onComplete: () => this.lineC.setX(l.x(0)) });
+        return;
+      }
+      window.__f5refusal = tooShort ? 'home' : 'dust';
+      const flying = this.lineTiles; this.lineTiles = [];
+      const sel = this.sel.slice(); this.sel = [];
+      const homes = flying.map((mc, k) => {
+        try {
+          const bm = this.board[sel[k]].c.getWorldTransformMatrix();
+          const lm = this.lineC.getWorldTransformMatrix();
+          return { x: bm.tx - lm.tx, y: bm.ty - lm.ty };
+        } catch (e) { return { x: mc.x, y: mc.y - l.u(150) }; }
+      });
+      for (const i of sel) if (this.board[i]) this.board[i].c.setAlpha(1);
+      this.layoutLine();
+      if (tooShort) {
+        flying.forEach((mc, k) => this.tweens.add({
+          targets: mc, x: homes[k].x, y: homes[k].y, alpha: 0.2, scale: 0.9,
+          delay: k * 28, duration: 300, ease: 'Back.easeIn', onComplete: () => mc.destroy(),
+        }));
+      } else {
+        this.cameras.main.shake(120, 0.004);
+        flying.forEach((mc, k) => {
+          this.tweens.add({
+            targets: mc, y: mc.y + l.u(30), angle: k % 2 ? 9 : -9, alpha: 0, scale: 0.88,
+            delay: k * 36, duration: 360, ease: 'Quad.easeIn', onComplete: () => mc.destroy(),
+          });
+          if (this.textures.exists('spark4')) for (let d = 0; d < 3; d++) {
+            const sp = this.add.image(mc.x + (Math.random() - 0.5) * l.u(22), mc.y + (Math.random() - 0.5) * l.u(14), 'spark4')
+              .setTint(0x8a8398).setScale(0.45).setAlpha(0.8);
+            this.lineC.add(sp);
+            this.tweens.add({ targets: sp, y: sp.y + l.u(26 + Math.random() * 18), alpha: 0, scale: 0.1, delay: k * 36, duration: 430, ease: 'Quad.easeIn', onComplete: () => sp.destroy() });
+          }
+        });
+      }
       return;
     }
     this.state = 'anim';
     // the first open's finger bows out on the player's first real cast —
     // both of its lessons (weave, then CAST) are now the player's own
-    if (this.ftue && !this.ftueGone) this.ftueRetire(true);
+    if (this.ftue && !this.ftueGone && !this.f5G) this.ftueRetire(true);   /* F5-GUIDED: with a script standing, the hand stays (f5GuideCast below) */
     // a successful cast winds the strike clock back to the top — "every
     // time you spell a word and cast a word, that timer goes back up"
     // (the clock itself is held through the cast's animation); hard's 10s
@@ -10739,6 +12208,7 @@ class Battle extends Phaser.Scene {
     if (this.purifyArmed) this.setPurifyArmed(false);
     const tiles = this.sel.map((i) => this.board[i]);
     const dmg = this.wordDamage(tiles);
+    if (this.ftue && !this.ftueGone && this.f5G) this.f5GuideCast(word, tiles, dmg);   /* F5-GUIDED */
     const letters = tiles.reduce((a, s) => a + s.ch.length, 0);
     const stormProc = this.stormProc();   // before words++ — same test the damage math ran
     this.run.words++; this.run.firstUsed = true;
@@ -10747,6 +12217,7 @@ class Battle extends Phaser.Scene {
     SS.prof.words++;
     if (letters > this.run.longest.length) this.run.longest = word;
     if (word.length > SS.prof.longest.length) SS.prof.longest = word;
+    if (this.f5Night) this.f5CastBeats(word, letters);   /* F5-CARD-04 */
     if (dmg > SS.prof.bigHit) SS.prof.bigHit = dmg;
     /* the sign's own ledger takes the word and the blow (v0.85.0, Skylar:
        "longest word played with that sign"). Only campaign and endless
@@ -10814,11 +12285,20 @@ class Battle extends Phaser.Scene {
       const dews = this.sel.filter((i) => this.board[i] && this.board[i].tier === 3 && !this.board[i].blk).length;
       if (dews > 0) {
         const before = this.run.hp;
+        /* F5-GREEN: THE MEND — under the green word the player bar HOLDS
+           (hpHold, the strike's own grammar) so the heal is SHOWN coming back
+           on the showcase's beat (f5MendShow → f5MendRise), never snapped;
+           the truth (run.hp) is paid right here, as live */
+        const mend = this.f5G && this.f5G.show && this.f5G.show.tier === 3 && this.f5G.beat === 'cast' ? this.f5G.show : null;
+        if (mend) { mend.hold = 1; this.hpHold = (this.hpHold | 0) + 1; }
         this.heal(DEW_HEAL * dews);
         SFX.dew();
-        const ht = ssTxt(this, l.x(-150), l.y(94), '♥ +' + (this.run.hp - before) + ' ♥', l.u(16), '#9fe87a').setOrigin(0.5).setDepth(70)
-          .setShadow(0, 0, '#2a7a3a', l.u(8), true, true);
-        this.tweens.add({ targets: ht, alpha: 0, y: l.y(74), delay: 700, duration: 450, onComplete: () => ht.destroy() });
+        if (mend) { mend.before = before; mend.after = this.run.hp; mend.healed = this.run.hp - before; if (window.__f5guide) window.__f5guide.show = Object.assign({}, mend); }
+        else {
+          const ht = ssTxt(this, l.x(-150), l.y(94), '♥ +' + (this.run.hp - before) + ' ♥', l.u(16), '#9fe87a').setOrigin(0.5).setDepth(70)
+            .setShadow(0, 0, '#2a7a3a', l.u(8), true, true);
+          this.tweens.add({ targets: ht, alpha: 0, y: l.y(74), delay: 700, duration: 450, onComplete: () => ht.destroy() });
+        }
         window.__ssdewHeal = { n: dews, healed: this.run.hp - before, hp: this.run.hp, t: Date.now() };
       }
       if (this.sign === 'scorpio') this.venom = (this.venom | 0) + this.signVal('venomAdd');   // the sting settles in (twofold at level 40)
@@ -10840,12 +12320,19 @@ class Battle extends Phaser.Scene {
       if (tier > 0) { this.pending.push(tier); SFX.forge(); }
       this.layoutLine();
       this.beastHit(dmg);
-      this.time.delayedCall(200, () => {
+      const cont = () => {
         if (this.beast.hpNow <= 0) return;   // board rebuilds next fight — nothing to drain
         this.expireSpecials();               // unspent bonuses fade BEFORE the new reward drops
         this.fillBoard(false);
+        if (this.f5G && !this.ftueGone) this.f5GuideRefill();   /* F5-GUIDED: the hand moves on once this refill settles */
+        if (this.f5G && !this.ftueGone) this.f5StrikeArm();   /* F5-GREEN: a tick that IS the strike becomes THE STRIKE beat (the pill held through the pounce) */
         this.tickEnemy(() => { this.state = 'pick'; this.sigilMoment(); });
-      });
+      };
+      /* F5-GUIDED: the showcase holds the flow — the refill and the beast's
+         count wait in g.cont until the lesson lets go (beastHit starts it
+         when the bar's drain settles); a beast that fell takes the plain road */
+      if (this.f5G && this.f5G.show && this.f5G.beat === 'cast' && this.beast.hpNow > 0) this.f5G.cont = cont;
+      else this.time.delayedCall(200, cont);
     });
   }
 
@@ -10907,6 +12394,7 @@ class Battle extends Phaser.Scene {
           onComplete: () => {
             this.drawEhp();
             if (this.beast.hpNow <= 0 && !this.dying) { this.dying = true; this.beastDeath(); }
+            else if (this.f5G && this.f5G.cont) this.f5GuideShow();   /* F5-GUIDED: the number has landed, the bar has drained — now the lesson */
           },
         });
         this.flyScore(dst, dmg, from, to);
@@ -10934,7 +12422,7 @@ class Battle extends Phaser.Scene {
     const big = boss || atk >= 15;
     const others = Math.max(0, (this.hitPend ? this.hitPend.length : 1) - 1);
     const nT = ssTxt(this, l.x(0), l.y(468) - l.u(44) * Math.min(others, 2), '−' + atk, l.u(big ? 54 : 46), '#ff9a8a')
-      .setOrigin(0.5).setDepth(70).setShadow(0, 0, '#7a1420', l.u(12), true, true);
+      .setOrigin(0.5).setDepth(this.f5G && this.f5G.beat === 'strike' ? 952 : 70).setShadow(0, 0, '#7a1420', l.u(12), true, true);   /* F5-GREEN: lit above the strike beat's veil */
     nT.setScale(0.2).setAlpha(0);
     this.tweens.add({ targets: nT, scale: big ? 1.3 : 1.15, alpha: 1, duration: 120, ease: 'Back.easeOut' });
     this.tweens.add({ targets: nT, scale: 1, delay: 120, duration: 110 });
@@ -10977,6 +12465,7 @@ class Battle extends Phaser.Scene {
         });
       },
     });
+    return nT;   /* F5-GREEN: the number, for the strike beat's hand to rest on */
   }
 
   // the tally beat (v0.9.0), re-anchored: a smaller +N lifts off the enemy bar
@@ -11027,6 +12516,7 @@ class Battle extends Phaser.Scene {
 
   beastDeath() {
     this.state = 'anim';
+    if (this.ftue && !this.ftueGone && this.f5G) this.f5GuideEnd(false);   /* F5-GUIDED: a beast felled mid-script ends the hand quietly (never on the authored road) */
     SFX.victory();
     const l = this.L;
     if (this.beastFx) this.beastFx.die();   // stops idle/shimmer, implodes the aura
@@ -11088,8 +12578,15 @@ class Battle extends Phaser.Scene {
     // edge — the climb is UNBOUNDED, so the exhausted-fights win below must
     // stay unreachable there (the same seed grows the same ladder)
     if (this.mode === 'endless' && this.run.fightIdx >= this.fights.length - 2) this.extendEndless();
-    if (this.mode === 'campaign' || this.mode === 'endless') this.saveCheckpoint();
-    this.time.delayedCall(1150, () => {
+    if (this.mode === 'campaign' || this.mode === 'endless' || this.f5Night /* F5-GRAFT-4: the first night's pocket */) this.saveCheckpoint();
+    /* F5-GRAFT-3: tomorrow inside the window — the ruled slot is the second
+       fell of the first night; card 06 fills it with THE LIT SKY's cue. */
+    if (this.mode === 'quick' && this.ftue && this.run.fightIdx === 2) ssF5TomorrowCue(this);
+    /* F5-CARD-06: the fell lights the sky — the full rite on the first
+       night's first fell, the quick converge after; the flow holds for it. */
+    let f5riteMs = 0;
+    if (this.mode === 'quick' && ssF5LitOwner(this)) f5riteMs = this.f5LightSky(this.fights[this.run.fightIdx - 1].id) | 0;
+    this.time.delayedCall(1150 + f5riteMs, () => {
       // the final win ends the run — endRun settles and announces for itself
       if (this.run.fightIdx >= this.fights.length) { this.endRun(true); return; }
       // THE CADENCE (v0.65.0): only a fight the plan marks pays an offer.
@@ -11154,6 +12651,22 @@ class Battle extends Phaser.Scene {
     if (!ssSigilAnnounce(this, pend, () => { if (this.state === 'rite') this.state = 'pick'; })) this.state = 'pick';
   }
   saveCheckpoint() {
+    /* F5-GRAFT-4: the run must survive a pocket — the quick run checkpoints
+       under its own key with fight-start semantics, exactly the campaign's
+       law. The ftue flag rides along so a killed FIRST night relaunches
+       with the finger's lessons intact (fight 1 only). */
+    if (this.mode === 'quick') {
+      if (this.run.fightIdx >= this.fights.length) { localStorage.removeItem('beta3.quickck'); return; }
+      localStorage.setItem('beta3.quickck', JSON.stringify({
+        fightIdx: this.run.fightIdx, hp: this.run.hp, hpMax: this.run.hpMax,
+        sigils: this.run.sigils, tiers: this.run.tiers, words: this.run.words, longest: this.run.longest,
+        totalDmg: this.run.totalDmg, scried: this.run.scried, featherUsed: this.run.featherUsed,
+        letters: this.run.letters, bigHit: this.run.bigHit, playMs: this.runElapsed(),
+        overkill: this.run.overkill | 0, qseed: this.qseed, clockV: 2,
+        ftue: this.f5Night ? 1 : undefined,   // the first night stays the first night on resume (f5Night)
+      }));
+      return;
+    }
     // the endless climb survives an app kill exactly as the campaign does
     // (v0.68.0): the seed rebuilds the identical ladder, the level and the
     // active-play clock ride along, and the same fight-start semantics hold
@@ -11703,6 +13216,10 @@ class Battle extends Phaser.Scene {
         this.tweens.add({ targets: st, alpha: 0, y: l.y(220), delay: 700, duration: 400, onComplete: () => st.destroy() });
       }
       if (this.hasSigil('ward')) atk = Math.max(1, atk - this.sigVal('ward', 'cut'));
+      /* F5-GREEN: THE STRIKE under the script — never lethal, whatever the
+         beats before it left (the player must FEEL the blow and stand) */
+      const f5s = this.f5G && this.f5G.strike && this.f5G.strike.armed && !this.f5G.strike.hit ? this.f5G.strike : null;
+      if (f5s) { atk = Math.max(1, Math.min(atk, this.run.hp - 1)); f5s.hit = atk; f5s.before = this.run.hp; }
       // the bar HOLDS its value while the blow's number flies to it — the
       // beast side's grammar mirrored (playerHit releases the hold). The
       // long linger lets blows overlap: count the hold, book the damage.
@@ -11735,15 +13252,33 @@ class Battle extends Phaser.Scene {
       // the blow LANDS on the player (v0.104.0, Skylar 9/22): its number
       // pops at the point of contact, flies to the player's bar at the top,
       // and only then does that bar drain — slow enough to watch
-      this.playerHit(atk, mult, boss, () => {
+      const nT = this.playerHit(atk, mult, boss, () => {
         // ride the landing that EMPTIES the bar — a still-flying later blow
         // keeps the death waiting for its own number to land
         if (this.run.hp <= 0 && this.state !== 'end' && !this.hitPend.length) this.endRun(false);
+        if (f5s) this.f5StrikeLanded(f5s);   /* F5-GREEN: the bar has drained — the second line, the hand onto the bar */
       });
       if (this.run.hp <= 0) return;   // the beat carries the death — endRun fires when the bar lands empty
+      /* F5-GREEN: THE STRIKE holds the fight on its lesson; the dew waits for
+         the lift and blooms on the authored cell (f5StrikeLift) */
+      if (f5s) { this.f5StrikeShow(f5s, nT, done); return; }
       // dew gathers where the blow fell — one plain tile greens, a beat
       // after the hit reads (never in versus: VsBattle has its own strike)
       this.time.delayedCall(260, () => { if (this.state !== 'end' && this.scene.isActive()) this.dewTile(); });
+      /* F5-CARD-05: the beast special's EARLY TASTE — fight 2's first landed
+         strike inks one plain tile, a small preview of the boss curse, and
+         the prompt rides blackTile. FOR SKYLAR: only bosses own the blackout
+         in the shipping game; this scripted taste is the generous read of
+         "a script where a beast uses their special" — say the word to move
+         it later (or leave it to DRACO's real volley alone). */
+      if (this.f5Night && this.run.fightIdx === 1 && !this.f5InkTaught) {
+        this.f5InkTaught = true;
+        this.time.delayedCall(900, () => {
+          if (this.state === 'end' || !this.scene.isActive()) return;
+          const open = this.board.map((s, i) => s && !s.blk && s.tier === 0 && s.c.active ? i : -1).filter((i) => i >= 0);
+          if (open.length) this.blackTile(open[Math.floor(Math.random() * open.length)]);
+        });
+      }
       done();
     };
     if (this.beastFx && this.beastFx.ready) this.beastFx.attack(land);
@@ -11827,6 +13362,185 @@ class Battle extends Phaser.Scene {
         });
       } else cool(p);
     });
+  }
+
+  /* ---- F5-FIX1-03: THE SCRY LESSON (Skylar, 10/08: "we need to make the
+     user use the scry button, when that happens the scry button should be
+     highlighted and the rest of the screen grayed out … then highlight the
+     'strikes in x casts' show the cast going down and then tell the
+     player"). Three beats:
+       1. the GATE (f5ScryGateUp): a veil grays the whole screen; under
+          topOnly input everything beneath it is inert — tiles, CAST, the
+          back door; SCRY alone rises above it, glowing, Skylar's line
+          standing over the one lit door.
+       2. the TAP (f5ScryTap): scry() fires AS NORMAL — the board redeals
+          and the beast counts it — but the pill is HELD at the old count.
+       3. the COST (the delayed release): the strikes pill rises above the
+          veil, the hold releases, the number steps down before the
+          player's eyes (strikePulse pops it hot), then the cost line
+          speaks. Then the gate lifts and the night goes on.
+     Once a night (SS.prof.f5scry, written at the tap); the stage's
+     refresh-restart (fix card 01) replays it on a fresh open. The beacon
+     window.__f5scry carries armed/gate/tapped/down/cost/lifted. */
+  f5ScryGateUp(scripted) {
+    const l = this.L;
+    const seen = this.f5Prompted || (this.f5Prompted = {});
+    seen.scry = 1;   // the gate IS the scry ribbon's moment — never both in one run
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setDepth(900).setInteractive();
+    this.tweens.add({ targets: veil, alpha: 0.66, duration: 320 });
+    // SCRY alone keeps the light: button and letters above the veil, a
+    // breathing glow in the button's own ink behind them
+    this.scryB.setDepth(905); this.scryT.setDepth(906);
+    const glow = this.add.image(this.scryB.x, this.scryB.y, 'glowbig').setDisplaySize(l.u(200), l.u(110))
+      .setTint(0x9fb0e8).setBlendMode('ADD').setAlpha(0.3).setDepth(904);
+    const breathe = this.tweens.add({ targets: glow, alpha: 0.75, duration: 620, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    // Skylar's line, verbatim, just above the lit door
+    const str = (SS_F5_PROMPTS[PACK.lang] || SS_F5_PROMPTS.en).scry || SS_F5_PROMPTS.en.scry;
+    const c = ssF5Frame(this, str).setDepth(950).setAlpha(0).setScale(0.92);
+    c.setPosition(Math.max(c.f5W / 2 + l.u(6), Math.min(l.W - c.f5W / 2 - l.u(6), l.x(-150))), l.y(706));
+    this.tweens.add({ targets: c, alpha: 1, scale: 1, duration: 220, ease: 'Back.easeOut' });
+    // a tap that lands anywhere else is guided to the one door: the button pops
+    const bx = this.scryB.scaleX, by = this.scryB.scaleY;
+    const pop = () => {
+      this.tweens.killTweensOf(this.scryB);
+      this.scryB.setScale(bx, by);
+      this.tweens.add({ targets: this.scryB, scaleX: bx * 1.07, scaleY: by * 1.07, duration: 130, yoyo: true, ease: 'Sine.easeOut', onComplete: () => this.scryB.setScale(bx, by) });
+    };
+    veil.on('pointerdown', pop);
+    this.f5ScryGate = { veil, glow, breathe, prompt: c, bx, by, pop, scripted: !!scripted };
+    /* F5-SCRYGATE: the script's finger rises above the veil and rests on SCRY
+       (ftueGoal 'scry') — the one lit door, pointed at */
+    const h = this.ftueHand; if (scripted && h && h.active) h.setDepth(960);
+    const b = window.__f5scry = window.__f5scry || {};
+    b.armed = (b.armed | 0) + 1; b.gate = str; b.scripted = (b.scripted | 0) + (scripted ? 1 : 0);
+    DIAG('f5: scry gate up' + (scripted ? ' (scripted)' : ''));
+  }
+  f5ScryTap() {
+    const g = this.f5ScryGate;
+    /* F5-GUIDED: no fresh board while the hand is teaching — F5-SCRYGATE: except
+       at the gate's own beat, where SCRY is the one door the hand points at */
+    if (this.f5GuideLocked() && !(g && g.scripted && this.f5G.beat === 'scry')) { this.f5GuideRefuse('scry'); return; }
+    if (!g) { this.scry(); return; }          // no lesson standing — the button is just itself
+    if (this.state !== 'pick') return;        // the same patience scry() keeps; the gate stands
+    this.f5ScryGate = null;                   // beat 2 — the hand is released into the tap
+    if (SS.prof) { SS.prof.f5scry = 1; SS.save(); }
+    g.breathe.remove(); g.glow.destroy();
+    if (g.pop) g.veil.off('pointerdown', g.pop);   /* F5-SCRYGATE: the reveal's taps are its own */
+    this.tweens.killTweensOf(this.scryB);
+    this.scryB.setScale(g.bx, g.by);
+    this.scryB.setDepth(0); this.scryT.setDepth(0);
+    if (g.prompt.active) this.tweens.add({ targets: g.prompt, alpha: 0, duration: 180, onComplete: () => { if (g.prompt.active) g.prompt.destroy(); } });
+    const was = this.beast.count;
+    const b = window.__f5scry = window.__f5scry || {};
+    b.tapped = (b.tapped | 0) + 1;
+    /* F5-SCRYGATE: the finger lets go of the door and waits (faded) for the pill */
+    if (this.f5G && this.f5G.beat === 'scry') { this.f5G.pose = null; this.f5GuideBeat('reveal'); }
+    this.f5PillHold = 1;                      // the pill waits for the lesson's beat
+    this.scry();                              // AS NORMAL: the board redeals, the beast counts it
+    this.f5ScryReveal(g, was);                // beat 3 — the cost, SHOWN SLOWLY (F5-SCRYGATE)
+  }
+  /* F5-SCRYGATE: THE REVEAL. Skylar (10/09): "we really need to highlight
+     that the beast is striking in one cast earlier. Maybe it pops up for a
+     second, but it needs to be slowed down so the player has a moment to
+     realize what Scry really does." The fresh board rains in under the
+     veil while the pill (raised into the light) still says the OLD count;
+     then, big at the hit number's own seat, the old reading stands in the
+     pill's own words — and STEPS: the pill ticks down with its hot pulse
+     (the ember alarm, at 1) while the old line is struck through and the
+     new one pops hot, the finger moves onto the pill, Skylar's cost line
+     rises beneath. The beat HOLDS — SS_F5_SCRY_SHOW_MS from the step, a tap
+     past SS_F5_SCRY_FLOOR_MS lets go — then the gate lifts and the script's
+     hand retires. Shared by the scripted gate and the stall-born one. */
+  f5ScryReveal(g, was) {
+    const l = this.L, b = window.__f5scry = window.__f5scry || {};
+    this.strikeGlow.setDepth(901); this.strikeRib.setDepth(902); this.strikeT.setDepth(903);
+    const c = this.add.container(l.x(0), l.y(468)).setDepth(950).setAlpha(0).setScale(0.92);   // the hit number's own seat
+    c.setData('f5scryshow', 1);
+    const old = ssTxt(this, 0, -l.u(30), SS_T(was === 1 ? 'strikeIn1' : 'strikeIn', was), l.u(18), '#e6a2a2').setOrigin(0.5);
+    const cross = this.add.graphics();        // the strike-through, drawn at the step
+    c.add([old, cross]);
+    g.reveal = c; g.old = old; g.cross = cross;
+    this.time.delayedCall(SS_F5_SCRY_REVEAL_MS, () => {
+      if (!this.sys.isActive() || !c.active) return;
+      this.tweens.add({ targets: c, alpha: 1, scale: 1, duration: 260, ease: 'Back.easeOut' });
+      b.reveal = (b.reveal | 0) + 1; b.revealAt = Date.now();
+      this.time.delayedCall(SS_F5_SCRY_STEP_MS, () => this.f5ScryStep(g, was));
+    });
+  }
+  f5ScryStep(g, was) {
+    const l = this.L, b = window.__f5scry = window.__f5scry || {}, c = g.reveal;
+    this.f5PillHold = 0;
+    if (!this.sys.isActive() || !c || !c.active) return;
+    this.updateBars();                        // the number steps down in the light (the hot pulse; the ember alarm at 1)
+    const now = this.beast ? this.beast.count : null;
+    b.down = [was, now];
+    // the price ticked? (A sign's own arrow felling the beast inside the scry
+    // never ticks it — the line would lie; the victory speaks for itself.)
+    const told = now === was - 1;
+    let dwellMs = SS_F5_SCRY_SHOW_MS;
+    if (told) {
+      SFX.tick(); SFX.noise(0.3, 220, 0.8, 0.14, 70);
+      const old = g.old, cross = g.cross, w = old.width + l.u(10), seg = { t: 0 };
+      this.tweens.add({
+        targets: seg, t: 1, duration: 260, ease: 'Sine.easeOut',
+        onUpdate: () => { if (!cross.active) return; cross.clear(); cross.lineStyle(l.u(2.2), 0xff8a70, 0.9); cross.beginPath(); cross.moveTo(-w / 2, old.y); cross.lineTo(-w / 2 + w * seg.t, old.y); cross.strokePath(); },
+      });
+      this.tweens.add({ targets: old, alpha: 0.45, duration: 400 });
+      // the new reading pops hot, an ember breathing behind it
+      const ember = this.add.image(0, l.u(10), 'glowbig').setDisplaySize(l.u(300), l.u(70)).setTint(0xff5a48).setBlendMode('ADD').setAlpha(0);
+      const nowT = ssTxt(this, 0, l.u(10), SS_T(now === 1 ? 'strikeIn1' : 'strikeIn', now), l.u(25), '#ff8a70').setOrigin(0.5)
+        .setShadow(0, 0, '#ff5a48', l.u(10), true, true).setScale(0.6).setAlpha(0);
+      c.addAt(ember, 0); c.add(nowT);
+      this.tweens.add({ targets: nowT, alpha: 1, scale: 1, duration: 300, ease: 'Back.easeOut' });
+      this.tweens.add({ targets: ember, alpha: 0.5, duration: 320, onComplete: () => { if (ember.active) this.tweens.add({ targets: ember, alpha: 0.22, duration: 640, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' }); } });
+      // …then SAID, in Skylar's words (the one prompt frame; the once law on the table's own key)
+      const seen = this.f5Prompted || (this.f5Prompted = {}); seen.scryCost = 1;
+      window.__f5prompt = Object.assign(window.__f5prompt || {}, { scryCost: ((window.__f5prompt || {}).scryCost | 0) + 1 });
+      b.cost = (b.cost | 0) + 1;
+      const str = (SS_F5_PROMPTS[PACK.lang] || SS_F5_PROMPTS.en).scryCost || SS_F5_PROMPTS.en.scryCost;
+      const line = ssF5Frame(this, str).setPosition(0, l.u(62)).setAlpha(0);
+      c.add(line);
+      this.tweens.add({ targets: line, alpha: 1, duration: 260, delay: 500 });
+      // the script's finger moves onto the pill — the counter the player watches from now on
+      const sg = this.f5G;
+      if (sg && sg.beat === 'reveal') {
+        sg.pose = { x: l.x(0) + this.strikeT.width / 2 + l.u(10), y: l.y(343) + l.u(6), flip: false, dip: 7 };
+        sg.poseN = (sg.poseN | 0) + 1;
+        this.ftueAt = null; this.ftueRepoint();
+      }
+    } else dwellMs = 900;                     // nothing to teach — a short beat, then the night goes on
+    g.steppedAt = this.time.now; b.stepAt = Date.now();
+    const release = (how) => {
+      if (g.tapFn) { this.input.off('pointerdown', g.tapFn); g.tapFn = null; }
+      b.released = how; b.holdMs = Math.round(this.time.now - g.steppedAt);
+      this.f5ScryGateDown(g);
+    };
+    const dwell = this.time.delayedCall(dwellMs, () => release('dwell'));
+    this.time.delayedCall(Math.min(SS_F5_SCRY_FLOOR_MS, dwellMs), () => {
+      if (g.lifted || !this.sys.isActive() || !c.active) return;
+      g.tapFn = () => { dwell.remove(false); release('tap'); };   // taps accelerate, past the floor
+      this.input.once('pointerdown', g.tapFn);
+    });
+    DIAG('f5: scry reveal ' + was + ' → ' + now + (told ? '' : ' (no step to teach)'));
+  }
+  f5ScryGateDown(g) {
+    if (g.lifted) return;
+    g.lifted = true;
+    // beat 4 — the gate lifts: the reveal fades, every depth goes home, the night goes on
+    const c = g.reveal;
+    if (c && c.active) this.tweens.add({ targets: c, alpha: 0, duration: 260, onComplete: () => { if (c.active) c.destroy(); } });
+    this.strikeGlow.setDepth(0); this.strikeRib.setDepth(0); this.strikeT.setDepth(0);
+    if (g.veil.active) {
+      this.tweens.add({ targets: g.veil, alpha: 0, duration: 300, onComplete: () => { if (g.veil.active) g.veil.destroy(); } });
+    }
+    const b = window.__f5scry = window.__f5scry || {};
+    b.lifted = (b.lifted | 0) + 1;
+    /* F5-SCRYGATE: the script's hand goes on from here — F5-BLUE: into the
+       blue lesson (or retires, when nothing more is authored); without a
+       script the stall clock starts fresh from the lesson */
+    if (this.f5G && this.f5G.beat === 'reveal') this.f5GuideScried();
+    else { this.f5LastTap = this.time.now; this.f5Glinted = false; }
+    DIAG('f5: scry gate lifted');
   }
 
   // The hint teaches the ORDER, not just the letters: tiles light one at a
@@ -11920,6 +13634,14 @@ class Battle extends Phaser.Scene {
     return { rare: 0.10, leg: 0.03 };
   }
   rollSigilOpts() {
+    /* F5-CARD-04: the first-ever sigil trio is curated legible — QUILL /
+       SALVE / FIRST LIGHT (damage, sustain, the first-word double), the
+       page's own pick. The six rolls the stock path would spend are burned
+       so the stream downstream never moves (the draw-order law). */
+    if (this.ftue && !this.run.sigils.length) {
+      const trio = ['quill', 'salve', 'first'].map((id) => SS_SIGILS.find((s) => s.id === id)).filter(Boolean);
+      if (trio.length === 3) { for (let k = 0; k < 6; k++) rng(); return trio; }
+    }
     const { rare, leg } = this.sigilChances();
     /* THE DRIP'S ONE GATE. Every solo pick — quick, campaign and daily alike
        — draws from ssSigilOpen(), so a locked sigil can never be offered.
@@ -11996,7 +13718,7 @@ class Battle extends Phaser.Scene {
         // vessel, data-read so the ladder and the pick can never disagree
         if (sg.id === 'aegis') { this.run.hpMax += ssSigilVal('aegis', 'hp', 1); this.run.hp = this.run.hpMax; }
         this.repaintChips();   // a letter-bonus sigil shows on the standing board at once
-        if (this.mode === 'campaign' || this.mode === 'endless') this.saveCheckpoint();
+        if (this.mode === 'campaign' || this.mode === 'endless' || this.f5Night /* F5-GRAFT-4: the first night's pocket */) this.saveCheckpoint();
         sparks.emitParticleAt(card.x, card.y, tier === 2 ? 26 : 12);
         this.tweens.add({ targets: card, scale: 1.05, duration: 130, yoyo: true });
         for (const it of items) if (it !== card && it !== sparks) this.tweens.add({ targets: it, alpha: 0, duration: 200 });
@@ -12060,7 +13782,7 @@ class Battle extends Phaser.Scene {
         this.run.hpMax += d; this.heal(d);
       }
       this.repaintChips();   // a choir/runes step shows on the standing board at once
-      if (this.mode === 'campaign' || this.mode === 'endless') this.saveCheckpoint();
+      if (this.mode === 'campaign' || this.mode === 'endless' || this.f5Night /* F5-GRAFT-4: the first night's pocket */) this.saveCheckpoint();
       const glow = this.add.image(row.x, row.y + rc.y, 'glowbig').setDisplaySize(l.u(440), l.u(180))
         .setTint(GD.glow).setAlpha(0).setBlendMode('ADD');
       this.overlayC.add(glow);
@@ -12299,6 +14021,10 @@ class Battle extends Phaser.Scene {
       }
     }
     if (this.mode === 'campaign') ssClearCampaign();
+    if (this.mode === 'quick') localStorage.removeItem('beta3.quickck');   /* F5-GRAFT-4: the run ended by a real door — nothing left to hold */
+    this.f5ClearSeatMarks();   /* F5-FIX1-02: the ledger below is the end screen's one source of kept marks */
+    /* F5-CARD-06: the graduation ache rides the end screen's settle */
+    if (this.mode === 'quick' && ssF5LitOwner(this)) this.time.delayedCall(1600, () => { if (this.scene.isActive()) this.f5Ledger(); });
     let streak = null;
     if (this.mode === 'daily') {
       SS.award('daily-devout', this.game);
