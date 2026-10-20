@@ -57079,7 +57079,7 @@ function netSync(){
         
         
         adv:advCount(),
-        advv:4, advo:advCount523(),   
+        advv:5, advo:advCount523(),   
         
         
         
@@ -88893,7 +88893,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='25.06';        
+let GVT_CV='25.07';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -170826,7 +170826,9 @@ const ADV_CELLS=[
   ()=> META.nemM20?1:0,                             
   ...['palace','caves','sky','chess','gmy'].flatMap(k=>['e','m','h','g'].map(d=>()=>(META[k]&&META[k][d])?1:0)),   
   ()=> (META.ice&&META.ice.u)?1:0,                  
-  ()=> (META.bone&&META.bone.u)?1:0                 
+  ()=> (META.bone&&META.bone.u)?1:0,                
+  
+  ...[1,2,3,4].map(k=>()=>(META.msbAdv&&META.msbAdv[k])?1:0)   
 ];
 const ADV_PARKS=['yeti','dino','western','teddy','moon'];      
 const ADV_MAX=THIRD_MAX+ADV_PARKS.length*50+ADV_CELLS.length;   
@@ -187270,6 +187272,29 @@ const MSB={ on:(function(){ try{ const q=/[?&]msb=([01])/.exec(location.search||
 
 
 
+(function(){ let M; try{ M=MSB; }catch(e){} if(!M || typeof M!=='object') return;
+  const MBA={ n:0, log:[] };
+  function sweep(){ try{
+      const m=META.msb; if(!m || typeof m!=='object' || !m.done || typeof M.dayOf!=='function') return 0;
+      const k=M.dayOf(m.dk)|0; if(k<1 || k>MSB_ORDERS) return 0;
+      if(!META.msbAdv || typeof META.msbAdv!=='object') META.msbAdv={};
+      if(META.msbAdv[k]) return 0;
+      META.msbAdv[k]=1; MBA.n++; MBA.log.push('won:'+k+':'+m.dk); if(MBA.log.length>12) MBA.log.shift();
+      saveMeta(); try{ netSync(); }catch(e){}
+      return 1;
+    }catch(e){ try{ MBA.log.push('err:'+String(e).slice(0,80)); }catch(e2){} return 0; } }
+  const s0=sqGameTick; sqGameTick=function(){ const r=s0.apply(this,arguments); sweep(); return r; };            
+  const w0=olvTrophyWin; olvTrophyWin=function(){ const r=w0.apply(this,arguments); sweep(); return r; };         
+  const b0=bdSpoils; bdSpoils=function(){ const r=b0.apply(this,arguments); sweep(); return r; };                 
+  setTimeout(sweep, 0); setInterval(sweep, 7000);                                                                  
+  M.adv=function(){ return { won:Object.assign({}, META.msbAdv||{}), n:MBA.n, log:MBA.log.slice(), cells:[1,2,3,4].map(function(k){ return (META.msbAdv&&META.msbAdv[k])? 1 : 0; }) }; };
+  M.advSweep=sweep;
+})();
+
+
+
+
+
 
 
 
@@ -191494,7 +191519,8 @@ window.GVT = {
   adv(){ const cells={}; const names=['nemPark','nemY50','nemD50','nemW20','nemRoom','nemBank',
       'ice_e','ice_m','ice_h','ice_g','bone_e','bone_m','bone_h','bone_g',
       'croak_e','croak_m','croak_h','croak_g','fields_e','fields_m','fields_h','fields_g','mom',
-      'nemT20','nemM20','palace_e','palace_m','palace_h','palace_g','caves_e','caves_m','caves_h','caves_g','sky_e','sky_m','sky_h','sky_g','chess_e','chess_m','chess_h','chess_g','gmy_e','gmy_m','gmy_h','gmy_g','ice_u','bone_u'];   
+      'nemT20','nemM20','palace_e','palace_m','palace_h','palace_g','caves_e','caves_m','caves_h','caves_g','sky_e','sky_m','sky_h','sky_g','chess_e','chess_m','chess_h','chess_g','gmy_e','gmy_m','gmy_h','gmy_g','ice_u','bone_u',
+      'msb1','msb2','msb3','msb4'];   
     ADV_CELLS.forEach((c,j)=>{ let v=0; try{ v=c()?1:0; }catch(e){} cells[names[j]||('c'+j)]=v; });
     const legs={ camp:Math.max(0,Math.min(THIRD_MAX,META.campaign|0)),
       parks:ADV_PARKS.map(id=>{ const p=(META.parks&&META.parks[id])||{}; return Math.max(0,Math.min(parkLevels(id),p.lv|0)); }) };
