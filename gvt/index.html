@@ -88894,7 +88894,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='25.08';        
+let GVT_CV='25.09';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -187328,6 +187328,46 @@ function adwLine(){ try{
   const g0=squadAdGate; squadAdGate=function(launch){ try{ ADW.why=adwWhy(); ADW.t=Date.now(); }catch(e){ ADW.why='err'; } const r=g0.apply(this,arguments); try{ ADW.brk=(AD_LAST&&AD_LAST.brk)?1:0; }catch(e){} return r; };   
   const t0=telAd; telAd=function(kind,r){ try{ if(kind==='int') ADW.res=(r&&r.displayed)?'shown':'nofill'; }catch(e){} return t0.apply(this,arguments); };   
   setTimeout(function(){ try{ if(window.GVT && !GVT.adw) GVT.adw=function(){ return { line:adwLine(), why:ADW.why, res:ADW.res, brk:ADW.brk, calc:adwWhy() }; }; }catch(e){} }, 0);
+})();
+
+
+
+
+
+let ADH_ON=1;           
+let ADH_LEAD=400;       
+let ADH_TAP_MS=2000;    
+const ADH={ on:0, t0:0, n:0, rel:0, held:0, def:0, kind:'', log:[] };   
+function adhOn(){ return !!(ADH_ON && ADH.on); }
+function adhHold(kind){ try{
+  if(!ADH_ON || ADH.on) return false;
+  ADH.on=1; ADH.n++; ADH.t0=Date.now(); ADH.kind=String(kind||''); ADH.def=0;
+  ADH.held=qtHold('ad')? 1 : 0;   
+  sfxSession();                   
+  return true;
+}catch(e){ return false; } }
+function adhRelease(why){ try{
+  if(!ADH.on) return false;
+  ADH.on=0; ADH.rel++; ADH.log.push(String(why||'')); if(ADH.log.length>8) ADH.log.shift();
+  if(document.hidden) return true;   
+  if(qtHeld()) qtRelease('ad');      
+  return true;
+}catch(e){ return false; } }
+(function(){
+  const m0=maxShow; maxShow=function(kind){
+    const intish=(kind==='int');
+    if(!ADH_ON || !MAXA.ok || (intish?!MAXA.int:!MAXA.rew)) return m0.apply(this,arguments);   
+    adhHold(kind);
+    const p=m0.apply(this,arguments);
+    try{ p.then(function(){ adhRelease('result'); }, function(){ adhRelease('result'); }); }catch(e){}   
+    return p;
+  };
+  const p0=maxPost; maxPost=function(m){ if(adhOn() && m && m.cmd==='show' && ADH_LEAD>0){ setTimeout(function(){ p0(m); }, ADH_LEAD); return; } return p0.apply(this,arguments); };   
+  const c0=maxOnCreative; maxOnCreative=function(d){ const r=c0.apply(this,arguments); try{ if(ADH_ON && d && !ADH.on){ for(const k in MAXA.pend){ const q=MAXA.pend[k]; if(q && q.kind===d.kind){ adhHold(d.kind); break; } } } }catch(e){} return r; };   
+  const r0=qtRelease; qtRelease=function(why){ if(adhOn() && why!=='ad'){ ADH.def++; return false; } return r0.apply(this,arguments); };   
+  const s0=sfxSession; sfxSession=function(){ if(adhOn()){ try{ const s=navigator.audioSession; if(!s) return false; if(s.type!=='ambient') s.type='ambient'; return true; }catch(e){ return false; } } return s0.apply(this,arguments); };   
+  window.addEventListener('pointerdown', function(){ try{ if(adhOn() && Date.now()-ADH.t0>=ADH_TAP_MS) adhRelease('tap'); }catch(e){} }, {capture:true, passive:true});
+  setTimeout(function(){ try{ if(window.GVT && !GVT.adh) GVT.adh=function(){ return { on:ADH.on, n:ADH.n, rel:ADH.rel, held:ADH.held, def:ADH.def, kind:ADH.kind, qt:qtHeld()?1:0, ac:AC? AC.state : null, lead:ADH_LEAD, tap:ADH_TAP_MS, log:ADH.log.slice() }; }; }catch(e){} }, 0);
 })();
 
 
