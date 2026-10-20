@@ -57079,6 +57079,7 @@ function netSync(){
         
         
         adv:advCount(),
+        adst:adwLine(),   
         advv:5, advo:advCount523(),   
         
         
@@ -88893,7 +88894,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='25.07';        
+let GVT_CV='25.08';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -187289,6 +187290,44 @@ const MSB={ on:(function(){ try{ const q=/[?&]msb=([01])/.exec(location.search||
   setTimeout(sweep, 0); setInterval(sweep, 7000);                                                                  
   M.adv=function(){ return { won:Object.assign({}, META.msbAdv||{}), n:MBA.n, log:MBA.log.slice(), cells:[1,2,3,4].map(function(k){ return (META.msbAdv&&META.msbAdv[k])? 1 : 0; }) }; };
   M.advSweep=sweep;
+})();
+
+
+
+
+
+let ADW={ why:'-', res:'-', brk:'-', t:0 };
+function adwWhy(){ try{
+  if(STEAM_SHELL) return 'steam';
+  if(adFree()) return 'free';
+  if(GA.hold) return 'torch';
+  if(adNewbie()) return 'cradle';
+  let live=false; try{ live=!!AD; }catch(e){} if(live) return 'live';
+  if(!((META.adGames|0)>=(META.adNext|0))) return 'notdue';
+  if(ADS.provider==='placeholder') return 'plc';
+  const sq=!!((S.bf&&S.bf.sqAdT)||(S.sq&&S.sq.sqAdT));
+  const due= sq && AD_SQUAD_EVERY>0 && ADQ.squad>0 && ADQ.sqPaid!==ADQ.squad && (AD_SQUAD_LIFE? (META.adGames|0)>=META.adNext : (ADQ.squad%AD_SQUAD_EVERY)===0);
+  const soloDue= !sq && AD_SOLO_POST===1 && ADQ.games>AD_FREE_GAMES && AD_SOLO_MAX>0 && (META.adGames|0)>=META.adNext && ADQ.soloPaid!==ADQ.games;
+  if(!(due||soloDue)) return 'latch';
+  if(META.paidEver) return 'paid';
+  if(!(MAXA.sess<AD_SESS_CAP)) return 'cap';
+  if(MAXA.lastShow && (Date.now()-MAXA.lastShow)<AD_MIN_GAP_MIN*60000) return 'gap';
+  return 'ok';
+}catch(e){ return 'err'; } }
+function adwLine(){ try{
+  let p='-', ok='-', it='-', rw='-', s='-', b='-', h='-';
+  try{ p=String(ADS.provider||'-').charAt(0); }catch(e){}
+  try{ ok=MAXA.ok?1:0; it=MAXA.int?1:0; rw=MAXA.rew?1:0; s=MAXA.sess|0; }catch(e){}
+  try{ b=ADS_BRIDGE?1:0; }catch(e){}
+  try{ h=GA.hold?1:0; }catch(e){}
+  const tr=String((META&&META.adTrack)||'-').charAt(0);
+  let w='-', z='-', k='-'; try{ w=ADW.why; z=ADW.res; k=ADW.brk; }catch(e){}
+  return String('p='+p+' ok='+ok+' i='+it+' r='+rw+' s='+s+' b='+b+' t='+tr+' h='+h+' g='+(META.adGames|0)+' n='+(META.adNext|0)+' k='+k+' w='+w+' z='+z).replace(/[^ -~]/g,'?').slice(0,96);
+}catch(e){ return '-'; } }
+(function(){
+  const g0=squadAdGate; squadAdGate=function(launch){ try{ ADW.why=adwWhy(); ADW.t=Date.now(); }catch(e){ ADW.why='err'; } const r=g0.apply(this,arguments); try{ ADW.brk=(AD_LAST&&AD_LAST.brk)?1:0; }catch(e){} return r; };   
+  const t0=telAd; telAd=function(kind,r){ try{ if(kind==='int') ADW.res=(r&&r.displayed)?'shown':'nofill'; }catch(e){} return t0.apply(this,arguments); };   
+  setTimeout(function(){ try{ if(window.GVT && !GVT.adw) GVT.adw=function(){ return { line:adwLine(), why:ADW.why, res:ADW.res, brk:ADW.brk, calc:adwWhy() }; }; }catch(e){} }, 0);
 })();
 
 
