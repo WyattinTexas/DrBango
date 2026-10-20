@@ -72368,7 +72368,7 @@ const FDEF = {
   
   angler:   { hp:60, spd:26, bounty:80,  leak:4, w:110, boss:true, rod:{r:480, wind:0.8, reel:220, cd:7, lineHp:3}, stomp:{r:84, dmg:2}, shroom:{r:28, cloudR:56, cloudT:3, poison:0.5, poisonT:6, max:2, sprout:9} },
   toadstool:{ hp:1,  spd:0,  bounty:0,   leak:0, w:48,  mine:1 },
-  wqueen:   { hp:90, spd:30, bounty:100, leak:4, w:104, boss:true, fly:1, lay:{cd:6, cap:2}, call:{cd:8}, needle:{hits:2, pips:3} },
+  wqueen:   { hp:180, spd:30, bounty:100, leak:4, w:104, boss:true, fly:1, lay:{cd:6, cap:2}, call:{cd:8}, needle:{hits:2, pips:3}, assault:{cd:5, first:0} },   
   princess: { hp:160, spd:24, bounty:400, leak:8, w:120, rng:400, boss:true, harp:{shotCd:2.4, pips:2, halt:240, back:80, killR:84, tell:0.12, hopT:0.3, hopPx:80, arrowT:2.0, arrowN:3, arrowDy:120, arrowSpd:900, arrowHw:56, arrowLen:160, arrowGap:0.08, arrowBack:0.25, dim:0.55} },   
   pfrog:    { hp:4,  spd:0,  bounty:10, leak:1, w:44, pounce:{aggro:150, leap:460, swing:0.9, pips:1, cap:1, cd:2.0}, tongue:{r:56, pips:1, cd:2} },   
   tcannon: { hp:10, spd:18, bounty:24, leak:2, w:88, elite:true, rng:400, minRng:120, fireCd:3.6, cotton:{spd:190, r:24, range:760, wind:0.5, splashR:40} },   
@@ -88828,7 +88828,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='25.00';        
+let GVT_CV='25.01';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -101358,6 +101358,7 @@ function bfSfx(fn,x,y){ if(bfVis(x,y)) fn(); }
 
 const FLAME_SNOW_X=3;
 function hurt(f,dmg,src,fire9){ if(f.trk && trkTurn(f)) return; dmg*=sqlArmX(f); dmg*=hunHugX(f);         dmg*=olvSightX(f,dmg,src,fire9); dmg*=olvVisorX12(f,src,fire9); dmg*=gmyWrapFireX(f,fire9);   ovfHatHit19(src,f);             if(f.olvH && !S.bf && olvHurt(f,dmg,src,fire9)) return;           
+  if(!S.bf && f.def && f.def.lay && qwShield(f,src)) return;   
   if(S.bf && f.side && (f.jetT>0||f.falling||f.dropT>0||f.hlbAir)) return;           
   if(f.jhs) return;    
   if(fire9 && f.def && (f.def.fly || f.skyDrop) && !hrtS3Grd(f)) return;       
@@ -107340,12 +107341,12 @@ function gnNestTick(f,dt){
 function gnFairyTick(f,dt){
   const hv=f.def.hover, bb=f.def.bubble; if(f.mendT>0) f.mendT-=dt;
   let front=null; for(const o of S.foes){ if(o===f || o.dead || o.def.fly || o.def.nest || o.def.bubbleOf || o.def.mine) continue; if(!front || o.x<front.x) front=o; if(o.hp<o.hpMax && Math.hypot(o.x-f.x,o.y-f.y)<f.def.healR) f.mendT=0.3; }
-  const tx=front? Math.min(W-40, front.x+hv.leash) : W-60, ty=front? front.y : f.y;
+  const q9=qwQueen(); const tx=q9? Math.min(W-40, q9.x+hv.leash) : front? Math.min(W-40, front.x+hv.leash) : W-60, ty=q9? q9.y : front? front.y : f.y;   
   const dx=tx-f.x, dy=ty-f.y, d=Math.hypot(dx,dy); if(d>4){ const sp=Math.min(60*dt,d); f.x+=dx/d*sp; f.y+=dy/d*sp*0.6; }
   if(f.blowT>0){ f.blowT-=dt; if(f.blowT<=0){ const u=f.blowU; f.blowU=null; if(u && !u.dead && !u.big){ const b=spawnFoe('fbubble', f.x-18, foeBandY(f.y), null, false); if(b){ b.tgt=u; b.fairy=f; b.hp=b.hpMax=1;   } bfSfx(SFX.twink,f.x,f.y); } } return; }
   f.bubbleCd=(f.bubbleCd==null? bb.cd*0.4 : f.bubbleCd)-dt; if(f.bubbleCd>0) return;
   if(f.bigId!=null){ let alive=false; for(const o of S.foes){ if(o.id===f.bigId && !o.dead){ alive=true; break; } } if(alive) return; f.bigId=null; }   
-  let pick=null; for(const o of S.foes){ if(o===f || o.dead || o.boss || o.big || o.def.fly || o.def.nest || o.def.bubbleOf || o.def.hover || o.def.mine) continue; if(!pick || o.x<pick.x) pick=o; }
+  let pick=null; for(const o of S.foes){ if(o===f || o.dead || o.boss || o.big || o.def.fly || o.def.nest || o.def.bubbleOf || o.def.hover || o.def.mine) continue; if(q9 && !(o.def.swoop && o.def.sting)) continue; if(!pick || o.x<pick.x) pick=o; }   
   if(!pick) return;
   f.blowU=pick; f.blowT=bb.blow; f.bubbleCd=bb.cd;
 }
@@ -107427,6 +107428,7 @@ function gnQueenTick(f,dt){
   if(f.layCd<=0){ f.layCd=ly.cd; let n=0; for(const o of S.foes){ if(o.queenOf===f && !o.dead) n++; } if(n<ly.cap && f.x<W-20){ const m=spawnFoe('wnest', f.x+10, foeBandY(f.y+6), null, false); if(m){ m.queenOf=f; m.nestCd=1.5; } f.layT=0.5; bfSfx(SFX.thock,f.x,f.y); S.fx.push({k:'ring',x:f.x,y:f.y-6,r:6,R:30,t:0,dur:0.4,col:'#D9D4C7'}); } }
   if(f.callCd<=0){ f.callCd=cl.cd; f.callT=0.6; for(const o of S.foes){ if(o!==f && !o.dead && o.def.swoop && o.def.sting && o.swoopState!=='dive' && o.swoopState!=='stall'){ o.swoopCd=0; o.gnCall=1; } } bfSfx(SFX.screech,f.x,f.y); S.fx.push({k:'ring',x:f.x,y:f.y-50,r:10,R:90,t:0,dur:0.6,col:'#FFF4C8'}); }
   if(f.needleN>=nd.hits && f.needleU && !f.needleU.dead){ f.qState='out'; f.needleU9=f.needleU; f.qHome={x:f.x,y:f.y}; f.needleN=0; bfSfx(SFX.swish,f.x,f.y); }
+  qwAssaultTick(f,dt);   
 }
 function gnJabTick(f,dt){
   const jb=f.def.jab; if(f.shT>0) f.shT-=dt;
@@ -119515,6 +119517,7 @@ function update(dt){
     
     if(f.def.rod){ gnAnglerTick(f,dt); if(f.anSeat && !f.falling){ if(dt>0){ f.vx=0; f.vy=0; } f.airB=0; continue; } }   
     if(f.def.lay){ gnQueenTick(f,dt); if((f.qState==='out'||f.qState==='back') && !f.falling){ if(dt>0){ f.vx=0; f.vy=0; } continue; } }   
+    if(f.def.swoop && f.def.sting && !f.boss && !f.falling && qwSwarmTick(f,dt)){ if(dt>0){ f.vx=0; f.vy=0; } continue; }   
     if(f.kyHeldT>0){ f.kyHeldT-=dt;
       if(!f.boss && !f.falling && !f.shv){ if(dt>0){ f.vx=0; f.vy=0; } f.airB=0; continue; } }
     
@@ -123180,6 +123183,7 @@ function foeFell(f,u){
       else S.fx.push({k:'fallen', type:f.type, img:(f.type==='kingyeti'&&IMG.kingyetiko)||((f.def.sting||f.def.rod||f.def.lay||f.def.harp)&&IMG[f.type+'fall'])||foeCmdImg(f), w:f.def.w*(f.big?2:1),   
                  x:f.x, y:f.y, t:0, dur:RM?0.4:1.1, rot:(f.def.vehicle?3.14:undefined)});
       if(f.type==='wnest') gnNestBurst(f);   
+      if(f.def.lay) qwNestsFall(f);   
       if(f.def.rod){ if(f.hookU) anFree(f); for(const o of S.foes.slice()){ if(o.shroomOf===f && !o.dead){ o.hp=0; foeFell(o,null); } } }   
       fzShatter(f);   
       if(TEDDY_CAST[f.type]) teddyDie(f);   
@@ -161071,7 +161075,7 @@ function parkCfgMoon(n){
   if(m<=19) moonDrill(m, wv, G, NM[m-1], !!MPARK_BEATS[n] || n===50);   
   const beats=(n===50)? ['angler','wqueen'] : (MPARK_BEATS[n]? [MPARK_BEATS[n]] : []);   
   for(const beat of beats)   
-  wv.push({ name:BOSSDEF[beat].wave, boss:beat, groups:[ {f:'boss',t:beat,n:1,e:'right',at:0} ].concat(beat==='angler'? [ G('line','gslinger',2,'right-bottom',3.0) ] : [ G('guerrilla','wasp',3,'right-top',2.5) ]) });
+  wv.push({ name:BOSSDEF[beat].wave, boss:beat, groups:[ {f:'boss',t:beat,n:1,e:'right',at:0} ].concat(beat==='angler'? [ G('line','gslinger',2,'right-bottom',3.0) ] : [ G('guerrilla','wasp',4,'right-top',2.5), FAIRY(n>=40? 3 : 2,'right',1.5) ]) });   
   return cfg;
 }
 
@@ -185683,6 +185687,46 @@ if(balOn()) try{
 
 
 
+var QWF={ v:1, err:0 };
+const QW_SWARM_SPD=200;   
+function qwQueen(){ let q=null; for(const o of S.foes){ if(o.def && o.def.lay && !o.dead && o.hp>0 && !(o.x<-40)){ if(!q || o.x<q.x) q=o; } } return q; }   
+function qwSeat(f,q){ const k=f.id|0, a=k*2.39996+S.t*0.6, r=56+((k*7)%3)*26; return { x:Math.min(W-30, q.x+Math.cos(a)*r*1.25), y:foeBandY(q.y+Math.sin(a)*r*0.7) }; }   
+function qwShield(f,src){ if(f.dead || !(f.x>=W-10)) return false;
+  if(!(f.qShT>0)){ f.qShT=0.12; S.fx.push({k:'ring',x:Math.min(f.x,W-8),y:f.y-44,r:4,R:20,t:0,dur:0.25,col:'#E6F4FF'}); } return true; }   
+function qwNestsFall(f){ for(const o of S.foes.slice()){ if(o.queenOf===f && !o.dead && o.type==='wnest'){ o.hp=0; foeFell(o,null); } } }   
+function qwAssaultTick(f,dt){ const a=f.def.assault; if(f.qShT>0) f.qShT-=dt; if(!a || S.bf) return;
+  if(f.qAtk==null) f.qAtk=+(a.first||0);
+  if(f.qState!=='hover' || !(f.x<W-10) || f.falling) return;
+  f.qAtk-=dt; if(f.qAtk>0) return;
+  const u=gnNearGreen(f,1e4); if(!u){ f.qAtk=0.5; return; }
+  f.qAtk=a.cd; f.qState='out'; f.needleU9=u; f.qHome={x:f.x,y:f.y}; f.needleN=0; bfSfx(SFX.swish,f.x,f.y); S.fx.push({k:'ring',x:f.x,y:f.y-44,r:6,R:40,t:0,dur:0.3,col:'#FFD24A'}); }   
+function qwSwarmTick(f,dt){ if(S.bf || f.swoopState==='dive' || f.swoopState==='stall') return false;
+  const q=qwQueen(); if(!q) return false;
+  const wb=f.def.swoop; if(f.sAlt==null) f.sAlt=1;
+  f.swoopCd=(f.swoopCd||0)-dt; if(!wb.stall && S.gnHum) f.swoopCd-=dt; if(f.swoopSting>0) f.swoopSting-=dt; f.sAlt=Math.min(1,f.sAlt+dt*1.6);   
+  if(dt>0){ const s=qwSeat(f,q), dx=s.x-f.x, dy=s.y-f.y, d=Math.hypot(dx,dy), sp=QW_SWARM_SPD*dt*(f.spdMul||1); if(d>sp){ f.x+=dx/d*sp; f.y+=dy/d*sp; } else { f.x=s.x; f.y=s.y; } }
+  if(f.swoopCd<=0 && f.x<W-10){ const m=foeSaberNext(f, f.gnCall? 1e4 : wb.aggro); f.gnCall=0;   
+    if(m){ const ex=m.x-f.x, ey=m.y-f.y, e=Math.hypot(ex,ey)||1; f.swoopDir={x:ex/e,y:ey/e}; f.swoopRun=e+110; f.swoopHit={};
+      if(wb.stall>0){ f.swoopState='stall'; f.stallT=wb.stall; S.fx.push({k:'ring',x:f.x,y:f.y-40,r:6,R:34,t:0,dur:wb.stall,col:'#FFF4C8'}); bfSfx(SFX.thump,f.x,f.y); }
+      else { f.swoopState='dive'; bfSfx(SFX.swish,f.x,f.y); } } }
+  return true; }   
+function qwfRig(o){ o=o||{}; const q=qwQueen();
+  const bees=S.foes.filter(f=>f.def && f.def.swoop && f.def.sting && !f.dead).map(f=>({ id:f.id, t:f.type, x:Math.round(f.x), y:Math.round(f.y), st:f.swoopState||'glide', big:f.big|0, hp:f.hp, d:q? Math.round(Math.hypot(f.x-q.x,f.y-q.y)) : null }));
+  const fairies=S.foes.filter(f=>f.def && f.def.hover && !f.dead).map(f=>({ id:f.id, x:Math.round(f.x), y:Math.round(f.y), bigId:(f.bigId==null)? null : f.bigId, blow:+(f.blowT||0).toFixed(2), cd:+(f.bubbleCd||0).toFixed(2), d:q? Math.round(Math.hypot(f.x-q.x,f.y-q.y)) : null }));
+  const nests=S.foes.filter(f=>f.type==='wnest' && !f.dead).map(f=>({ id:f.id, x:Math.round(f.x), y:Math.round(f.y), hp:f.hp, ofQ:!!(q && f.queenOf===q) }));
+  const types={}; for(const f of S.foes) if(!f.dead) types[f.type]=(types[f.type]|0)+1;
+  return { cv:GVT_CV, W:W, queen:q? { id:q.id, x:Math.round(q.x), y:Math.round(q.y), hp:q.hp, hpMax:q.hpMax, st:q.qState||null, on:q.x<W-10, atk:(q.qAtk==null)? null : +q.qAtk.toFixed(2), lay:+(q.layCd||0).toFixed(2), call:+(q.callCd||0).toFixed(2), sh:+(q.qShT||0).toFixed(2) } : null,
+    bees:bees, fairies:fairies, nests:nests, types:types, foes:S.foes.length, queue:S.queue.length, wave:S.wave|0, waves:(S.cfg&&S.cfg.waves)? S.cfg.waves.length : 0, waveActive:!!S.waveActive, cleared:!!S.cleared, mode:S.mode, park:S.park? S.park.id+':'+S.park.n : null,
+    row:{ hp:FDEF.wqueen.hp, assault:FDEF.wqueen.assault||null }, swarmSpd:QW_SWARM_SPD, err:QWF.err }; }
+
+
+
+
+
+
+
+
+
 
 
 
@@ -190774,6 +190818,7 @@ window.GVT = {
   xbi(o){ return xbiRig(o); },
   apt(o){ return aptRig(o); },   
   bal(o){ return balRig(o); },   
+  qwf(o){ return qwfRig(o); },   
   tsn(o){ return tsnRig(o); },   
   tro(o){ return troRig(o); },   
   mfs(o){ return mfsRig(o); },   
