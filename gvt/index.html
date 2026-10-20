@@ -88908,7 +88908,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='25.10';        
+let GVT_CV='25.11';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -187401,6 +187401,56 @@ function bbnFill(){ try{
   const d0=drawBossBar; drawBossBar=function(){ if(BBN_ON && !BBN.done) bbnFill(); return d0.apply(this,arguments); };   
   const s0=spawnGroup; spawnGroup=function(g,wk9){ if(BBN_ON && g && g.bnm && BBN_BNM[g.bnm]){ const g2=Object.assign({}, g, { bnm:BBN_BNM[g.bnm] }); BBN.stamped++; return s0.call(this, g2, wk9); } return s0.apply(this,arguments); };   
   setTimeout(function(){ try{ if(window.GVT && !GVT.bbn) GVT.bbn=function(){ return { on:BBN_ON, done:BBN.done, filled:BBN.filled, keys:BBN.keys.slice(), stamped:BBN.stamped, bnm:Object.assign({}, BBN_BNM) }; }; }catch(e){} }, 0);
+})();
+
+
+
+
+let PDL_ON=1;   
+try{ if(/[?&]pdl=0(&|$)/.test(location.search)) PDL_ON=0; }catch(e){}
+const PDL={ n:0, last:null };   
+function pdlOwner(u){   
+  if(S.bf) return (((u.seat|0)===bfMySeat())&&!u.coopBy)? 'me' : 's'+(u.seat|0);
+  if(!u.coopBy) return 'me';
+  return (u.coopBy==='bot')? 'bot'+(u.botIx|0) : String(u.coopBy);
+}
+function pdlHex(u){   
+  if(S.bf){ try{ return unitHex(u)||null; }catch(e){ return null; } }
+  return u.coopHex||(COOP&&COOP.seatHex&&COOP.seatHex[String(u.coopBy)])||'#5B84C4';
+}
+function pdlCast(){   
+  const by={}, ord=[], tm=S.bf? bfMyTeam() : null;
+  for(const u of S.units){
+    if(u.dead) continue;
+    if(S.bf && u.side!==tm) continue;
+    const k=pdlOwner(u);
+    if(!by[k]){ by[k]=[]; ord.push(k); }
+    by[k].push(u);
+  }
+  const mi=ord.indexOf('me'); if(mi>0){ ord.splice(mi,1); ord.unshift('me'); }   
+  if(ord.length<2) return null;
+  const ent=function(u){ const my=(pdlOwner(u)==='me'); const e={t:u.type,my:my?1:0}; if(!my){ const h=pdlHex(u); if(h) e.hex=h; } return e; };
+  const line=[];
+  for(const k of ord){ const i=by[k].findIndex(function(u){ return u.type==='sarge'; }); if(i>=0){ line.push(ent(by[k][i])); by[k].splice(i,1); } }   
+  for(let r=0, more=true; more; r++){ more=false; for(const k of ord){ if(r<by[k].length){ line.push(ent(by[k][r])); more=true; } } }   
+  return line;
+}
+(function(){
+  const c0=shakeCast;
+  shakeCast=function(){
+    if(!PDL_ON) return c0.apply(this,arguments);
+    let line=null; try{ line=pdlCast(); }catch(e){ line=null; }
+    if(!line) return c0.apply(this,arguments);   
+    PDL.n++; PDL.last=line.map(function(e){ return e.my? 'me' : e.hex; });
+    let mine=line.filter(e=>SPRITES_SRC[e.t]).slice(0,DANCERS_MAX);   
+    if(!mine.some(e=>e.t==='sarge'&&e.my)) mine=mine.slice(0,DANCERS_MAX-1);   
+    const pad=[];
+    if(!mine.some(e=>e.t==='sarge'&&e.my)) pad.push({t:'sarge',my:1});   
+    const fill=['rifleman','mgunner','bazooka','flame']; let fi=0;
+    while(mine.length+pad.length<DANCERS_MIN){ pad.push({t:fill[fi%4],my:1}); fi++; }
+    return { mine:mine, pad:pad.slice(0, Math.max(0, DANCERS_MAX-mine.length)) };
+  };
+  setTimeout(function(){ try{ if(window.GVT && !GVT.pdl) GVT.pdl=function(){ return { on:PDL_ON, n:PDL.n, last:PDL.last? PDL.last.slice() : null }; }; }catch(e){} }, 0);
 })();
 
 
