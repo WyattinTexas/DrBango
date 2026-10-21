@@ -88950,7 +88950,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='25.13';        
+let GVT_CV='25.14';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -187449,10 +187449,12 @@ function bbnFill(){ try{
 
 
 
+
 let WBT_ON=1;   
 try{ if(/[?&]wbt=0(&|$)/.test(location.search)) WBT_ON=0; }catch(e){}
-const WBT={ crateX:0.5, hatP:0.05, beamLo:120, beamHi:220, snowShare:0.15, roamX:1.2 };   
-const WBT_N={ crate:0, hatRoll:0, hatHit:0, beam:0, beamCrit:0, snow:0, roam:0 };   
+const WBT={ crateX:0.5, hatP:0.05, beamLo:120, beamHi:220, snowShare:0.15, roamX:1.2, heroReachX:1.2 };   
+const WBT_N={ crate:0, hatRoll:0, hatHit:0, beam:0, beamCrit:0, snow:0, roam:0, hero:0 };   
+let WBT_HERO0=0;   
 function wbtCrateX(u){ if(!WBT_ON || !u || u.type!=='sarge') return 1; const w=unitSargeStats(u).w; if(w==='sniper' || w==='lightsaber'){ WBT_N.crate++; return WBT.crateX; } return 1; }   
 function wbtRoamX(){ if(!WBT_ON) return 1; WBT_N.roam++; return WBT.roamX; }   
 function wbtSnowBite(f,d){ if(!WBT_ON || !f || !REFL_SNOWMAN_T[f.type] || !(f.boss||(f.def&&f.def.boss)) || !(f.hpMax>0)) return d; WBT_N.snow++; return f.hpMax*WBT.snowShare; }   
@@ -187466,7 +187468,8 @@ function wbtBeamDeal(u,hits){
 (function(){
   const h0=ovfHatHit19; ovfHatHit19=function(u,f){ if(WBT_ON && ovfHatOn19(u) && f && !f.dead){ WBT_N.hatRoll++; if(!(Math.random()<WBT.hatP)) return false; } const r=h0.apply(this,arguments); if(r) WBT_N.hatHit++; return r; };   
   const l0=lensLines2; lensLines2=function(id){ if(WBT_ON && id==='sniperhat') return ['HIT A MAN: ONE TIME IN TWENTY, SARGE RELOADS AT ONCE.']; return l0.apply(this,arguments); };   
-  setTimeout(function(){ try{ if(window.GVT && !GVT.wbt) GVT.wbt=function(){ return { on:WBT_ON, dials:Object.assign({},WBT), n:Object.assign({},WBT_N), beamRef:+wbtBeamRef().toFixed(3) }; }; }catch(e){} }, 0);
+  try{ if(UDEF && UDEF.kingcroak && UDEF.kingcroak.rng>0){ WBT_HERO0=UDEF.kingcroak.rng; if(WBT_ON){ UDEF.kingcroak.rng=Math.round(UDEF.kingcroak.rng*WBT.heroReachX); WBT_N.hero=1; } } }catch(e){}   
+  setTimeout(function(){ try{ if(window.GVT && !GVT.wbt) GVT.wbt=function(){ return { on:WBT_ON, dials:Object.assign({},WBT), n:Object.assign({},WBT_N), beamRef:+wbtBeamRef().toFixed(3), heroRng:UDEF.kingcroak.rng, heroRng0:WBT_HERO0 }; }; }catch(e){} }, 0);
 })();
 
 
