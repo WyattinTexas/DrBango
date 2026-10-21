@@ -49338,6 +49338,7 @@ function ycdMicOff(){
   try{ if(ac && ac.state!=='closed' && ac.close){ const p=ac.close(); if(p && p.catch) p.catch(()=>{}); } }catch(e){}
   ycdSession(0); }
 function ycdStands(){ return !!document.querySelector('#roomModal .ycdcard'); }
+function ycdHome(){ try{ return fortSceneOpen() || (typeof mbhOn==='function' && mbhOn() && roomOpenNow()); }catch(e){ return false; } }   
 function ycdDeal(html){ roomModal(html, 'medalhall fortcard rcpcard ycdcard', 'ycdTapX'); }   
 function ycdSheet(){ if(ycdStands()) roomModal(rcpHTML(), 'medalhall fortcard rcpcard'); }   
 function ycdSession(on){ try{ const s=navigator.audioSession; if(!s) return; if(on){ if(s.type!=='play-and-record') s.type='play-and-record'; } else sfxSession(); }catch(e){} }   
@@ -49362,7 +49363,8 @@ function ycdWire(st){ const ac=YCD.ac; try{ YCD.stream=st; const src=ac.createMe
   }catch(e){ ycdFail('mic'); } }
 function ycdTick(){   
   const ph=YCD.ph; if(ph!=='open' && ph!=='live'){ if(YCD.tid){ clearInterval(YCD.tid); YCD.tid=0; } return; }
-  let card=document.getElementById('ycdRec'); if(!card || !fortSceneOpen()){ ycdEnd('gone'); return; }
+  let card=document.getElementById('ycdRec'); if(!card || !ycdHome()){ ycdEnd('gone'); return; }   
+  try{ const ac=YCD.ac; if(ac && ac.state!=='running' && ac.state!=='closed' && ac.resume){ const p=ac.resume(); if(p && p.catch) p.catch(()=>{}); } }catch(e){}   
   if(card.dataset.ph!==ph){ ycdDeal(ycdRecHTML()); card=document.getElementById('ycdRec'); }
   if(ph==='open'){ if(YCD.stream && performance.now()-YCD.t1>8000) ycdFail('mic'); return; }
   const left=Math.max(0, YCD_CAP-YCD.n/YCD.rate), sec=document.getElementById('ycdSec'), fill=document.getElementById('ycdFill'), mic=document.getElementById('ycdMic');
@@ -49378,7 +49380,7 @@ function ycdEnd(by){
   ycdPut({ v:1, rate:YCD_RATE, n:r.n, sec:r.sec, at:Date.now(), pcm:r.pcm.buffer }, ()=>{ ycdFlagSet(true, r.sec); YCD.ph=null; if(LOC.bid===YCD_ID) locFree();   
     let i=-1; for(let k=0;k<RCP_SONGS.length;k++) if(RCP_SONGS[k].id===YCD_ID) i=k; if(!(i>=0 && rcpPick(i))){ ycdMusicBack(); ycdSheet(); } }, ()=>ycdFail('save')); }
 function ycdFail(kind){ YCD.tok++; ycdMicOff(); YCD.chunks=null; ycdMusicBack(); if(ycdStands()){ YCD.ph='err'; ycdDeal(ycdErrHTML(kind)); } else YCD.ph=null; }   
-function ycdTapRec(){ if(YCD.ph && !ycdStands()){ if(YCD.ph==='open'||YCD.ph==='live') ycdEnd('gone'); YCD.ph=null; } if(YCD.ph || !fortSceneOpen() || !ycdCan()) return; audio(); SFX.blip(); YCD.ph='ask'; ycdDeal(ycdAskHTML()); }   
+function ycdTapRec(){ if(YCD.ph && !ycdStands()){ if(YCD.ph==='open'||YCD.ph==='live') ycdEnd('gone'); YCD.ph=null; } if(YCD.ph || !ycdHome() || !ycdCan()) return; audio(); SFX.blip(); YCD.ph='ask'; ycdDeal(ycdAskHTML()); }   
 function ycdTapYes(){ if(YCD.ph!=='ask') return; audio(); SFX.snap(); ycdStart(); }
 function ycdTapStop(){ const ph=YCD.ph; if(ph!=='open' && ph!=='live') return; audio(); ycdEnd(ph==='live'? 'tap' : 'x'); }
 function ycdTapBack(){ const ph=YCD.ph; if(ph!=='ask' && ph!=='err' && ph!=='del') return; audio(); SFX.clack(); YCD.ph=null; ycdSheet(); }   
@@ -88950,7 +88952,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='25.15';        
+let GVT_CV='25.16';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -190587,7 +190589,7 @@ function hunTakeAt(){ try{ const v=JSON.parse(localStorage.getItem(YCD_FLAG)||'n
 function hunJoin(){ const fresh=petGrant('hunter'); if(!fresh) return false; saveMeta(); try{ SFX.arf(); }catch(e){}
   if(!milePopUp() && !(META.pet.seen && META.pet.seen.hunter)){ META.pet.seen.hunter=1; saveMeta(); try{ UI.closeModal(); }catch(e){} petCard('hunter'); MB_TAKE=function(){}; }   
   return true; }
-function hunHeard(id){ try{ if(id!==YCD_ID || petOwns('hunter') || !fortSceneOpen()) return false; if(!(hunTakeAt()>=HU.from)) return false; return hunJoin(); }catch(e){ return false; } }   
+function hunHeard(id){ try{ if(id!==YCD_ID || petOwns('hunter') || !ycdHome()) return false;     if(!(hunTakeAt()>=HU.from)) return false; return hunJoin(); }catch(e){ return false; } }   
 
 
 function huDur(p){ return petHas(p,'hulonger')? HU.dur60 : petHas(p,'hulong')? HU.dur10 : HU.dur; }
