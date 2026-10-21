@@ -89129,7 +89129,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='25.26';        
+let GVT_CV='25.27';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -152495,12 +152495,15 @@ function tp2Rig(o){ o=o||{}; if(o.on!=null){ TP2.on=o.on? 1 : 0; } if(o.reset){ 
 
 
 
+
+const CKW={ on:(function(){ try{ const m=/[?&]ckw=([01])/.exec(location.search||''); if(m){ if(m[1]==='0') localStorage.setItem('gvt_ckw','0'); else localStorage.removeItem('gvt_ckw'); } return localStorage.getItem('gvt_ckw')==='0'? 0 : 1; }catch(e){ return 1; } })() };   
+function ckwOn(){ return !!CKW.on; }
 const CKL={ on:(function(){ try{ const m=/[?&]ckl=([01])/.exec(location.search||''); if(m){ if(m[1]==='0') localStorage.setItem('gvt_ckl','0'); else localStorage.removeItem('gvt_ckl'); } return localStorage.getItem('gvt_ckl')==='0'? 0 : 1; }catch(e){ return 1; } })(), err:0, old:{}, log:[], up:0, busy:0, arriving:0, land:-1, landT:0, tabKey:'', tid:0, n:0, seq:0 };   
 const CKL_STARS=50, CKL_TAB_W=69, CKL_TAB_H=99, CKL_TAB_DY=33, CKL_TAB_PAD=6, CKL_IN_MS=420, CKL_SEAT_MS=470, CKL_AUTO_MS=1200, CKL_TICK_MS=400, CKL_OPEN_MS=220, CKL_STAMP_GAP_MS=650;   
 const CKL_CAMP_LINE="In the campaign, help me rescue our lost soldiers!";   
 const CKL_ORDERS=[ ['camp', "WIN CAMPAIGN LEVEL 1"], ['bf', "FIGHT ONE BATTLEFIELD BATTLE"], ['lab', "MAKE AN UPGRADE IN FLOOP'S LAB"], ['park', "VISIT ONE OF THE PARKS"] ];   
 function cklOn(){ return !!CKL.on; }
-function cklKeys(){ let o=META.ckl; if(!o || typeof o!=='object' || Array.isArray(o)){ o=META.ckl={ v:1, given:((META.tour|0)>=TOUR_DONE)? -1 : 0, got:{}, paid:{}, seen:{}, all:0 }; }   
+function cklKeys(){ let o=META.ckl; if(!o || typeof o!=='object' || Array.isArray(o)){ o=META.ckl={ v:1, given:((META.tour|0)>=TOUR_DONE)? -1 : 0, got:{}, paid:{}, seen:{}, all:0, tapped:0 }; }   
   if(!o.got || typeof o.got!=='object') o.got={}; if(!o.paid || typeof o.paid!=='object') o.paid={}; if(!o.seen || typeof o.seen!=='object') o.seen={}; return o; }
 (function(){ try{ if(cklOn()) cklKeys(); }catch(e){ CKL.err++; } })();   
 function cklHome(){ return S.mode==='menu' && roomCur()==='bedroom'; }
@@ -152533,6 +152536,8 @@ const CKL_CSS=`
 .ckl-star{ transform-origin:9px 9px; transform-box:fill-box; }
 .ckl-beat .ckl-star{ animation:cklBeat 1.8s ease-in-out infinite; }
 @keyframes cklBeat{ 0%,68%,100%{ transform:scale(1); } 78%{ transform:scale(1.28); } 88%{ transform:scale(.94); } }
+#cklTab.ckl-nudge svg.ckl-tart{ transform-origin:50% 14.4%; animation:cklNudge 3s ease-in-out 3s infinite; }
+@keyframes cklNudge{ 0%,20%,100%{ transform:rotate(0deg); } 4%{ transform:rotate(-7deg); } 8%{ transform:rotate(6deg); } 12%{ transform:rotate(-4deg); } 16%{ transform:rotate(2deg); } }
 #cklScrim{ position:fixed; inset:0; z-index:21; background:rgba(12,9,6,.40); opacity:0; pointer-events:none; transition:opacity .22s ease-out; }
 #cklScrim.on{ opacity:1; pointer-events:auto; }
 #cklCard{ position:fixed; right:0; top:var(--ckl-top,40px); bottom:0; width:min(60vw,520px); z-index:22; transform:translateX(104%); transition:transform .22s ease-out; box-sizing:border-box; padding:0 0 calc(8px + var(--chin,0px)) 0; filter:drop-shadow(-3px 4px 8px rgba(0,0,0,.45)); font-family:var(--ui); -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent; }
@@ -152566,20 +152571,22 @@ const CKL_CSS=`
 @keyframes cklPlus{ 0%{ transform:translate(-50%,0) scale(.4); opacity:0; } 18%{ transform:translate(-50%,-14px) scale(1.2); opacity:1; } 70%{ opacity:1; } 100%{ transform:translate(-50%,-52px) scale(1); opacity:0; } }
 .ckl-fly{ position:fixed; z-index:23; left:0; top:0; width:24px; height:24px; pointer-events:none; }
 .ckl-fly svg{ width:100%; height:100%; display:block; filter:drop-shadow(0 0 4px rgba(255,220,90,.9)); }
-@media (prefers-reduced-motion: reduce){ .ckl-beat .ckl-star, #cklCard .ckl-hole svg.slam, #cklCard .ckl-chip.pop, #cklCard .ckl-row.jolt{ animation:none !important; } #cklTab, #cklCard, #cklScrim{ transition:none !important; } }
+@media (prefers-reduced-motion: reduce){ .ckl-beat .ckl-star, #cklTab.ckl-nudge svg.ckl-tart, #cklCard .ckl-hole svg.slam, #cklCard .ckl-chip.pop, #cklCard .ckl-row.jolt{ animation:none !important; } #cklTab, #cklCard, #cklScrim{ transition:none !important; } }
 `;
 function cklCss(){ if(document.getElementById('cklCss')) return; const s=document.createElement('style'); s.id='cklCss'; s.textContent=CKL_CSS; document.head.appendChild(s); }
 
 function cklSeat(){ const h=document.querySelector('.roomhead'); const b=h? h.getBoundingClientRect().bottom : 0; return Math.round((b||34)+CKL_TAB_PAD+CKL_TAB_DY); }   
 function cklTabEnsure(){ cklCss(); let t=document.getElementById('cklTab'); if(t) return t; t=document.createElement('div'); t.id='cklTab'; t.className='ckl-hide'; t.setAttribute('role','button'); t.setAttribute('aria-label','CHECKLIST'); t.addEventListener('click', (e)=>{ e.stopPropagation(); cklOpen({ tap:1 }); }); document.body.appendChild(t); return t; }
 function cklTabPaint(){ const t=cklTabEnsure(); const d=cklDone(), w=cklReady()? 1 : 0, key=d+':'+w; if(key!==CKL.tabKey){ CKL.tabKey=key; t.innerHTML=cklTabSVG(d, CKL_ORDERS.length, w, 'T'); t.classList.toggle('ckl-beat', !!w); } t.style.top=cklSeat()+'px'; return t; }
-function cklTabSync(){ const o=cklKeys(); const want=cklOn() && o.given===1 && !o.all && !CKL.up && !CKL.arriving && !cklCovered(); const t=document.getElementById('cklTab'); if(!want){ if(t) t.classList.add('ckl-hide'); return; } cklTabPaint().classList.remove('ckl-hide'); }
+function cklNudgeSync(t){ const o=cklKeys(); t.classList.toggle('ckl-nudge', !!(ckwOn() && !o.tapped && !t.classList.contains('ckl-off'))); return t; }   
+function cklTabSync(){ if(CKL.arriving) return; const o=cklKeys(); const want=cklOn() && o.given===1 && !o.all && !CKL.up && !cklCovered(); const t=document.getElementById('cklTab'); if(!want){ if(t){ t.classList.add('ckl-hide'); t.classList.remove('ckl-nudge'); } return; } const tt=cklTabPaint(); tt.classList.remove('ckl-hide'); cklNudgeSync(tt); }   
 
 function cklHandleHTML(){ return '<div class="ckl-handle'+(cklReady()? ' ckl-beat' : '')+'" role="button" aria-label="CHECKLIST" onclick="event.stopPropagation();cklClose()">'+cklTabSVG(cklDone(), CKL_ORDERS.length, cklReady()? 1 : 0, 'H')+'</div>'; }
 function cklRowHTML(r, i){ const s=cklSt(r[0]), n=cklPrize(), o=cklKeys(); return '<div class="ckl-row'+(s==='d'? ' done' : '')+'" data-k="'+r[0]+'" data-i="'+i+'"><div class="ckl-hole">'+(s==='d'? cklCheckSVG() : '')+'</div><div class="ckl-txt">'+TXT(r[1])+'</div><div class="ckl-chip" data-notr>'+(s==='d'? '+'+(o.paid[r[0]]|0) : n)+'★</div></div>'; }
 function cklCardHTML(){ return '<div class="ckl-board"><div class="ckl-clip"></div><div class="ckl-paper"><div class="ckl-ttl">'+TXT("CHECKLIST")+'</div><div class="ckl-sub">'+tf("YOUR FIRST ORDERS · %1★ EACH", String(cklPrize()))+'</div><div class="ckl-rows">'+CKL_ORDERS.map(cklRowHTML).join('')+'</div></div></div>'+cklHandleHTML(); }
 function cklOpen(o){ o=o||{}; if(!cklOn()) return null; const k=cklKeys(); if(k.given!==1 || k.all) return null; if(cklCovered()) return null; if(CKL.busy || CKL.up) return null;
-  cklCss(); const old=document.getElementById('cklCard'); if(old) old.remove(); const os=document.getElementById('cklScrim'); if(os) os.remove(); const t=document.getElementById('cklTab'); if(t) t.classList.add('ckl-off');
+  if(o.tap && !k.tapped){ k.tapped=1; saveMeta(); CKL.log.push(['tapped', Math.round(performance.now())]); }   
+  cklCss(); const old=document.getElementById('cklCard'); if(old) old.remove(); const os=document.getElementById('cklScrim'); if(os) os.remove(); const t=document.getElementById('cklTab'); if(t){ t.classList.remove('ckl-nudge'); t.classList.add('ckl-off'); }
   const sc=document.createElement('div'); sc.id='cklScrim'; sc.addEventListener('click', (e)=>{ e.stopPropagation(); cklClose(); }); document.body.appendChild(sc);   
   const c=document.createElement('div'); c.id='cklCard'; c.setAttribute('role','dialog'); c.style.setProperty('--ckl-top', (cklSeat()-CKL_TAB_DY)+'px'); c.innerHTML=cklCardHTML(); document.body.appendChild(c);
   const RM=cklRM(); const seq=++CKL.seq; CKL.up=1; CKL.log.push(['open:'+(o.first? 'first' : o.tap? 'tap' : o.rig? 'rig' : 'late'), Math.round(performance.now())]); cklSfx('whoosh');
@@ -152617,7 +152624,7 @@ async function cklStamp(i){
 
 function cklArrive(why){ if(!cklOn()) return false; const k=cklKeys(); if(k.given!==0 || CKL.arriving) return false; if(cklCovered()) return false;
   k.given=1; saveMeta(); CKL.arriving=1; CKL.log.push(['arrive:'+(why||''), Math.round(performance.now())]);
-  const t=cklTabEnsure(); t.style.transition='none'; t.classList.add('ckl-off'); cklTabPaint(); t.classList.remove('ckl-hide'); void t.getBoundingClientRect();
+  const t=cklTabEnsure(); t.style.transition='none'; t.classList.add('ckl-off'); t.classList.remove('ckl-nudge'); cklTabPaint(); t.classList.remove('ckl-hide'); void t.getBoundingClientRect();
   const RM=cklRM();
   if(RM){ t.classList.remove('ckl-off'); t.style.transition=''; }
   else { t.style.transition='transform '+CKL_IN_MS+'ms cubic-bezier(.22,.61,.36,1)'; requestAnimationFrame(()=>{ t.classList.remove('ckl-off'); }); cklSfx('whoosh'); }
@@ -152640,11 +152647,11 @@ function cklTick(){ try{ if(!cklOn()) return; if(window.GVT && !GVT.ckl) GVT.ckl
   CKL.old.openParkScene=openParkScene; openParkScene=function(){ const r=CKL.old.openParkScene.apply(this, arguments); try{ const ps=document.getElementById('parkscene'); if(ps && !ps.classList.contains('hidden')) cklGot('park', 'park'); }catch(e){ CKL.err++; } return r; };   
   CKL.tid=setInterval(cklTick, CKL_TICK_MS);
 }catch(e){ CKL.err++; } })();
-function cklRig(o){ o=o||{}; if(o.on!=null){ CKL.on=o.on? 1 : 0; } if(o.reset){ META.ckl={ v:1, given:0, got:{}, paid:{}, seen:{}, all:0 }; saveMeta(); } if(o.given!=null){ cklKeys().given=o.given; saveMeta(); } if(o.got) cklGot(o.got, 'rig'); if(o.arrive) cklArrive('rig'); if(o.open) cklOpen({ rig:1 }); if(o.close) cklClose(true); if(o.tick) cklTick();   
+function cklRig(o){ o=o||{}; if(o.on!=null){ CKL.on=o.on? 1 : 0; } if(o.reset){ META.ckl={ v:1, given:0, got:{}, paid:{}, seen:{}, all:0, tapped:0 }; saveMeta(); } if(o.tapped!=null){ cklKeys().tapped=o.tapped? 1 : 0; saveMeta(); } if(o.ckw!=null){ CKW.on=o.ckw? 1 : 0; } if(o.given!=null){ cklKeys().given=o.given; saveMeta(); } if(o.got) cklGot(o.got, 'rig'); if(o.arrive) cklArrive('rig'); if(o.open) cklOpen({ rig:1 }); if(o.close) cklClose(true); if(o.tick) cklTick();   
   const k=cklKeys(), R=e=>{ if(!e) return null; const q=e.getBoundingClientRect(); return { x:+q.left.toFixed(1), y:+q.top.toFixed(1), w:+q.width.toFixed(1), h:+q.height.toFixed(1), r:+q.right.toFixed(1), b:+q.bottom.toFixed(1) }; };
   const t=document.getElementById('cklTab'), c=document.getElementById('cklCard'), sc=document.getElementById('cklScrim'), hd=document.querySelector('.roomhead');
   return { cv:GVT_CV, on:CKL.on, keys:JSON.parse(JSON.stringify(k)), prize:cklPrize(), stars:META.starBank|0, up:CKL.up, busy:CKL.busy, arriving:CKL.arriving, home:cklHome(), covered:cklCovered(), quiet:cklQuiet(), head:R(hd), seat:cklSeat(),
-    tab:t? { r:R(t), off:t.classList.contains('ckl-off'), hidden:t.classList.contains('ckl-hide'), beat:t.classList.contains('ckl-beat'), text:(t.textContent||'').trim(), tx:getComputedStyle(t).transform } : null,
+    tab:t? { r:R(t), off:t.classList.contains('ckl-off'), hidden:t.classList.contains('ckl-hide'), beat:t.classList.contains('ckl-beat'), nudge:t.classList.contains('ckl-nudge'), text:(t.textContent||'').trim(), tx:getComputedStyle(t).transform, disp:getComputedStyle(t).display, art:(function(){ const a=t.querySelector('svg.ckl-tart'); if(!a) return null; const cs=getComputedStyle(a); return { tx:cs.transform, org:cs.transformOrigin, anim:cs.animationName, delay:cs.animationDelay, r:R(a) }; })() } : null, tapped:k.tapped|0, ckw:CKW.on,
     page:c? { cls:c.className, on:c.classList.contains('on'), scrim:!!(sc && sc.classList.contains('on')), top:c.style.getPropertyValue('--ckl-top'), card:R(c), board:R(c.querySelector('.ckl-board')), paper:R(c.querySelector('.ckl-paper')), handle:R(c.querySelector('.ckl-handle')), ttl:(c.querySelector('.ckl-ttl')||{}).textContent||'', ttlPx:c.querySelector('.ckl-ttl')? getComputedStyle(c.querySelector('.ckl-ttl')).fontSize : '', sub:(c.querySelector('.ckl-sub')||{}).textContent||'',
       rows:Array.prototype.map.call(c.querySelectorAll('.ckl-row'), r=>{ const tx=r.querySelector('.ckl-txt'); return { k:r.getAttribute('data-k'), st:r.classList.contains('done')? 'done' : 'open', check:!!r.querySelector('.ckl-hole svg'), hole:R(r.querySelector('.ckl-hole')), txt:(tx||{}).textContent||'', px:tx? getComputedStyle(tx).fontSize : '', lines:tx? Math.round(tx.getBoundingClientRect().height/(parseFloat(getComputedStyle(tx).lineHeight)||parseFloat(getComputedStyle(tx).fontSize))) : 0, chip:((r.querySelector('.ckl-chip')||{}).textContent||'').trim(), row:R(r) }; }) } : null,
     camp:TP2_PLACES[0][0], log:CKL.log.slice(), err:CKL.err, wraps:Object.keys(CKL.old), land:LAND_N, why:(function(){ const g=f=>{ try{ return f(); }catch(e){ return 'err'; } }; return { covered:g(cklCovered), brief:g(()=>!!COMM.brief), up:g(()=>TOUR.up|0), walk:g(()=>TOUR.walk|0), tend:g(()=>TEND.up|0), lbeat:g(()=>LBEAT.up|0), tq:g(tourQuiet), rq:g(()=>roomQuiet()), sinceLand:Date.now()-CKL.landT, mode:S.mode, room:g(roomCur), door:g(doorSceneOpen), shop:g(shopIsOpen), fort:g(fortSceneOpen), hqs:g(()=>!!HQS.on), pintro:g(()=>PINTRO.up|0), modal:g(()=>!!document.querySelector('#roomModal > *')), idle:g(idleFree) }; })() }; }
