@@ -59517,6 +59517,43 @@ function stmuPlay(cont){
 
 
 
+
+const FTC_MIN_S=120;   
+var FTC={ on:(function(){ try{ const m=/[?&]ftc=([01])/.exec(location.search||''); if(m){ if(m[1]==='0') localStorage.setItem('gvt_ftc','0'); else if(localStorage.getItem('gvt_ftc')==='0') localStorage.removeItem('gvt_ftc'); } return localStorage.getItem('gvt_ftc')==='0'? 0 : 1; }catch(e){ return 1; } })(),
+  key:'gvt_ftc', min:FTC_MIN_S, n:0, why:null, last:null, err:0 };   
+function ftcOn(){ return !!FTC.on; }
+function ftcSeen(){ try{ return localStorage.getItem(FTC.key)==='1'; }catch(e){ return true; } }   
+function ftcMark(){ try{ localStorage.setItem(FTC.key,'1'); }catch(e){} }
+function ftcLeft(){ return (BD.bell>0)? BD.bell-evNow() : -1; }   
+function ftcWhy(){   
+  if(!ftcOn()) return 'off';
+  if(FTC.n>0) return 'played';   
+  if(document.getElementById('stmuFilm') || document.getElementById('snduFilm')) return 'film';
+  if(S.mode!=='menu') return 'mode';
+  if(reducedMotion()) return 'motion';
+  if(ftcSeen()) return 'seen';
+  if(!(BD.bell>0)) return 'none';   
+  if(bdKindOf(BD.bell)!=='tundra') return 'desert';
+  const st9=bdDoorState(); if(st9!=='live') return st9;   
+  if(ftcLeft()<FTC.min) return 'late';
+  return null;
+}
+function ftcDue(){ FTC.why=ftcWhy(); return FTC.why===null; }
+function ftcPlay(cont){   
+  ftcMark(); FTC.n++; const t0=performance.now(); FTC.last={ at:Math.round(evNow()), left:Math.round(ftcLeft()), kind:bdKindOf(BD.bell||0), ran:null, leftAfter:null };
+  return stmuPlay(()=>{ try{ FTC.last.ran=+((performance.now()-t0)/1000).toFixed(1); FTC.last.leftAfter=Math.round(ftcLeft()); }catch(e){ FTC.err++; } try{ if(cont) cont(); }catch(e){ FTC.err++; } });
+}
+function ftcRig(o){ o=o||{}; if(o.on!=null) FTC.on=o.on? 1 : 0; if(o.min!=null) FTC.min=+o.min; if(o.seen!=null){ try{ if(o.seen) localStorage.setItem(FTC.key,'1'); else localStorage.removeItem(FTC.key); }catch(e){} } if(o.stm!=null){ try{ if(o.stm) localStorage.setItem(STMU.key,'1'); else localStorage.removeItem(STMU.key); }catch(e){} } if(o.reset){ FTC.n=0; FTC.why=null; FTC.last=null; FTC.err=0; }   
+  const f=document.getElementById('stmuFilm'), v=f&&f.querySelector('video');
+  return { cv:GVT_CV, on:FTC.on, key:(function(){ try{ return localStorage.getItem(FTC.key); }catch(e){ return null; } })(), stm:(function(){ try{ return localStorage.getItem(STMU.key); }catch(e){ return null; } })(), min:FTC.min, dial:FTC_MIN_S, now:ftcWhy(), why:FTC.why, n:FTC.n, last:FTC.last, err:FTC.err,
+    kind:bdKindOf(BD.bell||0), bdKind:BD.kind, door:bdDoorState(), left:Math.round(ftcLeft()), bell:BD.bell|0, open:BD.open|0, ring:bdRing()|0, clock:Math.round(evNow()), mode:S.mode, motion:reducedMotion(), seenStm:stmuSeen(),
+    film:f? { t:v? +v.currentTime.toFixed(2) : -1, paused:v? v.paused : null, rs:v? v.readyState : -1, err:(v&&v.error)? v.error.code : 0, src:v? v.getAttribute('src') : null, x:!!f.querySelector('.stmuX') } : null,
+    hold:S.evHold? { bell:S.evHold.bell|0, ring:S.evHold.ring|0, bd:S.evHold.bd|0 } : null, bf:!!S.bf, bd:!!(S.bf&&S.bf.bd), fzt:!!(S.bf&&S.bf.fzt), coop:!!(COOP&&COOP.plc==='bd'), code:COOP? COOP.code : null }; }
+setTimeout(()=>{ try{ if(window.GVT && !GVT.ftc) GVT.ftc=ftcRig; }catch(e){} }, 0);   
+
+
+
+
 const MDYU={ key:'gvt_mdy', src:'mdy-mayday.mp4', poster:'mdy-mayday.jpg' };
 function mdyuSeen(){ try{ return localStorage.getItem(MDYU.key)==='1'; }catch(e){ return true; } }
 function mdyuMark(){ try{ localStorage.setItem(MDYU.key,'1'); }catch(e){} }
@@ -89129,7 +89166,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='25.27';        
+let GVT_CV='25.28';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -92639,6 +92676,7 @@ function bdPopTry(){
 
 function bdJoin(){
   if(S.coop || S.mode!=='menu') return Promise.resolve(null);
+  if(ftcDue()) return new Promise(r9=>{ ftcPlay(()=>r9(bdJoin())); });   
   mileFold();   
   if(COOP) coopLeave();
   COOP=coopFresh('lobby','room');
@@ -184716,7 +184754,7 @@ window.UI = {
     if(id==='wpark'){ openParkScene('western'); return; }  
     if(id==='bearfort'){ openParkScene('teddy'); return; }   
     if(id==='bank'){ bankOpen(); return; }           
-    if(id==='bf' && stmuDue()){ stmuPlay(()=>UI.room('bf')); return; }   
+    if(id==='bf' && !ftcOn() && stmuDue()){ stmuPlay(()=>UI.room('bf')); return; }   
     if(id==='bf'){ openWarTable(); return; }   
     if(id==='board'){ openWorldRank(); return; }  
     if(id==='shop'){ openShop(); return; }
