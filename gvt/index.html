@@ -89079,7 +89079,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='25.20';        
+let GVT_CV='25.21';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -187094,6 +187094,67 @@ function fnxRead(){ const q=s=>Array.from(document.querySelectorAll(s)), R=e=>{ 
     badges:q('[data-fnx]').map(e=>({ t:e.getAttribute('data-fnx'), r:R(e) })), plank:R(document.querySelector('#fortBg .fnx-g')), cue:cue? { on:cue.classList.contains('on'), r:R(cue) } : null,
     fxr:(typeof FXR==='object')? { x:+(+FXR.x||0).toFixed(1), e:+(+FXR.e||0).toFixed(1) } : null, ledgers:{ sargeSeen:(META.sargeSeen||[]).slice(), gearSeen:(META.gearSeen||[]).slice(), rackSeen:(META.rackSeen||[]).length }, log:FNX.log.slice(-30) }; }
 setTimeout(()=>{ try{ if(window.GVT && !GVT.fnx) GVT.fnx=fnxRead; }catch(e){} }, 0);
+
+
+
+
+
+
+
+
+
+
+var FNO={ on:(function(){ try{ const q=/[?&]fno=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_fno','0'); else localStorage.removeItem('gvt_fno'); } return localStorage.getItem('gvt_fno')==='0'? 0 : 1; }catch(e){ return 1; } })(),
+  visit:null, inside:0, dealing:0, log:[] };
+function fnoOn(){ return !!(FNO.on && typeof FNX==='object' && FNX && FNX.on); }
+function fnoLog(a){ if(FNO.log.length<120) FNO.log.push(a); }
+function fnoFound(){ return Array.isArray(META.fnxFound)? META.fnxFound : []; }   
+function fnoFoundIs(k,id){ return fnoFound().indexOf(k+':'+id)>=0; }
+function fnoPrune(a){ return a.filter((x,i)=>{ const j=x.indexOf(':'); return j>0 && a.indexOf(x)===i && freshIs(x.slice(0,j), x.slice(j+1)); }); }   
+
+function fnoLive(){ const v=FNO.visit; if(!v) return false; if(FNO.dealing>0) return true;
+  if(v.box==='hangar') return shopIsOpen() && SHOP.store==='hangar';
+  return fortStands() && FORT_TAB===v.box; }
+function fnoVisit(){ return fnoLive()? FNO.visit : null; }
+function fnoBoxNews(box){ const n={ box:box, irons:[], pieces:[], gear:[], heroes:[], pets:[] };   
+  if(box==='outfitter'){ n.irons=fnxIrons(); n.pieces=fnxPieces(); } else if(box==='heroes') n.heroes=fnxHeroes(); else if(box==='pets') n.pets=fnxPets(); else if(box==='hangar') n.gear=fnxGear(); else return null;
+  return n; }
+function fnoWrite(n){ let w=0; const add=(a,v)=>{ if(a.indexOf(v)<0){ a.push(v); w++; } };
+  if(n.irons.length){ if(!Array.isArray(META.sargeSeen)) META.sargeSeen=[]; n.irons.forEach(id=>add(META.sargeSeen,id)); }
+  if(n.pieces.length){ if(!Array.isArray(META.rackSeen)) META.rackSeen=[]; n.pieces.forEach(id=>add(META.rackSeen,id)); }
+  if(n.gear.length){ if(!Array.isArray(META.gearSeen)) META.gearSeen=[]; n.gear.forEach(id=>add(META.gearSeen,id)); }
+  if(n.heroes.length || n.pets.length){ if(!Array.isArray(META.fnxFound)) META.fnxFound=[]; n.heroes.forEach(k=>add(META.fnxFound,'hero:'+k)); n.pets.forEach(k=>add(META.fnxFound,'pet:'+k)); META.fnxFound=fnoPrune(META.fnxFound); }
+  if(w) saveMeta(); return w; }
+function fnoOpen(box){   
+  if(!fnoOn()) return null; const v=FNO.visit; if(v && v.box===box && fnoLive()) return v;
+  const n=fnoBoxNews(box); if(!n) return null; FNO.visit=n; const w=fnoWrite(n); fnoLog('open:'+box+':'+w+':'+(n.irons.length+n.pieces.length+n.gear.length+n.heroes.length+n.pets.length)); return n; }
+function fnoAfterOpen(a0){ try{   
+  fnxSignsSync(); const g=document.querySelector('#fortBg .fnx-g[data-fnx="gear:jetpack"]'); if(g && !fnxGear().length) g.remove(); fnxCueSync();
+  if(a0 && !fortNews() && S.mode==='menu') renderMenu();
+}catch(e){ fnoLog('after-err:'+String(e && e.message || e).slice(0,80)); } }
+function fnoWrapIn(fn){ return function(){ FNO.inside++; try{ return fn.apply(this,arguments); } finally{ FNO.inside--; } }; }   
+
+try{ if(typeof fnxIrons==='function' && !FNO.i0){ const i0=fnxIrons; FNO.i0=i0; fnxIrons=function(){ const v=(fnoOn() && FNO.inside>0)? fnoVisit() : null; return v? v.irons.slice() : i0.apply(this,arguments); }; } }catch(e){}
+try{ if(typeof fnxPieces==='function' && !FNO.p0){ const p0=fnxPieces; FNO.p0=p0; fnxPieces=function(){ const v=(fnoOn() && FNO.inside>0)? fnoVisit() : null; return v? v.pieces.slice() : p0.apply(this,arguments); }; } }catch(e){}
+try{ if(typeof fnxGear==='function' && !FNO.g0){ const g0=fnxGear; FNO.g0=g0; fnxGear=function(){ const v=(fnoOn() && FNO.inside>0)? fnoVisit() : null; return v? v.gear.slice() : g0.apply(this,arguments); }; } }catch(e){}
+try{ if(typeof fnxHeroes==='function' && !FNO.h0){ const h0=fnxHeroes; FNO.h0=h0; fnxHeroes=function(){ if(!fnoOn()) return h0.apply(this,arguments); const v=(FNO.inside>0)? fnoVisit() : null;
+    if(v){ const s=heroSel(); return v.heroes.filter(k=>freshIs('hero',k) && k!==s); } return h0.apply(this,arguments).filter(k=>!fnoFoundIs('hero',k)); }; } }catch(e){}   
+try{ if(typeof fnxPets==='function' && !FNO.e0){ const e0=fnxPets; FNO.e0=e0; fnxPets=function(){ if(!fnoOn()) return e0.apply(this,arguments); const v=(FNO.inside>0)? fnoVisit() : null;
+    if(v){ const s=petSel(); return v.pets.filter(k=>freshIs('pet',k) && k!==s); } return e0.apply(this,arguments).filter(k=>!fnoFoundIs('pet',k)); }; } }catch(e){}
+try{ if(typeof fnxCard==='function' && !FNO.c0){ FNO.c0=fnxCard; fnxCard=fnoWrapIn(FNO.c0); } }catch(e){}   
+try{ if(typeof fnxIs==='function' && !FNO.s0){ FNO.s0=fnxIs; fnxIs=fnoWrapIn(FNO.s0); } }catch(e){}   
+try{ if(typeof fnxTabNews==='function' && !FNO.n0){ FNO.n0=fnxTabNews; fnxTabNews=fnoWrapIn(FNO.n0); } }catch(e){}
+try{ if(typeof shopJetHTML==='function' && !FNO.j0){ FNO.j0=shopJetHTML; shopJetHTML=fnoWrapIn(FNO.j0); } }catch(e){}   
+try{ if(typeof fnxSee==='function' && !FNO.w0){ const w0=fnxSee; FNO.w0=w0; fnxSee=function(k,id){ const v=fnoOn()? fnoVisit() : null;
+    if(v){ const a=k==='iron'? v.irons : k==='piece'? v.pieces : k==='gear'? v.gear : null; if(a){ const i=a.indexOf(id); if(i>=0) a.splice(i,1); } } return w0.apply(this,arguments); }; } }catch(e){}   
+try{ if(typeof fortDeal==='function' && !FNO.d0){ const d0=fortDeal; FNO.d0=d0; fortDeal=function(tab){ if(!fnoOn() || FNX_AREAS.indexOf(tab)<0) return d0.apply(this,arguments);
+    const a0=fortNews(), v=fnoOpen(tab); FNO.dealing++; let r; try{ r=d0.apply(this,arguments); } finally{ FNO.dealing--; } if(v) fnoAfterOpen(a0); return r; }; } }catch(e){}   
+try{ if(typeof lchHangarTap==='function' && !FNO.t0){ const t0=lchHangarTap; FNO.t0=t0; lchHangarTap=function(){ if(!fnoOn() || !LCH.on || S.mode!=='menu' || shopIsOpen()) return t0.apply(this,arguments);   
+    const a0=fortNews(), v=fnoOpen('hangar'); FNO.dealing++; let r; try{ r=t0.apply(this,arguments); } finally{ FNO.dealing--; } if(v) fnoAfterOpen(a0); return r; }; } }catch(e){}   
+try{ if(Array.isArray(META.fnxFound)){ const f=fnoPrune(META.fnxFound); if(f.length!==META.fnxFound.length) META.fnxFound=f; } }catch(e){}   
+function fnoRead(){ const v=FNO.visit; return { cv:GVT_CV, on:FNO.on, live:fnoOn(), visit:v? { box:v.box, irons:v.irons.slice(), pieces:v.pieces.slice(), gear:v.gear.slice(), heroes:v.heroes.slice(), pets:v.pets.slice(), live:fnoLive() } : null,
+  found:fnoFound().slice(), fresh:(Array.isArray(META.fresh)? META.fresh : []).slice(), inside:FNO.inside, dealing:FNO.dealing, news:{ irons:fnxIrons(), pieces:fnxPieces(), gear:fnxGear(), heroes:fnxHeroes(), pets:fnxPets() }, any:fortNews(), log:FNO.log.slice(-30) }; }
+setTimeout(()=>{ try{ if(window.GVT && !GVT.fno) GVT.fno=fnoRead; }catch(e){} }, 0);
 
 
 
