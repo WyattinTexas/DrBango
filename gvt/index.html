@@ -89122,7 +89122,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='25.24';        
+let GVT_CV='25.25';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -189237,6 +189237,58 @@ const MSBK={ on:(function(){ try{ const q=/[?&]msbk=([01])/.exec(location.search
 
 
 
+
+
+
+
+
+
+
+
+
+
+var SGC={ on:(function(){ try{ const q=/[?&]sgc=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_sgc','0'); else localStorage.removeItem('gvt_sgc'); } return localStorage.getItem('gvt_sgc')==='0'? 0 : 1; }catch(e){ return 1; } })(),
+  away:0, skipped:0, log:[], err:0, finish:null, PIECES:{ pushups:1, nap:1 } };   
+function sgcOn(){ return SGC.on===1; }
+function sgcSkip(w){ SGC.skipped++; if(SGC.log.length<40) SGC.log.push([Math.round(performance.now()), w]); }
+function sgcCss(){ if(document.getElementById('sgcCss')) return; const st=document.createElement('style'); st.id='sgcCss';   
+  st.textContent='#fortBg.sgc-live .fd-man[data-station="sarge"]>.fd-sarge, #fortBg.sgc-live .fd-man[data-station="sarge"]>ellipse { transition:opacity .3s; } #fortBg .fd-man[data-station="sarge"].sgc-away>.fd-sarge, #fortBg .fd-man[data-station="sarge"].sgc-away>ellipse { opacity:0; } #fortBg .fd-man[data-station="sarge"].sgc-away .fd-sarge.fd-nod { animation:none; } @media (prefers-reduced-motion:reduce){ #fortBg.sgc-live .fd-man[data-station="sarge"]>.fd-sarge, #fortBg.sgc-live .fd-man[data-station="sarge"]>ellipse { transition:none; } }';
+  document.head.appendChild(st); }
+function sgcPost(){   
+  const im=document.querySelector('#fortBg image[data-fh="sarge"]'); if(!im) return null; const bg=im.closest('#fortBg');
+  const w=im.closest('.fd-man[data-station="sarge"]'); if(w) return { w, im, bg, top:null, sh:null };
+  const top=im.closest('.fl-man')||im; let sh=top.previousElementSibling; if(sh && sh.dataset && sh.dataset.fa==='lampost') sh=sh.previousElementSibling; if(!(sh && sh.tagName==='ellipse' && !(sh.dataset && sh.dataset.fh))) sh=null;
+  return { w:null, im, bg, top, sh }; }
+function sgcAway(on){   
+  on=on? 1 : 0; SGC.away=on; const p=sgcPost(); if(!p) return false;
+  try{ if(on){ sgcCss(); if(p.bg) p.bg.classList.add('sgc-live'); }   
+    if(p.w) p.w.classList.toggle('sgc-away', !!on);
+    else { const rm=(typeof reducedMotion==='function' && reducedMotion()); [p.top,p.sh].forEach(e=>{ if(!e) return; e.style.transition=(on && !rm)? 'opacity .3s' : ''; e.style.opacity=on? '0' : ''; }); }
+  }catch(e){ SGC.err++; } return true; }
+function sgcHandURI(k){ return ftxHandURI(outfitDress(TOUR_POSES[k]||TOUR_POSES.salute, 'sarge'), FF2_POSE_INK[k]||AM_MOLDS.sarge, dyeHex()); }   
+function sgcRig(o){ o=o||{}; if(o.on!==undefined) SGC.on=o.on? 1 : 0; if(o.away!==undefined) sgcAway(o.away);   
+  const p=sgcPost(); let op=null; try{ if(p){ const e=p.w? (p.w.querySelector('.fd-sarge')||p.w) : p.top; op=+getComputedStyle(e).opacity; } }catch(e){}
+  let road='flat'; try{ road=!AM_INK_ON()? 'flat' : (sgcOn()? 'hand' : 'finish'); }catch(e){ road='?'; }
+  return { cv:GVT_CV, on:SGC.on, road, away:SGC.away, post:!!p, wrapped:!!(p && p.w), cls:!!(p && p.w && p.w.classList.contains('sgc-away')), live:!!(p && p.bg && p.bg.classList.contains('sgc-live')), op, fig:!!(typeof FTT!=='undefined' && FTT.fig && FTT.fig.isConnected), skipped:SGC.skipped, log:SGC.log.slice(-8), err:SGC.err }; }
+(function(){   
+  try{ const u0=tourFigURI; SGC.finish=u0; tourFigURI=function(k){ if(!sgcOn() || !AM_INK_ON()) return u0(k); try{ return sgcHandURI(k); }catch(e){ SGC.err++; return u0(k); } }; }catch(e){ SGC.err++; }
+  try{ const b0=fttBuild; fttBuild=function(){ const r=b0.apply(this,arguments); try{ if(sgcOn() && r) sgcAway(1); }catch(e){ SGC.err++; } return r; }; }catch(e){ SGC.err++; }
+  try{ const f0=fttFold; fttFold=function(){ try{ if(SGC.away) sgcAway(0); }catch(e){ SGC.err++; } return f0.apply(this,arguments); }; }catch(e){ SGC.err++; }
+  try{ const t0=fttTick; fttTick=function(){ const r=t0.apply(this,arguments); try{ if(SGC.away && FTT.fig && FTT.fig.isConnected) sgcAway(1); }catch(e){ SGC.err++; } return r; }; }catch(e){ SGC.err++; }
+  try{ if(typeof FD==='object' && FD && typeof FD.beat==='function'){ const b1=FD.beat, c1=FD.cls, p1=FD.pieceCast;
+    FD.beat=function(f,w){ if(SGC.away && f && f.k==='sarge'){ sgcSkip('beat:'+w); return false; } return b1.apply(this,arguments); };
+    if(typeof c1==='function') FD.cls=function(el,c,ms){ if(SGC.away && c==='fd-nod'){ sgcSkip('nod'); return; } return c1.apply(this,arguments); };
+    if(typeof p1==='function') FD.pieceCast=function(key){ if(SGC.away && SGC.PIECES[key]){ sgcSkip('piece:'+key); return null; } return p1.apply(this,arguments); }; } }catch(e){ SGC.err++; }
+})();
+
+
+
+
+
+
+
+
+
 const DLG_N=(typeof window.__DLG_N==='number')? window.__DLG_N : 6, DLG_LOOPS=(typeof window.__DLG_LOOPS==='number')? window.__DLG_LOOPS : 24, DLG_ROT_MS=(typeof window.__DLG_ROT==='number')? window.__DLG_ROT : 6000;   
 const DLG_DOZE_MS=(typeof window.__DLG_DOZE==='number')? window.__DLG_DOZE : 45000, DLG_HZ=30;   
 const DLG_FEW=8, DLG_SLICE_MS=8, DLG_HOLD_MS=1500, DLG_STIR_MS=1200, DLG_DRAG_MS=2500, DLG_PARK_MAX=12000, DLG_ROAM=40;   
@@ -192100,6 +192152,7 @@ window.GVT = {
   apt(o){ return aptRig(o); },   
   bal(o){ return balRig(o); },   
   qwf(o){ return qwfRig(o); },   
+  sgc(o){ return sgcRig(o); },   
   tsn(o){ return tsnRig(o); },   
   tro(o){ return troRig(o); },   
   mfs(o){ return mfsRig(o); },   
