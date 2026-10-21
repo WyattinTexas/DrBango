@@ -89460,7 +89460,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='25.40';        
+let GVT_CV='25.41';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -139295,6 +139295,34 @@ function atrPlay(id){ if(id && (id==='needleup' || !atrRecOk(id))) return; if(AT
 function atrStop(){ UI.closeModal(); ATP.rec='needleup'; atrRecKeep(); atpRecSet(); atpRecGo(); }   
 try{ ATX_ACT.record=atrRecord; }catch(e){}   
 try{ const id9=META.atrRec; if(atrRecOk(id9)) ATP.rec=id9; }catch(e){}   
+
+
+
+
+
+
+
+
+const CWK={ on:(function(){ try{ const q=/[?&]cwk=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_cwk','0'); else localStorage.removeItem('gvt_cwk'); } return localStorage.getItem('gvt_cwk')==='0'? 0 : 1; }catch(e){ return 1; } })(), n:0, memo:{} };
+function cwkOn(){ return CWK.on===1 && typeof sgpOn==='function' && sgpOn() && typeof SGP_SCREENS==='object' && !!SGP_SCREENS['room-attic'] && typeof sgpPass==='function'; }
+function cwkWalk(s){   
+  if(!cwkOn() || typeof s!=='string') return s;
+  const i=s.indexOf("<g id='atx-pose-walk'"); if(i<0) return s;
+  const re=/<\/?g\b[^>]*>/g; re.lastIndex=i; let d=0, m, j=-1;
+  while((m=re.exec(s))){ if(m[0].charAt(1)==='/') d--; else if(m[0].charAt(m[0].length-2)!=='/') d++; if(d<=0){ j=m.index+m[0].length; break; } }
+  if(j<0) return s;
+  const raw=s.slice(i,j), pi=s.lastIndexOf("<g id='atx-coy-place'", i), pm=pi>=0? /transform='([^']*)'/.exec(s.slice(pi, s.indexOf('>',pi)+1)) : null, tf=pm? pm[1] : '';
+  const key=tf+'|'+raw.length, M=CWK.memo[key]; let v;
+  if(M && M.raw===raw) v=M.v;
+  else { const keep=SGP_SIG; SGP_SIG={};   
+    try{ v=sgpPass('<g transform="'+tf+'">'+raw+'</g>','room-attic'); }catch(e){ v=null; } finally{ SGP_SIG=keep; }
+    if(v){ if(v.indexOf(SGP_DEFS)===0) v=v.slice(SGP_DEFS.length); const a=v.indexOf('>'), b=v.lastIndexOf('</g>'); v=(a>=0 && b>a)? v.slice(a+1,b) : null; }
+    if(!v || v.indexOf("<g id='atx-pose-walk'")!==0) return s;
+    CWK.memo[key]={ raw:raw, v:v }; CWK.n++; }
+  return s.slice(0,i)+v+s.slice(j); }
+if(typeof atticFloorSVG==='function'){ const cwkFloor0=atticFloorSVG; atticFloorSVG=function(){ const s=cwkFloor0.apply(this,arguments); try{ return cwkWalk(s); }catch(e){ return s; } }; }   
+function cwkRead(){ try{ const n=function(id){ const e=document.getElementById(id); return e? e.querySelectorAll('.sgp').length : -1; }; return { on:cwkOn(), n:CWK.n, walk:n('atx-pose-walk'), sit:n('atx-pose-sit'), lie:n('atx-pose-lie'), sleep:n('atx-pose-sleep') }; }catch(e){ return { err:String(e).slice(0,80) }; } }   
+
 function roomFloorSVG(){
   const r=roomCur();
   if(r==='attic') return atticFloorSVG();   
