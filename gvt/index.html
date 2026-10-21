@@ -75921,12 +75921,12 @@ function dfRows(p){ const V=dfbSpan(p), east=(p.boxDir>0); let n=0, sy=0; for(co
   const bot9=S.bf? WORLD_H-30 : FOE_BOT; if(!n){ p.oval=V; return; } const my=sy/n, lo=DF_TOP+DF_ALT, hi=bot9-DF_ROW_OFF*0.5, r0=Math.max(lo,Math.min(hi,my-DF_ROW_OFF)); p.oval={ x0:V.x0, x1:V.x1, y0:Math.round(r0), y1:Math.round(Math.max(r0+60,Math.min(hi,my+DF_ROW_OFF))) }; }   
 function dfLedger(){ return S.dfLog||(S.dfLog={ launched:0, strafes:0, rounds:0, kills:0, hits:0, miss:0, by:{}, downs:[] }); }   
 function dfById(id){ if(S.dfs) for(const p of S.dfs){ if(p.id===id) return p; } return null; }
-function dfLaunch(x,y,mine,o){ o=o||{}; if(!S.dfs) S.dfs=[]; const side=S.bf? (o.side||bfMyTeam()) : null, seat=S.bf? ((o.seat!=null)? o.seat|0 : bfMySeat()) : null, V=dfOval(side), hp=(o.hp>0)? Math.min(99,+o.hp) : dfHpMax()+((mine && bondWarOn())? BOND_WAR.hp : 0)  , spd=(o.spd>0)? Math.max(DF_SPD,Math.min(Math.round(DF_SPD*ENG_MUL),o.spd|0)) : dfSpd();   
+function dfLaunch(x,y,mine,o){ o=o||{}; if(!S.dfs) S.dfs=[]; const side=S.bf? (o.side||bfMyTeam()) : null, seat=S.bf? ((o.seat!=null)? o.seat|0 : bfMySeat()) : null, V=dfOval(side), hp=(o.hp>0)? Math.min(99,+o.hp) : dfHpMax()+(mine? BOND_WAR.hp*bondWarStack() : 0)  , spd=(o.spd>0)? Math.max(DF_SPD,Math.min(Math.round(DF_SPD*ENG_MUL),o.spd|0)) : dfSpd();   
   const eb9=S.bf? (S.bf.base? S.bf.base[side==='you'? 'foe' : 'you'] : null) : S.tanBase, boxDir=(eb9 && eb9.x<(S.bf? WORLD_W : W)/2)? -1 : 1;   
   const p={ id:(S.dfN=(S.dfN|0)+1), own:(o.own!=null)? String(o.own) : 'me', mine:!!mine, side:side, seat:seat, type:'dogfighter', def:UDEF.dogfighter, hex:o.hex||null, gx:x, gy:y, alt:0, x:x, y:y, dir:(boxDir>0)? 1 : -1, hd:(boxDir>0)? 0 : Math.PI, boxDir:boxDir, hunt:null, lane:(y<(V.y0+V.y1)/2)? 0 : 1, cd:DF_CD*0.6, t:0, spd:spd,
     bank:0, altT:DF_ALT, spdMul:1, spdNow:spd, st:null, stT:0, wpDir:(boxDir>0)? 1 : -1, wing:0, wingBox:0, roll:null, rollA:0, splitCd:0, splitDir:0,   
     runCd:DF_RUN_CD*0.3, run:null,   
-    hp:hp, hpMax:hp, dmg:(o.dmg>0)? Math.min(50,+o.dmg) : +(dfDmg()+(mine? pglDmg()+(bondWarOn()? BOND_WAR.dmg : 0)   : 0)).toFixed(3)  , base:V, oval:V, v2:!!(o.v2 || (mine && df2Owned()))  , shots:0, airShots:0, boxShots:0, rounds:0, kills:0, hits:0, laps:0, down:null, by:null, gone:false, wob:((x*7+y*3)|0)%6 };   
+    hp:hp, hpMax:hp, dmg:(o.dmg>0)? Math.min(50,+o.dmg) : +(dfDmg()+(mine? pglDmg()+BOND_WAR.dmg*bondWarStack()   : 0)).toFixed(3)  , base:V, oval:V, v2:!!(o.v2 || (mine && df2Owned()))  , shots:0, airShots:0, boxShots:0, rounds:0, kills:0, hits:0, laps:0, down:null, by:null, gone:false, wob:((x*7+y*3)|0)%6 };   
   p.src={ type:'dogfighter', def:UDEF.dogfighter, x:x, y:y, df:1, side:side, seat:seat };   
   dfRows(p); S.dfs.push(p); dfLedger().launched++; bfSfx(SFX.prop,x,y); S.fx.push({k:'ring',x:x,y:y-6,r:10,R:46,t:0,dur:0.5,col:'rgba(191,227,154,0.9)'}); return p; }
 function dfDrop(x,y){ if(!dfOwned() ||   S.plastic<COSTS.dogfighter || (S.bf && (S.bf.resolved || S.bf.ending || !!(S.cfg && S.cfg.terrain && S.cfg.terrain.cq)))){ SFX.clack(); return null; }   
@@ -88950,7 +88950,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='25.14';        
+let GVT_CV='25.15';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -90375,7 +90375,7 @@ function coopPlaceCmd(u, bot, bi, re){
   
   
   if(soulIs('u',u.type)) cm.mo=(cm.mo||[]).concat('sl');
-  if(u.bondWar) cm.mo=(cm.mo||[]).concat('bw');   
+  if(u.bondWar) cm.mo=(cm.mo||[]).concat(bondWarToks(u.bondWar));   
   
   
   
@@ -96886,34 +96886,57 @@ const BOND_CODE_RE=/^[A-Z2-9]{6}$/;
 
 
 
+
+
+
 const BOND_WAR={ hp:2, dmg:2, lvl:250 };   
-function bondWar(uid){ uid=String(uid||''); return !!uid && (META.bonds||[]).some(r=>r && String(r.u)===uid && r.w); }   
-function bondWarOn(){ if(!S.bond || !COOP || !Array.isArray(COOP.members)) return false; for(const m of COOP.members){ if(!m || !m.uid || (m.seat|0)===(COOP.seat|0)) continue; const u=String(m.uid); if(!avoidHas(u) && bondWar(u)) return true; } return false; }   
-function bondWarDmg(u){ return (u && u.bondWar)? BOND_WAR.dmg : 0; }   
-function bondWarHp(u){ return (u && u.bondWar)? BOND_WAR.hp : 0; }   
+const BOND_WAR_SRC={ coop:1, hq:2 };   
+const BOND_WAR_ALL=BOND_WAR_SRC.coop|BOND_WAR_SRC.hq;
+function bondWarMask(w){ return (w===true)? BOND_WAR_SRC.coop : ((+w|0)&BOND_WAR_ALL); }   
+function bondWarCnt(w){ let m=bondWarMask(w), n=0; while(m){ n+=m&1; m>>=1; } return n; }   
+function bondWarN(uid){ uid=String(uid||''); if(!uid) return 0; const r=(META.bonds||[]).find(r=>r && String(r.u)===uid); return r? bondWarCnt(r.w) : 0; }   
+function bondWarStack(){ if(!S.bond || !COOP || !Array.isArray(COOP.members)) return 0; let n=0; for(const m of COOP.members){ if(!m || !m.uid || (m.seat|0)===(COOP.seat|0)) continue; const u=String(m.uid); if(avoidHas(u)) continue; n=Math.max(n, bondWarN(u)); } return n; }   
+function bondWarKey(uid,bit){ return String(uid)+((bit===BOND_WAR_SRC.hq)? ':h' : ((bit==='refile')? ':r' : '')); }   
+function bondWarKeyUid(k){ return String(k||'').split(':')[0]; }
+function bondWarKeySrc(k){ const s=String(k||'').split(':')[1]||''; return s==='h'? 'hq' : (s==='r'? 'refile' : 'coop'); }   
+function bondWarTok(mo){ if(!Array.isArray(mo)) return 0; let n=0; for(const m of mo){ if(m==='bw') n=Math.max(n,1); else if(typeof m==='string' && /^bw[2-9]$/.test(m)) n=Math.max(n,+m.slice(2)); } return n; }   
+function bondWarToks(n){ n=n|0; return n<=0? [] : (n===1? ['bw'] : ['bw','bw'+Math.min(9,n)]); }   
+function bondWarEcho(w, uid){ const p=bondWarPend(uid); let m=bondWarMask(w); if((p&8) && m===BOND_WAR_SRC.coop) m=BOND_WAR_SRC.hq; return m|(p&BOND_WAR_ALL); }   
+function bondWarHeal(){   
+  const m=META.msb, p=(m && typeof m==='object')? m.paid : null; if(!p || typeof p!=='object' || p.k!=='bond' || !Array.isArray(p.u) || !p.u.length) return false;
+  if(META.bwHeal===String(m.dk)) return false; META.bwHeal=String(m.dk);
+  let n=0; for(const u0 of p.u){ const uid=String(u0||'').slice(0,32); if(!uid) continue; const row=(META.bonds||[]).find(r=>r && String(r.u)===uid); if(!row) continue; const w=bondWarMask(row.w); if(w&BOND_WAR_SRC.hq) continue;
+    if(!Array.isArray(META.bondWarPend)) META.bondWarPend=[];
+    if(p.f){ if(w!==BOND_WAR_SRC.coop) continue; row.w=BOND_WAR_SRC.hq; const k9=bondWarKey(uid,'refile'); if(META.bondWarPend.indexOf(k9)<0) META.bondWarPend.push(k9); n++; }
+    else { row.w=w|BOND_WAR_SRC.hq; const k9=bondWarKey(uid,BOND_WAR_SRC.hq); if(META.bondWarPend.indexOf(k9)<0) META.bondWarPend.push(k9); n++; } }
+  return n>0; }
+function bondWar(uid){ return bondWarN(uid)>0; }   
+function bondWarOn(){ return bondWarStack()>0; }   
+function bondWarDmg(u){ return (u && u.bondWar)? BOND_WAR.dmg*(u.bondWar|0) : 0; }   
+function bondWarHp(u){ return (u && u.bondWar)? BOND_WAR.hp*(u.bondWar|0) : 0; }   
 function bondWarLand(u){   
-  if(!u || u.bondWar) return !!(u && u.bondWar); if(!bondWarOn()){ u.bondWar=0; return false; }
-  u.bondWar=1; if(u.hpMax){ u.hpMax+=BOND_WAR.hp; u.hp=u.hpMax; }
-  if(!(S.bwN|0) && S.floats) S.floats.push({x:u.x,y:u.y-70,txt:'+'+BOND_WAR.hp+' HP · +'+BOND_WAR.dmg+' DAMAGE',t:0,col:'#FFD24A'}); S.bwN=(S.bwN|0)+1;
+  if(!u || u.bondWar) return !!(u && u.bondWar); const n9=bondWarStack(); if(!n9){ u.bondWar=0; return false; }    
+  u.bondWar=n9; if(u.hpMax){ u.hpMax+=BOND_WAR.hp*n9; u.hp=u.hpMax; }
+  if(!(S.bwN|0) && S.floats) S.floats.push({x:u.x,y:u.y-70,txt:'+'+(BOND_WAR.hp*n9)+' HP · +'+(BOND_WAR.dmg*n9)+' DAMAGE',t:0,col:'#FFD24A'}); S.bwN=(S.bwN|0)+1;
   return true; }
-function bondWarRelay(u, cm, hp){ if(!u) return false; const on=!!(cm && Array.isArray(cm.mo) && cm.mo.indexOf('bw')>=0); u.bondWar=on? 1 : 0; if(on && hp && u.hpMax){ u.hpMax+=BOND_WAR.hp; u.hp=u.hpMax; } return on; }   
-function bondWarRow(uid, nm){   
-  uid=String(uid||'').slice(0,32); if(!uid) return false; if(!Array.isArray(META.bonds)) META.bonds=[];
-  let row=META.bonds.find(r=>r && String(r.u)===uid); const fresh=!(row && row.w);
+function bondWarRelay(u, cm, hp){ if(!u) return false; const n9=(cm && Array.isArray(cm.mo))? bondWarTok(cm.mo) : 0; u.bondWar=n9; if(n9 && hp && u.hpMax){ u.hpMax+=BOND_WAR.hp*n9; u.hp=u.hpMax; } return n9>0; }       
+function bondWarRow(uid, nm, bit){   
+  uid=String(uid||'').slice(0,32); if(!uid) return false; if(!Array.isArray(META.bonds)) META.bonds=[]; bit=(bit===BOND_WAR_SRC.hq)? BOND_WAR_SRC.hq : BOND_WAR_SRC.coop;
+  let row=META.bonds.find(r=>r && String(r.u)===uid); const fresh=!(row && (bondWarMask(row.w)&bit));
   if(!row){ row={ u:uid, n:String(nm||'A COMMANDER').slice(0,18) }; META.bonds.push(row); }
-  row.w=1;
-  if(!Array.isArray(META.bondWarPend)) META.bondWarPend=[]; if(META.bondWarPend.indexOf(uid)<0) META.bondWarPend.push(uid);
+  row.w=bondWarMask(row.w)|bit;
+  if(!Array.isArray(META.bondWarPend)) META.bondWarPend=[]; { const k9=bondWarKey(uid,bit); if(META.bondWarPend.indexOf(k9)<0) META.bondWarPend.push(k9); }
   if(!Array.isArray(META.bondNew)) META.bondNew=[]; if(!Array.isArray(META.bondSeen)) META.bondSeen=[];
   if(META.bondSeen.indexOf(uid)<0 && META.bondNew.indexOf(uid)<0) META.bondNew.push(uid);
   return fresh; }
-function bondWarPend(uid){ uid=String(uid||''); return !!uid && Array.isArray(META.bondWarPend) && META.bondWarPend.indexOf(uid)>=0; }
-function bondWarPost(uid){   
-  return netFetch(NET+'/bond/war',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({device:META.deviceId, uid:String(uid||''), cv:GVT_CV})}).then(r=>r.json()); }
+function bondWarPend(uid){ uid=String(uid||''); if(!uid || !Array.isArray(META.bondWarPend)) return 0; let m=0; for(const k of META.bondWarPend){ if(bondWarKeyUid(k)!==uid) continue; const s=bondWarKeySrc(k); if(s==='hq') m|=BOND_WAR_SRC.hq; else if(s==='coop') m|=BOND_WAR_SRC.coop; else m|=8; } return m; }   
+function bondWarPost(uid, src){   
+  return netFetch(NET+'/bond/war',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({device:META.deviceId, uid:String(uid||''), src:String(src||'coop'), cv:GVT_CV})}).then(r=>r.json()); }
 function bondWarTick(){   
   if(!Array.isArray(META.bondWarPend) || !META.bondWarPend.length) return; if(bondWarTick.busy) return; bondWarTick.busy=1;
-  const uid=String(META.bondWarPend[0]);
-  bondWarPost(uid).then(r=>{ bondWarTick.busy=0;
-    if(r && (r.ok || r.err==='self' || r.err==='bad uid' || r.err==='no such' || r.err==='full')){ META.bondWarPend=META.bondWarPend.filter(u=>u!==uid); if(r.ok && r.friend && r.friend.uid){ const row=(META.bonds||[]).find(q=>q && String(q.u)===String(r.friend.uid)); if(row) row.w=1; } try{ saveMeta(); }catch(e){} bondWarTick(); }
+  const key=String(META.bondWarPend[0]), uid=bondWarKeyUid(key), src=bondWarKeySrc(key);    
+  bondWarPost(uid, src).then(r=>{ bondWarTick.busy=0;
+    if(r && (r.ok || r.err==='self' || r.err==='bad uid' || r.err==='no such' || r.err==='full' || r.err==='bad src')){ META.bondWarPend=META.bondWarPend.filter(k=>k!==key); if(r.ok && r.friend && r.friend.uid){ const row=(META.bonds||[]).find(q=>q && String(q.u)===String(r.friend.uid)); if(row){ const hw=('war' in r)? bondWarMask(r.war) : BOND_WAR_SRC.coop; row.w=bondWarEcho(hw, row.u); } } try{ saveMeta(); }catch(e){} bondWarTick(); }    
   }).catch(()=>{ bondWarTick.busy=0; }); }
 function bondMul(){ return S.bond? BOND_MUL : 1; }
 function bondHas(uid){ uid=String(uid||''); return !!uid && (META.bonds||[]).some(r=>r && String(r.u)===uid); }
@@ -96926,15 +96949,15 @@ function bondMate(){
   }
   return null;
 }
-function bondGlyph(){ return S.bond? '<i class="wkx bond" data-notr>'+gly('bond')+'+75%'+(bondWarOn()? ' XP · +'+BOND_WAR.hp+' HP · +'+BOND_WAR.dmg+' DMG' : '')+'</i>' : ''; }       
+function bondGlyph(){ const n9=S.bond? bondWarStack() : 0; return S.bond? '<i class="wkx bond" data-notr>'+gly('bond')+'+75%'+(n9? ' XP · +'+(BOND_WAR.hp*n9)+' HP · +'+(BOND_WAR.dmg*n9)+' DMG' : '')+'</i>' : ''; }       
 function bondShareText(){ return TXT('Join me in Green vs Tan! We share THE BOND OF FRIENDSHIP: +75% XP when we fight together.'); }   
 function bondAdopt(d){   
   if(!d || !d.ok) return;
   let dirty=false;
   if(typeof d.fcode==='string' && BOND_CODE_RE.test(d.fcode) && META.fcode!==d.fcode){ META.fcode=d.fcode; dirty=true; }
   if(Array.isArray(d.bonds)){
-    const rows=d.bonds.filter(r=>r && typeof r.u==='string' && r.u).map(r=>{ const o={ u:String(r.u).slice(0,32), n:String(r.n||'A COMMANDER').slice(0,18) }; if(r.w || bondWarPend(o.u)) o.w=1; return o; }).slice(0,100);    
-    for(const u9 of (META.bondWarPend||[])){ if(!rows.some(r=>r.u===u9)){ const o9=(META.bonds||[]).find(r=>r && String(r.u)===u9); if(o9) rows.push({ u:o9.u, n:o9.n, w:1 }); } }   
+    const rows=d.bonds.filter(r=>r && typeof r.u==='string' && r.u).map(r=>{ const o={ u:String(r.u).slice(0,32), n:String(r.n||'A COMMANDER').slice(0,18) }; { const w9=bondWarEcho(r.w, o.u); if(w9) o.w=w9; } return o; }).slice(0,100);    
+    for(const k9 of (META.bondWarPend||[])){ const u9=bondWarKeyUid(k9); if(!rows.some(r=>r.u===u9)){ const o9=(META.bonds||[]).find(r=>r && String(r.u)===u9); if(o9 && !rows.some(r=>r.u===o9.u)) rows.push({ u:o9.u, n:o9.n, w:bondWarMask(o9.w)||BOND_WAR_SRC.coop }); } }       
     if(JSON.stringify(rows)!==JSON.stringify(META.bonds||[])){ META.bonds=rows; dirty=true; }
     for(const r of rows){ if(META.bondSeen.indexOf(r.u)<0 && META.bondNew.indexOf(r.u)<0){ META.bondNew.push(r.u); dirty=true; } }
   } else if(typeof d.fcode==='string' && (META.bonds||[]).length && !(META.bondWarPend||[]).length  ){ META.bonds=[]; dirty=true; }   
@@ -97011,7 +97034,7 @@ function bondSweep(){
   partyPopShow('bond',
     '<div class="pp-card pp-bond" data-notr><div class="pp-mark">'+gly('bond')+'</div>'
     +'<div class="pp-head">'+tf('YOU AND %1 SHARE THE BOND OF FRIENDSHIP', escH(nm))+'</div>'
-    +'<div class="pp-sub">'+escH(t('+75% XP WHEN YOU FIGHT TOGETHER')+(row.w? ' · '+t('+'+BOND_WAR.hp+' HP · +'+BOND_WAR.dmg+' DAMAGE') : ''))+'</div>'    
+    +'<div class="pp-sub">'+escH(t('+75% XP WHEN YOU FIGHT TOGETHER')+(bondWarCnt(row.w)? ' · '+t('+'+(BOND_WAR.hp*bondWarCnt(row.w))+' HP · +'+(BOND_WAR.dmg*bondWarCnt(row.w))+' DAMAGE') : ''))+'</div>'    
     +'<button type="button" class="pp-big" onclick="partyPopClear();bondSweep()">OK</button></div>');
   SFX.horn();
   return true;
@@ -97083,7 +97106,7 @@ function ptyRowsHTML(here){
     return '<div class="pts-row'+(mine?' me':'')+(lit?' lit':'')+((!mine&&(m.dk|0)>0)?' dark':'')+(armed?' armed':'')+'" id="ptsrow-'+seat+'" data-notr>'
       +'<i style="background:'+escH(String(hex))+'"></i>'
       +'<div class="pts-nm"><span class="pts-sq'+(sq?'':' none')+'">'+escH(String(sq||t('NO SQUAD')).toUpperCase().slice(0,18))+'</span>'
-      +'<span class="pts-name">'+((!mine&&m.uid&&bondHas(m.uid))? '<i class="pts-bond">'+gly('bond')+'</i>' : '')+((L&&m.host)? PTY_LEAD_GLYPH+' ':'')+escH(String(nm).slice(0,14))+(mine? ' · '+escH(t('YOU')):'')+'</span>'+((!mine&&m.uid&&bondWar(m.uid))? '<span class="pts-bwar">'+escH(t('THE BOND OF FRIENDSHIP')+' · '+t('+'+BOND_WAR.hp+' HP · +'+BOND_WAR.dmg+' DAMAGE'))+'</span>' : '')+'</div>'    
+      +'<span class="pts-name">'+((!mine&&m.uid&&bondHas(m.uid))? '<i class="pts-bond">'+gly('bond')+'</i>' : '')+((L&&m.host)? PTY_LEAD_GLYPH+' ':'')+escH(String(nm).slice(0,14))+(mine? ' · '+escH(t('YOU')):'')+'</span>'+((!mine&&m.uid&&bondWar(m.uid))? '<span class="pts-bwar">'+escH(t('THE BOND OF FRIENDSHIP')+' · '+t('+'+(BOND_WAR.hp*bondWarN(m.uid))+' HP · +'+(BOND_WAR.dmg*bondWarN(m.uid))+' DAMAGE'))+'</span>' : '')+'</div>'    
       +'<span class="pts-st'+(want?' want':'')+'">'+st+'</span>'
       
       
@@ -99116,7 +99139,7 @@ function roomPlaced(seat,type,x,y,para,kit9){
     
     
     if(soulIs('u',type)) cm.mo=(cm.mo||[]).concat('sl');   
-    if(bondWarOn()) cm.mo=(cm.mo||[]).concat('bw');   
+    { const n9=bondWarStack(); if(n9) cm.mo=(cm.mo||[]).concat(bondWarToks(n9)); }   
     if(vehKind(type)) cm.vh=vehHP(type)|0;
     { const tk9=tkdTok(type); if(tk9) cm.mo=(cm.mo||[]).concat(tk9); }    
     if(vehKind(type) && vehEng(type)) cm.mo=(cm.mo||[]).concat('ve');   
@@ -187287,7 +187310,7 @@ const MSB={ on:(function(){ try{ const q=/[?&]msb=([01])/.exec(location.search||
   function verdict1(){ if(!S.coop || !COOP || S.bf || coopHumans()<2) return; if(S.raid && S.raid.void) return; if(S.mode!=='win' && S.mode!=='lose') return;   
     if(!clockOK()) return; const m=row(); if(m.done || dayOf(m.dk)!==1) return;
     const ms=mates(); if(!ms.length) return;
-    let fresh=0; for(const mt of ms){ if(bondWarRow(mt.u, mt.n)) fresh++; }   
+    let fresh=0; for(const mt of ms){ if(bondWarRow(mt.u, mt.n, BOND_WAR_SRC.hq)) fresh++; }   
     const nm=ms.map(function(mt){ return mt.n.toUpperCase().slice(0,14); }).join(' · ');
     m.done=1; m.paid={ k:'bond', n:nm, f:fresh? 1 : 0, u:ms.map(function(mt){ return mt.u; }) }; try{ saveMeta(); }catch(e){} try{ bondWarTick(); }catch(e){}
     M.v1={ cfg:S.cfg, n:nm, f:fresh? 1 : 0 }; M.log.push('o1:'+nm+':'+(fresh? 'new' : 'had')); }
@@ -190813,12 +190836,13 @@ THIRD_PRIZES[BOND_WAR.lvl]=n=>{
   if(!COOP || !Array.isArray(COOP.members)) return null;
   const mates=[]; for(const m of COOP.members){ if(!m || !m.uid || (m.seat|0)===(COOP.seat|0)) continue; const u=String(m.uid).slice(0,32); if(avoidHas(u)) continue; mates.push({ u:u, n:String(m.name||'A COMMANDER').slice(0,18) }); }
   if(!mates.length) return null;
-  let fresh=0; for(const mt of mates){ if(bondWarRow(mt.u, mt.n)) fresh++; }
+  let fresh=0; for(const mt of mates){ if(bondWarRow(mt.u, mt.n, BOND_WAR_SRC.coop)) fresh++; }    
   try{ saveMeta(); }catch(e){} bondWarTick();
   const nm=mates.map(mt=>mt.n.toUpperCase().slice(0,14)).join(' · ');
   return { t:'THE BOND OF FRIENDSHIP', f:fresh? 'bond' : 'own', a:'<span class="ocr-pic bond">'+gly('bond')+'</span>', s:tf('WITH %1', nm)+' · '+t('+2 HP AND +2 DAMAGE WHILE YOU TWO FIGHT TOGETHER.') }; };
 
 (function(){ if(thirdHeal()) saveMeta(); })();
+(function(){ try{ if(bondWarHeal()) saveMeta(); }catch(e){} })();   
 
 
 
@@ -192165,7 +192189,7 @@ window.GVT = {
   foParty(k){ return foParty(k); },
   bond(){ return { cv:GVT_CV, fcode:META.fcode||'', fPend:META.fPend||'', bonds:(META.bonds||[]).slice(), bondNew:(META.bondNew||[]).slice(), bondSeen:(META.bondSeen||[]).slice(), sBond:S.bond||null, mul:bondMul(), pop:(typeof PTY_POP!=='undefined')? PTY_POP : null, mate:bondMate() }; },   
   bondClaim(code){ return bondClaim(String(code||'')); },   
-  bondWar(){ const G9=u=>{ try{ return (!S.bf)? +gritCap(u).toFixed(2) : null; }catch(e){ return null; } }; return { cv:GVT_CV, war:Object.assign({},BOND_WAR), on:bondWarOn(), sBond:S.bond||null, pend:(META.bondWarPend||[]).slice(), rows:(META.bonds||[]).map(r=>({u:r.u,n:r.n,w:r.w|0})), foot:VD_FOOT.bond, prize:typeof THIRD_PRIZES[BOND_WAR.lvl], bwN:S.bwN|0, floats:(S.floats||[]).map(f=>f.txt), units:S.units.filter(u=>!u.dead).map(u=>({ id:u.id, type:u.type, by:(u.coopBy==null)? null : String(u.coopBy), seat:(u.seat==null)? null : u.seat, bw:u.bondWar|0, hp:u.hp, hpMax:u.hpMax, grit:G9(u), dmg:bondWarDmg(u) })) }; },   
+  bondWar(){ const G9=u=>{ try{ return (!S.bf)? +gritCap(u).toFixed(2) : null; }catch(e){ return null; } }; return { cv:GVT_CV, war:Object.assign({},BOND_WAR), src:Object.assign({},BOND_WAR_SRC), on:bondWarOn(), stack:bondWarStack(), heal:META.bwHeal||null, sBond:S.bond||null, pend:(META.bondWarPend||[]).slice(), rows:(META.bonds||[]).map(r=>({u:r.u,n:r.n,w:bondWarMask(r.w),k:bondWarCnt(r.w)})), foot:VD_FOOT.bond, prize:typeof THIRD_PRIZES[BOND_WAR.lvl], bwN:S.bwN|0, floats:(S.floats||[]).map(f=>f.txt), units:S.units.filter(u=>!u.dead).map(u=>({ id:u.id, type:u.type, by:(u.coopBy==null)? null : String(u.coopBy), seat:(u.seat==null)? null : u.seat, bw:u.bondWar|0, hp:u.hp, hpMax:u.hpMax, grit:G9(u), dmg:bondWarDmg(u) })) }; },   
   bondWarRow(uid,nm){ const f=bondWarRow(uid,nm); saveMeta(); return f; },   
   bondWarTick(){ bondWarTick(); return (META.bondWarPend||[]).slice(); },   
   bondShareText(){ return bondShareText()+' '+BOND_LINK+String(META.fcode||''); },   
