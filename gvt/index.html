@@ -89460,7 +89460,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='25.41';        
+let GVT_CV='25.42';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -190160,6 +190160,88 @@ if(FIR.on) try{
   FIR.old.renderFortScene=renderFortScene; renderFortScene=function(){ const r=FIR.old.renderFortScene.apply(this, arguments); try{ if(FIR.on && FIR.yard==='off'){ const e=document.getElementById('fhHot-table'); if(e) e.remove(); } }catch(e){ FIR.err++; } return r; };   
 }catch(e){ FIR.err++; }
 firApply();
+
+
+
+
+
+
+
+
+const JCL={ on:(function(){ try{ const m=/[?&]jcl=([01])/.exec(location.search||''); if(m){ if(m[1]==='0') localStorage.setItem('gvt_jcl','0'); else localStorage.removeItem('gvt_jcl'); return m[1]==='1'? 1 : 0; } return localStorage.getItem('gvt_jcl')==='0'? 0 : 1; }catch(e){ return 1; } })(), old:{}, last:null, n:{ cage:0, crate:0 }, err:0, v:1,
+  cyc:1.45, shakeT:0.6, rate:13, amp:3.0, cageK:0.5, tilt:0.028,   
+  D0:0.1, D1:0.6, WALK:1.15, extra:0.75, lockFall:0.38,              
+  x0:-24, y0:-14, xs:-58 };                                          
+const JCL_C={ ir:'#5B6470', ird:'#343A44', irh:'#9AA5B4', irb:'#3E444E', wd:'#8f6b3f', wdd:'#6e5130', star:'#e8d9b0', gold:'#FFD24A', br:'#C9A24A', brd:'#7A5A14' };   
+function jclClamp(k){ return Math.max(0,Math.min(1,k)); }
+function jclEase(k){ return 1-Math.pow(1-jclClamp(k),3); }
+function jclRow(){ try{ if(!JCL.on || S.mode!=='play' || !S.tanBase || !ffgOn()) return null; const r=rscRow(); return (r && (META.campaign|0)<r.n)? r : null; }catch(e){ return null; } }   
+function jclRR(c,x,y,w,h,r){ c.beginPath(); c.moveTo(x+r,y); c.lineTo(x+w-r,y); c.quadraticCurveTo(x+w,y,x+w,y+r); c.lineTo(x+w,y+h-r); c.quadraticCurveTo(x+w,y+h,x+w-r,y+h); c.lineTo(x+r,y+h); c.quadraticCurveTo(x,y+h,x,y+h-r); c.lineTo(x,y+r); c.quadraticCurveTo(x,y,x+r,y); c.closePath(); }   
+function jclBar(c,x,y,w,h){ c.fillStyle=JCL_C.ird; c.fillRect(x-1,y-1,w+2,h+2); c.fillStyle=JCL_C.ir; c.fillRect(x,y,w,h); c.fillStyle=JCL_C.irh; c.fillRect(x,y,Math.max(1,w*0.3),h); }   
+function jclStar(c,x,y,R,fill,pulse){ const r=R*0.46; c.save(); c.translate(x,y); if(pulse) c.scale(pulse,pulse); c.beginPath(); for(let i=0;i<10;i++){ const q=(i%2? r : R), a=-Math.PI/2+i*Math.PI/5; if(i) c.lineTo(Math.cos(a)*q, Math.sin(a)*q); else c.moveTo(Math.cos(a)*q, Math.sin(a)*q); } c.closePath(); c.fillStyle=fill; c.fill(); if(pulse){ c.strokeStyle='rgba(122,82,12,0.85)'; c.lineWidth=1.2; c.lineJoin='round'; c.stroke(); } c.restore(); }   
+function jclLock(c,x,y,t){ let dy=0, rot=0, a=1; if(t>=0){ dy=0.5*700*t*t; rot=t*1.6; a=1-jclClamp(t/JCL.lockFall); if(a<=0) return; }   
+  c.save(); c.globalAlpha*=a; c.translate(x,y+dy); c.rotate(rot);
+  c.strokeStyle=JCL_C.irh; c.lineWidth=2.2; c.beginPath(); c.arc(0,-4,3.6,Math.PI,0); c.stroke();   
+  jclRR(c,-5,-4,10,9,2); c.fillStyle=JCL_C.br; c.fill(); c.strokeStyle=JCL_C.brd; c.lineWidth=1.3; c.stroke(); c.fillStyle=JCL_C.brd; c.fillRect(-0.8,-1,1.6,3);   
+  c.restore(); }
+
+function jclCage(c,bx,by,o){ const a=o.alpha==null? 1 : o.alpha, j=o.jit||0; c.save(); c.translate(bx+j,by); c.globalAlpha=a;
+  jclRR(c,-66,-16,132,12,3); c.fillStyle=JCL_C.wd; c.fill(); c.strokeStyle=JCL_C.wdd; c.lineWidth=3; c.stroke();   
+  c.fillStyle='rgba(255,255,255,0.14)'; c.fillRect(-62,-15,124,2);
+  if(o.star){ const pu=1+0.035*Math.sin(performance.now()/190); jclStar(c,0,-10,6,JCL_C.gold,pu); } else jclStar(c,0,-10,4.6,JCL_C.star,0);   
+  c.strokeStyle=JCL_C.irb; c.lineWidth=2.5; c.lineCap='butt'; for(let x=-48;x<=50;x+=14){ c.beginPath(); c.moveTo(x,-86); c.lineTo(x,-16); c.stroke(); }   
+  c.translate(-(bx+j),-by); if(o.man){ try{ o.man(); }catch(e9){ JCL.err++; } } c.translate(bx+j,by);   
+  jclBar(c,-61,-92,6,78); jclBar(c,55,-92,6,78);   
+  jclBar(c,-66,-92,132,6); jclBar(c,-7,-99,14,8);   
+  c.fillStyle=JCL_C.irh; for(let x=-58;x<=58;x+=16) c.fillRect(x-0.6,-90.5,1.2,1.2);   
+  for(const x of [2,16,30,44]) jclBar(c,x-2,-86,4,70);   
+  jclBar(c,-11,-88,5,72);   
+  const th=(o.door||0)*Math.PI*0.611;   
+  c.save(); c.translate(-55,0); c.scale(Math.cos(th)||0.001,1);
+  for(const x of [13,26,39]) jclBar(c,x-2,-85,4,67);   
+  c.strokeStyle=JCL_C.ird; c.lineWidth=3; c.strokeRect(0.5,-85.5,43,68); c.strokeStyle=JCL_C.ir; c.lineWidth=1.4; c.strokeRect(0.5,-85.5,43,68);   
+  c.fillStyle=JCL_C.ir; c.fillRect(38,-57,5,12); c.fillStyle=JCL_C.ird; c.fillRect(38,-57,5,1); c.fillRect(38,-46,5,1);   
+  c.restore();
+  jclLock(c,-8.5,-50,o.lockT==null? -1 : o.lockT);
+  c.restore(); }
+function jclDrawMan(k,P){ const im=unitImg(k,null); if(!im) return; drawSprite(k, P.x, P.y, unitW(k), P.rot||0, 0, im, true); }   
+
+function jclMan(v){ const R=v.rsc; if(!R) return null; const e=v.t-R.t0, rm=reducedMotion(), bx=v.x, x0=bx+JCL.x0, y0=v.y+JCL.y0, x1=v.x+RSC.dx, y1=v.y+RSC.dy, xs=bx+JCL.xs;
+  if(e<0) return { x:x0, y:y0, inside:true, ph:'wait', rot:0 };
+  if(rm || e>=JCL.D1+JCL.WALK){ const s9=e-JCL.D1-JCL.WALK; return { x:x1, y:y1-(rm? 0 : Math.abs(Math.sin(s9*6))*Math.max(0,5-s9*5)), inside:false, ph:'stand', rot:0 }; }   
+  if(e<JCL.D1) return { x:x0, y:y0, inside:true, ph:'door', rot:0 };
+  const q=(e-JCL.D1)/JCL.WALK, x=x0+(x1-x0)*q, bob=Math.abs(Math.sin(q*JCL.WALK*Math.PI*2*3.6))*2;   
+  let y; if(x>=xs+4) y=y0; else if(x<=xs-14) y=y1; else { const d=(xs+4-x)/18; y=y0+(y1-y0)*d-Math.sin(d*Math.PI)*6; }   
+  return { x, y:y-bob, inside:x>xs, ph:'walk', rot:0 }; }
+function jclState(b,bx,by){ const v=S.vflag, R=v && v.rsc, rm=reducedMotion();   
+  if(R && R.jcl){ const e=v.t-R.t0; let door=0, lockT=-1; if(e>=0){ lockT=e; door=rm? 1 : jclEase((e-JCL.D0)/(JCL.D1-JCL.D0)); } return { jit:0, door, lockT, star:false, P:jclMan(v) }; }
+  if(v || b.dead) return { jit:0, door:0, lockT:-1, star:false, P:{ x:bx+JCL.x0, y:by+JCL.y0, inside:true, ph:'wait', rot:0 } };   
+  let jit=0; if(!rm){ const T=S.t%JCL.cyc; if(T<JCL.shakeT) jit=JCL.amp*Math.sin(T*Math.PI*2*JCL.rate)*(1-0.35*T/JCL.shakeT); }   
+  const star=!!(COMM.brief && COMM.brief.kind==='rescue');
+  return { jit, door:0, lockT:-1, star, P:{ x:bx+JCL.x0+jit, y:by+JCL.y0, inside:true, ph:'shake', rot:jit*JCL.tilt } }; }
+function jclRead(){ const b=S.tanBase, v=S.vflag, r=jclRow(), st=JCL.last;   
+  return { cv:GVT_CV, on:JCL.on, v:JCL.v, err:JCL.err, n:{ cage:JCL.n.cage, crate:JCL.n.crate }, wraps:['drawTanBase','rscArm','rscTick','rscAt','rscDraw'].filter(function(k){ return typeof JCL.old[k]==='function'; }).length, rung:r? r.t : null, lvl:S.levelN|0, camp:META.campaign|0, mode:S.mode, t:+(+S.t).toFixed(3),
+    box:b? { x:W-120, y:b.y+52, hp:b.hp, hpMax:b.hpMax, dead:!!b.dead, hitT:+(+(b.hitT||0)).toFixed(2) } : null,
+    st:st? { jit:+(+st.jit).toFixed(3), door:+(+st.door).toFixed(3), lockT:+(+st.lockT).toFixed(3), star:st.star, P:st.P? { x:+(+st.P.x).toFixed(1), y:+(+st.P.y).toFixed(1), inside:st.P.inside, ph:st.P.ph, rot:+(+(st.P.rot||0)).toFixed(4) } : null } : null,
+    vf:v? { t:+(+v.t).toFixed(3), dur:+(+v.dur).toFixed(2), rsc:v.rsc? { t0:+(+v.rsc.t0).toFixed(2), T:+(+v.rsc.T).toFixed(3), e:+(v.t-v.rsc.t0).toFixed(3), pop:v.rsc.pop|0, land:v.rsc.land|0, said:v.rsc.said|0, jcl:v.rsc.jcl|0 } : null } : null, brief:COMM.brief? COMM.brief.kind : null }; }
+if(JCL.on) try{   
+  JCL.old.drawTanBase=drawTanBase; drawTanBase=function(){ let r=null, st=null, b=S.tanBase; try{ r=jclRow(); if(r){ st=jclState(b, W-120, b.y+52); } }catch(e){ JCL.err++; r=null; }
+    if(!r || !st){ JCL.n.crate++; return JCL.old.drawTanBase.apply(this, arguments); }
+    JCL.n.cage++; JCL.last=st; const bx=W-120, by=b.y+52, k=Math.max(0,b.hp/b.hpMax);
+    try{ boxSeat(bx,by);   
+      jclCage(cx,bx,by,{ alpha:(b.hitT>0? 1 : 0.55+0.45*k), jit:st.jit*JCL.cageK, door:st.door, lockT:st.lockT, star:st.star, man:(st.P && st.P.inside)? function(){ jclDrawMan(r.t, st.P); } : null }); }catch(e){ JCL.err++; }
+    const im=IMG.toybox, bs=boxSeat, fc=ffgCaptive, hp=b.hp; IMG.toybox=null; boxSeat=function(){}; ffgCaptive=function(){}; b.hp=b.hpMax;   
+    try{ JCL.old.drawTanBase.apply(this, arguments); } finally{ IMG.toybox=im; boxSeat=bs; ffgCaptive=fc; b.hp=hp; } };
+  JCL.old.rscArm=rscArm; rscArm=function(v,foeWin){ JCL.old.rscArm.apply(this, arguments); try{ if(v && v.rsc && jclRow()){ v.rsc.jcl=1; v.rsc.T+=JCL.extra; v.dur+=JCL.extra; } }catch(e){ JCL.err++; } };   
+  JCL.old.rscTick=rscTick; rscTick=function(v){ const R=v.rsc; if(!R || !R.jcl) return JCL.old.rscTick.apply(this, arguments); const e=v.t-R.t0; if(e<0) return;
+    if(!R.pop){ R.pop=1; try{ S.fx.push({k:'ring',x:v.x-9,y:v.y-50,r:2,R:12,t:0,dur:0.3,col:'rgba(255,210,74,0.85)'}); SFX.thock(); }catch(e9){} }   
+    if(!R.land && e>=JCL.D1+JCL.WALK){ R.land=1; try{ S.fx.push({k:'ring',x:v.x+RSC.dx,y:v.y+RSC.dy-4,r:4,R:34,t:0,dur:0.4,col:'rgba(255,210,74,0.85)'}); SFX.blip(); }catch(e9){} }   
+    if(!R.said && e>=JCL.D1+JCL.WALK-0.05){ R.said=1; try{ commSayAs({ name:rscName(R.k), img:sprURI(R.k, dyeHex()||undefined) }, R.say, { rank:3, always:1, hold:R.T }); }catch(e9){} } };   
+  JCL.old.rscAt=rscAt; rscAt=function(v){ return (v && v.rsc && v.rsc.jcl)? jclMan(v) : JCL.old.rscAt.apply(this, arguments); };
+  JCL.old.rscDraw=rscDraw; rscDraw=function(v){ const R=v.rsc; if(!R || !R.jcl) return JCL.old.rscDraw.apply(this, arguments); let P=null; try{ P=jclMan(v); }catch(e){ JCL.err++; } if(!P || P.inside) return; const im=unitImg(R.k,null); if(!im) return;   
+    cx.save(); cx.fillStyle='rgba(0,0,0,0.22)'; cx.beginPath(); cx.ellipse(P.x, v.y+RSC.dy+2, 15, 4, 0, 0, Math.PI*2); cx.fill(); drawSprite(R.k, P.x, P.y, unitW(R.k), 0, 0, im, true); cx.restore(); };
+}catch(e){ JCL.err++; }
+setTimeout(function(){ try{ if(typeof GVT==='object' && GVT) GVT.jcl=jclRead; }catch(e){} },0);   
 
 
 
