@@ -89933,7 +89933,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='25.70';        
+let GVT_CV='25.71';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -102575,6 +102575,7 @@ function hurt(f,dmg,src,fire9){ if(f.trk && trkTurn(f)) return; dmg*=sqlArmX(f);
   if(f.def && f.def.soak>0) dmg*=1-(cfdGapOpen(f,src)? ((f.chs && f.chs.soak0)||0) : f.def.soak);       
   if(f.type==='skyfort' && src && !hrtS1Reach(src,f)) return;   
   if(f.def && f.def.kb && f.gnSt==='snap') return;   
+  if(f.bbsInv>0 && f.def && f.def.bbs){ bbsInvFlash(f); return; }   
   if(f.def && f.def.kb && src && src.def && S.units.indexOf(src)>=0){ f.kbStungU=src; f.kbStungT=S.t; if(src.type==='sarge'){ f.kbSargeU=src; f.kbSargeT=S.t; } }   
   dmg*=seyX(f,src);    
   dmg+=tkOrX(src); if(f.cyDance>0||f.fyDance>0||f.dyDance>0) dmg*=CY_DANCE_X;
@@ -124347,6 +124348,7 @@ function hitCheck(f,u){
   if(f.retFloor!=null && f.hp<=f.hpMax*f.retFloor){ f.hp=f.hpMax*f.retFloor; if(f.def.kb) kbFloorTell(f); return; }   
   if(rxmFloor(f)) return;   
   if(f.def.kb && !f.gnFoot && f.hp<=0 && !f.fdBless){ kbUnhorse(f,u); return; }   
+  if(f.def.bbs && f.type==='bbshow' && !f.bbsRide && f.hp<=0 && !f.fdBless){ bbsMount(f,u); return; }   
   if(f.type==='skyfort' && f.hp<=0 && hrtS3PtyHold(f)) return;   
   if(f.type==='skyfort' && f.hp<=0 && !f.fdBless && hrtS3Fall(f,u)) return;   
   if(f.def.harp && f.pcRet && f.hp<f.hpMax){ f.hp=f.hpMax; pcShrug(f); return; }   
@@ -124404,6 +124406,7 @@ function foeFell(f,u){
       else if(!S.bf && oc10Wreck(f)){}   
       else if(!S.bf && f.def.o11 && oc11Wreck(f)){}   
       else if(!S.bf && f.def.o12 && oc12Wreck(f)){}   
+      else if(!S.bf && f.bbsRide && bbsThrown(f)){}   
       else if(f.def.mine) anBurst(f);   
       else if(f.def.bubbleOf || f.def.hover){ if(!f.popQuiet) gnPopFx(f); if(f.def.bubbleOf && f.fairy && f.fairy.bigId==null) f.fairy.bubbleCd=Math.min(f.fairy.bubbleCd||0,2); }   
       else if(f.type==='mom') momExitPush(f,RM);   
@@ -124862,6 +124865,7 @@ function splash(x,y,R,dmg,vx2,src,mach,refl,bigSelf,rb,air,msh){ if(!S.bf && S.c
     const f=S.foes[i];
     if(air? (skyAir(f) && Math.hypot(f.x-x,skyAirY(f)-y)<=R+f.def.w*0.3) : Math.hypot(f.x-x,f.y-y)<=R+f.def.w*0.3){   
       if(f.def.kb && f.gnSt==='snap') continue;   
+      if(f.bbsInv>0 && f.def && f.def.bbs){ bbsInvFlash(f); continue; }   
       if(!S.bf && f.gjAir) continue;   
       if(f.gmyLp && gmyLeapAir(f)) continue;   
       if(!S.bf && f.paraSt==='drop') continue;    
@@ -128828,6 +128832,7 @@ function draw(){
       cx.globalAlpha=(1-k)*0.42; cx.fillStyle=e.col||'#b8b6ae';   
       cx.beginPath(); cx.arc(e.x+e.vx*e.t, e.y+e.vy*e.t-(e.up||0)*e.t*e.t, e.r0+(e.r1-e.r0)*k,0,7); cx.fill();
       cx.globalAlpha=1; }
+    else if(e.k==='bbsthrow'){ bbsThrowDraw(e,k); }   
     else if(e.k==='momexit'){ momExitDraw(e,k); }   
     else if(e.k==='fallen'){ 
       
@@ -129257,6 +129262,7 @@ function drawBossBar(){
   let hp=0, mx=0; for(const b of bs){ hp+=Math.max(0,b.hp); mx+=b.hpMax; }
   let k=mx? hp/mx : 0; const bw=VW*0.46, b0=bs[0];   
   if(b0.def && b0.def.harp && b0.pcRet && b0.pcRet.st==='fly') k*=Math.min(1,b0.pcRet.t/Math.max(0.01,b0.pcRet.dur));   
+  if(b0.def && b0.def.bbs && b0.bbs && b0.bbs.st==='mount') k*=Math.min(1,(b0.bbs.mt||0)/BBS3.inv);   
   
   
   
@@ -129267,7 +129273,7 @@ function drawBossBar(){
   
   const nm=b0.bnm? TXT(b0.bnm)   
     : b0.type==='mom'? (S.momRaid? t('MOM · ROUND '+S.wave) : BOSSDEF.mom.title)
-    : TXT(BOSSDEF[b0.type]? (BOSSDEF[b0.type].bar||BOSSDEF[b0.type].wave) : 'BOSS');   
+    : TXT(bbsBarName(b0) || (BOSSDEF[b0.type]? (BOSSDEF[b0.type].bar||BOSSDEF[b0.type].wave) : 'BOSS'));       
   const col=b0.type==='mom'? (k>0.35? MOM_BAR_COL[Math.min(2,Math.max(0,(S.momRaid? S.wave : (b0.phaseN||1))-1))] : '#8a2f26')
     : (k>0.35?'#C0473A':'#8a2f26');
   const nm9=(b0.def && b0.def.kb)? nm+' · '+(((b0.kbLife|0)>=2)? '2/2' : '1/2') : (b0.def && b0.def.harp && pcLives()>1)? nm+' · '+(b0.pcLife||1)+'/'+pcLives() : nm;   
@@ -131862,6 +131868,7 @@ function drawFoe(f){
   if(f.caveIn) return;   
   if(f.chs){ chsDrawPiece(f); return; }   
   if(f.def && f.def.gmyP && !S.bf){ gmyPaintFoe(f); return; }   
+  if(f.bbs && f.def && f.def.bbs && (f.bbsRide || f.bbs.st==='mount') && bbsDrawBill(f)) return;   
   if(f.def.fly){ skyDrawPlane(f); return; }   
   if(f.skyDrop){ skyDrawChute(f); return; }   
   if(f.skySap && !S.bf && SKY_SAP_PAINT!==f){ const p9=SKY_SAP_PAINT; SKY_SAP_PAINT=f; try{ drawFoe(f); } finally{ SKY_SAP_PAINT=p9; } skySapDraw(f); return; }   
@@ -193853,9 +193860,11 @@ function bbsRig(o){ o=o||{}; const rd=S.raid, B=(bbsOn() && rd.bbs)||null, bill=
   if(B && o.fan!=null) B.force=o.fan? 1 : 0;   
   if(B && o.rally) bbsRallyPour();   
   if(B && o.ride) bbsRideCall(B, o.ride|0);   
+  bbsRig3(o, B, bill);   
   return { on:BBS.on, raid:bbsOn()?1:0, tier:bbsOn()? S.raid.t : null, phase:bill? (bill.bbs? bill.bbs.st : 'walk') : (bbsOn()? (rd.kingDown? 'down' : 'wait') : null), bar:bill? { hp:Math.round(bill.hp), max:bill.hpMax, k:+(bill.hp/Math.max(1,bill.hpMax)).toFixed(4) } : null,
     ride:B? { n:B.rides|0, alert:B.alert? { t:+B.alert.t.toFixed(2), n:B.alert.n, left:+Math.max(0,BBS_RIDE.warn-B.alert.t).toFixed(2) } : null, out:S.foes.filter(f=>f.type==='wrider' && !f.dead).length, clears:B.clears|0 } : null,
     rally:B? { n:B.rallyN|0, on:(bill && bill.bbs && bill.bbs.st==='rally')? +(bill.bbs.t).toFixed(2) : 0, aura:bill? (bill.def.auraFire||null) : null } : null,
+    mind:bbsMindRead(bill), v:bbsVRead(bill), horse:bbsHorseRead(bill),   
     tags:bbsTags(), vote:null, fan:(bill && bill.bbs)? { st:bill.bbs.st, t:+bill.bbs.t.toFixed(2), n:bill.bbs.n|0, rounds:bill.bbs.rounds|0, fans:bill.bbs.fans|0, reloads:bill.bbs.reloads|0, pips:bill.bbs.pips|0 } : null,
     guns:S.foes.filter(f=>f.type==='bbcannon' && !f.dead).length, planes:S.foes.filter(f=>f.def.bbs && f.def.fly && !f.dead).map(f=>({ t:f.type, x:Math.round(f.x), y:Math.round(f.y), hp:f.hp, ace:+(f.bbsAceT||0).toFixed(1), dodged:f.bbsDodged|0 })), wave:S.wave, waves:S.cfg? S.cfg.waves.length : 0, t0:(S.sq && S.sq.bbsT0!=null)? +S.sq.bbsT0.toFixed(2) : null, key:raidDoorKey('bbs')?1:0, code:META.billCode?1:0, night:bbsNight()?1:0, fill:[1,2,3,4,5].map(evBotsNFor9) }; }
 function evBotsNFor9(pc){ return Math.max(0, Math.min(3, BBS_FILL-pc)); }   
@@ -193877,11 +193886,11 @@ function bbsTick(dt){ const rd=S.raid; if(!rd || rd.k!=='bbs' || rd.cfg!==S.cfg 
     else if(f.def.fly){ if(!f.sky){ f.sky={ dir:-1, bankT:0, cd:1.2+((f.id|0)%5)*0.17, lane:(f.y<(SKY_OVAL.y0+SKY_OVAL.y1)/2)? 0 : 1, born:S.t, boxArm:1, laps:0, hd:Math.PI, bank:0, alt:SKY_ALT, altT:SKY_ALT, spdMul:1, spdNow:SKY_SPD[f.type]||150, wpDir:-1, wing:0, wingBox:0 }; rd.sky.seen++; }   
       if(f.bbsAceT>0) f.bbsAceT=Math.max(0, f.bbsAceT-dt);
       skyFly(f,dt,BBS_SKY_T); } }
-  if(sqRef() && !rd.won && !rd.kingDown){ const bill=bbsBill(); if(bill){ const marks=BBS_RALLY.at[bbsTier()]||BBS_RALLY.at.e; const k=bill.hp/Math.max(1,bill.hpMax); if(B.rallyN<marks.length && k<=marks[B.rallyN]) bbsRallyPour(); } }   
+  if(sqRef() && !rd.won && !rd.kingDown){ const bill=bbsBill(); if(bill && !bill.bbsRide && !(bill.bbs && bill.bbs.st==='mount')){   const marks=BBS_RALLY.at[bbsTier()]||BBS_RALLY.at.e; const k=bill.hp/Math.max(1,bill.hpMax); if(B.rallyN<marks.length && k<=marks[B.rallyN]) bbsRallyPour(); } }   
 }
 function bbsRallyPour(){ const rd=S.raid; if(!bbsOn() || !rd.bbs) return; const n=(rd.bbs.rallyN|0)+1; bbsPourIn(n); coopSend({k:'ckp', n:n}); }   
 function bbsPourIn(n){ const rd=S.raid; if(!bbsOn() || !rd.bbs || S.mode!=='play') return 0; n=n|0; const B=rd.bbs; if(n<=(B.rallyN|0)) return 0; let k=0; while((B.rallyN|0)<n){ B.rallyN=(B.rallyN|0)+1; bbsRallyStart(B); k++; } return k; }   
-function bbsRallyStart(B){ const bill=bbsBill(); if(bill){ const b=bill.bbs||(bill.bbs={ st:'idle', t:0, n:0 }); b.st='rally'; b.t=0; bill.def=Object.assign({}, FDEF.bbshow, { auraR:BBS_RALLY.r, auraFire:BBS_RALLY.fire }); bill.bbsSpd0=bill.spdMul; bill.spdMul=0;   
+function bbsRallyStart(B){ const bill=bbsBill(); if(bill){ const b=bill.bbs||(bill.bbs={ st:'idle', t:0, n:0 }); b.st='rally'; b.t=0; bill.def=Object.assign({}, FDEF.bbshow, { auraR:BBS_RALLY.r, auraFire:BBS_RALLY.fire }); bill.bbsSpd0=bill.spdMul; bill.spdMul=1e-6;     
     S.floats.push({ x:bill.x, y:bill.y-bill.def.w*0.9, txt:'FIRE AWAY, BOYS! Make it rain!', t:0, col:'#FFD24A' }); const fz=foeFaceX(bill); for(let i=0;i<2;i++){ const m=BBS_FAN_MZ[i]; S.fx.push({ k:'flash', x:bill.x+m.x*fz, y:bill.y+m.y-14, ang:-Math.PI/2, R:14, lw:3, t:0, dur:0.16 }); } bfSfx(SFX.wshot, bill.x, bill.y); setTimeout(()=>{ try{ if(S.mode==='play') bfSfx(SFX.wshot, bill.x, bill.y); }catch(e){} }, 180); S.shake=Math.max(S.shake,0.25); }   
   for(const f of S.foes){ if(!f.dead && f.def.sneak && f.mzT!=null && f.mzT>f.def.sneak.mineAt) f.mzT=f.def.sneak.mineAt; }   
   bbsRideCall(B, Math.min(BBS_RIDE.max, BBS_RIDE.n0+(B.rides|0)*BBS_RIDE.step)); }   
@@ -193889,7 +193898,8 @@ function bbsRideCall(B, n){ const RD=BBS_RIDER[bbsTier()]||BBS_RIDER.e; n=Math.m
   S.queue.push({ f:'line', t:'wrider', n:n, e:'right', at:S.waveT+BBS_RIDE.warn, pin:1, hpX:RD.hpX, spdx:RD.spdx }); }   
 function bbsBillTick(f,dt,B){ const b=f.bbs||(f.bbs={ st:'idle', t:BBS_FAN.cd, n:0, rounds:0, fans:0, reloads:0, pips:0 }); const tier=bbsTier(), FN=BBS_FAN, PIP=BBS_PIP[tier]||0.8;
   if(f.x<300){ f.x=300; }   
-  if(b.st==='rally'){ b.t+=dt; if(b.t>=BBS_RALLY.t){ b.st='idle'; b.t=FN.cd; f.def=FDEF.bbshow; f.spdMul=(f.bbsSpd0!=null)? f.bbsSpd0 : 1; } return; }   
+  if(b.st==='mount' || b.st==='ride'){ bbsRideTick(f,dt,B,b); return; }   
+  if(b.st==='rally'){ b.t+=dt; if(b.t>=BBS_RALLY.t){ b.st='idle'; b.t=FN.cd; f.def=f.bbsRide? FDEF.bbride : FDEF.bbshow;   f.spdMul=(f.bbsSpd0!=null)? f.bbsSpd0 : 1; } return; }   
   if(b.st==='reload'){ b.t-=dt; if(b.t<=0){ b.st='idle'; b.t=FN.cd; } else if(((b.t*2)|0)!==((( b.t+dt)*2)|0)) S.fx.push({ k:'ring', x:f.x, y:f.y+4, r:10, R:34, t:0, dur:0.4, col:'rgba(255,170,70,0.75)' }); return; }   
   if(b.st==='fan'){ b.t-=dt;
     const men=bbsCorridor(f, b.aim, FN.R, FN.half, FN.thru);
@@ -194433,6 +194443,203 @@ function bbsStreetRig(o){ o=o||{}; const TR=S.cfg && S.cfg.terrain, on=!!(bbsOn(
     stats:on? Object.assign({}, TR.bbs) : null, graph:(TR&&TR.streets)? { nodes:TR.streets.nodes.length, block:TR.streets.block.length, roads:BBS_ROADS.length } : null, hv:Object.assign({}, HVIL.stats), foe:CMX.stats.foe, guide:HVIL.guide,
     pics:{ n:BBS_ART.n, ready:BBS_ART.ready, blits:BBS_ART.stats.blits, frames:BBS_ART.stats.frames, list:(BBS_ART.list||[]).map(d=>({ key:d.key, left:Math.round(d.left), top:Math.round(d.top), w:Math.round(d.w), h:Math.round(d.h) })) },
     dials:{ blaze:BBS_BLAZE, barrel:BBS_BARREL, mud:BBS_MUD, bands:BBS_BANDS, sand:BBS_SAND, tower:BBS_TOWER, rails:BBS_RAILS, barrels:BBS_BARRELS, roads:BBS_ROADS.map(r=>({ w:r.w, n:r.p.length/2 })) } }; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const BBS3={ inv:2.8, horseIn:2.0, vault:0.8, v0:36, acc:24, vmax:84, skid:0.5, turnA:1.75, skidCd:1.0, xMin:300, xLo:420, xHi:1880, yLo:84, yHi:548, hw:108, bw:70, arrive:26, turnRate:3.2,
+  spray:{ every:2.5, t:1.5, gap:0.2, carry:3.0 }, air:{ min:12, max:20, r:300, h:170 }, mind:{ every:3, turn:0.15, hunt:560, lane:4, past:120, flank:60, bandPad:24 }, mud:{ cap:60, rx:200, ry:56, step:0.55 }, line:{ min:20, max:40, gap:4 }, dust:0.09, hoof:0.26, say:{ hunt:15, mud:20, barrel:15 } };   
+const BBS3_LINES=['WOOOO! Faster, faster!',"Can't hit what you can't catch!",'I could do this ALL night!','Hold still, little green men!'];   
+FDEF.bbride=Object.assign({}, FDEF.bbshow, { bbsRide:1 });   
+BOSSDEF.bbride={ title:'BUFFALO BILL RIDES', wave:'BUFFALO BILL RIDES', bar:'BUFFALO BILL RIDES' };   
+SPRITES_SRC.bbhorse=(function(){ const s=SPRITES_SRC.wrider||'', cut='<g transform="translate(72,88)"><g class="rman">', i=s.indexOf(cut); return (i>0)? s.slice(0,i) : s; })();   
+spriteMint('bbhorse');   
+(function bbsMintAliases(){   
+  const P=[['bbshow','bbill'],['bbcannon','tcannon'],['bbfighter','skyfighter'],['bbv2','skyace']]; let n=0;
+  const tick=()=>{ let ok=true; for(const pr of P){ const im=IMG[pr[1]]; if(im && im.width){ if(!IMG[pr[0]] || !IMG[pr[0]].width) IMG[pr[0]]=im; } else ok=false; } if(!ok && n++<600) setTimeout(tick,50); };
+  tick(); })();
+{ const BBS3_ALIAS={ bbshow:'bbill', bbcannon:'tcannon', bbfighter:'skyfighter', bbv2:'skyace' }, foeImg0=foeImg; foeImg=function(k){ return foeImg0(BBS3_ALIAS[k]||k); }; }   
+SFX.bbsWhistle=()=>{ try{ tone(1480,2350,0.17,'sine',0.11); setTimeout(()=>{ try{ tone(2300,1620,0.26,'sine',0.11); }catch(e){} }, 190); }catch(e){} };   
+function bbsClock(){ return (S.sq && S.sq.bbsT0!=null)? (S.sq.t-S.sq.bbsT0) : S.t; }   
+function bbsMindKey(n,tag){ return 'bbs3:'+rxDoorKey()+':'+(n|0)+(tag? ':'+tag : ''); }   
+function bbsHorseOf(f){ return f && f.bbs && f.bbs.horse; }
+function bbsInvFlash(f){ if(!f) return; if(!(f.bbsFlashT>0) || S.t-f.bbsFlashT>0.08){ f.bbsFlashT=S.t; S.fx.push({ k:'ring', x:f.x, y:f.y-30, r:6, R:30, t:0, dur:0.18, col:'rgba(255,255,255,0.85)' }); } }   
+function bbsBarName(b0){ return (b0 && b0.def && b0.def.bbs && b0.bbs && (b0.bbsRide || b0.bbs.st==='mount'))? BOSSDEF.bbride.bar : null; }   
+function bbsSay(f,key,opts){ opts=opts||{}; const b=f&&f.bbs; if(b){ if(!opts.force && b.sayT!=null && S.t-b.sayT<BBS3.line.gap){ if(opts.pend) b.pendSay=key; return false; } b.sayT=S.t; b.lines=(b.lines|0)+1; b.lastLine=key; if(b.pendSay===key) b.pendSay=null; }
+  S.floats.push({ x:f.x, y:f.y-f.def.w*1.15, txt:key, t:0, col:'#FFD24A' });   
+  try{ if(typeof bbsSpeaker==='function'){ const sp=bbsSpeaker(); if(sp) commSayAs(sp, key, { rank:3, hold:opts.hold||3, always:1 }); } }catch(e){}   
+  return true; }
+function bbsMount(f,u){   
+  const b=f.bbs||(f.bbs={ st:'idle', t:BBS_FAN.cd, n:0, rounds:0, fans:0, reloads:0, pips:0 });
+  if(b.st==='rally'){ f.def=FDEF.bbshow; f.spdMul=(f.bbsSpd0!=null)? f.bbsSpd0 : 1; }   
+  f.kbLife=2; f.hp=f.hpMax; f.bbsInv=BBS3.inv; f.bbsSpd0=1; f.spdMul=1e-6; f.bbsMountT=S.t; f.hvilO=0; f.hvilT=0; f.hvilA=undefined;   
+  b.st='mount'; b.t=0; b.mt=0; b.horse={ x:W+70, y:f.y, x0:W+70, x1:f.x+16 }; b.dir=-1; b.h=Math.PI; b.v=0; b.dist=0; b.skid=0; b.mode=null; b.tgt=null; b.lane=null; b.goal=null; b.leg=null; b.mindN=null; b.decisions=0; b.turns=0; b.modes=[];
+  b.sprayCd=1.2; b.spray=null; b.sprays=0; b.sprayRounds=0; b.sprayPips=0; b.airT=0; b.airDue=BBS3.air.min+(BBS3.air.max-BBS3.air.min)*rxRoll(bbsMindKey(0,'air0')); b.airs=0; b.lineT=0; b.lineDue=BBS3.line.min+(BBS3.line.max-BBS3.line.min)*rxRoll(bbsMindKey(0,'line0')); b.lines=0; b.sayT=null; b.hoofT=0; b.dustT=0; b.mounts=(b.mounts|0)+1; b.huntSaid=0; b.mudSaid=null; b.barrelSaid=null; b.thrown=0;
+  S.floats.push({ x:f.x, y:f.y-f.def.w*1.05, txt:"HE'S NOT DONE!", t:0, col:'#FFD24A' });
+  S.ann={ txt:t('HE WHISTLES FOR HIS HORSE'), t:2.6 };   
+  try{ SFX.bbsWhistle(); }catch(e){}
+  S.fx.push({ k:'ring', x:f.x, y:f.y-20, r:8, R:60, t:0, dur:0.45, col:'#ffffff' }); if(bfVis(f.x,f.y) && !reducedMotion()) S.shake=Math.max(S.shake,0.3);
+  if(u && !u.side) f.lastHitU=u;
+  const rd=S.raid; if(rd && rd.bbs){ rd.bbs.mountAt=S.t; rd.bbs.mounts=(rd.bbs.mounts|0)+1; }
+}
+function bbsRoadPts(i){ const C=(BBS3.roads||(BBS3.roads=[])); if(C[i]) return C[i]; const L=hvilCurve(BBS_ROADS[i].p), out=[]; for(let k=0;k<L.length;k+=2){ const x=L[k], y=L[k+1]; if(x<BBS3.xLo || x>BBS3.xHi) continue; out.push([x, Math.max(BBS3.yLo, Math.min(BBS3.yHi, y))]); } return (C[i]=out); }   
+function bbsRoadNear(i,x,y){ const P=bbsRoadPts(i); let bi=0, bd=1e9; for(let k=0;k<P.length;k++){ const d=Math.hypot(P[k][0]-x,P[k][1]-y); if(d<bd){ bd=d; bi=k; } } return bi; }
+function bbsBandOf(y){ for(let i=0;i<BBS_BANDS.length;i++){ if(y>=BBS_BANDS[i][0] && y<BBS_BANDS[i][1]) return i; } return (y<BBS_BANDS[0][0])? 0 : BBS_BANDS.length-1; }
+function bbsGreen(){ const out=[]; for(const u of S.units){ if(u.dead || u.jetT>0 || u.falling || u.dropT>0 || u.cloakT>0 || u.burrow) continue; if(S.drag && S.drag.unit===u) continue; out.push(u); } return out; }   
+function bbsSarges(f){ const out=[]; for(const u of bbsGreen()){ if(u.type!=='sarge' || u.x<BBS3.xMin) continue; if(Math.hypot(u.x-f.x,u.y-f.y)>BBS3.mind.hunt) continue; if(bbsWalled(f,u)) continue; out.push(u); }
+  out.sort((a,b)=>bbsSeatKey(a)<bbsSeatKey(b)? -1 : bbsSeatKey(a)>bbsSeatKey(b)? 1 : 0); return out; }   
+function bbsSeatKey(u){ return (u.seat!=null)? 's'+(u.seat|0) : 'z'+String(u.cid||('u'+(u.id|0))); }   
+function bbsLaneCounts(){ const n=[0,0,0], M=BBS3.mind.bandPad; for(const u of bbsGreen()){ if(u.x<BBS3.xMin+30) continue; const b=bbsBandOf(u.y); n[b]++; if(b>0 && u.y<BBS_BANDS[b][0]+M) n[b-1]++; if(b<2 && u.y>=BBS_BANDS[b][1]-M) n[b+1]++; } return n; }   
+function bbsMudPt(a){ return { x:BBS_MUD.x+Math.cos(a)*BBS3.mud.rx, y:BBS_MUD.y+Math.sin(a)*BBS3.mud.ry }; }
+function bbsSetMode(f,b,mode,tgt,lane){ const was=b.mode; b.mode=mode; b.tgt=tgt||null; b.lane=(lane==null)? null : lane; b.leg='to'; b.modes.push([+bbsClock().toFixed(1), mode, (mode==='hunt' && tgt)? bbsSeatKey(tgt) : (mode==='own')? lane : null]); if(b.modes.length>400) b.modes.shift();
+  if(mode==='own'){ b.ri=bbsRoadNear(lane,f.x,f.y); b.rdir=(Math.cos(b.h)<0)? 1 : -1; }   
+  if(mode==='mud'){ b.ma=Math.atan2((f.y-BBS_MUD.y)/BBS3.mud.ry, (f.x-BBS_MUD.x)/BBS3.mud.rx); b.mdir=(f.y<BBS_MUD.y)? 1 : -1; }
+  if(mode==='hunt' && (was!=='hunt' || !b.huntSaid)){ if(S.t-(b.huntSaidT||-99)>BBS3.say.hunt){ b.huntSaidT=S.t; b.huntSaid=1; bbsSay(f,'There you are, Sarge!',{ pend:1 }); } }
+  b.goal=null; }
+function bbsDecide(f,b,B,n){   
+  b.decisions++; b.mindN=n; const pin=B.mindPin||null;
+  const r=rxRoll(bbsMindKey(n)); b.lastRoll=+r.toFixed(3);
+  if(!pin && r<BBS3.mind.turn && b.mode){ bbsTurnAround(f,b); return 'turn'; }
+  const sg=pin? (pin==='hunt'? bbsSarges(f) : []) : bbsSarges(f);
+  if(sg.length){ const i=Math.min(sg.length-1, Math.floor(rxRoll(bbsMindKey(n,'h'))*sg.length)), u=sg[i]; if(b.mode!=='hunt' || b.tgt!==u) bbsSetMode(f,b,'hunt',u,null); return 'hunt'; }
+  const lc=bbsLaneCounts(); let best=-1, bn=BBS3.mind.lane-1; for(let i=0;i<lc.length;i++){ if(lc[i]>bn){ bn=lc[i]; best=i; } }
+  if(pin==='own' && best<0){ best=1; }
+  if(best>=0 && pin!=='mud'){ if(b.mode!=='own' || b.lane!==best) bbsSetMode(f,b,'own',null,best); return 'own'; }
+  if(b.mode!=='mud') bbsSetMode(f,b,'mud',null,null); return 'mud'; }
+function bbsTurnAround(f,b){ b.turns++; b.h=Math.atan2(-Math.sin(b.h), -Math.cos(b.h)); bbsSkid(f,b); if(b.mode==='own') b.rdir=-b.rdir; if(b.mode==='mud') b.mdir=-b.mdir; if(b.mode==='hunt'){ b.leg='past'; b.goal={ x:f.x+Math.cos(b.h)*160, y:f.y+Math.sin(b.h)*60 }; } else b.goal=null;
+  try{ if(typeof SFX.bblaugh==='function') SFX.bblaugh(); }catch(e){} }   
+function bbsSkid(f,b){ b.skid=BBS3.skid; b.v=0; b.skids=(b.skids|0)+1; b.skidCdT=BBS3.skidCd; const RM=reducedMotion(); S.fx.push({ k:'ring', x:f.x, y:f.y+2, r:10, R:40, t:0, dur:0.4, col:'rgba(214,170,110,0.7)' }); if(!RM) for(let i=0;i<4;i++) S.fx.push({ k:'puff', x:f.x-16+i*11, y:f.y+2-(i%2)*6, t:-i*0.04, dur:0.45, R:9+i }); bfSfx(SFX.thock, f.x, f.y); }
+function bbsClampGoal(g){ return { x:Math.max(BBS3.xLo, Math.min(BBS3.xHi, g.x)), y:Math.max(BBS3.yLo, Math.min(BBS3.yHi, g.y)) }; }
+function bbsGoal(f,b){   
+  if(b.mode==='hunt'){ const u=b.tgt; if(!u || u.dead || S.units.indexOf(u)<0){ b.leg='to'; return null; }
+    if(b.leg==='past' && b.goal) return b.goal;
+    const dx=u.x-f.x, dy=u.y-f.y, d=Math.hypot(dx,dy)||1, side=(u.y<BBS_MUD.y)? 1 : -1;   
+    const g=bbsClampGoal({ x:u.x+dx/d*BBS3.mind.flank*0.6, y:u.y+side*BBS3.mind.flank }); b.goal=g; return g; }
+  if(b.mode==='own'){ const P=bbsRoadPts(b.lane); if(!P.length) return null; if(b.goal && b.leg==='to') return b.goal; let i=b.ri+b.rdir; if(i<0 || i>=P.length){ b.rdir=-b.rdir; i=b.ri+b.rdir; b.endTurn=1; } b.ri=Math.max(0,Math.min(P.length-1,i)); b.goal={ x:P[b.ri][0], y:P[b.ri][1] }; b.leg='to'; return b.goal; }
+  if(b.mode==='mud'){ if(b.goal && b.leg==='to') return b.goal; b.ma+=b.mdir*BBS3.mud.step; b.goal=bbsClampGoal(bbsMudPt(b.ma)); b.leg='to'; return b.goal; }
+  return null; }
+function bbsLegDone(f,b){ if(b.mode==='hunt'){ if(b.leg==='past'){ b.leg='to'; b.goal=null; } else { b.leg='past'; b.goal=bbsClampGoal({ x:f.x+Math.cos(b.h)*BBS3.mind.past, y:f.y+Math.sin(b.h)*BBS3.mind.past*0.5 }); } return; } b.goal=null; }
+function bbsRideTick(f,dt,B,b){   
+  if(f.bbsInv>0) f.bbsInv=Math.max(0, f.bbsInv-dt);
+  f.spdMul=1e-6;   
+  if(b.st==='mount'){ b.mt+=dt; const H=b.horse, k=Math.min(1, b.mt/BBS3.horseIn), e=1-(1-k)*(1-k); H.x=H.x0+(H.x1-H.x0)*e; H.y=f.y; H.v=(1-k)*300;
+    b.dustT-=dt; if(b.dustT<=0 && k<1 && !reducedMotion()){ b.dustT=BBS3.dust; S.fx.push({ k:'puff', x:H.x+40, y:H.y+2, t:0, dur:0.4, R:8 }); }
+    b.hoofT-=dt; if(b.hoofT<=0 && k<1){ b.hoofT=BBS3.hoof*0.8; b.hoofN=(b.hoofN|0)+1; bfSfx(()=>SFX.whhoof(b.hoofN&1), H.x, H.y); }
+    if(b.mt>=BBS3.horseIn+BBS3.vault){ b.st='ride'; f.bbsRide=1; f.def=FDEF.bbride; f.x=Math.max(BBS3.xMin, H.x); f.y=H.y; f.hp=f.hpMax; b.v=BBS3.v0; b.h=Math.PI; b.dir=-1; b.rideAt=S.t; bbsSay(f,'Round two, Sarge. Try and catch me!',{ force:1, hold:3.5 }); bbsDecide(f,b,B,Math.floor(bbsClock()/BBS3.mind.every)); }
+    return; }
+  if(b.pendSay && !(b.sayT!=null && S.t-b.sayT<BBS3.line.gap)){ const k=b.pendSay; b.pendSay=null; bbsSay(f,k); }   
+  
+  const n=Math.floor(bbsClock()/BBS3.mind.every); if(b.mindN!==n) bbsDecide(f,b,B,n);
+  
+  if(b.skid>0){ b.skid-=dt; if(b.skid<=0){ b.skid=0; b.v=BBS3.v0; } bbsSprayTick(f,dt,B,b); return; }
+  
+  let g=bbsGoal(f,b); if(!g){ g=bbsClampGoal({ x:f.x+Math.cos(b.h)*200, y:f.y }); }
+  let dx=g.x-f.x, dy=g.y-f.y; const gd=Math.hypot(dx,dy);
+  if(gd<=BBS3.arrive){ bbsLegDone(f,b); g=bbsGoal(f,b)||g; dx=g.x-f.x; dy=g.y-f.y; }
+  let ax=g.x, ay=g.y; const G=S.cfg.terrain && S.cfg.terrain.streets; if(G){ const pl=hvilPlan(f,G,g.x,g.y,dt); if(pl){ ax=pl.x; ay=pl.y; } }   
+  let want=Math.atan2(ay-f.y,ax-f.x); const st=rockSteer(f.x,f.y,ax,ay,ROCK_PAD_FOE,null,1); if(st){ want=Math.atan2(st.y,st.x); }   
+  b.stuckT=(b.stuckT||0)+dt; if(b.stuckT>=4){ b.stuckT=0; const moved=Math.hypot(f.x-(b.stuckX==null? -1e9 : b.stuckX), f.y-(b.stuckY||0)); b.stuckX=f.x; b.stuckY=f.y; if(moved<40){ b.stuck=(b.stuck|0)+1; b.goal=null; b.leg='to'; if(b.mode==='mud') b.ma+=1.0; f.hvilT=0; } }   
+  let da=want-b.h; while(da>Math.PI) da-=Math.PI*2; while(da<-Math.PI) da+=Math.PI*2;
+  if(b.skidCdT>0) b.skidCdT-=dt;
+  if(Math.abs(da)>BBS3.turnA && b.v>BBS3.v0+2 && !(b.skidCdT>0)){ b.h=want; bbsSkid(f,b); return; }   
+  const tr=BBS3.turnRate*dt; b.h+=Math.max(-tr, Math.min(tr, da));
+  b.v=Math.min(BBS3.vmax, b.v+BBS3.acc*dt);
+  const mud=bbsMudAt(f.x,f.y), gx=mud? BBS_MUD.ride : 1, cap=(b.mode==='mud')? BBS3.mud.cap : BBS3.vmax, ve=Math.min(b.v,cap)*gx; b.ve=ve; b.inMud=mud? 1 : 0;
+  f.x+=Math.cos(b.h)*ve*dt; f.y+=Math.sin(b.h)*ve*dt; b.dist+=ve*dt;
+  if(f.x<BBS3.xMin) f.x=BBS3.xMin; if(f.x>W-20) f.x=W-20; if(f.y<BBS3.yLo) f.y=BBS3.yLo; if(f.y>BBS3.yHi) f.y=BBS3.yHi;   
+  b.dir=(Math.cos(b.h)>=0)? 1 : -1; f.faceX=b.dir; f.wkX=b.dir; f.wkT=S.t;
+  b.dustT-=dt; if(b.dustT<=0 && ve>20 && !reducedMotion()){ b.dustT=BBS3.dust; S.fx.push({ k:'puff', x:f.x-b.dir*28, y:f.y+2, t:0, dur:0.4, R:mud? 6 : 8 }); }
+  b.hoofT-=dt; if(b.hoofT<=0 && ve>20){ b.hoofT=BBS3.hoof*(mud? 1.4 : 1); b.hoofN=(b.hoofN|0)+1; bfSfx(()=>SFX.whhoof(b.hoofN&1), f.x, f.y); }
+  if(b.mode==='mud' && mud){ const men=bbsCorridor(f, b.h+Math.PI/2, BBS3.air.r, BBS3.air.r, 9).concat(bbsCorridor(f, b.h-Math.PI/2, BBS3.air.r, BBS3.air.r, 9)); if(men.some(u=>bbsMudAt(u.x,u.y)) && (b.mudSaid==null || S.t-b.mudSaid>BBS3.say.mud)){ b.mudSaid=S.t; bbsSay(f,"Stuck in the mud? That's a shame.",{ pend:1 }); } }
+  bbsSprayTick(f,dt,B,b);
+  
+  if(!b.spray){ b.airT+=dt; if(b.airT>=b.airDue){ const near=bbsGreen().some(u=>Math.hypot(u.x-f.x,u.y-f.y)<=BBS3.air.r); if(!near){ bbsAirShot(f,b); b.airT=0; b.airDue=BBS3.air.min+(BBS3.air.max-BBS3.air.min)*rxRoll(bbsMindKey(b.airs,'air')); } else b.airT=b.airDue-0.5; } }
+  
+  b.lineT+=dt; if(b.lineT>=b.lineDue){ b.lineT=0; const k=Math.floor(rxRoll(bbsMindKey(b.lines,'say'))*BBS3_LINES.length); if(bbsSay(f, BBS3_LINES[Math.min(BBS3_LINES.length-1,k)])) b.lineDue=BBS3.line.min+(BBS3.line.max-BBS3.line.min)*rxRoll(bbsMindKey(b.lines,'line')); else b.lineT=b.lineDue-1; }
+}
+function bbsSprayAim(f,b){ const a1=b.h-Math.PI/2, a2=b.h+Math.PI/2, R=BBS_FAN.R;   
+  if(b.mode==='hunt' && b.tgt && !b.tgt.dead){ const u=b.tgt, dx=u.x-f.x, dy=u.y-f.y; if(Math.hypot(dx,dy)<=R){ const cr=Math.cos(b.h)*dy-Math.sin(b.h)*dx; return (cr<0)? a1 : a2; } }
+  const n1=bbsCorridor(f,a1,R,R*0.5,99).length, n2=bbsCorridor(f,a2,R,R*0.5,99).length; if(!n1 && !n2) return null; return (n1>=n2)? a1 : a2; }
+function bbsSprayTick(f,dt,B,b){ const FN=BBS_FAN, PIP=BBS_PIP[bbsTier()]||0.8;
+  if(b.spray){ const sp=b.spray; sp.t-=dt; sp.rt-=dt;
+    const men=bbsCorridor(f, sp.aim, FN.R, FN.half, FN.thru);
+    for(const u of men){ if(u.bbsLast!=null && S.t-u.bbsLast>BBS3.spray.carry){ u.bbsExp=0; u.bbsPips=0; } u.bbsLast=S.t; u.bbsExp=(u.bbsExp||0)+dt; const due=Math.floor((u.bbsExp+1e-6)/PIP); while((u.bbsPips|0)<due && !u.dead){ u.bbsPips=(u.bbsPips|0)+1; b.pips++; b.sprayPips++; f.pipN=1; tanHit(u, f.x, f.y, f); f.pipN=0; } }   
+    if(sp.rt<=0 && (sp.t>0 || B.force)){ sp.rt+=BBS3.spray.gap; sp.n++; b.rounds++; b.sprayRounds++; const fz=(b.dir>0)? 1 : -1, m=BBS_FAN_MZ[sp.n&1], mx=f.x+m.x*fz, my=f.y+m.y-22, ex=mx+Math.cos(sp.aim)*FN.R, ey=my+Math.sin(sp.aim)*FN.R*0.35+(f.y-my);
+      S.fx.push({ k:'slugtr', x1:mx, y1:my, x2:ex, y2:ey, t:0, dur:0.11 }); S.fx.push({ k:'flash', x:mx, y:my, ang:sp.aim, R:12, lw:2.6, t:0, dur:0.1 }); S.fx.push({ k:'shell', x:mx-3*fz, y:my-2, h:sp.n&1, t:0, dur:0.55 }); bfSfx(SFX.wshot, f.x, f.y);
+      const bk=bbsFanBarrel(f, sp.aim, FN.R, FN.half); if(bk){ b.barrels=(b.barrels|0)+1; if(b.barrelSaid==null || S.t-b.barrelSaid>BBS3.say.barrel){ b.barrelSaid=S.t; bbsSay(f,"Ooh, that's gonna leave a mark!",{ pend:1 }); } } }
+    if(sp.t<=0 && !B.force){ b.spray=null; b.sprayCd=BBS3.spray.every; }
+    return; }
+  b.sprayCd-=dt; if(b.sprayCd>0) return;
+  const aim=bbsSprayAim(f,b); if(aim==null && !B.force){ b.sprayCd=0.6; return; }
+  b.spray={ t:BBS3.spray.t, rt:0, n:0, aim:(aim==null)? b.h-Math.PI/2 : aim }; b.sprays++; b.sprayAt=S.t; }
+function bbsAirShot(f,b){ b.airs++; const fz=(b.dir>0)? 1 : -1, m=BBS_FAN_MZ[0], mx=f.x+m.x*fz, my=f.y+m.y-22;   
+  S.fx.push({ k:'slugtr', x1:mx, y1:my, x2:mx+fz*6, y2:my-BBS3.air.h, t:0, dur:0.14 }); S.fx.push({ k:'flash', x:mx, y:my, ang:-Math.PI/2, R:13, lw:2.6, t:0, dur:0.12 }); S.fx.push({ k:'shell', x:mx-3*fz, y:my-2, h:0, t:0, dur:0.55 }); bfSfx(SFX.wshot, f.x, f.y);
+  bbsSay(f,'WAHOOO!',{ force:1 }); }
+function bbsDrawBill(f){   
+  const b=f.bbs; if(!b) return false; const RM=reducedMotion(), hi=IMG.bbhorse, bi=foeImg('bbshow'); if(!hi || !bi || !bi.width) return false;
+  const hw=BBS3.hw, bw=BBS3.bw;
+  const horse=(x,y,flip,lean,bob,alpha)=>{ if(alpha!=null) cx.globalAlpha=alpha; drawSprite('bbhorse', x, y-bob, hw, lean, 0, hi, flip); if(alpha!=null) cx.globalAlpha=1; };
+  const seat=(x,y,flip,lean,bob)=>{ const h=bw*(bi.height/bi.width), sx=(flip? -1 : 1); const ox=(10*hw/120+2*bw/120)*sx, oy=-60.8*hw/120+29.8*bw/120;   
+    cx.save(); cx.translate(x+ox, y-bob+oy); if(flip) cx.scale(-1,1); cx.rotate(lean-0.05);
+    cx.beginPath(); cx.rect(-bw, -h-10, bw*2, h*2+20); cx.ellipse(0, (126-128.8)*bw/120, 33*bw/120*1.06, 7.5*bw/120*1.15, 0, 0, Math.PI*2); cx.clip('evenodd');   
+    cx.drawImage(bi, -bw/2, -h+h*0.08, bw, h); cx.restore(); };
+  if(b.st==='mount'){ const H=b.horse, mt=b.mt; if(!H) return false; const k=Math.min(1, mt/BBS3.horseIn);
+    const hb=RM? 0 : Math.abs(Math.sin(H.x/9))*3.5*(k<1? 1 : 0), hl=RM? 0 : Math.sin(H.x/9)*0.05*(k<1? 1 : 0);
+    if(mt<BBS3.horseIn){ drawSprite('bbshow', f.x, f.y+7, f.def.w, -0.42, 0, bi, false); horse(H.x, H.y, false, hl, hb, null); return true; }   
+    const vk=Math.min(1,(mt-BBS3.horseIn)/BBS3.vault), e=vk*vk*(3-2*vk), arc=Math.sin(Math.PI*vk)*34;   
+    horse(H.x, H.y, false, 0, 0, null);
+    const h=bw*(bi.height/bi.width), ox=(10*hw/120+2*bw/120), oy=-60.8*hw/120+29.8*bw/120, x0=f.x, y0=f.y+7, x1=H.x+ox, y1=H.y+oy, w0=f.def.w, ww=w0+(bw-w0)*e;
+    cx.save(); cx.translate(x0+(x1-x0)*e, y0+(y1-y0)*e-arc); cx.rotate(-0.42*(1-e)); const hh=ww*(bi.height/bi.width);
+    if(e>0.35){ cx.beginPath(); cx.rect(-ww, -hh-10, ww*2, hh*2+20); cx.ellipse(0, (126-128.8)*ww/120, 33*ww/120*1.06, 7.5*ww/120*1.15, 0, 0, Math.PI*2); cx.clip('evenodd'); }
+    cx.drawImage(bi, -ww/2, -hh+hh*0.08, ww, hh); cx.restore(); return true; }
+  if(b.st==='ride'){ const mv=(b.ve>20 && !b.skid)? 1 : 0, d=b.dist, flip=b.dir>0, bob=RM? 0 : Math.abs(Math.sin(d/9+f.wob))*3.5*mv, lean=(RM? 0 : Math.sin(d/9+f.wob)*0.05*mv)+(b.skid>0? -0.14*b.dir : 0);
+    if(f.bbsInv>0){ cx.globalAlpha=0.8+0.2*Math.sin(S.t*22); } horse(f.x, f.y, flip, lean, bob, null); seat(f.x, f.y, flip, lean, bob); cx.globalAlpha=1; return true; }
+  return false; }
+function bbsThrown(f){   
+  if(!f.bbsRide) return false; const b=f.bbs||{}, RM=reducedMotion(), dir=(b.dir||-1);
+  S.fx.push({ k:'bbsthrow', x:f.x, y:f.y, w:f.def.w, dir:dir, t:0, dur:RM? 1.4 : 3.4, flip:b.dir>0, d0:b.dist||0 });
+  if(!RM) for(let i=0;i<6;i++) S.fx.push({ k:'puff', x:f.x-20+i*9, y:f.y+2-(i%3)*5, t:-i*0.03, dur:0.6, R:10+i });
+  S.fx.push({ k:'ring', x:f.x, y:f.y-10, r:8, R:70, t:0, dur:0.5, col:'#ffffff' });
+  b.thrown=1; const rd=S.raid; if(rd && rd.bbs) rd.bbs.thrownAt=S.t; return true; }
+function bbsThrowDraw(e,k){ const hi=IMG.bbhorse, bi=foeImg('bbshow'); if(!hi || !bi || !bi.width) return; const T=e.t, RM=reducedMotion(), hw=BBS3.hw, bw=BBS3.bw;
+  const hk=Math.min(1, T/(RM? 0.8 : 2.0)), hx=e.x+hk*(W+140-e.x), hb=RM? 0 : Math.abs(Math.sin((e.d0+hk*900)/9))*3.5, hl=RM? 0 : Math.sin((e.d0+hk*900)/9)*0.05;   
+  if(hx<W+120){ cx.globalAlpha=1; drawSprite('bbhorse', hx, e.y-hb, hw, hl, 0, hi, true); }
+  const tk=Math.min(1, T/0.55);   
+  const land=e.x+(e.dir>0? -1 : 1)*52*tk, up=Math.sin(Math.PI*tk)*44, rot=(RM? 0 : -e.dir*Math.PI*2*tk);
+  const h=bw*(bi.height/bi.width), fade=(k>0.8)? Math.max(0,1-(k-0.8)/0.2) : 1;
+  cx.save(); cx.globalAlpha=fade; cx.translate(land, e.y-up+(tk>=1? 6 : 0)); if(e.flip) cx.scale(-1,1); cx.rotate(tk<1? rot : -0.55);
+  if(tk<1){ cx.beginPath(); cx.rect(-bw, -h-10, bw*2, h*2+20); cx.ellipse(0, (126-128.8)*bw/120, 33*bw/120*1.06, 7.5*bw/120*1.15, 0, 0, Math.PI*2); cx.clip('evenodd'); }
+  cx.drawImage(bi, -bw/2, -h+h*0.08, bw, h); cx.restore(); cx.globalAlpha=1; }   
+function bbsMindRead(bill){ const b=bill && bill.bbs; if(!b || !b.mode) return null; return { mode:b.mode, target:(b.mode==='hunt' && b.tgt)? bbsSeatKey(b.tgt) : (b.mode==='own')? b.lane : null, next:+Math.max(0, (b.mindN==null? 0 : (b.mindN+1)*BBS3.mind.every-bbsClock())).toFixed(2), n:b.mindN, decisions:b.decisions|0, turns:b.turns|0, roll:b.lastRoll==null? null : b.lastRoll, leg:b.leg||null, modes:b.modes? b.modes.slice(-40) : [] }; }
+function bbsVRead(bill){ const b=bill && bill.bbs; return (b && b.st==='ride')? +(b.ve||0).toFixed(2) : 0; }
+function bbsHorseRead(bill){ const b=bill && bill.bbs; if(!b) return null; return { st:b.st, mt:+(b.mt||0).toFixed(2), inv:+(bill.bbsInv||0).toFixed(2), ride:bill.bbsRide|0, x:Math.round(bill.x), y:Math.round(bill.y), h:+(b.h||0).toFixed(3), dir:b.dir|0, v:+(b.v||0).toFixed(2), ve:+(b.ve||0).toFixed(2), mud:b.inMud|0, skid:+(b.skid||0).toFixed(2), skids:b.skids|0, dist:Math.round(b.dist||0), goal:b.goal? [Math.round(b.goal.x),Math.round(b.goal.y)] : null, horse:b.horse? [Math.round(b.horse.x),Math.round(b.horse.y)] : null,
+    spray:b.spray? { t:+b.spray.t.toFixed(2), n:b.spray.n, aim:+b.spray.aim.toFixed(2) } : null, sprays:b.sprays|0, sprayRounds:b.sprayRounds|0, sprayPips:b.sprayPips|0, sprayCd:+(b.sprayCd||0).toFixed(2), airs:b.airs|0, airDue:+(b.airDue||0).toFixed(1), airT:+(b.airT||0).toFixed(1), lines:b.lines|0, lastLine:b.lastLine||null, barrels:b.barrels|0, mounts:b.mounts|0, thrown:b.thrown|0, def:(bill.def===FDEF.bbride)? 'bbride' : (bill.def===FDEF.bbshow)? 'bbshow' : 'other', life:bill.kbLife|0, dials:BBS3 }; }
+function bbsRig3(o,B,bill){ if(!bill) return; const b=bill.bbs;   
+  if(o.mount && b && b.st!=='mount' && b.st!=='ride'){ bbsMount(bill,null); }
+  if(B && o.mind!==undefined){ B.mindPin=o.mind||null; if(b && b.st==='ride'){ bbsDecide(bill,b,B,(b.mindN==null)? 0 : b.mindN); } }
+  if(o.park!==undefined && b && b.st==='ride'){ b.skid=o.park? 1e9 : 0; if(!o.park) b.v=BBS3.v0; }   
+  if(o.say && b) bbsSay(bill, String(o.say), { force:1 }); }
+Object.assign(TR["ja"]||(TR["ja"]={}), {"HE'S NOT DONE!":"やつは まだ おわってない！","BUFFALO BILL RIDES":"バッファロー・ビル、うまに のる","Round two, Sarge. Try and catch me!":"だい2ラウンドだ、サージ。つかまえて みな！","WAHOOO!":"ヤッホーーー！","HE WHISTLES FOR HIS HORSE":"やつは くちぶえで うまを よぶ","WOOOO! Faster, faster!":"ウオーーッ！ もっと はやく、はやく！","Can't hit what you can't catch!":"つかまえられない やつには あたらないぜ！","I could do this ALL night!":"ひとばんじゅう だって やれるぜ！","Hold still, little green men!":"じっとしてろ、ちいさな みどりの へいたいども！","There you are, Sarge!":"そこに いたか、サージ！","Stuck in the mud? That's a shame.":"どろに はまったか？ そりゃ きのどくだ。","Ooh, that's gonna leave a mark!":"おっと、そりゃ あとが のこるぜ！"});
+Object.assign(TR["ko"]||(TR["ko"]={}), {"HE'S NOT DONE!":"그는 아직 끝나지 않았다!","BUFFALO BILL RIDES":"버팔로 빌이 말을 탄다","Round two, Sarge. Try and catch me!":"2라운드다, 병장. 잡을 수 있으면 잡아 봐!","WAHOOO!":"와후우우!","HE WHISTLES FOR HIS HORSE":"그가 휘파람으로 말을 부른다","WOOOO! Faster, faster!":"우오오오! 더 빨리, 더 빨리!","Can't hit what you can't catch!":"못 잡는 건 못 맞히지!","I could do this ALL night!":"밤새도록이라도 할 수 있어!","Hold still, little green men!":"가만히 있어라, 꼬마 초록 병정들아!","There you are, Sarge!":"거기 있었군, 병장!","Stuck in the mud? That's a shame.":"진흙에 빠졌나? 안됐군.","Ooh, that's gonna leave a mark!":"오오, 그건 자국이 남겠는걸!"});
+Object.assign(TR["zh-Hans"]||(TR["zh-Hans"]={}), {"HE'S NOT DONE!":"他还没完！","BUFFALO BILL RIDES":"水牛比尔骑马了","Round two, Sarge. Try and catch me!":"第二回合，中士。来抓我呀！","WAHOOO!":"哇呼呼！","HE WHISTLES FOR HIS HORSE":"他吹口哨唤马","WOOOO! Faster, faster!":"呜呼！再快点，再快点！","Can't hit what you can't catch!":"抓不到我就打不中我！","I could do this ALL night!":"我能这样玩一整晚！","Hold still, little green men!":"别动，小绿人！","There you are, Sarge!":"找到你了，中士！","Stuck in the mud? That's a shame.":"陷在泥里了？真可惜。","Ooh, that's gonna leave a mark!":"哦，那可要留疤了！"});
+Object.assign(TR["de"]||(TR["de"]={}), {"HE'S NOT DONE!":"ER IST NOCH NICHT FERTIG!","BUFFALO BILL RIDES":"BUFFALO BILL REITET","Round two, Sarge. Try and catch me!":"Runde zwei, Sarge. Fang mich doch!","WAHOOO!":"JUHUUU!","HE WHISTLES FOR HIS HORSE":"ER PFEIFT NACH SEINEM PFERD","WOOOO! Faster, faster!":"WUUUH! Schneller, schneller!","Can't hit what you can't catch!":"Was du nicht fängst, triffst du nicht!","I could do this ALL night!":"Das könnte ich die GANZE Nacht machen!","Hold still, little green men!":"Stillhalten, kleine grüne Männer!","There you are, Sarge!":"Da bist du ja, Sarge!","Stuck in the mud? That's a shame.":"Im Schlamm stecken geblieben? Wie schade.","Ooh, that's gonna leave a mark!":"Uuh, das gibt blaue Flecken!"});
+Object.assign(TR["ru"]||(TR["ru"]={}), {"HE'S NOT DONE!":"ОН ЕЩЁ НЕ ЗАКОНЧИЛ!","BUFFALO BILL RIDES":"БАФФАЛО БИЛЛ ВЕРХОМ","Round two, Sarge. Try and catch me!":"Раунд второй, Сарж. Попробуй догони!","WAHOOO!":"ЙИХААА!","HE WHISTLES FOR HIS HORSE":"ОН СВИСТИТ СВОЕМУ КОНЮ","WOOOO! Faster, faster!":"УУУ! Быстрее, быстрее!","Can't hit what you can't catch!":"Не догонишь, не попадёшь!","I could do this ALL night!":"Я могу так ВСЮ ночь!","Hold still, little green men!":"Стойте смирно, зелёные человечки!","There you are, Sarge!":"Вот ты где, Сарж!","Stuck in the mud? That's a shame.":"Застрял в грязи? Какая жалость.","Ooh, that's gonna leave a mark!":"Ох, вот это будет синяк!"});
+Object.assign(TR["es"]||(TR["es"]={}), {"HE'S NOT DONE!":"¡NO HA TERMINADO!","BUFFALO BILL RIDES":"BUFFALO BILL CABALGA","Round two, Sarge. Try and catch me!":"Segundo asalto, Sargento. ¡A ver si me atrapas!","WAHOOO!":"¡YUJUUU!","HE WHISTLES FOR HIS HORSE":"SILBA A SU CABALLO","WOOOO! Faster, faster!":"¡UUUH! ¡Más rápido, más rápido!","Can't hit what you can't catch!":"¡No le das a lo que no alcanzas!","I could do this ALL night!":"¡Podría seguir TODA la noche!","Hold still, little green men!":"¡Quietos, soldaditos verdes!","There you are, Sarge!":"¡Ahí estás, Sargento!","Stuck in the mud? That's a shame.":"¿Atascado en el barro? Qué pena.","Ooh, that's gonna leave a mark!":"¡Uy, eso va a dejar marca!"});
+Object.assign(TR["ar"]||(TR["ar"]={}), {"HE'S NOT DONE!":"لم ينتهِ بعد!","BUFFALO BILL RIDES":"بافالو بيل يمتطي حصانه","Round two, Sarge. Try and catch me!":"الجولة الثانية يا سارج. حاول أن تمسك بي!","WAHOOO!":"واهووو!","HE WHISTLES FOR HIS HORSE":"يصفّر لحصانه","WOOOO! Faster, faster!":"وووو! أسرع، أسرع!","Can't hit what you can't catch!":"لا تصيب ما لا تلحق به!","I could do this ALL night!":"أستطيع فعل هذا طوال الليل!","Hold still, little green men!":"اثبتوا مكانكم أيها الجنود الخضر الصغار!","There you are, Sarge!":"ها أنت ذا يا سارج!","Stuck in the mud? That's a shame.":"علقت في الوحل؟ يا للأسف.","Ooh, that's gonna leave a mark!":"أوه، هذه ستترك أثرًا!"});
 
 window.GVT = {
   cks(o){ if(o && o.pct!=null) CKS.pct=+o.pct||0; const R=[0,1,10,20,25,50,75,99,100], t={}; for(const r of R) t[r]={ mul:+cksMul(r).toFixed(4), hit:+hitDmgNowAt('kingcroak',r).toFixed(4), whole:hitWhole(hitDmgNowAt('kingcroak',r)) }; return { cv:GVT_CV, pct:CKS.pct, at:CKS.at, ck:HHB.ck, slope:HERO_DMG_RANK, mine:(META.up.kingcroak||0)|0, table:t }; },   
