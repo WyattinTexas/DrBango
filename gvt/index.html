@@ -90466,7 +90466,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='26.04';        
+let GVT_CV='26.05';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -196372,6 +196372,74 @@ function otsRoadIx(i){ i=i|0; if(!(typeof BTW==='object' && BTW.laid) && BBS_ROA
   for(let k=0;k<BBS_ROADS.length;k++){ const p=BBS_ROADS[k].p; let s=0, n=0; for(let j=1;j<p.length;j+=2){ s+=p[j]; n++; } const d=n? Math.abs(s/n-y) : 1e9; if(d<bd){ bd=d; bi=k; } }
   return bi; }
 { const r0=bbsRoadPts; bbsRoadPts=function(i){ return r0.call(this, otsRoadIx(i)); }; }   
+
+
+
+
+
+
+
+
+
+const BACK_LIVE=1;   
+const BACK={ on:(function(){ try{ const q=/[?&]back=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_back','0'); else localStorage.removeItem('gvt_back'); } return localStorage.getItem('gvt_back')==='0'? 0 : BACK_LIVE; }catch(e){ return BACK_LIVE; } })(),
+  hm:1.4, dy:120, laid:0, stats:{ paints:0 },
+  rocks:[[180,64,16],[420,150,11],[700,44,13],[1010,118,18],[1290,58,12],[1560,150,15],[1780,88,12],[300,196,9],[760,198,10],[1440,196,9]],   
+  tufts:[[90,120],[260,30],[520,96],[640,180],[880,60],[1120,170],[1200,30],[1370,110],[1650,40],[1840,120],[980,20],[1530,82]] };
+function backShiftTown(dy){   
+  const T9=BTW_TOWN; T9.feet+=dy; T9.street.y0+=dy; T9.street.y1+=dy; T9.walk.y0+=dy; T9.walk.y1+=dy;
+  for(const o of T9.set) o.y+=dy; T9.tower.y+=dy; for(const r of T9.rails) r[2]+=dy; for(const b of T9.barrels) b[1]+=dy;
+  T9.mud.y+=dy; T9.pen.y+=dy; T9.pen.y1+=dy; for(const q of T9.edge.posts) q[1]+=dy;
+  for(const rd of T9.roads){ for(let i=1;i<rd.p.length;i+=2) rd.p[i]+=dy; }
+  for(const pr of T9.props) pr.y+=dy; for(const t of T9.tufts) t[1]+=dy;
+}
+function backLay(){
+  const dy=BACK.dy;
+  RAID_INFO.bbs.hmul=BACK.hm;   
+  backShiftTown(dy);
+  if(typeof OTS_DECOR==='object'){ for(const d of OTS_DECOR){ if(d.Y!=null) d.Y+=dy; } }   
+  if(typeof OTS_BUNT==='object'){ OTS_BUNT.a[1]+=dy; OTS_BUNT.b[1]+=dy; OTS_BUNT.bb[1]+=dy; }
+  for(const b of BBS_BANDS){ b[0]+=dy; b[1]+=dy; }   
+  for(const p of BBS_GUN_PTS) p[1]+=dy;               
+  if(typeof BBS3==='object'){ BBS3.yLo+=dy; BBS3.yHi+=dy; }  
+  if(BTW.laid) btwLay(1);   
+  BACK.laid=1; return 1;
+}
+function backLate(){ if(!BACK.laid || BACK.late) return; try{ BBF.yMin+=BACK.dy; BBF.yMax+=BACK.dy; BACK.late=1; }catch(e){} }   
+{ const c0=bbsCfg; bbsCfg=function(tier){ backLate(); const cfg=c0.apply(this, arguments); try{ if(BACK.laid && cfg && cfg.waves){ for(const w of cfg.waves){ if(w.herd && w.herd.y!=null && !w.herd.backDy){ w.herd.y+=BACK.dy; w.herd.backDy=1; } } } }catch(e){} return cfg; }; }   
+function backPaint(){   
+  const dy=BACK.dy; cx.save(); cx.lineCap='round';
+  cx.strokeStyle='rgba(150,104,56,0.28)'; cx.lineWidth=2; cx.beginPath(); for(const yy of [34, 96, 158]){ cx.moveTo(0,yy); for(let x=0;x<=1920;x+=40) cx.lineTo(x, yy+Math.sin(x/170+yy)*5); } cx.stroke();
+  for(const r of BACK.rocks){ const x=r[0], y=r[1], s=r[2];
+    cx.fillStyle='rgba(0,0,0,0.18)'; cx.beginPath(); cx.ellipse(x+2,y+s*0.45,s*1.25,s*0.4,0,0,7); cx.fill();
+    cx.fillStyle='#9C7A55'; cx.beginPath(); cx.ellipse(x,y,s*1.1,s*0.7,0,0,7); cx.fill();
+    cx.fillStyle='#B8956B'; cx.beginPath(); cx.ellipse(x-s*0.15,y-s*0.22,s*0.75,s*0.38,0,0,7); cx.fill();
+    cx.strokeStyle='rgba(110,82,52,0.55)'; cx.lineWidth=1.4; cx.beginPath(); cx.ellipse(x,y,s*1.1,s*0.7,0,0,7); cx.stroke(); }
+  cx.strokeStyle='#6b5a2e'; cx.lineWidth=2; cx.beginPath(); for(const t of BACK.tufts){ const x=t[0], y=t[1]; cx.moveTo(x,y); cx.lineTo(x+2,y-12); cx.moveTo(x+5,y); cx.lineTo(x+5,y-15); cx.moveTo(x+10,y); cx.lineTo(x+8,y-11); } cx.stroke();
+  cx.restore(); BACK.stats.paints++;
+}
+{ const fp1=bbsFloorPaint; bbsFloorPaint=function(WD,HT){ const r=fp1.apply(this, arguments); try{ if(BACK.laid && BTW.laid) backPaint(); }catch(e){} return r; }; }   
+function backRead(){ return { on:BACK.on, live:BACK_LIVE, laid:BACK.laid, hm:RAID_INFO.bbs.hmul, dy:BACK.dy, WORLD_H:WORLD_H, T:{ x:T.x, y:T.y }, foe:[FOE_TOP,FOE_BOT], cam:S.cCam? { x:Math.round(S.cCam.x), y:Math.round(S.cCam.y||0) } : null,
+  bands:BBS_BANDS.map(b=>[b[0],b[1]]), bbf:(function(){ try{ return [BBF.yMin,BBF.yMax,BACK.late|0]; }catch(e){ return null; } })(), bbs3:(typeof BBS3==='object')? [BBS3.yLo,BBS3.yHi] : null, feet:BTW_TOWN.feet, street:Object.assign({},BTW_TOWN.street), stats:Object.assign({},BACK.stats) }; }
+setTimeout(function(){ try{ if(window.GVT && !GVT.back) GVT.back=function(){ return backRead(); }; }catch(e){} }, 0);   
+if(BACK.on && BTW.on && typeof OTS==='object' && OTS.laid) backLay();   
+
+
+
+
+
+
+
+
+
+
+const OTS_TM={ tagK:0.75, tMax:10, pad:0.4, tag0:null, mice:0 };
+(function(){ try{ if(Array.isArray(BBS_TAGX) && !OTS_TM.tag0){ OTS_TM.tag0=BBS_TAGX.slice(); for(let i=0;i<BBS_TAGX.length;i++) BBS_TAGX[i]=+(BBS_TAGX[i]*OTS_TM.tagK).toFixed(4); } }catch(e){} })();   
+{ const s0=updateFoeSneak; updateFoeSneak=function(f,dt){   
+    try{ if(f && f.mzT==null && f.type==='wmouse' && f.def && f.def.sneak && !f.def.sneak.mark && bbsOn()){ const sk=f.def.sneak, need=(f.x-sk.gx)/Math.max(1,sk.spd)+sk.mineAt+OTS_TM.pad;
+      f.mzT=Math.max(sk.t, Math.min(OTS_TM.tMax, need)); f.burrow=true; f.mzLaid=false; OTS_TM.mice++; } }catch(e){}
+    return s0.apply(this, arguments); }; }
+setTimeout(function(){ try{ if(window.GVT && !GVT.otsTM) GVT.otsTM=function(){ return { tagK:OTS_TM.tagK, table:BBS_TAGX.slice(), table0:OTS_TM.tag0, mice:OTS_TM.mice, tMax:OTS_TM.tMax }; }; }catch(e){} }, 0);
 
 
 
