@@ -89460,7 +89460,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='25.43';        
+let GVT_CV='25.44';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -156727,7 +156727,8 @@ const NA_VEINS='M324.7 179.9 L327 181.4 L320.4 184.1 L327.2 181.6 L323.9 182 M31
 const NA_YEE_MP3='@m/56a9dc131f9f.mp3';   
 const NA_YEEB={ buf:null, t:0 };
 function naYeeDecode(){ if(NA_YEEB.buf || NA_YEEB.t) return; NA_YEEB.t=1; try{ const OAC=window.OfflineAudioContext||window.webkitOfflineAudioContext; if(!OAC) return; odvBytes(NA_YEE_MP3, a=>{ new OAC(1,1,44100).decodeAudioData(a.buffer, buf=>{ NA_YEEB.buf=buf; }, ()=>{}); }, null); }catch(e){} }   
-function naYee(){ const Y=NA_ST.yee||(NA_ST.yee={ play:0, fb:0 }); try{ if(soundOn){ const ac=audio(); if(ac && NA_YEEB.buf){ const s=ac.createBufferSource(), g=ac.createGain(); s.buffer=NA_YEEB.buf; g.gain.value=.9; s.connect(g).connect(ac.destination); s.start(); Y.play++; } else if(ac){ Y.fb++; NA_SND.whoop(); } } }catch(e){} return Y; }   
+function naYee(){ const Y=NA_ST.yee||(NA_ST.yee={ play:0, fb:0, jsx:0, last:'' }); try{ if(soundOn){ const ac=audio(); let r='off'; if(ac && typeof jsxVoice==='function' && JSX.on) r=jsxVoice('plaque', null, JSX.pvol); if(r==='play'){ Y.jsx++; Y.last='jsx'; } else if(ac && NA_YEEB.buf){ const s=ac.createBufferSource(), g=ac.createGain(); s.buffer=NA_YEEB.buf; g.gain.value=.9; s.connect(g).connect(ac.destination); s.start(); Y.play++; Y.last='mp3'; } else if(ac){ Y.fb++; Y.last='whoop'; NA_SND.whoop(); } else Y.last='none'; } else Y.last='mute'; }catch(e){} return Y; }   
+function naPrep(){ naYeeDecode(); try{ jsxWarm(); }catch(e){} }   
 
 const NA_PX=251.8, NA_PY=141.4, NA_PS=4.25;   
 function naT(dx,dy){ return 'translate('+(NA_PX+dx).toFixed(1)+' '+(NA_PY+dy).toFixed(1)+') scale('+NA_PS+')'; }
@@ -156819,7 +156820,7 @@ function naAct(k){ const S=NA_ST.s; if(!S || !msaStands()) return; const b=S.b, 
   if(S.busy) return; S.busy=k; S.acts++; ms6Log(k);
   if(k==='tip'){ S.tips++; cls('tip',1); at(1150, ()=>{ cls('tip',0); S.busy=''; }); return; }   
   if(k==='jump'){ S.jumps++; cls('jump',1); [500,1080].forEach(t=>at(t, ()=>{ NA_SND.thump(); pop('.na-kpuff','pop',520); })); at(1340, ()=>{ cls('jump',0); S.busy=''; }); return; }   
-  if(k==='yee'){ S.yees++; cls('yee',1); naYee(); at(1250, ()=>NA_SND.whoop()); at(2400, ()=>{ cls('yee',0); S.busy=''; }); return; }   
+  if(k==='yee'){ S.yees++; cls('yee',1); const yv=naYee().last==='jsx'; at(1250, ()=>{ if(!yv) NA_SND.whoop(); }); at(2400, ()=>{ cls('yee',0); S.busy=''; }); return; }       
   if(k==='twirl'){ S.twirls++; cls('twirl',1); [0,420,840].forEach(t=>at(t+120, ()=>ms6Sfx(()=>noise(.08,.012,2200)))); at(1450, ()=>{ NA_SND.jingle(1); }); at(1700, ()=>{ cls('twirl',0); S.busy=''; }); return; }   
   if(k==='shot'){ S.shots++; const can=b.querySelector('.na-can');   
     H.style.setProperty('--aF','58deg'); H.style.setProperty('--aN','40deg'); cls('aim',1);
@@ -156860,7 +156861,7 @@ function naRig(b,Q){ const q=s=>b.querySelector(s), V=e=>(e && naVis(e))? Q(e) :
   out.st=NA_ST.s? { acts:NA_ST.s.acts, shots:NA_ST.s.shots, jumps:NA_ST.s.jumps, yees:NA_ST.s.yees, twirls:NA_ST.s.twirls, tips:NA_ST.s.tips, taps:NA_ST.s.taps, tw:NA_ST.s.tw, caught:NA_ST.s.caught, paid:NA_ST.s.paid, cries:NA_ST.s.cries, howls:NA_ST.s.howls, yips:NA_ST.s.yips, busy:NA_ST.s.busy, yee:NA_ST.yee } : null;
   return out; }
 
-const MSA_NA={ prep:naYeeDecode, cls:(c,e)=>'ms6 ms6-na'+(e? '' : ' carved'), card:'ms6-card', bg:naBg, back:()=>'<svg viewBox="0 0 874 402" width="874" height="402" aria-hidden="true"><g class="na-backin"></g></svg>', host:naHost, plaque:naPlaque, mid:()=>'<div class="ms6-mid"><i class="na-midin"></i></div>', front:naFront,
+const MSA_NA={ prep:naPrep, cls:(c,e)=>'ms6 ms6-na'+(e? '' : ' carved'), card:'ms6-card', bg:naBg, back:()=>'<svg viewBox="0 0 874 402" width="874" height="402" aria-hidden="true"><g class="na-backin"></g></svg>', host:naHost, plaque:naPlaque, mid:()=>'<div class="ms6-mid"><i class="na-midin"></i></div>', front:naFront,
   fore:()=>'<svg viewBox="0 0 874 402" width="874" height="402" aria-hidden="true">'+NA_PEARS+'</svg>', air:()=>'<div class="ms6-air">'+NA_AIR+'</div>', run:naRun, rig:naRig };
 MSA_STAGE.na=MSA_NA;   
 
@@ -163493,9 +163494,12 @@ function janeCameoOut(){
 
 
 
+
+
+
 const JSX_SRC='jane-yeehaw.m4a';   
 var JSX={ on:(function(){ try{ const m=/[?&]jsx=([01])/.exec(location.search||''); if(m){ if(m[1]==='0') localStorage.setItem('gvt_jsx','0'); else localStorage.removeItem('gvt_jsx'); } return localStorage.getItem('gvt_jsx')==='0'? 0 : 1; }catch(e){ return 1; } })(),
-  kills:10, gap:2, vol:0.4,   
+  kills:10, gap:2, vol:0.4, pvol:0.34,   
   buf:null, bytes:null, busy:0, dead:0, src:null, lastAt:-1e9, last:null,   
   warm:0, fetched:0, decoded:0, n:0, fb:0, held:0, miles:0, err:0, log:[] };   
 function jsxOn(){ return !!JSX.on; }
@@ -163513,17 +163517,17 @@ function jsxWarm(){ try{
   fetch(JSX_SRC).then(r=>{ if(!r.ok) throw new Error('jsx '+r.status); return r.arrayBuffer(); }).then(ab=>{ JSX.busy=0; JSX.bytes=new Uint8Array(ab); JSX.fetched++; jsxLog('fetched',{ bytes:ab.byteLength }); dec(JSX.bytes); })
     .catch(e=>{ JSX.busy=0; JSX.err++; jsxLog('nofile',{ why:String(e&&e.message||e).slice(0,60) }); });
 }catch(e){ JSX.err++; } }
-function jsxVoice(why,fb){   
+function jsxVoice(why,fb,vol){   
   if(!JSX.on){ if(fb) fb(); return 'off'; }
   if(!JSX.buf){ jsxWarm(); JSX.fb++; jsxLog('fb',{ why, dead:JSX.dead }); if(fb) fb(); return 'fb'; }
   if(!soundOn){ jsxLog('mute',{ why }); return 'mute'; }   
   const ac=audio(); if(!ac){ jsxLog('none',{ why }); return 'none'; }   
   try{ const t0=ac.currentTime;
     if(JSX.src){ try{ JSX.src.stop(); }catch(e){} JSX.src=null; }
-    const s=ac.createBufferSource(), g=ac.createGain(); s.buffer=JSX.buf; g.gain.value=JSX.vol;
+    const s=ac.createBufferSource(), g=ac.createGain(); s.buffer=JSX.buf; g.gain.value=(vol!=null)? +vol : JSX.vol;
     s.connect(g).connect(ac.destination); s.start(t0);
     s.onended=()=>{ try{ s.disconnect(); g.disconnect(); }catch(e){} if(JSX.src===s) JSX.src=null; jsxLog('ended',{ why }); };
-    JSX.src=s; JSX.n++; JSX.last=why; JSX.lastAt=performance.now(); jsxLog('play',{ why, vol:JSX.vol, s:+JSX.buf.duration.toFixed(3), state:ac.state });
+    JSX.src=s; JSX.n++; JSX.last=why; JSX.lastAt=performance.now(); jsxLog('play',{ why, vol:g.gain.value, s:+JSX.buf.duration.toFixed(3), state:ac.state });
     return 'play';
   }catch(e){ JSX.err++; JSX.fb++; jsxLog('err',{ why, e:String(e&&e.message||e).slice(0,60) }); if(fb) try{ fb(); }catch(e2){} return 'err'; } }
 function jsxKill(u){ try{   
@@ -163534,9 +163538,9 @@ function jsxKill(u){ try{
   if(S.floats) S.floats.push({ x:u.x, y:u.y-96, txt:'YEE-HAW!', t:0, col:'#FFD24A' });
   jsxVoice('kills:'+k, null);
 }catch(e){ JSX.err++; } }
-function jsxRig(o){ o=o||{}; if(o.on!=null) JSX.on=o.on? 1 : 0; for(const k of ['kills','gap','vol']) if(o[k]!=null) JSX[k]=+o[k]; if(o.warm) jsxWarm(); if(o.reset){ JSX.lastAt=-1e9; JSX.held=0; JSX.miles=0; JSX.n=0; JSX.fb=0; JSX.log.length=0; }   
+function jsxRig(o){ o=o||{}; if(o.on!=null) JSX.on=o.on? 1 : 0; for(const k of ['kills','gap','vol','pvol']) if(o[k]!=null) JSX[k]=+o[k]; if(o.warm) jsxWarm(); if(o.reset){ JSX.lastAt=-1e9; JSX.held=0; JSX.miles=0; JSX.n=0; JSX.fb=0; JSX.log.length=0; }   
   const j=S.units? S.units.filter(q=>q.type==='jane' && !q.dead).map(q=>({ id:q.id, kills:q.kills|0, at:q.jsxAt|0, emgV:q.emgV|0, mine:killIsMine(q) })) : [];
-  return { cv:GVT_CV, on:JSX.on, key:(function(){ try{ return localStorage.getItem('gvt_jsx'); }catch(e){ return null; } })(), src:JSX_SRC, kills:JSX.kills, gap:JSX.gap, vol:JSX.vol,
+  return { cv:GVT_CV, on:JSX.on, key:(function(){ try{ return localStorage.getItem('gvt_jsx'); }catch(e){ return null; } })(), src:JSX_SRC, kills:JSX.kills, gap:JSX.gap, vol:JSX.vol, pvol:JSX.pvol,
     buf:JSX.buf? { s:+JSX.buf.duration.toFixed(4), sr:JSX.buf.sampleRate, ch:JSX.buf.numberOfChannels } : null, bytes:JSX.bytes? JSX.bytes.length : 0, busy:JSX.busy, dead:JSX.dead, live:!!JSX.src,
     warm:JSX.warm, fetched:JSX.fetched, decoded:JSX.decoded, n:JSX.n, fb:JSX.fb, held:JSX.held, miles:JSX.miles, err:JSX.err, last:JSX.last, lastAt:JSX.lastAt>0? +(JSX.lastAt/1000).toFixed(3) : null,
     ac:AC? { state:AC.state, t:+AC.currentTime.toFixed(3), sr:AC.sampleRate } : null, sound:soundOn, mode:S.mode, janes:j, log:JSX.log.slice() }; }
