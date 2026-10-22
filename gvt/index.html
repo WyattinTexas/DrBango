@@ -89903,7 +89903,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='25.59';        
+let GVT_CV='25.60';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -107681,6 +107681,20 @@ function hhbCkDmg(u){ return (u && u.type==='kingcroak' && HHB.ck)? HHB.ck : 0; 
 
 
 
+
+
+
+
+
+const CKS={ pct:2, at:RANK_MAX };   
+function cksMul(r){ r=Math.max(0,Math.min(RANK_MAX,r|0)); return 1+CKS.pct*Math.min(1,r/CKS.at); }   
+function cksMulU(u){ return (u && u.type==='kingcroak' && CKS.pct)? cksMul(perkRank(u)) : 1; }   
+function cksStorm(u,dmg){ const g=mstGiftDmg(u)+bondWarDmg(u)+l100Dmg(u)+cflDmg(u); return (dmg-g+hhbCkDmg(u))*cksMulU(u)+g; }   
+
+
+
+
+
 const HLV={ hp:6, every:10 };   
 function hlvHp(u){ if(!u || !HLV.hp || HEROES.indexOf(u.type)<0) return 0; return Math.floor(Math.max(0,Math.min(RANK_MAX,perkRank(u)|0))/HLV.every)*HLV.hp; }   
 
@@ -121819,7 +121833,7 @@ function update(dt){
       const ckM=ckStormMul(u);   
       const kcAim=rpScan(u, rng*rngMul);   
       if(!kcAim){ u.cd=0.25; continue; }   
-      u.rpT=RP_PLANT+BRG_WAVES*BRG_GAP; u.rpSt=0; u.rpAim=kcAim.ang; u.rpDmg=dmg+hhbCkDmg(u)  ; u.rpR=def.rng*rngMul*ckM; u.rpHalf=CROAK_FAN_HALF*ckM; u.rpKC=1;   
+      u.rpT=RP_PLANT+BRG_WAVES*BRG_GAP; u.rpSt=0; u.rpAim=kcAim.ang; u.rpDmg=cksStorm(u,dmg)    ; u.rpR=def.rng*rngMul*ckM; u.rpHalf=CROAK_FAN_HALF*ckM; u.rpKC=1;   
       bfSfx(SFX.thock, u.x, u.y);
       continue;
     }
@@ -186361,7 +186375,7 @@ function hitWhole(v){ return String(Math.round(v)); }
 function heroStub(k,r,mir){ const u={ type:k, def:UDEF[k] }; const r0=(META.up[k]||0)|0; if(mir || (r!=null && (r|0)!==r0)) u.nrk=Math.max(0,Math.min(RANK_MAX,(r==null? r0 : r)|0)); return u; }   
 function hitDmgNowAt(k,r){ const st=heroStub(k,r), v=rsaBaseHit(k,r,st); if(v==null) return null;     let m=(k!=='sarge' && soulIs('u',k))? SOUL_MUL : 1; if(k==='kingbear') m*=kbSwordMul(st);
   const fav=(k==='kingyeti' || k==='kingbear')? 0 : (pickDmg(st)+toothDmg(st))*hitMul(k,r);       
-  return (v+fav)*m*(k==='kingrex'? KRS_FIRE_X : 1)+mstGiftDmg(st,1)+l100Dmg(st,1)+hhbCkDmg(st); }   
+  return ((v+fav)*m*(k==='kingrex'? KRS_FIRE_X : 1)+hhbCkDmg(st))*cksMulU(st)+mstGiftDmg(st,1)+l100Dmg(st,1); }   
 
 
 
@@ -193804,6 +193818,7 @@ Object.assign(TR["es"]||(TR["es"]={}), {"THE BUFFALO BILL SHOWDOWN":"EL DUELO DE
 Object.assign(TR["ar"]||(TR["ar"]={}), {"THE BUFFALO BILL SHOWDOWN":"مواجهة بافالو بيل","THE SHOWDOWN<br>IS WON":"الفوز<br>بالمواجهة","BUFFALO BILL IS WAITING. HE'S AT THE RAIDS DOOR.":"بافالو بيل ينتظر. إنه عند باب الغارات.","RIDERS! %1 BANDITS INBOUND":"فرسان! %1 قطاع طرق قادمون","THE STREET IS CLEAR!":"الشارع خالٍ!","FIRE AWAY, BOYS! Make it rain!":"أطلقوا النار يا أولاد! أمطروهم!","THE SHOWDOWN":"المواجهة","THE SHOWDOWN BEGINS":"تبدأ المواجهة","THE SHOWDOWN IS IN %1. TAP THE SHOWDOWN TO JOIN.":"المواجهة بعد %1. اضغط المواجهة للانضمام.","Buffalo Bill has called us out every %1 at %2. Ten commanders, one outlaw, a level for everyone who fights and his prizes for the winners.":"بافالو بيل يتحدانا كل %1 في %2. عشرة قادة، خارج واحد عن القانون، مستوى لكل من يقاتل وجوائزه للفائزين.","YOU FOUGHT BUFFALO BILL":"قاتلت بافالو بيل","YOU FOUGHT BUFFALO BILL · HE STANDS":"قاتلت بافالو بيل · ما زال واقفًا","Buffalo Bill called us out. Pick how hard, then bring everyone you know.":"بافالو بيل تحدانا. اختر الصعوبة، ثم أحضر كل من تعرف.","Ha... ha. Best fight I ever lost, Sarge.":"ها... ها. أفضل معركة خسرتها يومًا يا سارج.","Come back when you can keep up.":"عد عندما تستطيع مجاراتي.","You defeated BUFFALO BILL!":"لقد هزمت بافالو بيل!","Buffalo Bill. He called us out, Soldier. Let's answer him.":"بافالو بيل. لقد تحدانا أيها الجندي. فلنرد عليه.","BUFFALO BILL CALLED US OUT. TEN COMMANDERS, ONE OUTLAW, THURSDAY NIGHT.":"بافالو بيل تحدانا. عشرة قادة، خارج واحد عن القانون، ليلة الخميس.","THE SHOWDOWN OPENS THURSDAY NIGHT AT THE BELL":"تفتح المواجهة ليلة الخميس عند الجرس"});
 
 window.GVT = {
+  cks(o){ if(o && o.pct!=null) CKS.pct=+o.pct||0; const R=[0,1,10,20,25,50,75,99,100], t={}; for(const r of R) t[r]={ mul:+cksMul(r).toFixed(4), hit:+hitDmgNowAt('kingcroak',r).toFixed(4), whole:hitWhole(hitDmgNowAt('kingcroak',r)) }; return { cv:GVT_CV, pct:CKS.pct, at:CKS.at, ck:HHB.ck, slope:HERO_DMG_RANK, mine:(META.up.kingcroak||0)|0, table:t }; },   
   ffi(o){ return ffiRig(o); },   
   bbs(o){ return bbsRig(o); },   
   spb2(o){ o=o||{}; const st=spbS(); if(o.grant){ for(const k of o.grant) if(!enhOwns(k)){ grantOwned('enh',k); if(!enhOn(k)){ META.enh.on.push(k); enhExclude(k); } } saveMeta(); }   
