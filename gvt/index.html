@@ -90171,7 +90171,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='25.82';        
+let GVT_CV='25.83';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -195415,6 +195415,223 @@ Object.assign(TR["de"]||(TR["de"]={}), {"THE SHOTGUN BANDIT":"DER SCHROTFLINTENB
 Object.assign(TR["ru"]||(TR["ru"]={}), {"THE SHOTGUN BANDIT":"БАНДИТ С ДРОБОВИКОМ","THE IRON CANNON":"ЖЕЛЕЗНАЯ ПУШКА"});
 Object.assign(TR["es"]||(TR["es"]={}), {"THE SHOTGUN BANDIT":"EL BANDIDO DE LA ESCOPETA","THE IRON CANNON":"EL CAÑÓN DE HIERRO"});
 Object.assign(TR["ar"]||(TR["ar"]={}), {"THE SHOTGUN BANDIT":"قاطع الطريق ببندقية الرش","THE IRON CANNON":"المدفع الحديدي"});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const BBF={ on:(function(){ try{ const q=/[?&]bbf=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_bbf','0'); else localStorage.removeItem('gvt_bbf'); } return localStorage.getItem('gvt_bbf')==='0'? 0 : 1; }catch(e){ return 1; } })(),   
+  walk:32, run:70,   
+  tell:0.45, pad:30, peek:28, refuge:330, yMin:190, yMax:470, silent:6, railD:36, railX:600, side:{ d:46, spd:32 }, off:70, adv:32, fans:2, crowdR:150, crowdN:3, flankK:0.5, flankMin:2, vehR:240, flameR:190, xMin:330, rest:2.0, scan:0.25, stuck:3.0,   
+  mz:{ R:36, dur:0.13 }, tr:{ dur:0.25, head:0.6, w:4.2, tail:48 }, spark:{ dur:0.3, n:7 }, kick:{ add:0.12, cap:0.24 }, flinch:{ t:0.2, px:5 }, cyl:{ r:12, spin:10 }, glint:{ R:15 }, rock:{ tell:0.1, rc:0.05 },   
+  W:{ minShield:0.5, across:1.2, shield:2.2, open:0.6, crowd:1.2, fire:2.4, fireN:3, dist:400, back:0.3, die:0.35, stay:1.5 } };   
+const BBF_WHY=['first','peek','fan','fans','flank','crowd','vehicle','flame','nofire','stuck'];   
+function bbfOwns(f){ if(!BBF.on || !f || f.dead || !bbsOn() || f.bbsRide) return false; const st=f.bbs && f.bbs.st; return !(st==='mount' || st==='ride' || st==='rally') && bbfSeats().length>0; }   
+function bbfM(f){ const b=f.bbs||(f.bbs={ st:'idle', t:BBS_FAN.cd, n:0, rounds:0, fans:0, reloads:0, pips:0 }); return b.bbf||(b.bbf={ st:'in', seat:-1, peek:-1, t:0, fansHere:0, tHere:0, ordOut:0, ordIn:0, log:[], scanT:0, stuckT:0, sx:f.x, sy:f.y, tells:0, fansM:0, words:0, pend:null, goal:null, rl:0, call:0, rallyN:0, mzLog:[], dist:{ walk:0, run:0 }, time:{} }); }
+
+function bbfSeats(){ const TR=S.cfg && S.cfg.terrain; if(!TR || !TR.bbs) return []; if(TR.bbfSeats) return TR.bbfSeats; const out=[], P=BBF.pad, K=BBF.peek;
+  const clear=(x,y,pk)=>{ if(x<BBF.xMin || x>W-60 || y<(pk? BBF.yMin-10 : BBF.yMin) || y>(pk? BBF.yMax+10 : BBF.yMax)) return false; for(const rk of (TR.rocks||[])){ if(!(rk.r>0)) continue; if(Math.hypot(rk.x-x,rk.y-y)<rk.r+(rk.cov? 18 : 22)) return false; } return true; };
+  const add=(x,y,side,key,pk,o9)=>{ if(!(o9 && o9.rail) && !clear(x,y)) return; const peeks=pk.filter(p=>(o9 && o9.rail) || clear(p.x,p.y,1)).map(p=>({ x:Math.round(p.x), y:Math.round(p.y) })); if(!peeks.length) return; out.push(Object.assign({ i:out.length, x:Math.round(x), y:Math.round(y), side:side, key:key, peeks:peeks }, o9||{})); return true; };
+  for(const o of BBS_SET){ const x0=o.x, x1=o.x+o.w, y0=o.y, y1=o.y+o.h;
+    for(const [sd,xs,xp] of [['E', x1+P, x1+P*0.3], ['W', x0-P, x0-P*0.3]]){ for(const fy of [0.5, 0.3, 0.7]){ if(add(xs, y0+o.h*fy, sd, o.key, [{ x:xp, y:y0-K }, { x:xp, y:y1+K }])) break; } } }   
+  const tw=BBS_TOWER; add(tw.x+tw.r+P, tw.y, 'E', 'tower', [{ x:tw.x+tw.r*0.6, y:tw.y-tw.r-K }, { x:tw.x+tw.r*0.6, y:tw.y+tw.r+K }]); add(tw.x-tw.r-P, tw.y, 'W', 'tower', [{ x:tw.x-tw.r*0.6, y:tw.y-tw.r-K }, { x:tw.x-tw.r*0.6, y:tw.y+tw.r+K }]);
+  for(const rl of BBS_RAILS){ for(let x=rl[0]+20; x<=rl[1]-10; x+=50){ for(const dy of [-BBF.railD, BBF.railD]){ const y=rl[2]+dy; if(x<BBF.railX || y<92 || y>WORLD_H-62) continue; let bad=false; for(const rk of (TR.rocks||[])){ if(rk.r>0 && !(rk.key==='hitch' && rk.cov) && Math.hypot(rk.x-x,rk.y-y)<rk.r+22){ bad=true; break; } } if(!bad) add(x, y, dy<0? 'N' : 'S', 'hitch', [{ x:x, y:y }], { rail:1, rl:rl }); } } }   
+  return (TR.bbfSeats=out); }
+
+function bbfMen(){ const out=[]; for(const u of S.units){ if(u.dead || u.jetT>0 || u.dropT>0 || u.falling || u.cloakT>0 || u.burrow) continue; if(S.drag && S.drag.unit===u) continue; out.push(u); } return out; }
+function bbfReach(u){ return Math.min(460, Math.max(120, (u.def && u.def.rng) || 200)); }
+function bbfSees(u,x,y){ return !!(TRENCH_EXEMPT[u.type] || pbmTall(u) || !pbmBetween(u.x,u.y,x,y,u.x,u.y)); }   
+function bbfShield(x,y,men){ let thr=0, see=0, near=0; for(const u of men){ const d=Math.hypot(u.x-x,u.y-y); if(d<BBF.crowdR) near++; if(d>bbfReach(u)+30) continue; thr++; if(bbfSees(u,x,y)) see++; } return { thr:thr, see:see, near:near, k:thr? 1-see/thr : 1 }; }   
+function bbfFire(x,y,men){ let n=0; for(const u of men){ const d=Math.hypot(u.x-x,u.y-y); if(d>Math.min(BBS_FAN.R, bbfReach(u)) || d<16) continue; if(pbmBetween(x,y,u.x,u.y,x,y)) continue; n++; } return n; }   
+function bbfThreat(f,men){   
+  const sh=bbfShield(f.x,f.y,men); if(sh.near>=BBF.crowdN) return 5;
+  for(const u of men){ const d=Math.hypot(u.x-f.x,u.y-f.y); if(u.def && u.def.vehicle && d<BBF.vehR) return 6; if(d<BBF.flameR && (u.type==='flame' || u.type==='flamer' || (u.def && (u.def.flame || u.def.lick)))) return 7; }
+  if(S.fires && S.fires.length){ for(const p of S.fires){ if(p.t<p.life && Math.hypot(p.x-f.x,p.y-f.y)<(p.r||60)+30) return 7; } }
+  if(sh.see>=Math.max(BBF.flankMin, Math.ceil(BBF.flankK*sh.thr))) return 4;
+  return -1; }
+
+function bbfKey(n,tag){ return 'bbf:'+rxDoorKey()+':'+(n|0)+(tag? ':'+tag : ''); }
+function bbfAcross(x0,y0,x1,y1){ for(const rl of BBS_RAILS){ if((y0-rl[2])*(y1-rl[2])>=0) continue; const xc=x0+(x1-x0)*(rl[2]-y0)/(y1-y0); if(xc>rl[0]-24 && xc<rl[1]+24) return true; } return false; }
+function bbfPick(f,M,men,n,why,refuge){ const L=bbfSeats(); let best=-1, bs=-1e9;   
+  const hot=(S.fires||[]).filter(p=>p.t<p.life);
+  for(const s of L){ if(hot.some(p=>Math.hypot(p.x-s.x,p.y-s.y)<(p.r||60)+30)) continue;   
+    if(M.bad && M.bad[s.i]>bbsClock()) continue;   
+    let fire=0; if(!refuge){ for(const p of s.peeks){ fire=Math.max(fire, bbfFire(p.x,p.y,men)); } if(!fire) continue; } const sh=bbfShield(s.x,s.y,men), d=Math.hypot(s.x-f.x,s.y-f.y); if(sh.thr && sh.k<BBF.W.minShield) continue; if(refuge && d>BBF.refuge) continue;   
+    const across=bbfAcross(f.x,f.y,s.x,s.y)? BBF.W.across : 0;   
+    let sc=-across+BBF.W.shield*(sh.thr? sh.k : BBF.W.open)-(sh.near>=BBF.crowdN? BBF.W.crowd : 0)+BBF.W.fire*Math.min(1,fire/BBF.W.fireN)-d/BBF.W.dist+((s.x>=f.x-10)? BBF.W.back : 0)+BBF.W.die*rxRoll(bbfKey(n,'s'+s.i));
+    if(s.i===M.seat && why!=='first'){ if(why==='fans') continue; sc-=BBF.W.stay; }   
+    if(sc>bs){ bs=sc; best=s.i; } }
+  return best; }
+function bbfPeekPick(f,M,men,n){ const s=bbfSeats()[M.seat]; if(!s) return -1; let best=-1, bn=0; for(let i=0;i<s.peeks.length;i++){ const p=s.peeks[i], k=bbfFire(p.x,p.y,men)+rxRoll(bbfKey(n,'p'+i))*0.5; if(k>=1 && k>bn){ bn=k; best=i; } } return best; }   
+function bbfDecide(f,b,M,why){   
+  const men=bbfMen(), n=M.ordOut+1; let seat=M.seat, p=9;
+  if(why==='first'){ seat=bbfPick(f,M,men,n,'first'); if(seat<0) seat=bbfPick(f,M,men,n,'first',1); p=8; if(seat<0) seat=99; M.engaged=1; }   
+  else { if(why==='peek'){ if(M.fansHere<BBF.fans){ p=bbfPeekPick(f,M,men,n); if(p<0){ why='nofire'; p=9; } } else why='fans'; }
+    if(p===9){ seat=bbfPick(f,M,men,n,why);
+      if(seat<0){ seat=99; p=7; }   
+      else if(seat===M.seat){ if(why==='fans'){ seat=99; p=7; } else { M.decT=1.0; M.tHere=0; return false; } } } }   
+  M.ordOut=n; const w={ seat:seat, p:p, why:Math.max(0,BBF_WHY.indexOf(why)), x:Math.round(f.x), y:Math.round(f.y) };
+  if(S.coop && COOP && !COOP.ended && sqRef()){ try{ coopSend({ k:'bbf', n:n*1000+seat*10+p, b:w.why, x:w.x, y:w.y }); }catch(e){} M.words++; BBF_STATS.sent++; }   
+  bbfApply(f,b,M,n,w); return true; }
+
+const BBF_STATS={ sent:0, got:0, applied:0, skipped:0 };
+function bbfWord(cm){ const rd=S.raid; if(!bbsOn() || !rd || !rd.bbs || !cm) return; const v=Math.max(0, Math.floor(+cm.n||0)), n=Math.floor(v/1000), r=v-n*1000, seat=Math.floor(r/10), p=r-seat*10;
+  const B=rd.bbs, Wd=B.bbfW||(B.bbfW={}); Wd[n]={ seat:seat, p:p, why:Math.max(0,Math.min(9,cm.b|0)), x:(typeof cm.x==='number')? cm.x : null, y:(typeof cm.y==='number')? cm.y : null }; BBF_STATS.got++; if(B.bbfTop==null || n>B.bbfTop) B.bbfTop=n; }
+{ const ca0=coopApply; coopApply=function(cm){ if(cm && cm.k==='bbf'){ bbfWord(cm); return; } return ca0.apply(this,arguments); }; }
+function bbfGuest(){ return !!(S.coop && COOP && !COOP.ended && !sqRef()); }
+function bbfListen(f,b,M,B){   
+  if(M.st==='tell' || M.st==='fan') return; const top=B.bbfTop; if(top==null || top<=M.ordIn) return; const w=B.bbfW[top]; if(!w) return;
+  BBF_STATS.skipped+=Math.max(0, top-M.ordIn-1); bbfApply(f,b,M,top,{ seat:w.seat, p:w.p, why:w.why, x:w.x, y:w.y }); }
+function bbfApply(f,b,M,n,w){ const L=bbfSeats(), s=L[w.seat]; M.ordIn=n; BBF_STATS.applied++; M.log.push([n, w.seat, w.p, BBF_WHY[w.why]||'?', +bbsClock().toFixed(2), Math.round(f.x), Math.round(f.y)]); if(M.log.length>240) M.log.shift();
+  if(w.p===8) M.engaged=1;
+  if(w.p===7 || !s){ M.seat=-1; M.peek=-1; M.pend=null; M.fansHere=0; if(w.p===8 && (M.st==='in' || M.st==='adv' || M.st==='cover' || M.st==='go')){ M.aimAt=(w.x!=null)? { x:w.x, y:w.y } : null; bbfTell(f,b,M); return; } if(M.st!=='tell' && M.st!=='fan') M.st=M.engaged? 'adv' : 'in'; return; }   
+  if(w.p===8){ M.seat=w.seat; M.peek=-1; M.fansHere=0; M.tHere=0; if(M.st==='in' || M.st==='adv' || M.st==='cover' || M.st==='go'){ M.aimAt=(w.x!=null)? { x:w.x, y:w.y } : null; bbfTell(f,b,M); } else { M.st='go'; M.goal={ x:s.x, y:s.y }; } return; }   
+  if(w.p===9 || w.seat!==M.seat){ if(w.seat!==M.seat){ M.fansHere=0; M.tHere=0; } M.seat=w.seat; M.peek=-1; M.pend=(w.p===0 || w.p===1)? { p:w.p } : null; M.st='go'; M.goal={ x:s.x, y:s.y }; return; }   
+  M.pend={ p:w.p }; if(M.st!=='cover'){ M.st='go'; M.goal={ x:s.x, y:s.y }; } }   
+
+function bbfStep(f,M,gx,gy,spd,dt){ const G=S.cfg.terrain && S.cfg.terrain.streets; let ax=gx, ay=gy; f.hvilO=0; const gk=Math.round(gx)+','+Math.round(gy); if(M.gk!==gk){ M.gk=gk; f.hvilT=0; f.hvilA=undefined; }   
+  if(G){ const pl=hvilPlan(f,G,gx,gy,dt); if(pl){ ax=pl.x; ay=pl.y; } }
+  let dx=ax-f.x, dy=ay-f.y; const st=rockSteer(f.x,f.y,ax,ay,ROCK_PAD_FOE,null,1); if(st){ dx=st.x; dy=st.y; }
+  const dd=Math.hypot(dx,dy)||1, left=Math.hypot(gx-f.x,gy-f.y), mv=Math.min(spd*dt, left);
+  const x0=f.x, y0=f.y; f.x+=dx/dd*mv; f.y+=dy/dd*mv; if(f.x<BBF.xMin-30) f.x=BBF.xMin-30; if(f.x>W-20) f.x=W-20; if(f.y<84) f.y=84; if(f.y>WORLD_H-40) f.y=WORLD_H-40;
+  const m9=Math.hypot(f.x-x0,f.y-y0); if(m9>0.01){ if(Math.abs(f.x-x0)>0.02){ f.wkX=(f.x>x0)? 1 : -1; f.wkT=S.t; } M.dist[spd>=BBF.run? 'run' : 'walk']+=m9; }
+  return Math.hypot(gx-f.x,gy-f.y); }
+function bbfStuck(f,M,dt){ M.stuckT+=dt; if(M.stuckT<BBF.stuck) return false; const moved=Math.hypot(f.x-M.sx,f.y-M.sy); M.stuckT=0; M.sx=f.x; M.sy=f.y; return moved<20; }
+
+function bbfTick(f,dt,B){ const b=f.bbs||(f.bbs={ st:'idle', t:BBS_FAN.cd, n:0, rounds:0, fans:0, reloads:0, pips:0 }), M=bbfM(f), tier=bbsTier(), FN=BBS_FAN;
+  if(M.alone && B.bbfTop!=null){ M.alone=0; M.ordIn=Math.min(M.ordIn, B.bbfTop-1); }   
+  const ref=!bbfGuest() || !!M.alone;
+  f.spdMul=1e-6; f.bbsSpd0=1e-6;   
+  if(f.x<300) f.x=300;   
+  M.time[M.st]=(M.time[M.st]||0)+dt;
+  if(B.rallyN!==M.rallyN){ M.rallyN=B.rallyN|0; if(M.st==='tell' || M.st==='fan'){ M.st=(M.seat>=0)? 'go' : 'in'; } b.st=(b.st==='reload')? 'reload' : 'idle'; if(M.seat>=0){ const s=bbfSeats()[M.seat]; if(s) M.goal={ x:s.x, y:s.y }; M.st='go'; M.pend=null; } if(ref && M.seat>=0) M.after=1; }   
+  if(b.st==='reload'){ b.t-=dt; if(((b.t*2)|0)!==(((b.t+dt)*2)|0)) S.fx.push({ k:'ring', x:f.x, y:f.y+4, r:10, R:34, t:0, dur:0.4, col:'rgba(255,170,70,0.75)' }); if(b.t<=0){ b.st='idle'; b.t=0; } }   
+  if(!ref) bbfListen(f,b,M,B);
+  if(M.st==='in' || M.st==='adv'){ 
+    const u9=tanPick(f), aim=(u9 && Math.hypot(u9.x-f.x,u9.y-f.y)<=Math.max(60,(u9.def.rng||0)*HOLD_K))? Math.atan2(u9.y-f.y,u9.x-f.x) : (M.held>0.25? bbsAim(f, FN.R) : null);   
+    if(aim!=null && b.st==='reload'){ bbfSide(f,M); return; }   
+    if(aim!=null && !ref && B.bbfTop==null){ M.waitW=(M.waitW||0)+dt; if(M.waitW>BBF.silent){ M.alone=1; M.alones=(M.alones|0)+1; } }   
+    if(aim!=null && ref){ M.aim0=aim; if(bbfDecide(f,b,M,'first')) return; bbfTell(f,b,M); return; }   
+    let gx=T.x+40, gy=T.y, nd=1e9; for(const u of bbfMen()){ if(u.x<BBF.xMin-60) continue; const d=Math.hypot(u.x-f.x,u.y-f.y); if(d<nd){ nd=d; gx=u.x; gy=u.y; } }   
+    const x0=f.x, y0=f.y; bbfStep(f,M,gx,gy,(M.st==='adv')? BBF.adv : BBF.walk,dt); const mv9=Math.hypot(f.x-x0,f.y-y0); M.held=(mv9<0.05)? (M.held||0)+dt : 0; if(b.st==='reload' && mv9<0.05) bbfSide(f,M);   
+    return; }
+  if(M.st==='off' || M.st==='side'){ const g=M.goal; if(!g){ M.st=M.engaged? 'adv' : 'in'; return; } const left=bbfStep(f,M,g.x,g.y,(M.st==='off')? BBF.run : BBF.side.spd,dt); const done=(left<3) || bbfStuck(f,M,dt);
+    if(done){ if(b.st==='reload') bbfSide(f,M); else { M.st=M.engaged? 'adv' : 'in'; M.goal=null; } } return; }
+  if(M.st==='tell'){ M.t-=dt; if(M.t<=0) bbfFanOpen(f,b,M,tier); return; }
+  if(M.st==='fan'){ bbfFanTick(f,b,M,dt,tier,B); return; }
+  const s=bbfSeats()[M.seat];
+  if(M.st==='go' || M.st==='back'){ if(!s){ M.st=M.engaged? 'adv' : 'in'; return; } const left=bbfStep(f,M,s.x,s.y,BBF.run,dt); if(left<3){ M.st='cover'; M.tHere=0; M.scanT=0; M.stuckT=0; return; }
+    if(bbfStuck(f,M,dt)){ M.stuck=(M.stuck|0)+1; if(ref){ (M.bad||(M.bad={}))[M.seat]=bbsClock()+10; } if(!(ref && bbfDecide(f,b,M,'stuck'))){ M.st='cover'; M.tHere=0; } } return; }   
+  if(M.st==='out'){ const p=s && s.peeks[M.peek]; if(!p){ M.st='go'; return; } const left=(left0=>left0)(bbfStep(f,M,p.x,p.y,BBF.run,dt)); if((left<3 || bbfStuck(f,M,dt)) && b.st!=='reload') bbfTell(f,b,M); return; }   
+  if(M.st==='cover'){ M.tHere+=dt;
+    if(ref){ M.scanT-=dt; if(M.scanT<=0){ M.scanT=BBF.scan; if(M.tHere>=BBF.rest || M.after){ const why=bbfThreat(f,bbfMen()); if(why>=0){ M.after=0; if(bbfDecide(f,b,M,BBF_WHY[why])) return; } } }
+      const lead=s? Math.hypot(s.peeks[0].x-s.x, s.peeks[0].y-s.y)/BBF.run : 0.8; if(!M.pend && (b.st!=='reload' || b.t<=lead) && !(M.decT>0)){ M.after=0; if(!bbfDecide(f,b,M,'peek')) M.decT=0.5; } if(M.decT>0) M.decT-=dt; }
+    if(M.pend && s){ const p=s.peeks[M.pend.p]; const lead=p? Math.hypot(p.x-f.x,p.y-f.y)/BBF.run : 0; if(b.st!=='reload' || b.t<=lead){ M.peek=M.pend.p; M.pend=null; M.st='out'; } }   
+    return; }
+}
+
+function bbfTell(f,b,M){ M.st='tell'; M.t=BBF.tell; b.st='tell'; M.tells++; M.tellAt=S.t;
+  const aim=(M.aimAt? Math.atan2(M.aimAt.y-f.y, M.aimAt.x-f.x) : null), a9=bbsAim(f, BBS_FAN.R); M.aim=(a9!=null)? a9 : (aim!=null? aim : (M.aim0!=null? M.aim0 : Math.PI)); M.aimAt=null;
+  bbfFace(f, M.aim, BBF.tell+1.8);
+  for(let i=0;i<2;i++){ const m=bbfMz(f,i); S.fx.push({ k:'bbf', kk:'gl', x:m.x, y:m.y, i:i, t:0, dur:BBF.tell }); }
+  bfSfx(SFX.bbfCock, f.x, f.y);
+  const B=S.raid && S.raid.bbs; if(B && !B.bbfCall){ B.bbfCall=1; S.floats.push({ x:f.x, y:f.y-f.def.w*0.9, txt:'FIRE AWAY, BOYS! Make it rain!', t:0, col:'#FFD24A' }); try{ bbsVoice('FIRE AWAY, BOYS! Make it rain!', { hold:BBS7.T.hold }); }catch(e){} }   
+}
+function bbfFace(f,aim,hold){ const fx=(Math.cos(aim)>=0)? 1 : -1; f.faceX=fx; f.faceAt=S.t; f.faceTo=S.t+hold; f.wkT=0; }   
+function bbfFz(f){ return (aimLive(f) && f.faceX>0)? 1 : -1; }   
+function bbfMz(f,i){ const m=BBS_FAN_MZ[i&1]||BBS_FAN_MZ[0], fz=bbfFz(f); return { x:f.x-m.x*fz, y:f.y+m.y }; }   
+
+function bbfFanOpen(f,b,M,tier){ M.st='fan'; b.st='fan'; b.aim=M.aim; b.n=0; b.nMax=(BBS_FAN.n[tier]||6); b.t=0; b.fans++; M.fansM++; if(M.seat>=0 && M.peek>=0) M.fansHere++; M.fanAt=S.t; bbfFace(f, b.aim, BBS_FAN.gap*b.nMax+0.5); }
+function bbfFanTick(f,b,M,dt,tier,B){ const FN=BBS_FAN, PIP=BBS_PIP[tier]||0.8; b.t-=dt;
+  const men=bbsCorridor(f, b.aim, FN.R, FN.half, FN.thru);
+  for(const u of men){ if(u.bbsLast!=null && S.t-u.bbsLast>1.0){ u.bbsExp=0; u.bbsPips=0; } u.bbsLast=S.t; u.bbsExp=(u.bbsExp||0)+dt; const due=Math.floor((u.bbsExp+1e-6)/PIP); while((u.bbsPips|0)<due && !u.dead){ u.bbsPips=(u.bbsPips|0)+1; b.pips++; f.pipN=1; tanHit(u, f.x, f.y, f); f.pipN=0; } }   
+  if(b.t<=0 && (b.n<b.nMax || B.force)){ b.t+=FN.gap; b.n++; b.rounds++; bbfRound(f,b,M,men); bbsFanBarrel(f, b.aim, FN.R, FN.half); const sc=bbsAim(f, FN.R); if(sc!=null){ b.aim=sc; bbfFace(f, sc, FN.gap*2+0.4); } }   
+  else if(b.t<=0 && b.n>=b.nMax){ bbfReload(f,b,M); } }
+function bbfRound(f,b,M,men){ const i=b.n&1, m=bbfMz(f,i), a=b.aim, RM=reducedMotion(), FN=BBS_FAN;
+  let ix=m.x+Math.cos(a)*FN.R, iy=m.y+Math.sin(a)*FN.R*0.35+(f.y-m.y), hit=null;
+  if(men.length){ hit=men[0]; ix=hit.x; iy=hit.y-18; }
+  else { const w=pbmBetween(f.x,f.y,f.x+Math.cos(a)*FN.R,f.y+Math.sin(a)*FN.R,f.x,f.y); if(w){ ix=w.x; iy=w.y-18; } }   
+  const dl=BBF.tr.dur*BBF.tr.head;
+  S.fx.push({ k:'bbf', kk:'mz', x:m.x, y:m.y, ang:a, t:0, dur:BBF.mz.dur });
+  S.fx.push({ k:'bbf', kk:'tr', x1:m.x, y1:m.y, x2:ix, y2:iy, t:0, dur:BBF.tr.dur });
+  S.fx.push({ k:'bbf', kk:'sp', x:ix, y:iy, ang:a, h:(b.rounds*7+i)%13, t:-dl, dur:BBF.spark.dur });
+  S.fx.push({ k:'shell', x:m.x+3*bbfFz(f), y:m.y-2, h:i, t:0, dur:0.55 });   
+  if(hit){ hit.bbfFl=S.t+dl; hit.bbfFd=(hit.x>=f.x)? 1 : -1; }   
+  M.rcAt=S.t; M.rcH=i; M.mzLog.push([+S.t.toFixed(2), i, Math.round(m.x), Math.round(m.y), Math.round(f.x), Math.round(f.y), bbfFz(f)]); if(M.mzLog.length>60) M.mzLog.shift();
+  bfSfx(SFX.colt, f.x, f.y);   
+  if(!RM && bfVis(f.x,f.y)) S.shake=Math.min(BBF.kick.cap, Math.max(S.shake, BBF.kick.add)); }   
+function bbfReload(f,b,M){ b.st='reload'; b.t=BBS_FAN.reload; b.reloads++; M.reloadAt=S.t; const fz=bbfFz(f);
+  for(let i=0;i<6;i++) S.fx.push({ k:'shell', x:f.x+6*fz+(i%3)*4, y:f.y-30+(i%2)*6, h:i&1, t:-i*0.05, dur:0.6 });   
+  bfSfx(SFX.thock, f.x, f.y); bfSfx(SFX.bbfSpin, f.x, f.y); if(!reducedMotion() && bfVis(f.x,f.y)) S.shake=Math.max(S.shake, 0.2);
+  const s=bbfSeats()[M.seat]; M.peek=-1;
+  if(s){ M.st='back'; M.goal={ x:s.x, y:s.y }; if(s.rail && Math.hypot(f.x-s.x,f.y-s.y)<6){ M.st='cover'; M.tHere=0; } return; }   
+  bbfOff(f,M); }   
+function bbfOff(f,M){ const men=bbfMen(); let sx=0, sy=0, n=0; for(const u of men){ if(Math.hypot(u.x-f.x,u.y-f.y)<BBS_FAN.R+80){ sx+=u.x; sy+=u.y; n++; } } let ax=1, ay=0; if(n){ ax=f.x-sx/n; ay=f.y-sy/n; const L=Math.hypot(ax,ay)||1; ax/=L; ay/=L; if(ax<0.3){ ax=0.3; const L2=Math.hypot(ax,ay); ax/=L2; ay/=L2; } }
+  M.st='off'; M.goal={ x:Math.max(BBF.xMin, Math.min(W-80, f.x+ax*BBF.off)), y:Math.max(110, Math.min(WORLD_H-80, f.y+ay*BBF.off)) }; }   
+function bbfSide(f,M){ M.sideN=(M.sideN|0)+1; const up=rxRoll(bbfKey(M.ordIn,'side'+M.sideN))<0.5, d=BBF.side.d*(up? -1 : 1); let y=f.y+d; if(y<110 || y>WORLD_H-80) y=f.y-d; M.st='side'; M.goal={ x:f.x, y:Math.max(110, Math.min(WORLD_H-80, y)) }; }   
+
+{ const rc0=croakRc; croakRc=function(f){ const r=rc0(f); if(r || !f || f.type!=='bbshow' || !BBF.on || f.bbsRide) return r; const b=f.bbs, M=b && b.bbf; if(!M || !bbsOn()) return r;
+  if(b.st==='tell'){ const k=Math.min(1, (BBF.tell-Math.max(0,M.t))/0.12); return BBF.rock.tell*k; }   
+  if(b.st==='fan' && M.rcAt!=null && !reducedMotion()){ const k=1-(S.t-M.rcAt)/0.12; return k>0? (M.rcH? -BBF.rock.rc : BBF.rock.rc)*k : 0; }   
+  return r; }; }
+{ const du0=drawUnit; drawUnit=function(u){ const t9=u && u.bbfFl; if(t9==null || S.t<t9 || S.t-t9>BBF.flinch.t || reducedMotion()) return du0.apply(this,arguments); const k=(S.t-t9)/BBF.flinch.t; cx.save(); cx.translate((u.bbfFd||1)*BBF.flinch.px*Math.sin(Math.PI*k), -2*Math.sin(Math.PI*k)); try{ return du0.apply(this,arguments); } finally { cx.restore(); } }; }   
+{ const ds0=drawSoccer; drawSoccer=function(){ const r=ds0.apply(this,arguments); try{ bbfDraw(); }catch(e){} return r; }; }
+function bbfDraw(){ if(!BBF.on || !bbsOn()) return; const RM=reducedMotion();
+  for(const e of S.fx){ if(e.k!=='bbf' || e.t<0) continue; const k=Math.min(1, e.t/e.dur);
+    if(e.kk==='mz'){ const R=BBF.mz.R*(0.7+0.3*k), al=1-k; cx.save(); cx.translate(e.x,e.y); cx.globalAlpha=al*0.55; cx.fillStyle='#FFE9A8'; cx.beginPath(); cx.arc(0,0,R*0.62,0,7); cx.fill();   
+      cx.rotate(e.ang); cx.globalAlpha=al; cx.strokeStyle='#FFD45A'; cx.lineCap='round'; for(let j=0;j<8;j++){ const a=j*Math.PI/4, L=(j===0)? R*1.25 : (j%2===0)? R*0.75 : R*0.45; cx.lineWidth=(j%2===0)? 4 : 2.6; cx.beginPath(); cx.moveTo(0,0); cx.lineTo(Math.cos(a)*L, Math.sin(a)*L); cx.stroke(); }   
+      cx.fillStyle='#FFFFFF'; cx.beginPath(); cx.arc(0,0,R*0.3,0,7); cx.fill(); cx.restore(); continue; }
+    if(e.kk==='tr'){ const L=Math.hypot(e.x2-e.x1,e.y2-e.y1)||1, ux=(e.x2-e.x1)/L, uy=(e.y2-e.y1)/L; cx.save(); cx.lineCap='round';
+      if(RM){ cx.globalAlpha=0.85*(1-k); cx.strokeStyle='#FFB347'; cx.lineWidth=BBF.tr.w; cx.beginPath(); cx.moveTo(e.x1,e.y1); cx.lineTo(e.x2,e.y2); cx.stroke(); cx.restore(); continue; }   
+      const p=Math.min(1, k/BBF.tr.head), hx=e.x1+ux*L*p, hy=e.y1+uy*L*p, tl=Math.min(BBF.tr.tail, L*p), fade=(k<=BBF.tr.head)? 1 : 1-(k-BBF.tr.head)/(1-BBF.tr.head);
+      cx.globalAlpha=0.32*fade; cx.strokeStyle='#FFC070'; cx.lineWidth=2; cx.beginPath(); cx.moveTo(e.x1,e.y1); cx.lineTo(hx,hy); cx.stroke();   
+      const g=cx.createLinearGradient(hx-ux*tl, hy-uy*tl, hx, hy); g.addColorStop(0,'rgba(255,140,40,0)'); g.addColorStop(0.6,'rgba(255,170,60,0.9)'); g.addColorStop(1,'rgba(255,246,200,1)');
+      cx.globalAlpha=fade; cx.strokeStyle=g; cx.lineWidth=BBF.tr.w; cx.beginPath(); cx.moveTo(hx-ux*tl, hy-uy*tl); cx.lineTo(hx,hy); cx.stroke();   
+      if(p<1){ cx.fillStyle='#FFF6D0'; cx.beginPath(); cx.arc(hx,hy,BBF.tr.w*0.75,0,7); cx.fill(); }
+      cx.restore(); continue; }
+    if(e.kk==='sp'){ cx.save(); cx.translate(e.x,e.y); cx.globalAlpha=1-k; cx.fillStyle='#FFFFFF'; cx.beginPath(); cx.arc(0,0,4+5*(1-k),0,7); cx.fill(); cx.strokeStyle='#FFD86B'; cx.lineWidth=2.2; cx.lineCap='round';
+      for(let j=0;j<BBF.spark.n;j++){ const a=e.ang+Math.PI+(j-(BBF.spark.n-1)/2)*0.42+((e.h*7+j*5)%9-4)*0.05, r0=4+10*k, r1=r0+6+8*(1-k); cx.beginPath(); cx.moveTo(Math.cos(a)*r0, Math.sin(a)*r0); cx.lineTo(Math.cos(a)*r1, Math.sin(a)*r1); cx.stroke(); }   
+      cx.restore(); continue; }
+    if(e.kk==='gl'){ const R=BBF.glint.R*(0.55+0.45*Math.sin(Math.PI*Math.min(1,k*1.4))), rot=RM? 0 : k*Math.PI*0.75; cx.save(); cx.translate(e.x,e.y); cx.rotate(rot); cx.globalAlpha=Math.min(1,0.4+k*1.5); cx.strokeStyle='#FFFFFF'; cx.lineCap='round'; cx.lineWidth=2.6;
+      cx.beginPath(); cx.moveTo(-R,0); cx.lineTo(R,0); cx.moveTo(0,-R); cx.lineTo(0,R); cx.stroke(); cx.strokeStyle='#FFE27A'; cx.lineWidth=1.8; const r2=R*0.5; cx.beginPath(); cx.moveTo(-r2,-r2); cx.lineTo(r2,r2); cx.moveTo(-r2,r2); cx.lineTo(r2,-r2); cx.stroke();
+      cx.fillStyle='#FFFFFF'; cx.beginPath(); cx.arc(0,0,2.6,0,7); cx.fill(); cx.restore(); continue; } }
+  const b9=bbsBill(); if(b9 && b9.bbs && b9.bbs.bbf && b9.bbs.st==='reload' && !b9.bbsRide && bbfOwns(b9)) bbfCylDraw(b9, RM);
+}
+function bbfCylDraw(f,RM){ const b=f.bbs, m=bbfMz(f,1), k=Math.max(0, Math.min(1, 1-b.t/BBS_FAN.reload)), r=BBF.cyl.r, x=m.x, y=m.y-r-10, spin=RM? 0 : (b.t*BBF.cyl.spin)*(0.35+0.65*Math.min(1,b.t));   
+  cx.save(); cx.translate(x,y); cx.globalAlpha=0.9; cx.strokeStyle='rgba(42,30,22,0.55)'; cx.lineWidth=4; cx.beginPath(); cx.arc(0,0,r+6,0,7); cx.stroke();
+  cx.strokeStyle='#FFD24A'; cx.lineWidth=3; cx.lineCap='round'; cx.beginPath(); cx.arc(0,0,r+6,-Math.PI/2,-Math.PI/2+k*Math.PI*2); cx.stroke();
+  cx.rotate(spin); cx.fillStyle='#6E7378'; cx.strokeStyle='#4A4F55'; cx.lineWidth=1.6; cx.beginPath(); cx.arc(0,0,r,0,7); cx.fill(); cx.stroke();
+  cx.fillStyle='#8E9499'; cx.beginPath(); cx.arc(-r*0.25,-r*0.3,r*0.55,0,7); cx.fill();   
+  for(let j=0;j<6;j++){ const a=j*Math.PI/3, filled=(j<Math.floor(k*6+0.001)); cx.fillStyle=filled? '#C9A227' : '#2A2622'; cx.beginPath(); cx.arc(Math.cos(a)*r*0.58, Math.sin(a)*r*0.58, r*0.2, 0, 7); cx.fill(); }   
+  cx.fillStyle='#2A2622'; cx.beginPath(); cx.arc(0,0,r*0.16,0,7); cx.fill(); cx.restore(); }
+
+SFX.bbfCock=function(){ if(!soundOn) return; const ac=audio(); if(!ac) return; try{ const t0=ac.currentTime, D=ac.destination;
+  for(const [dt9,fq,g9] of [[0,3600,0.34],[0.085,2700,0.42]]){ const c=ac.createBufferSource(); c.buffer=coltNoise(ac,0.016,20261031+dt9*1000); const bp=ac.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=fq; bp.Q.value=5; const gg=ac.createGain(); gg.gain.setValueAtTime(g9,t0+dt9); gg.gain.exponentialRampToValueAtTime(0.001,t0+dt9+0.03); c.connect(bp).connect(gg).connect(D); c.start(t0+dt9); }   
+  tone(2400,1900,0.035,'triangle',0.05,t0+0.088); }catch(e){} };
+SFX.bbfSpin=function(){ if(!soundOn) return; const ac=audio(); if(!ac) return; try{ const t0=ac.currentTime+0.12, D=ac.destination;
+  for(let j=0;j<7;j++){ const tj=t0+j*0.045*(1+j*0.12), c=ac.createBufferSource(); c.buffer=coltNoise(ac,0.008,20261041+j); const bp=ac.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=4200-j*120; bp.Q.value=7; const gg=ac.createGain(); gg.gain.setValueAtTime(0.18*(1-j*0.08),tj); gg.gain.exponentialRampToValueAtTime(0.001,tj+0.02); c.connect(bp).connect(gg).connect(D); c.start(tj); } }catch(e){} };   
+
+{ const bt0=bbsBillTick; bbsBillTick=function(f,dt,B){ if(!bbfOwns(f)) return bt0.apply(this, arguments); bbfTick(f,dt,B); try{ bbsVoiceTick(f,dt,B); }catch(e){} }; }
+function bbfRead(f,full){ const b=f && f.bbs, M=b && b.bbf; if(!M) return null; const s=bbfSeats()[M.seat];
+  const o={ st:M.st, bst:b.st, run:(M.st==='go' || M.st==='back' || M.st==='out' || M.st==='off')? 1 : 0, seat:M.seat, at:s? [s.x,s.y,s.side,s.key] : null, peek:M.peek, fansHere:M.fansHere, ordOut:M.ordOut, ordIn:M.ordIn, tells:M.tells, fans:M.fansM, words:M.words };
+  if(full){ o.log=M.log.slice(-60); o.mz=M.mzLog.slice(-16); o.dist={ walk:Math.round(M.dist.walk), run:Math.round(M.dist.run) }; o.time={}; for(const k in M.time) o.time[k]=+M.time[k].toFixed(1); o.stats=Object.assign({}, BBF_STATS); o.seats=bbfSeats().map(q=>[q.i,q.x,q.y,q.side,q.key,q.peeks.length]); }
+  return o; }
+function bbfRig(o){ o=o||{}; const f=bbsBill(); const M=f && f.bbs && f.bbs.bbf;
+  if(f && M && o.seat!=null && bbfOwns(f)){ const s=bbfSeats()[o.seat|0]; if(s){ M.seat=s.i; M.peek=-1; M.pend=null; M.fansHere=0; M.st='go'; M.goal={ x:s.x, y:s.y }; } }   
+  return { cv:GVT_CV, on:BBF.on, raid:bbsOn()?1:0, owns:f? (bbfOwns(f)?1:0) : null, bill:f? { x:Math.round(f.x), y:Math.round(f.y), hp:Math.round(f.hp), max:f.hpMax, st:f.bbs? f.bbs.st : null, ride:f.bbsRide|0, faceX:f.faceX||0, fz:bbfFz(f) } : null, m:f? bbfRead(f,1) : null, seats:bbfSeats().map(q=>({ i:q.i, x:q.x, y:q.y, side:q.side, key:q.key, peeks:q.peeks })), stats:Object.assign({}, BBF_STATS), wire:(S.raid && S.raid.bbs)? { top:S.raid.bbs.bbfTop==null? null : S.raid.bbs.bbfTop, got:Object.keys(S.raid.bbs.bbfW||{}).length } : null, dials:{ walk:BBF.walk, run:BBF.run, tell:BBF.tell, fans:BBF.fans, crowdR:BBF.crowdR, crowdN:BBF.crowdN, mz:BBF.mz, tr:BBF.tr, kick:BBF.kick, cyl:BBF.cyl }, fx:S.fx.filter(e=>e.k==='bbf').length, guest:bbfGuest()?1:0 }; }
+setTimeout(function(){ try{ if(window.GVT && !GVT.bbf) GVT.bbf=function(o){ return bbfRig(o); }; }catch(e){} }, 0);   
 
 window.GVT = {
   cks(o){ if(o && o.pct!=null) CKS.pct=+o.pct||0; const R=[0,1,10,20,25,50,75,99,100], t={}; for(const r of R) t[r]={ mul:+cksMul(r).toFixed(4), hit:+hitDmgNowAt('kingcroak',r).toFixed(4), whole:hitWhole(hitDmgNowAt('kingcroak',r)) }; return { cv:GVT_CV, pct:CKS.pct, at:CKS.at, ck:HHB.ck, slope:HERO_DMG_RANK, mine:(META.up.kingcroak||0)|0, table:t }; },   
