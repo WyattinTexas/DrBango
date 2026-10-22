@@ -90233,7 +90233,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='26.02';        
+let GVT_CV='26.03';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -195912,6 +195912,26 @@ function otsRead(){ return { on:OTS.on, live:OTS_LIVE, laid:OTS.laid, btw:{ on:B
   decor:OTS_DECOR.map(d=>({ key:d.key, X:d.X, Y:d.Y, s:d.s, ras:!!(BBS_ART.ras && BBS_ART.ras[d.key]) })), bunt:!!(BBS_ART.ras && BBS_ART.ras.ots_bunt), sign:otsSignSVG().length, stats:Object.assign({},OTS.stats) }; }
 setTimeout(function(){ try{ if(window.GVT && !GVT.ots) GVT.ots=function(){ return otsRead(); }; }catch(e){} }, 0);   
 if(OTS.on && BTW.on) otsLay();   
+
+
+
+
+
+
+
+
+const WHB_LIVE=1;
+const WHB={ on:(function(){ try{ const q=/[?&]whb=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_whb','0'); else localStorage.removeItem('gvt_whb'); } return localStorage.getItem('gvt_whb')==='0'? 0 : WHB_LIVE; }catch(e){ return WHB_LIVE; } })(),
+  stats:{ mounts:0, lifted:0, kept:0 }, last:null };
+function whbLift(f){   
+  const key='HE WHISTLES FOR HIS HORSE', a=S.ann; if(!a || a.lsb || a.txt!==t(key)){ WHB.stats.kept++; return 0; }
+  S.ann=null;
+  const w=(f && f.def && f.def.w)|| 40, y0=(f? f.y : 0)-w*1.05;
+  S.floats.push({ x:f? f.x : W/2, y:y0-24, txt:t(key), t:-1.5, col:'#FFD24A' });   
+  WHB.stats.lifted++; WHB.last={ t:+S.t.toFixed(2), x:f? Math.round(f.x) : null, y:f? Math.round(f.y) : null }; return 1; }
+{ const m0=bbsMount; bbsMount=function(f,u){ const r=m0.apply(this, arguments); WHB.stats.mounts++; if(WHB.on){ try{ whbLift(f); }catch(e){} } return r; }; }   
+function whbRead(){ return { on:WHB.on, live:WHB_LIVE, stats:Object.assign({},WHB.stats), last:WHB.last, ann:S.ann? { txt:S.ann.txt, t:S.ann.t, lsb:!!S.ann.lsb } : null, floats:S.floats.filter(function(z){ return z && typeof z.txt==='string'; }).map(function(z){ return [z.txt, Math.round(z.x), Math.round(z.y), +(z.t||0).toFixed(2)]; }).slice(-6) }; }
+setTimeout(function(){ try{ if(window.GVT && !GVT.whb) GVT.whb=function(){ return whbRead(); }; }catch(e){} }, 0);
 
 
 
