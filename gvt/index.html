@@ -13362,11 +13362,11 @@ html.tfh-on #wpfly { z-index:40; }   /**/   /**/
   /**/
   .dec-soc.kusq .socb { animation:kusquash 0.24s ease-out; }
   @keyframes kusquash { 0% { transform:translateY(0) scale(1.2,0.76); } 35% { transform:translateY(-2px) scale(0.94,1.07); } 70% { transform:scale(1.03,0.97); } 100% { transform:none; } }
-  #kuCount { width:56px; margin-left:-28px; text-align:center; font-size:26px; color:#FFF3C4; z-index:8; }   /**/
-  #kuCount.flare { color:#FFE97A; animation:kuflare 0.6s ease-out; }   /**/
+  #kuCount, #kuCountB { width:56px; margin-left:-28px; text-align:center; font-size:26px; color:#FFF3C4; z-index:8; }   /**/
+  #kuCount.flare, #kuCountB.flare { color:#FFE97A; animation:kuflare 0.6s ease-out; }   /**/   /**/
   @keyframes kuflare { 0% { transform:scale(1); } 35% { transform:scale(1.9); } 100% { transform:scale(1); } }
   #kuFloat { width:420px; margin-left:-210px; text-align:center; z-index:9; }   /**/
-  @media (prefers-reduced-motion: reduce){ #kuCount.flare { animation:none; } }
+  @media (prefers-reduced-motion: reduce){ #kuCount.flare, #kuCountB.flare { animation:none; } }
   /*
 
 
@@ -89673,7 +89673,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='25.49';        
+let GVT_CV='25.50';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -142324,7 +142324,7 @@ function decorReact(id){
   
   
   
-  if(id==='soccer'){ if(SOC_FLY) return; socGoalPurse(); if(KU){ if(!KU.b) kuTap(); return; } if(kuCan()){ kuStart(); return; } }   
+  if(id==='soccer'){ if(SOC_FLY) return; socGoalPurse(); if(KU){ kuTap(); return; } if(KUB && !tblOn()) return; if(kuCan()){ kuStart(); return; } }       
   if(id==='puffer') puffPurse();   
   if(id==='bass') bassPurse();     
   if((id==='snowfig'||id==='gsnowman') && wfLive()) wfSnowPay(id, document.getElementById(d.el), 1);   
@@ -142569,13 +142569,25 @@ function kuDieStep(now){ const h=KU_HOME; if(!h || !h.die) return;
       return; }
     h.vz=v; h.sq=performance.now(); tone(295*0.94,110,0.07,'sine',0.07*v/Math.sqrt(2*KU_G*KU_H)/PBL_E); }   
   kuDiePaint(h); h.raf=requestAnimationFrame(kuDieStep); }
-function kuRepaintLater(ms){ setTimeout(()=>{ if(S.mode!=='menu' || KU) return; if(KU_HOME){ kuRepaintLater(120); return; } renderMenu(); }, ms); }   
+function kuRepaintLater(ms){ setTimeout(()=>{ if(S.mode!=='menu' || KU) return; if(KU_HOME || KUB){ kuRepaintLater(120); return; } renderMenu(); }, ms); }   
 let KU=null;   
+
+
+
+
+
+
+
+let KUB=null;   
+const TBL={ on:(function(){ try{ const q=/[?&]2bl=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_2bl','0'); else localStorage.removeItem('gvt_2bl'); } return localStorage.getItem('gvt_2bl')==='0'? 0 : 1; }catch(e){ return 1; } })() };   
+function tblOn(){ return TBL.on===1; }
+function kuAs(k, fn){ if(!k || k===KU) return fn(); const s=KU; KU=k; try{ return fn(); } finally{ KUB=KU; KU=s; } }   
+function kuStepB(now){ const k=KUB; if(!k) return; kuAs(k, function(){ kuStep(now); }); }   
 function kuCan(){ return !SOC_FLY && !KU && !momDue() && S.mode==='menu' && decorHome('soccer'); }   
 function kuFirst(p,e){   
   const b=brwPick(p,1,e); if(b) return b;
   const h=(decorHome('soccer') || decorHome('football'))? rdragPick(p) : null; if(!h) return null;
-  if(h.k==='soccer') return (SOC_FLY || (KU && KU.b))? null : h;
+  if(h.k==='soccer') return (SOC_FLY || (KUB && !tblOn()))? null : h;   
   return h.k==='football'? h : null; }   
 function kuStart(){
   KU={ z:0, vz:Math.sqrt(2*KU_G*KU_H), x:kuHomeStop(), vx:0, waver:0, n:0, room:roomCur(), prev:performance.now(), roll:0, paid:0, raf:0 };   
@@ -142598,8 +142610,9 @@ function kuTap(){
 }
 function kuCounter(){   
   const st=document.getElementById('roomStage'); if(!st) return null;
-  let c=document.getElementById('kuCount');
-  if(!c){ c=document.createElement('div'); c.id='kuCount'; c.className='starfloat run'; c.textContent=String(KU? KU.n : 0); st.appendChild(c); }
+  const id9=(KU && KU.b)? 'kuCountB' : 'kuCount';   
+  let c=document.getElementById(id9);
+  if(!c){ c=document.createElement('div'); c.id=id9; c.className='starfloat run'; c.textContent=String(KU? KU.n : 0); st.appendChild(c); }
   return c;
 }
 function kuPaint(){
@@ -142788,7 +142801,7 @@ function brwSvg(){ return document.querySelector('#roomStage > svg'); }
 function brwHost(kind){ const svg=brwSvg(); return svg? svg.querySelector(kind==='dino'? '#by-kick' : '#wf-movers') : null; }
 function brwHeld(kind){ return !!(BRW && BRW.kind===kind); }   
 function brwFieldOn(kind){ return S.mode==='menu' && !document.hidden && (kind==='dino'? yardLive() : wfLive()) && !kuCovered(); }   
-function brwCan(kind){ return !BRW && !KU && !FGK && !SOC_FLY && brwFieldOn(kind); }   
+function brwCan(kind){ return !BRW && (tblOn() || !KU) && !FGK && !SOC_FLY && brwFieldOn(kind); }       
 function brwBox(el){ const st=document.getElementById('roomStage'); if(!st || !el) return null; const r=st.getBoundingClientRect(), b=el.getBoundingClientRect(); if(!r.width || !(b.width>0)) return null; const s=r.width/960;
   return { x:(b.left+b.width/2-r.left)/s, y:(b.top+b.height/2-r.top)/s, w:b.width/s, h:b.height/s }; }   
 function brwMx(el){ try{ const m=/matrix\(([^)]+)\)/.exec(getComputedStyle(el).transform||''); if(m) return m[1].split(',').map(Number); }catch(e){} return [1,0,0,1,0,0]; }
@@ -142799,11 +142812,11 @@ function brwLive(kind){
   if(kind==='yeti'){ const sh=brwBox(host.querySelector('.ft-sh')); if(sh){ o.sx=sh.x; o.sy=sh.y; } else o.sy=c.y+h+12; o.rot-=10; }   
   return o; }
 function brwPadR(kind,s){ return Math.max(KU_PAD*BRW_R[kind], KU_PAD_PX/2/Math.max(0.05, +s||1)); }   
-function brwZ(){ const k=KU; return k? (reducedMotion()? (k.z>0? KU_RM_LIFT : 0) : k.z) : 0; }
+function brwZ(){ const k=KUB; return k? (reducedMotion()? (k.z>0? KU_RM_LIFT : 0) : k.z) : 0; }   
 function brwSeat(){ const B=BRW; return { x:(B && B.g? B.g[0] : 0)-BRW_R.dino, w:2*BRW_R.dino }; }   
 function brwPick(p,live,e){   
   const B=BRW;
-  if(live){ if(!B || B.kind!=='dino' || B.ph!=='run' || !KU || !KU.b) return null; const cx=B.g[0]+KU.x, cy=B.g[1]-brwZ(), R=brwPadR('dino',p.s);
+  if(live){ if(!B || B.kind!=='dino' || B.ph!=='run' || !KUB) return null; const cx=B.g[0]+KUB.x, cy=B.g[1]-brwZ(), R=brwPadR('dino',p.s);   
     if((p.x-cx)*(p.x-cx)+(p.y-cy)*(p.y-cy)<=R*R){ KU_HIT=p.x-cx; return { k:'brw', tapOnly:true }; } return null; }
   if(B) return null;
   const kind=yardLive()? 'dino' : wfLive()? 'yeti' : null; if(!kind || !brwCan(kind)) return null;
@@ -142816,7 +142829,7 @@ function brwTapAt(e){
   document.addEventListener('click', eat, {capture:true, once:true}); setTimeout(()=>document.removeEventListener('click', eat, {capture:true}), 350);
   brwTap(); }
 function brwTap(){ const B=BRW;
-  if(B){ if(B.kind==='dino' && B.ph==='run' && KU && KU.b) kuTap(); return; }   
+  if(B){ if(B.kind==='dino' && B.ph==='run' && KUB) kuAs(KUB, kuTap); return; }   
   const kind=yardLive()? 'dino' : wfLive()? 'yeti' : null; if(!kind || !brwCan(kind)) return;
   const c=brwLive(kind); if(!c) return;
   audio(); if(kind==='dino') brwJuggle(c); else brwTake(c); }
@@ -142862,10 +142875,9 @@ function brwStep(now){ const B=BRW; if(!B) return;
 function brwJuggle(c){   
   const z0=Math.min(KU_H, c.h);
   BRW={ kind:'dino', ph:'run', g:[c.x, c.y+c.h], paid:0, raf:0 };
-  KU={ z:z0, vz:Math.sqrt(2*KU_G*Math.max(0, KU_H-z0)), x:0, vx:0, waver:0, n:0, room:roomCur(), prev:performance.now(), roll:c.rot||0, paid:0, raf:0, b:'dino' };
-  brwBall(); brwPaint();
-  kuKick();
-  KU.raf=requestAnimationFrame(kuStep); }
+  KUB={ z:z0, vz:Math.sqrt(2*KU_G*Math.max(0, KU_H-z0)), x:0, vx:0, waver:0, n:0, room:roomCur(), prev:performance.now(), roll:c.rot||0, paid:0, raf:0, b:'dino' };   
+  kuAs(KUB, function(){ brwBall(); brwPaint(); kuKick(); });
+  if(KUB) KUB.raf=requestAnimationFrame(kuStepB); }
 function brwPaint(){   
   const k=KU, B=BRW, n=brwBall(); if(!k || !B || !n) return;
   const rm=reducedMotion(), z=brwZ(), zk=Math.max(0,Math.min(1,z/KU_H)), gx=B.g[0]+k.x, gy=B.g[1], b=n.querySelector('.brw-b'), r=n.querySelector('.brw-r'), s=n.querySelector('.brw-sh');
@@ -142874,7 +142886,7 @@ function brwPaint(){
   if(s){ s.setAttribute('transform','translate('+fg1(gx)+','+fg1(gy+28.7)+') scale('+(1-0.3*zk).toFixed(3)+')'); s.setAttribute('opacity',(0.25*(1-0.55*zk)).toFixed(3)); }
   const c=kuCounter(); if(c){ c.style.left=fg1(gx)+'px'; c.style.top=fg1(gy-z-64.6)+'px'; } }   
 function brwDrop(k, why){   
-  const B=BRW, c=document.getElementById('kuCount');
+  const B=BRW, c=document.getElementById('kuCountB');   
   if(c){ c.classList.remove('run'); c.classList.remove('tick'); c.classList.remove('flare'); setTimeout(()=>{ try{ c.remove(); }catch(e){} }, 1000); }
   if(why==='ground') SFX.socland();
   if(!B || B.kind!=='dino'){ brwEnd(); return; }
@@ -142928,7 +142940,7 @@ function kuStep(now){
     if(k.x<lo){ k.x=lo+(lo-k.x); k.vx=Math.abs(k.vx)*KU_WALL; } else if(k.x>hi){ k.x=hi-(k.x-hi); k.vx=-Math.abs(k.vx)*KU_WALL; } }
   if(k.z<=0 && k.vz<0){ k.z=0; kuPaint(); kuEnd('ground'); return; }   
   kuPaint();
-  k.raf=requestAnimationFrame(kuStep);
+  k.raf=requestAnimationFrame(k.b? kuStepB : kuStep);   
 }
 function kuEnd(why){
   const k=KU; KU=null; if(!k) return;
@@ -147161,6 +147173,9 @@ function rdragEnd(e){
   }
 }
 document.addEventListener('pointerdown', e=>{
+  if(RDRAG && !e.isPrimary && S.mode==='menu' && tblOn() && (RDRAG.k==='soccer' || RDRAG.k==='brw')){   
+    try{ const st9=document.getElementById('roomStage'); if(st9 && st9.contains(e.target)){ const p9=rdragPt(e); const kb9=p9? (kuFirst(p9,e) || brwPick(p9,0,e)) : null;
+      if(kb9 && (kb9.k==='brw' || kb9.k==='soccer')){ e.stopImmediatePropagation(); if(kb9.k==='brw') brwTapAt(e); else { const px=e.clientX, py=e.clientY, eat=ev=>{ if(Math.abs(ev.clientX-px)<=8 && Math.abs(ev.clientY-py)<=8){ ev.stopPropagation(); ev.preventDefault(); } }; document.addEventListener('click', eat, {capture:true, once:true}); setTimeout(()=>document.removeEventListener('click', eat, {capture:true}), 350); audio(); decorReact('soccer'); } return; } } }catch(e9){} }
   if(RDRAG || !e.isPrimary || S.mode!=='menu') return;
   const st=document.getElementById('roomStage'); if(!st || !st.contains(e.target)) return;
   const p=rdragPt(e); if(!p) return;
@@ -190215,7 +190230,7 @@ const MSBC5={ on:(function(){ try{ const q=/[?&]msbc5=([01])/.exec(location.sear
   function standing(k){ try{ return !!W.due() && onSheet(k) && !W.done(k); }catch(e){ return false; } }   
   function fire(k,add,x){ try{ if(Q.fire(k, add, x)) C.fires++; }catch(e){ log('fire:'+k+':'+e); } }
   
-  function kuNote(){ const k=KU; if(!k || k.b || k.room!=='backyard' || cur('sport')!=='soccer' || !onSheet('sport')) return; const n=k.n|0, c=W.cnt('sport'); if(n>c) fire('sport', n-c, { id:'soccer', run:n }); }
+  function kuNote(){ const k=KU; if(!k || (k.b && !tblOn()) || k.room!=='backyard' || cur('sport')!=='soccer' || !onSheet('sport')) return; const n=k.n|0, c=W.cnt('sport'); if(n>c) fire('sport', n-c, { id:'soccer', run:n, ball:k.b||'own' }); }   
   const kk0=kuKick; kuKick=function(){ const r=kk0.apply(this,arguments); try{ kuNote(); }catch(e){ log('ku:'+e); } return r; };
   
   const fm0=fgMake; fgMake=function(){ const r=fm0.apply(this,arguments); try{ if(cur('sport')==='football') fire('sport', 1, { id:'football' }); }catch(e){ log('fg:'+e); } return r; };
@@ -190240,7 +190255,7 @@ const MSBC5={ on:(function(){ try{ const q=/[?&]msbc5=([01])/.exec(location.sear
     return { cv:GVT_CV, on:C.on, W0:C.W0, V:C.V, w:w, pool:ks(pool()), live:ks(Q.live()), sheet:(s && typeof s==='object')? { w:s.w, ks:(s.ks||[]).slice(), pk:s.pk? Object.assign({},s.pk) : null, v:s.v, w0:s.w0, n:Object.assign({},s.n||{}), c:Object.assign({},s.c||{}) } : null,
       pk:{ sport:cur('sport'), bird:cur('bird'), fish:cur('fish') }, raw:pick(w), far:pickFar(w), faces:['sport','bird','fish'].map(function(k){ return [k, ROW[k].line, ROW[k].en.slice(), ROW[k].n]; }), lines:['sport','bird','fish'].map(function(k){ return Q.lines(ROW[k]); }),
       standing:{ sport:standing('sport'), bird:standing('bird'), fish:standing('fish') }, reach:{ soccer:canSport('soccer'), football:canSport('football'), birds:BIRDS.map(function(b){ return [b.k, canBird(b.k)]; }), fish:FISH.map(function(f){ return [f, canFish(f)]; }) },
-      ku:KU? { n:KU.n, room:KU.room, b:KU.b||null } : null, bwv:BWV? { kind:BWV.kind, room:BWV.room, on:BWV.on, ph:BWV.ph, rm:!!BWV.rm } : null, degg:META.degg|0, baited:META.baited|0, fires:C.fires, log:C.log.slice(-30), q:{ fired:Q.fired, log:Q.log.slice(-20) }, msbw:W.read() }; };
+      ku:KU? { n:KU.n, room:KU.room, b:KU.b||null } : null, kub:(typeof KUB!=='undefined' && KUB)? { n:KUB.n, room:KUB.room, b:KUB.b||null } : null, tbl:(typeof TBL!=='undefined')? TBL.on : null, bwv:BWV? { kind:BWV.kind, room:BWV.room, on:BWV.on, ph:BWV.ph, rm:!!BWV.rm } : null, degg:META.degg|0, baited:META.baited|0, fires:C.fires, log:C.log.slice(-30), q:{ fired:Q.fired, log:Q.log.slice(-20) }, msbw:W.read() }; };
   setTimeout(function(){ try{ if(window.GVT && !GVT.msbc5) GVT.msbc5=function(o){ o=o||{}; if(o.pk!==undefined){ C.fpk=o.pk||null; try{ if(o.pk && META.msbw && META.msbw.pk) Object.assign(META.msbw.pk, o.pk); }catch(e){} } if(o.reset) delete META.msbw; if(o.deal!==undefined) return { w:o.deal|0, ks:C.deal(o.deal|0), pk:pickFar(o.deal|0), raw:pick(o.deal|0) }; if(o.sheet) W.sheet(); return C.read(); }; }catch(e){} }, 0);   
 })();
 
@@ -190308,6 +190323,7 @@ const MCS={ on:(function(){ try{ const q=/[?&]mcs=([01])/.exec(location.search||
     if(document.querySelector('#comms .cm-win')) return 'comms';
     if(document.querySelector('#roomModal .rmback')) return 'modal';
     if(typeof KU!=='undefined' && KU) return 'ku';
+    if(typeof KUB!=='undefined' && KUB) return 'kub';   
     const rv=document.getElementById('fzReveal'); if(rv && rv.style.display!=='none') return 'claw';
     if(typeof FO!=='undefined' && FO) return 'faceoff';
     if((S.mode==='win' || S.mode==='lose') && Date.now()-MCS.vt<MCS.VWAIT) return 'verdict';
@@ -194385,12 +194401,12 @@ window.GVT = {
     return { cv:GVT_CV, secs:S9.map(s=>({ key:s.key, word:s.word, face:s.face, n:s.vis.length, vis:s.vis.slice() })), arm:Object.assign({}, LAB_ARM), arms:LAB_ARMS.slice(), art:Object.keys(LAB_ARM_ART), saber:sh, saberMeta:META.saberColor||null, labOpen:SHOP.labOpen, keyOf:{ telekinesis:labKeyOf('telekinesis'), riotshield:labKeyOf('riotshield'), emperorsblade:labKeyOf('emperorsblade'), flameblade:labKeyOf('flameblade'), iceblade:labKeyOf('iceblade'), eldersaber:labKeyOf('eldersaber'), unarmed:labKeyOf('unarmed'), dualgun:labKeyOf('dualgun'), cougar:labKeyOf('cougar'), longtube:labKeyOf('longtube') }, subs:{ emperorsblade:ENH_INFO.emperorsblade.sub, flameblade:ENH_INFO.flameblade.sub, iceblade:ENH_INFO.iceblade.sub },
       faces: d? Array.from(d.querySelectorAll('.lb-h')).map(h=>{ const f=h.querySelector('.lb-face'), r=f? f.getBoundingClientRect() : null, p=h.querySelector('.lb-port').getBoundingClientRect(), n=h.querySelector('.lb-n'), arm=!!(f && f.classList.contains('lb-arm')); return { id:h.id, tag:f? f.tagName.toLowerCase() : null, arm, w:r? +r.width.toFixed(1) : 0, h:r? +r.height.toFixed(1) : 0, port:+p.width.toFixed(1), word:n.textContent, fs:getComputedStyle(n).fontSize, clip:n.scrollWidth>n.clientWidth+1, blade:arm? f.innerHTML.indexOf(sh)>=0 : null, kind:h.className.replace('lb-h','').trim() }; }) : null }; },
   ku(){ const c=document.getElementById('kuCount'), sp=document.getElementById('dspot-soccer'), g=document.getElementById('decSoc'), gb=g&&g.querySelector('.socb'), gs=g&&g.querySelector('.socsh'), w=document.getElementById('ro-soccer'), f=document.getElementById('kuFloat');
-    return { live:!!KU, n:KU? KU.n : 0, z:KU? +KU.z.toFixed(2) : 0, vz:KU? +KU.vz.toFixed(1) : 0, paid:KU? KU.paid : 0, ledger:{ day:META.ball.day, paid:META.ball.paid.slice() }, daily:KU_DAILY, rungs:KU_RUNGS.map(r=>r.slice()), h:KU_H, hang:KU_HANG, g:KU_G, catchZ:KU_CATCH, x:KU? +KU.x.toFixed(2) : 0, vx:KU? +KU.vx.toFixed(1) : 0, hit:KU_HIT, waver:KU? KU.waver : 0, home:KU_HOME? { x:+KU_HOME.x.toFixed(2) } : null, pad:{ k:KU_PAD, px:KU_PAD_PX }, steer:KU_STEER, sign:KU_STEER_SIGN, vxMax:KU_VX_MAX, waverFrom:KU_WAVER_FROM, waverP:+KU_WAVER_P.toFixed(4), waverV:KU_WAVER_V.slice(), wall:KU_WALL, homeV:KU_HOME_V, rng:KU_RNG,
+    return { live:!!KU, n:KU? KU.n : 0, kub:KUB? { n:KUB.n, z:+KUB.z.toFixed(2), vz:+KUB.vz.toFixed(1), x:+KUB.x.toFixed(2), paid:KUB.paid|0, room:KUB.room, waver:KUB.waver } : null, countB:(function(){ const c9=document.getElementById('kuCountB'); return c9? { t:c9.textContent, cls:c9.className, top:c9.style.top, left:c9.style.left } : null; })(), tbl:TBL.on,   z:KU? +KU.z.toFixed(2) : 0, vz:KU? +KU.vz.toFixed(1) : 0, paid:KU? KU.paid : 0, ledger:{ day:META.ball.day, paid:META.ball.paid.slice() }, daily:KU_DAILY, rungs:KU_RUNGS.map(r=>r.slice()), h:KU_H, hang:KU_HANG, g:KU_G, catchZ:KU_CATCH, x:KU? +KU.x.toFixed(2) : 0, vx:KU? +KU.vx.toFixed(1) : 0, hit:KU_HIT, waver:KU? KU.waver : 0, home:KU_HOME? { x:+KU_HOME.x.toFixed(2) } : null, pad:{ k:KU_PAD, px:KU_PAD_PX }, steer:KU_STEER, sign:KU_STEER_SIGN, vxMax:KU_VX_MAX, waverFrom:KU_WAVER_FROM, waverP:+KU_WAVER_P.toFixed(4), waverV:KU_WAVER_V.slice(), wall:KU_WALL, homeV:KU_HOME_V, rng:KU_RNG,
       count:c? { t:c.textContent, cls:c.className, top:c.style.top, left:c.style.left } : null, spotTop:sp? sp.style.top : null, tf:gb? gb.style.transform : null, sh:gs? [gs.style.transform, gs.style.opacity] : null, wrap:w? w.getAttribute('transform') : null, pos:rpXY('soccer').slice(),
       bank:META.starBank|0, life:META.starsLifetime|0, float:f? f.textContent : null, squash:!!(g&&g.classList.contains('kusq')), react:!!(g&&g.classList.contains('react')), fly:!!SOC_FLY, goal:!!META.socGoal }; },
   kuDay(day){ META.ball.day=day; saveMeta(); return META.ball.day; },
   brw(){ const B=BRW, L=k=>{ try{ const c=brwLive(k); return c? { x:+c.x.toFixed(2), y:+c.y.toFixed(2), h:+c.h.toFixed(2), rot:+c.rot.toFixed(1), sx:+c.sx.toFixed(2), sy:+c.sy.toFixed(2) } : null; }catch(e){ return null; } }, svg=brwSvg(), n=svg&&svg.querySelector('#brw-ball');   
-    return { on:!!B, kind:B? B.kind : null, ph:B? B.ph : null, g:(B&&B.g)? B.g.map(v=>+v.toFixed(2)) : null, tee:(B&&B.tee)? B.tee.slice() : null, paid:B? (B.paid|0) : 0, run:!!(KU&&KU.b), kick:!!(FGK&&FGK.b), node:!!n, teeMark:!!(n&&n.querySelector('#brw-tee')&&n.querySelector('#brw-tee').childElementCount), held:{ dino:!!(svg&&svg.querySelector('#by-kick.brw-hold')), yeti:!!(svg&&svg.querySelector('#wf-movers.brw-hold')) },
+    return { on:!!B, kind:B? B.kind : null, ph:B? B.ph : null, g:(B&&B.g)? B.g.map(v=>+v.toFixed(2)) : null, tee:(B&&B.tee)? B.tee.slice() : null, paid:B? (B.paid|0) : 0, run:!!KUB,   kick:!!(FGK&&FGK.b), node:!!n, teeMark:!!(n&&n.querySelector('#brw-tee')&&n.querySelector('#brw-tee').childElementCount), held:{ dino:!!(svg&&svg.querySelector('#by-kick.brw-hold')), yeti:!!(svg&&svg.querySelector('#wf-movers.brw-hold')) },
       live:{ dino:yardLive()? L('dino') : null, yeti:wfLive()? L('yeti') : null }, can:{ dino:brwCan('dino'), yeti:brwCan('yeti') }, tees:BRW_TEES.map(t=>t.slice()), nextTee:wfLive()? brwTee() : null, r:Object.assign({},BRW_R), lob:Object.assign({},BRW_LOB), rest:BRW_REST, beat:BRW_BEAT, clear:BRW_CLEAR }; },
   brwTap(off){ KU_HIT=+off||0; brwTap(); return !!BRW; },   
   
