@@ -89659,7 +89659,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='25.47';        
+let GVT_CV='25.48';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -110760,7 +110760,7 @@ const RXL_ON=true,
 function rxUX(){ return lairU()? RXB_U_X : 1; }
 function rxBossRng(){ return lairU()? RXB_U_RNG : RXB_RNG; }
 function rxBossMinN(){ return lairU()? RXB_U_MIN_N : RXB_MIN_N; }
-function rexBreathN(f){ return REX_BREATH_PIPS*KRS_FIRE_X*(lairU()? REX_BREATH_U_X : 1); }   
+function rexBreathN(f){ return REX_BREATH_PIPS*KRS_FIRE_X*(lairU()? REX_BREATH_U_X*LAIR_U_KING_X.fire : 1); }       
 function rxHopCol(f){ return (lairU() || (f && f.rxLeapK))? tkHexOf('purple') : '#FFD24A'; }   
 function rexUnplant(f){   
   f.aW=0; f.brT=0; f.shot=0; f.rxHopW=0; f.rxSwpW=0; f.rxSwpU=null; f.haltT=0; f.stkT=0; f.aimT=0; f.rexTurn=undefined;
@@ -162578,6 +162578,18 @@ const LAIR_U_STEGO={ court:2, ret:2 };
 
 const LAIR_U_STEGO_P3={ x:3, min:15 };   
 function sx3Stegos(cfg){ const w=cfg.waves.find(w9=>w9.sweep==='kingrex'); if(!w) return 0; let n=0, line=null; for(const g of w.groups){ if(g.t!=='stego') continue; if(g.f==='spout'){ g.per=Math.max(1,Math.round((g.per||1)*LAIR_U_STEGO_P3.x)); n+=(g.pts||[]).length*g.per; } else { g.n=Math.max(1,Math.round((g.n||1)*LAIR_U_STEGO_P3.x)); n+=g.n; line=g; } } if(n<LAIR_U_STEGO_P3.min){ if(line) line.n+=LAIR_U_STEGO_P3.min-n; else w.groups.push({f:'line',t:'stego',n:LAIR_U_STEGO_P3.min-n,e:'right',at:14.8,pin:1}); n=LAIR_U_STEGO_P3.min; } return n; }   
+
+
+
+
+
+
+
+
+
+const LAIR_U_KING_X={ hp:5, fire:5 };   
+const LAIR_U_GUARD={ court:{ bdino:6, trike:4 }, ret:{ bdino:8, trike:6 }, lag:1.0, hpX:4, pts:{ bdino:[[1560,360],[1560,840]], trike:[[1640,300],[1640,900]] } };   
+function krxKing(cfg){ let n=0; for(const w of cfg.waves){ const k=w.groups.find(g=>g.f==='boss' && g.t==='kingrex'); if(!k) continue; k.hpX=+((k.hpX||1)*LAIR_U_KING_X.hp).toFixed(3); if(k.hpAdd) k.hpAdd=Math.round(k.hpAdd*LAIR_U_KING_X.hp); const G=(w.sweep==='kingrex')? LAIR_U_GUARD.ret : LAIR_U_GUARD.court; for(const t of ['bdino','trike']){ const pts=LAIR_U_GUARD.pts[t], per=Math.round((G[t]||0)/pts.length); if(per<1) continue; w.groups.push({f:'spout',t:t,pts:pts.map(p=>[p[0],p[1]]),per:per,at:+((k.at||0)+LAIR_U_GUARD.lag).toFixed(2),pin:1,hpX:LAIR_U_GUARD.hpX,guard:1}); n+=per*pts.length; } } return n; }   
 const EV_HPX_BONE={ sdino:0.25, ptero:0.25, trike:0.25, bdino:0.25, eggling:0.25, spitter:0.5, stego:0.5, dilo:0.5, kingrex:0.56 };   
 
 const LAIR_U_MESAS=[[640,420,40],[760,840,42],[1600,600,36],[620,140,40],[760,1080,42]];
@@ -163492,6 +163504,7 @@ function raidCfg(tier,rk){
     
     for(const w of cfg.waves) for(const g of w.groups){ if(g.f==='spout' || g.t==='stego') g.pin=1; }
     sx3Stegos(cfg);   
+    krxKing(cfg);   
     const kxb=(RAID_CNT_MUL.u/RAID_CNT_MUL.g)*EV_FOE_F;
     for(const w of cfg.waves) for(const g of w.groups){ if(g.f==='boss' || g.pin) continue; g.n=Math.max(1,Math.round((g.n||1)*kxb)); }
     for(const w of cfg.waves) for(const g of w.groups){ const x=EV_HPX_BONE[g.t]; if(x){ g.hpX=(g.hpX||1)*x; if(g.hpAdd) g.hpAdd=Math.round(g.hpAdd*x); } }
