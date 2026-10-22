@@ -9489,6 +9489,7 @@
 */
   .roomtag { position:absolute; z-index:4; transform:translate(-50%,-50%); background:rgba(38,40,31,0.9); color:#fff; font-weight:bold; font-size:24px; letter-spacing:0.06em; padding:4px 14px; border-radius:15px; cursor:pointer; white-space:nowrap; text-transform:uppercase; }   /**/
   .roomtag.rt-wrap { white-space:normal; text-align:center; line-height:1.15; }   /**/   /**/
+  .roomtag.chw { font-size:21.6px; }   /**/
   .dogtop { position:absolute; inset:0; width:100%; height:100%; z-index:6; pointer-events:none; overflow:visible; }   /**/
   /*
 
@@ -50240,9 +50241,22 @@ const RCH={ k:0.4, dx:9, on:(function(){ try{ const q=/[?&]rch=([01])/.exec(loca
 function rchOn(){ try{ return RCH.on===1; }catch(e){ return false; } }
 function rchDue(){ return rchOn() && roomCur()!=='bedroom'; }   
 function rchSeat(s, mid){ const k=RCH.k, w=Math.round(s.w*k), h=Math.round(s.h*k); return { x: mid? Math.round(s.x+(s.w-w)/2) : s.x+RCH.dx, y:s.y+s.h-h, w:w, h:h }; }   
-function chestSeat(){ const s=chestSeatFull(); return rchDue()? rchSeat(s, yardLive()) : s; }   
+function chestSeat(){ const s=chestSeatFull(); return rchDue()? rchSeat(s, yardLive()) : chwDue()? chwSeat(s) : s; }   
 function rchRig(o){ o=o||{}; if(o.on!==undefined){ RCH.on=o.on? 1 : 0; if(S.mode==='menu') renderMenu(); } if(o.k!==undefined){ RCH.k=+o.k; if(S.mode==='menu') renderMenu(); } return { cv:GVT_CV, on:RCH.on, k:RCH.k, room:roomCur(), due:rchDue(), seat:chestSeat(), full:chestSeatFull(), at:chestAt(), band:xrBand(), key:(function(){ try{ return localStorage.getItem('gvt_rch'); }catch(e){ return null; } })() }; }
 function chestSeatFull(){ if(!bchOn()) return roomCur()==='attic'? CHEST_SEAT_AT_0 : yardLive()? CHEST_SEAT_BY_0 : CHEST_SEAT_0; return roomCur()==='attic'? CHEST_SEAT_AT : yardLive()? CHEST_SEAT_BY : (roomCur()==='bedroom' && !MAPPIN)? bchSeatBR() : CHEST_SEAT; }        
+
+
+
+
+
+
+const CHW={ k:0.9, fz:21.6, cap:191, half:110, pad:6, on:(function(){ try{ const q=/[?&]chw=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_chw','0'); else localStorage.removeItem('gvt_chw'); } return localStorage.getItem('gvt_chw')==='0'? 0 : 1; }catch(e){ return 1; } })() };   
+function chwOn(){ try{ return CHW.on===1; }catch(e){ return false; } }
+function chwDue(){ return chwOn() && bchOn() && roomCur()==='bedroom' && !MAPPIN; }   
+function chwMute(){ return chwOn() && roomCur()!=='bedroom'; }   
+function chwSeat(s){ const k=CHW.k, w=Math.round(s.w*k), h=Math.round(s.h*k); return { x:Math.round(s.x+(s.w-w)/2), y:s.y+s.h-h, w:w, h:h }; }   
+function chwLx(s){ const E=xrBand(), xr=960+E-CHW.pad; let lx=s.x+s.w/2-5; if(s.x+s.w<=xr) lx=Math.min(lx, xr-CHW.half); return Math.round(Math.max(lx, -E+CHW.pad+CHW.half)); }   
+function chwRig(o){ o=o||{}; if(o.on!==undefined){ CHW.on=o.on? 1 : 0; if(S.mode==='menu') renderMenu(); } if(o.k!==undefined){ CHW.k=+o.k; if(S.mode==='menu') renderMenu(); } return { cv:GVT_CV, on:CHW.on, k:CHW.k, fz:CHW.fz, cap:CHW.cap, room:roomCur(), due:chwDue(), mute:chwMute(), seat:chestSeat(), full:chestSeatFull(), at:chestAt(), band:xrBand(), east:exrEast(), lx:chwDue()? chwLx(chestSeat()) : null, key:(function(){ try{ return localStorage.getItem('gvt_chw'); }catch(e){ return null; } })() }; }
 function bchSeatBR(){ const W=192, H=104, Y=288, E=xrBand(); if(!E) return { x:-6, y:Y, w:W, h:H }; const X0=bcrDue()? bcrLay().X0 : 960+E+exrEast(); const cx=(960+X0)/2; const x=Math.max(933, Math.min(Math.round(cx-W/2), 960+E-6-W)); return { x:x, y:Y, w:W, h:H }; }   
 const CHEST_DROP_PAD=24;                        
 const CHEST_DROP_MS=500;                        
@@ -90143,7 +90157,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='25.75';        
+let GVT_CV='25.76';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -145554,7 +145568,7 @@ const ROOM_SPOTS=[
   
   
   
-  { id:CHEST_DOOR, get x(){ return chestSeat().x; }, get y(){ return chestSeat().y; }, get w(){ return chestSeat().w; }, get h(){ return chestSeat().h; }, label:()=>(bchOn() && !yardLive())? t('TREASURE CHEST') : '', cap:210, get lx(){ const s=chestSeat(); if(rchDue()){ const f=chestSeatFull(); return Math.max(f.x+f.w/2-5, 120-xrBand()); }   return s.x+s.w/2-5; }, get ly(){ const s=chestSeat(); return (s.y+s.h+30<=578)? s.y+s.h+30 : s.y-36; }, mv:CHEST_DOOR, z:3 },       
+  { id:CHEST_DOOR, get x(){ return chestSeat().x; }, get y(){ return chestSeat().y; }, get w(){ return chestSeat().w; }, get h(){ return chestSeat().h; }, label:()=>(bchOn() && !yardLive() && !chwMute())? t('TREASURE CHEST') : '', get cap(){ return chwDue()? CHW.cap : 210; }, cls:()=>chwDue()? 'chw' : '', get lx(){ const s=chestSeat(); if(rchDue()){ const f=chestSeatFull(); return Math.max(f.x+f.w/2-5, 120-xrBand()); }   if(chwDue()) return chwLx(s);   return s.x+s.w/2-5; }, get ly(){ const s=chestSeat(); return (s.y+s.h+30<=578)? s.y+s.h+30 : s.y-36; }, mv:CHEST_DOOR, z:3 },       
   
   
   
