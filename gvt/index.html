@@ -16348,9 +16348,26 @@ const GL_DATA={"map":{"004":"stone","008":"open","010":"winter","012":"open","02
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 (function(){
-  var armed=0, taps=0, line=null;
-  window.__gvtDoorArm=function(){ armed=1; if(line){ try{ line.remove(); }catch(e){} line=null; } };
+  var armed=0, taps=0, line=null, going=0, tick=0, stalled=0;
+  var HOS_STALL_MS=15000, HOS_TICK_MS=1000, LATCH_MS=90000, K='gvt_door_reload';
+  var mark=Date.now(), lastTick=Date.now(), pN=-1, pL=-1;
+  window.__gvtDoorArm=function(){ armed=1; clearInterval(tick); if(line){ try{ line.remove(); }catch(e){} line=null; } };
   function say(msg){
     var t=document.getElementById('title'); if(!t) return;
     if(!line){ line=document.createElement('div'); line.id='ptLine';
@@ -16358,16 +16375,33 @@ const GL_DATA={"map":{"004":"stone","008":"open","010":"winter","012":"open","02
       var p=t.querySelector('.press'); if(p && p.parentNode===t) t.insertBefore(line, p.nextSibling); else t.appendChild(line); }
     line.textContent=msg;
   }
+  function latched(){ var last=0; try{ last=+sessionStorage.getItem(K)||0; }catch(e){} return Date.now()-last<LATCH_MS; }
+  function road(){   
+    var was=location.search.replace(/^\?/,''), q=was.split('&').filter(function(x){ return x && !/^(nb|nbr|cb)=/.test(x); }).join('&');
+    if(q===was) location.reload(); else location.replace(location.pathname+(q? '?'+q : '')+location.hash);
+  }
+  function go(){ if(going) return; going=1; clearInterval(tick); try{ sessionStorage.setItem(K, String(Date.now())); }catch(e){} say('THE LINE DROPPED MID-LOAD. RELOADING…'); setTimeout(function(){ try{ road(); }catch(e){} }, 700); }
+  function prog(){ var s=document.scripts, e=s[s.length-1], c=e? e.lastChild : null; return [e? e.childNodes.length : 0, (c && c.length)|0]; }   
+  function watch(){   
+    if(armed || going){ clearInterval(tick); return; }
+    if(document.readyState!=='loading'){ clearInterval(tick); return; }   
+    var now=Date.now(), late=now-lastTick>HOS_TICK_MS*3; lastTick=now;
+    var p=prog(); if(p[0]!==pN || p[1]!==pL){ pN=p[0]; pL=p[1]; mark=now; return; }   
+    if(late || document.hidden){ mark=now; return; }   
+    if(now-mark<HOS_STALL_MS) return;
+    if(latched()){ stalled=1; say('STILL LOADING. CHECK YOUR SIGNAL, SOLDIER.'); return; }   
+    go();
+  }
+  tick=setInterval(watch, HOS_TICK_MS);
+  document.addEventListener('visibilitychange', function(){ if(!document.hidden) mark=Date.now(); });
   document.addEventListener('pointerdown', function(ev){
     if(armed) return;
     var t=document.getElementById('title'); if(!t || t.classList.contains('hidden') || !t.contains(ev.target)) return;
     taps++;
-    if(document.readyState==='loading'){ say('LOADING THE BATTLEFIELD… HOLD ON, SOLDIER'); return; }
-    var k='gvt_door_reload', last=0; try{ last=+sessionStorage.getItem(k)||0; }catch(e){}
-    if(Date.now()-last<90000){ say('THE GAME COULD NOT START ON THIS DEVICE. CLOSE IT AND OPEN IT AGAIN, OR TRY ANOTHER BROWSER.'); return; }
-    try{ sessionStorage.setItem(k, String(Date.now())); }catch(e){}
-    say('THE LINE DROPPED MID-LOAD. RELOADING…');
-    setTimeout(function(){ try{ location.reload(); }catch(e){} }, 700);
+    if(going) return;
+    if(document.readyState==='loading'){ say(stalled? 'STILL LOADING. CHECK YOUR SIGNAL, SOLDIER.' : 'LOADING THE BATTLEFIELD… HOLD ON, SOLDIER'); return; }
+    if(latched()){ say('THE GAME COULD NOT START ON THIS DEVICE. CLOSE IT AND OPEN IT AGAIN, OR TRY ANOTHER BROWSER.'); return; }
+    go();
   }, true);
 })();
 </script>
@@ -20869,6 +20903,7 @@ ar:{
 "NEW ORDERS FROM HQ":"أوامر جديدة من المقر",
 "A NEW BUILD IS READY":"نسخة جديدة جاهزة","%1 NEEDS THE NEW BUILD FOR %2":"%1 يحتاج إلى النسخة الجديدة من أجل %2",
 "UPDATE NOW":"حدّث الآن",
+"UPDATING…":"جارٍ التحديث…",
 
 "CAMPAIGN UNLOCKED!":"تم فتح الحملة!",
 "ELITE FORCES":"قوات النخبة",
@@ -23235,6 +23270,7 @@ ar:{
 "NEW ORDERS FROM HQ":"ほんぶから あたらしい めいれい",
 "A NEW BUILD IS READY":"あたらしい バージョンが できたよ","%1 NEEDS THE NEW BUILD FOR %2":"%1は %2のために あたらしい バージョンが ひつようだよ",
 "UPDATE NOW":"いま アップデート",
+"UPDATING…":"アップデートちゅう…",
 
 "CAMPAIGN UNLOCKED!":"キャンペーン かいほう！",
 "ELITE FORCES":"エリートぶたい",
@@ -27632,6 +27668,7 @@ ar:{
 "NEW ORDERS FROM HQ":"본부의 새 명령",
 "A NEW BUILD IS READY":"새 버전이 준비됐어","%1 NEEDS THE NEW BUILD FOR %2":"%1은(는) %2에 가려면 새 버전이 필요해",
 "UPDATE NOW":"지금 업데이트",
+"UPDATING…":"업데이트 중…",
 
 "CAMPAIGN UNLOCKED!":"캠페인 해제!",
 "ELITE FORCES":"엘리트 부대",
@@ -32029,6 +32066,7 @@ ar:{
 "NEW ORDERS FROM HQ":"总部的新命令",
 "A NEW BUILD IS READY":"新版本已准备好","%1 NEEDS THE NEW BUILD FOR %2":"%1需要新版本才能玩%2",
 "UPDATE NOW":"立即更新",
+"UPDATING…":"更新中…",
 
 "CAMPAIGN UNLOCKED!":"战役解锁啦！",
 "ELITE FORCES":"精英部队",
@@ -36426,6 +36464,7 @@ ar:{
 "NEW ORDERS FROM HQ":"NEUE BEFEHLE VOM HQ",
 "A NEW BUILD IS READY":"EINE NEUE VERSION IST BEREIT","%1 NEEDS THE NEW BUILD FOR %2":"%1 BRAUCHT DIE NEUE VERSION FÜR %2",
 "UPDATE NOW":"JETZT AKTUALISIEREN",
+"UPDATING…":"AKTUALISIERE…",
 
 "CAMPAIGN UNLOCKED!":"FELDZUG FREIGESCHALTET!",
 "ELITE FORCES":"ELITETRUPPEN",
@@ -40823,6 +40862,7 @@ ar:{
 "NEW ORDERS FROM HQ":"НОВЫЕ ПРИКАЗЫ ИЗ ШТАБА",
 "A NEW BUILD IS READY":"НОВАЯ ВЕРСИЯ ГОТОВА","%1 NEEDS THE NEW BUILD FOR %2":"%1 НУЖНА НОВАЯ ВЕРСИЯ ДЛЯ %2",
 "UPDATE NOW":"ОБНОВИТЬ СЕЙЧАС",
+"UPDATING…":"ОБНОВЛЯЮ…",
 
 "CAMPAIGN UNLOCKED!":"КАМПАНИЯ ОТКРЫТА!",
 "ELITE FORCES":"ЭЛИТНЫЕ ВОЙСКА",
@@ -45220,6 +45260,7 @@ ar:{
 "NEW ORDERS FROM HQ":"NUEVAS ÓRDENES DE LA BASE",
 "A NEW BUILD IS READY":"HAY UNA NUEVA VERSIÓN LISTA","%1 NEEDS THE NEW BUILD FOR %2":"%1 NECESITA LA NUEVA VERSIÓN PARA %2",
 "UPDATE NOW":"ACTUALIZAR AHORA",
+"UPDATING…":"ACTUALIZANDO…",
 
 "CAMPAIGN UNLOCKED!":"¡CAMPAÑA DESBLOQUEADA!",
 "ELITE FORCES":"FUERZAS DE ÉLITE",
@@ -89673,7 +89714,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='25.50';        
+let GVT_CV='25.51';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -93884,11 +93925,33 @@ function evInfo(){
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 const NB_EVERY=2;              
 const NB_SNOOZE_MS=10*60000;   
 const NB_AUTO_S=60;            
 const NB_BELL_GUARD_S=90;      
-let NB={ base:'', stamp:'', newer:false, checks:0, fails:0, last:0, beats:0, busy:null, chip:0, chipT:0, snoozeT:0, went:0 };   
+const NB_FETCH_MS=240000;      
+const NB_STALL_MS=30000;       
+const NB_RETRY_MS=60000;       
+const NB_READY_MS=540000;      
+const NB_MIN_BYTES=1000000;    
+const NB_SW_CACHE='gvt-open-door-v1';   
+const NB_SW_PAGE=(()=>{ try{ return new URL('index.html', location.href).href; }catch(e){ return ''; } })();   
+let NB={ base:'', stamp:'', newer:false, checks:0, fails:0, last:0, beats:0, busy:null, chip:0, chipT:0, snoozeT:0, went:0, pf:null, pfT:0, pfN:0, ready:'', readyT:0, bytes:0, put:0, go:'' };   
 function nbQuiet(x){ return S.mode==='menu' && !document.hidden && roomQuiet(x) && !document.getElementById('sqBack'); }   
 function nbBellFar(){ return !(evDoorState()==='live' && evIn()<=NB_BELL_GUARD_S) && !(bdDoorState()==='live' && bdIn()<=NB_BELL_GUARD_S); }
 function nbAutoOK(){ return NB_AUTO_S>0 && nbQuiet('nbCard') && idleQuiet()>=NB_AUTO_S && nbBellFar(); }
@@ -93923,8 +93986,9 @@ function nbChipShow(){
     +'<div class="sqb-r"><button class="mbtn nb-go" data-notr>'+TXT('UPDATE NOW')+'</button>'
     +'<button class="mbtn alt nb-no" data-notr>'+TXT('NOT NOW')+'</button></div>';
   document.body.appendChild(el);
-  el.querySelector('.nb-go').onclick=()=>{ audio(); nbGo(); };
-  el.querySelector('.nb-no').onclick=()=>{ audio(); SFX.clack(); NB.snoozeT=Date.now(); nbChipClear(); };
+  el.querySelector('.nb-go').onclick=()=>{ audio(); if(NB.pf) return; nbGo('tap'); };   
+  el.querySelector('.nb-no').onclick=()=>{ audio(); SFX.clack(); NB.snoozeT=Date.now(); if(NB.pf || NB.ready) NB.go='auto'; nbChipClear(); };   
+  if(NB.pf) nbChipWait(1);   
   el._t=setInterval(()=>{ if(!nbQuiet('nbCard')) nbChipClear(); }, 1000);   
 }
 
@@ -93967,16 +94031,58 @@ function hlqTick(){
 function nbTick(){   
   try{ hlqTick(); }catch(e){}   
   if(!NB.newer || NB.went) return;
-  if(nbAutoOK()){ nbGo(); return; }
+  if(NB.ready){   
+    if(nbReadyStale()){ NB.ready=''; NB.readyT=0; }
+    else if(NB.go==='auto'? nbAutoOK() : nbQuiet('nbCard')){ nbLeave(); return; }
+  }
+  if(NB.pf) return;   
+  if(!NB.ready && NB.pfT && Date.now()-NB.pfT<NB_RETRY_MS) return;   
+  if(!NB.ready && nbAutoOK()){ nbGo('auto'); return; }
   if(!NB.chip && Date.now()-NB.snoozeT>=NB_SNOOZE_MS && nbQuiet()) nbChipShow();
 }
-function nbGo(){   
-  if(NB.went) return false;
+function nbLang(){ const lang=(location.search.match(/[?&]lang=([A-Za-z-]+)/)||[])[1]; return lang? '&lang='+lang : ''; }   
+function nbURL(){ return location.pathname+'?nb='+Date.now()+nbLang(); }
+function nbReadyStale(){ return !NB.ready || Date.now()-NB.readyT>NB_READY_MS; }   
+function nbSW(){ try{ return !!(NB_SW_PAGE && 'serviceWorker' in navigator && navigator.serviceWorker.controller && typeof caches!=='undefined' && caches.open && typeof ReadableStream!=='undefined'); }catch(e){ return false; } }   
+function nbChipWait(on){ const el=document.getElementById('nbCard'); if(!el) return; const g=el.querySelector('.nb-go'), n=el.querySelector('.nb-no'); if(g){ g.textContent=on? TXT('UPDATING…') : TXT('UPDATE NOW'); g.disabled=!!on; } if(n) n.disabled=!!on; }   
+function nbFetch(u){   
+  if(NB.pf) return NB.pf.p;
+  const ac=(typeof AbortController==='function')? new AbortController() : null; let tAll=0, tStall=0;
+  const cut=()=>{ try{ if(ac) ac.abort(); }catch(e){} }, stall=()=>{ clearTimeout(tStall); tStall=setTimeout(cut, NB_STALL_MS); };
+  tAll=setTimeout(cut, NB_FETCH_MS); stall();
+  const stamp=Date.now();
+  const p=fetch(u, Object.assign({ headers:{ 'Accept':'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' } }, ac? { signal:ac.signal } : {}))
+    .then(r=>{ if(!r.ok || !/text\/html/i.test(String(r.headers.get('Content-Type')||''))) throw new Error('nb '+r.status);
+      let body=r.body, putP=Promise.resolve(false);
+      if(body && typeof body.tee==='function' && nbSW()){   
+        const pair=body.tee(); body=pair[0]; const h=new Headers(); for(const k of ['Content-Type','ETag','Last-Modified','Cache-Control']){ const v=r.headers.get(k); if(v) h.set(k, v); } h.set('X-GVT-NB', String(stamp));
+        putP=caches.open(NB_SW_CACHE).then(c=>c.put(NB_SW_PAGE, new Response(pair[1], { status:200, headers:h }))).then(()=>true, ()=>false); }
+      let count;
+      if(!body || typeof body.getReader!=='function') count=r.arrayBuffer().then(b=>b.byteLength);   
+      else { const rd=body.getReader(); let n=0; const step=()=>rd.read().then(x=>{ if(x.done) return n; n+=x.value.length; stall(); return step(); }); count=step(); }
+      return count.then(n=>putP.then(put=>({ n, put }))); })
+    .then(o=>{ if(o.n<NB_MIN_BYTES) throw new Error('nb short '+o.n); NB.put=o.put? 1 : 0; NB.ready=o.put? location.pathname+'?nbr='+stamp+nbLang() : u; NB.readyT=Date.now(); NB.bytes=o.n; return true; })   
+    .catch(()=>{ NB.pfT=Date.now(); NB.pfN++; NB.ready=''; NB.readyT=0; NB.put=0; return false; })
+    .then(ok=>{ clearTimeout(tAll); clearTimeout(tStall); NB.pf=null; return ok; });
+  NB.pf={ u, t0:Date.now(), p }; return p;
+}
+function nbLeave(){   
+  if(NB.went || !NB.ready) return false;
   NB.went=Date.now();
   saveMeta();
   nbChipClear();
-  const lang=(location.search.match(/[?&]lang=([A-Za-z-]+)/)||[])[1];   
-  location.replace(location.pathname+'?nb='+Date.now()+(lang? '&lang='+lang : ''));
+  location.replace(NB.ready);
+  return true;
+}
+function nbGo(how){   
+  if(NB.went || NB.pf) return false;
+  NB.go=(how==='auto')? 'auto' : 'tap';
+  if(!nbReadyStale()) return nbLeave();
+  NB.ready=''; NB.readyT=0;
+  saveMeta();
+  if(!nbSW()){ NB.ready=nbURL(); NB.readyT=Date.now(); NB.put=0; return nbLeave(); }   
+  nbChipWait(1);
+  nbFetch(nbURL()).then(ok=>{ nbChipWait(0); if(ok && (NB.go==='auto'? nbAutoOK() : nbQuiet('nbCard'))) nbLeave(); });   
   return true;
 }
 
@@ -195569,7 +195675,7 @@ window.GVT = {
   flow(){ const g=id=>document.getElementById(id), vis=id=>{ const e=g(id); return !!e && !e.classList.contains('hidden'); }; const hb=g('winHqBtn'); return { cv:GVT_CV, top:CAMP_FLOW_TOP, home:CAMP_FLOW_HOME, on:PGFLOW, due:campFlowDue(), hq:!!hb && !hb.classList.contains('off'), hqRect:hb? (r=>[Math.round(r.left),Math.round(r.top),Math.round(r.right),Math.round(r.bottom)])(hb.getBoundingClientRect()) : null, hqText:hb? hb.textContent : null, mode:S.mode, levelN:S.levelN, camp:META.campaign|0, pend:META.pendingPicks|0, menu:vis('menu'), scene:vis('campscene'), picker:vis('picker'), win:vis('win'), lose:vis('lose'), card:milePopUp(), box:mboxUp(), dealt:MB_DEALT, end:MB_END, head:(document.querySelector('#milePop .mb-h')||{}).textContent||'' }; },   
   winVerdict(){ const g=id=>document.getElementById(id), win=g('win'), mr=g('medalRow'), mt=g('medalText'); return { cv:GVT_CV, starGap:VD_STAR_GAP, artPx:VD_ART_PX, whisperFrom:VD_WHISPER_FROM, beats:[VD_MEDAL_AT,VD_MEDAL_STAG,VD_TILE_AT,VD_TILE_MS,VD_ROW_AT], sfx:VD_MEDAL_SFX, swords:VD_BOSS_SWORDS, foot:Object.assign({},VD_FOOT), camp:win.classList.contains('camp'), done:win.classList.contains('vdone'), running:!!VD, stars:mr.dataset.stars||null, v:mt.dataset.v||null, parts:[...mt.children].map(e=>({ k:e.className, t:e.innerText.replace(/\s+/g,' ').trim(), op:getComputedStyle(e).opacity })), medals:[...mr.querySelectorAll('.vm')].map(e=>({ g:e.textContent, on:e.classList.contains('on'), off:e.classList.contains('off'), op:getComputedStyle(e).opacity })), title:g('winTitle').innerText.replace(/\s+/g,' ').trim(), btn:g('againBtn').getBoundingClientRect().bottom, due:{ by:(META.lvl|0)>=BY_FREE_LVL && !META.byGift && !roomOwns('backyard'), winter:false, rooftop:false  , bomber:bmbOwned() && !META.bomberSeen, cmd:cmdOwned() && !META.cmdSeen, blade:bladeOwned() && !META.bladeSeen, cmdo:cmdoOwned() && !META.cmdoSeen, soul:soulOwned() && !META.soulSeen, paint:paintRiteOwed(), lens:lensDue() && !lensOwned() }, whispered:[REX_WHISPERED, RANK_WHISPERED], mode:S.mode }; },   
   
-  nb(){ return { cv:GVT_CV, base:NB.base||null, stamp:NB.stamp||null, newer:NB.newer?1:0, checks:NB.checks, fails:NB.fails, last:NB.last, beats:NB.beats, busy:!!NB.busy, chip:NB.chip?1:0, card:!!document.getElementById('nbCard'), snoozeT:NB.snoozeT, went:NB.went, auto:nbAutoOK()?1:0, quiet:nbQuiet()?1:0, idle:+idleQuiet().toFixed(1), bellFar:nbBellFar()?1:0, every:NB_EVERY, snoozeMs:NB_SNOOZE_MS, autoS:NB_AUTO_S, guardS:NB_BELL_GUARD_S, path:location.pathname, proto:location.protocol }; },
+  nb(){ return { cv:GVT_CV, base:NB.base||null, stamp:NB.stamp||null, newer:NB.newer?1:0, checks:NB.checks, fails:NB.fails, last:NB.last, beats:NB.beats, busy:!!NB.busy, chip:NB.chip?1:0, card:!!document.getElementById('nbCard'), snoozeT:NB.snoozeT, went:NB.went, pf:!!NB.pf, pfT:NB.pfT, pfN:NB.pfN, ready:NB.ready||null, readyT:NB.readyT, bytes:NB.bytes|0, put:NB.put|0, go:NB.go||null, sw:nbSW()?1:0, auto:nbAutoOK()?1:0, quiet:nbQuiet()?1:0, idle:+idleQuiet().toFixed(1), bellFar:nbBellFar()?1:0, every:NB_EVERY, snoozeMs:NB_SNOOZE_MS, autoS:NB_AUTO_S, guardS:NB_BELL_GUARD_S, path:location.pathname, proto:location.protocol }; },
   nbForce(stamp){ stamp=String(stamp||'forced'); if(!NB.base) NB.base='(rig)'; NB.stamp=stamp; NB.newer=(stamp!==NB.base); NB.last=Date.now(); nbTick(); return GVT.nb(); },
   nbCheck(){ return nbCheck().then(()=>GVT.nb()); },
   bdFeel(){ return { bell:BD.bell, ring:bdRing(), ringRaw:BD.ring|0, knockBell:BDD.knockBell|0, knockSys:BDD.knockSys|0, saidIn:+bdSaidIn().toFixed(1), in:+bdIn().toFixed(1), holdRing:evHoldRing()|0, open:BD.open, wk:BD.wk, state:bdDoorState(), band:evBandState(), fielded:(S.bf&&S.bf.bd)? (S.bf.bdN|0) : 0, teamMin:BD_TEAM_MIN, live:BD.live, sealed:BD.sealed, rooms:BD.rooms, players:BD.players, mine:BD.mine, annWk:BDD.annWk, popBell:BDD.popBell, popT:BDD.popT, redealMs:BD_REDEAL_MS, popS:BD_POP_S, hold:!!S.evHold, holdBell:S.evHold? S.evHold.bell : 0, bd:!!(S.bf&&S.bf.bd), touched:!!S.evTouched, afk:!!S.evAfk, code:COOP&&COOP.code, seat:COOP&&COOP.seat, side:COOP&&COOP.side, host:!!(COOP&&COOP.host), map:S.bf&&S.bf.mapId, team:S.bf&&S.bf.team, seats:S.bf? S.bf.seats.map(s=>({ i:s.i, h:s.human?1:0, me:s.me?1:0, b:s.brain?1:0, e:s.empty?1:0, k:s.kit?1:0, n:s.name, cpu:s.cpu?1:0, away:s.away?1:0, purse:Math.round(s.purse||0), bdPourT:+((s.bdPourT||0).toFixed(3)), diff:s.brain? s.brain.diff : null, hex:s.hex })) : null, note:BD.note, hull:S.bf? [S.bf.base.you.hp, S.bf.base.you.hpMax, S.bf.base.foe.hp, S.bf.base.foe.hpMax] : null, aiDiff:S.bf? S.bf.ai.diff : null, hard:!!(S.bf&&S.bf.hard), hq:!!btnRects.hq, pour:[BD_POUR, BD_POUR_T], baseHp:BD_BASE_HP, diffDial:BD_DIFF, titleY:BD_TITLE_Y, titleAlpha:(S.bf&&S.bf.bd)? +bdTitleAlpha().toFixed(3) : null, bellAt:(S.bdBellAt==null)? null : S.bdBellAt, simT:+((S.t||0).toFixed(3)), rosters:(S.bf&&S.bf.bd)? [bdRosterRows(0), bdRosterRows(1)] : null, putAway:Object.assign({},PUTAWAY), awayLog:BD_AWAY_LOG.slice(), inRoom:bdInRoom(), shell:bdInShell(), annS:BD_ANN_S, annAfterYeti:BD_ANN_AFTER_YETI, plastic:S.plastic, ot:!!(S.bf&&S.bf.ot) }; },   

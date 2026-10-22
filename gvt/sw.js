@@ -6,6 +6,11 @@
 const SW_K = 'gvt-open-door-v1';   // the cache; a new name here = every old cache dropped at activate
 const SW_NET_MS = 20000;           // the network's silence (headers not yet in) before the cache answers — ⚑ PT-C
 const SW_PAGE = new URL('./index.html', self.location.href).href;
+// CARD-HOS HOLD ON, SOLDIER (jumpr 2461, built on Maker 1; design/hold-on-soldier-1021/00-CARD-HOS.md): THE NEW BUILD downloads the new page first and streams it into
+// THIS cache under SW_PAGE with an X-GVT-NB stamp (the page's own Cache API hand: index.html nbFetch), then navigates to <page>?nbr=<stamp>. A ?nbr= navigation is
+// answered FROM THAT COPY while it is under SW_NBR_MS old (the copy IS the live build, seconds old: never a stale client), the page road below otherwise (no copy,
+// an old one, a page that got here by a stale address); every other query still passes straight through. The HTTP cache was measured and declined the page's size.
+const SW_NBR_MS = 600000;          // a ?nbr= navigation takes the copy only this young (index.html NB_READY_MS 540 s stays inside it)
 // CARD-ODV-SHIP THE MUSIC KEEPS (Wyatt 10/10/2026 19:00 EDT on Maker 1: "Do it. Plan it out. Execute to the best of your ability."; his plan's point 2: "The music and
 // pictures would then download once and stay saved on the device."): the served page carries its music as files, m/<sha256/12>.<m4a|mp3|wav> (tools/gvt-dist).
 // A name is its content's hash, so a file in this cache is never stale: CACHE FIRST, filled from the network on the first fetch; a new track is a new name.
@@ -40,11 +45,27 @@ function mediaFetch(e, rq) {
   }, () => SW_DEAD())),   // a dead line and no copy: a plain 504 (the page's odvBytes reads !ok and takes its failure road; a rejected or error reply makes WebKit log a page error)
   () => fetch(rq).catch(() => SW_DEAD()));   // no cache to open: the network's own answer, as before
 }
+function nbrOf(rq) {   // CARD-HOS: a navigation to this page carrying ?nbr=<stamp> (THE NEW BUILD's hand-off) → the stamp, else 0
+  if (rq.method !== 'GET' || rq.mode !== 'navigate') return 0;
+  const u = new URL(rq.url); if (u.origin !== self.location.origin) return 0;
+  const base = new URL('./', self.location.href).pathname; if (u.pathname !== base && u.pathname !== base + 'index.html') return 0;
+  return +(u.searchParams.get('nbr') || 0);
+}
+async function nbrFetch(e, rq) {   // CARD-HOS: the young copy first, the page road otherwise
+  let hit = null; try { hit = await caches.match(SW_PAGE); } catch (err) { hit = null; }
+  const stamp = hit ? +(hit.headers.get('X-GVT-NB') || 0) : 0;
+  if (hit && stamp && Date.now() - stamp >= 0 && Date.now() - stamp < SW_NBR_MS) return hit;
+  return pageFetch(e, rq);
+}
 self.addEventListener('fetch', e => {
   const rq = e.request;
   if (isMedia(rq)) { e.respondWith(mediaFetch(e, rq)); return; }   // CARD-ODV-SHIP: m/ cache first
+  if (nbrOf(rq)) { e.respondWith(nbrFetch(e, rq)); return; }   // CARD-HOS: the new build's hand-off, from the copy the page just stored
   if (!isPage(rq)) return;   // everything else: the browser's own road, untouched
-  e.respondWith((async () => {
+  e.respondWith(pageFetch(e, rq));
+});
+function pageFetch(e, rq) {   // 1097's page road, byte-what-it-was inside: NETWORK FIRST, the copy when the line fails or says nothing for SW_NET_MS
+  return (async () => {
     const net = fetch(rq).then(r => {
       if (r && r.ok && (r.type === 'basic' || r.type === 'default')) {   // a whole, good reply refreshes the copy; a torn body fails the put and the last good copy stands
         const c = r.clone(); e.waitUntil(caches.open(SW_K).then(k => k.put(SW_PAGE, c)).catch(() => {}));
@@ -57,8 +78,8 @@ self.addEventListener('fetch', e => {
     const hit = await caches.match(SW_PAGE).catch(() => null);
     if (hit) return hit;
     return net.catch(() => Response.error());   // no copy yet: the network's own answer (or its error page), as before
-  })());
-});
+  })();
+}
 
 // CARD-G90 THE PUSH (jumpr 1348; Wyatt 9/29/2026 by phone: "if your country gets attacked, it's one of the only times we'll give a push notification to players. If one of your countries is
 // under attack, you need to respond within 90 seconds."): HQ v88 sends the FACTS, sealed for this phone alone ({k:'gl', by, a2, nm, secs, until, lang}); the WORDS are written here, in the
