@@ -98,6 +98,21 @@
   .queue-lines { font-family:var(--mono); font-size:11.5px; color:var(--muted); margin:10px 0 0; line-height:1.7;
     overflow:hidden; }
 
+  /* 10/22 CARD-WBT: two tabs under the header; Whiteboard shows THE WHITEBOARD edge to edge, down to the bottom */
+  .tabs { display:flex; gap:4px; padding:4px; margin:0 0 12px; background:var(--panel);
+    border:1px solid var(--line); border-radius:12px; }
+  .tabs button { flex:1; padding:9px 6px; border:1px solid transparent; border-radius:9px; background:none;
+    color:var(--muted); font-weight:700; font-size:14px; cursor:pointer; }
+  .tabs button.on { background:var(--panel2); border-color:var(--line); color:var(--ink); }
+  #wbview { display:none; position:fixed; left:0; right:0; bottom:0; top:130px; z-index:5; background:#0f1115;
+    border-top:1px solid var(--line); padding:0 env(safe-area-inset-right) 0 env(safe-area-inset-left); }
+  #wbmsg { position:absolute; z-index:-1; left:0; right:0; top:38%; margin:0; padding:0 24px; text-align:center;
+    font-family:var(--mono); font-size:12.5px; color:var(--muted); }
+  #wbframe { display:block; width:100%; height:100%; border:0; background:transparent; }
+  body.wb { overflow:hidden; }
+  body.wb #main > .card, body.wb .gobar { display:none; }
+  body.wb #wbview { display:block; }
+
   /* lock screen + settings */
   .sheet { position:fixed; inset:0; background:var(--bg); z-index:50; padding: max(40px, env(safe-area-inset-top)) 20px 20px; overflow:auto; }
   .sheet .inner { max-width:420px; margin:0 auto; display:flex; flex-direction:column; gap:14px; }
@@ -162,6 +177,11 @@
     <button class="gear" id="gear" aria-label="Settings">⚙︎</button>
   </header>
 
+  <div class="tabs" id="tabs" role="tablist">
+    <button class="on" id="tabnotes" role="tab" aria-selected="true" data-tab="notes">✍️ Notes</button>
+    <button id="tabwb" role="tab" aria-selected="false" aria-controls="wbview" data-tab="wb">📋 Whiteboard</button>
+  </div>
+
   <div class="card">
     <p class="label">Project</p>
     <div class="seg" id="projseg"></div>
@@ -199,6 +219,11 @@
   <div class="card">
     <p class="label">Sent</p>
     <div id="sentlist"><p style="color:var(--muted); font-size:13.5px; margin:0;">Nothing sent yet.</p></div>
+  </div>
+
+  <div id="wbview" role="tabpanel" aria-labelledby="tabwb">
+    <p id="wbmsg">Loading the whiteboard…</p>
+    <iframe id="wbframe" title="The whiteboard" referrerpolicy="no-referrer" sandbox="allow-scripts"></iframe>
   </div>
 </div>
 
@@ -718,6 +743,41 @@ async function pollHeldAcks() {
   }
 }
 
+/* ---------- 10/22 CARD-WBT: the Whiteboard tab ----------
+   Wyatt by phone (card 2506): "To everyone's jumpr site, drbango.com/jumpr, let's add a tab that the user can
+   push to show the whiteboard." The tab shows THE WHITEBOARD, every card building in Green vs Tan: the board
+   drbango.com/whiteboard shows after its three taps, the copy the Big Mac pushes to the game box every 30 s
+   (it reloads itself). Every link's pad has the tab, Wyatt's and each guest's. The frame loads when the tab is
+   tapped and is emptied on Notes, so nothing reloads behind the pad. WB_SRC = whiteboard/index.html's SRC:
+   a new token changes both. The sandbox lets the board reload itself and never steer this page. */
+const WB_SRC = "https://nationgame.live/wb-61l3uy7dff2shtym/";
+let tab = "notes";
+function showTab(t) {
+  tab = t === "wb" ? "wb" : "notes";
+  const wb = tab === "wb";
+  document.body.classList.toggle("wb", wb);
+  [...$("tabs").children].forEach(b => {
+    b.classList.toggle("on", b.dataset.tab === tab);
+    b.setAttribute("aria-selected", String(b.dataset.tab === tab));
+  });
+  if (wb) {
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();   // the keyboard goes down
+    scrollTo(0, 0); placeBoard(); loadBoard();
+  } else $("wbframe").src = "about:blank";
+}
+function placeBoard() {         // the board starts under the tabs, however tall the header is
+  if (tab === "wb") $("wbview").style.top = Math.round($("tabs").getBoundingClientRect().bottom + 10) + "px";
+}
+function loadBoard() {
+  if (!navigator.onLine) {
+    $("wbframe").src = "about:blank";
+    $("wbmsg").textContent = "Offline. The whiteboard shows when this phone is back online.";
+    return;
+  }
+  $("wbmsg").textContent = "Loading the whiteboard…";
+  $("wbframe").src = WB_SRC + "?t=" + Math.floor(Date.now() / 30000);
+}
+
 /* ---------- wiring ---------- */
 function showLock(show) { $("lock").classList.toggle("hidden", !show); $("main").classList.toggle("hidden", show); }
 async function boot() {
@@ -779,11 +839,17 @@ addEventListener("paste", e => {               // a copied screenshot pastes str
   if (files.length && imgMax > 0) { e.preventDefault(); addShots(files); }
 });
 $("go").onclick = go;
+$("tabs").onclick = e => { const b = e.target.closest("button"); if (b) showTab(b.dataset.tab); };
+addEventListener("resize", placeBoard);
+new MutationObserver(() => requestAnimationFrame(placeBoard))      // the Mac's line or a guest's name can make the header taller
+  .observe(document.querySelector("header"), { subtree:true, childList:true, characterData:true, attributes:true });
 
 setInterval(() => { flushOutbox(); pollAcks(); pollHeldAcks(); }, 15000);
 setInterval(pollStatus, 20000);
 addEventListener("online", flushOutbox);
+addEventListener("online", () => { if (tab === "wb") loadBoard(); });
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { flushOutbox(); pollStatus(); pollAcks(); } });
+document.addEventListener("visibilitychange", () => { if (!document.hidden && tab === "wb") loadBoard(); });   // a fresh board on wake
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(()=>{});
 boot();
 </script>
