@@ -90171,7 +90171,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='25.87';        
+let GVT_CV='25.88';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -195632,6 +195632,60 @@ function bbfRig(o){ o=o||{}; const f=bbsBill(); const M=f && f.bbs && f.bbs.bbf;
   if(f && M && o.seat!=null && bbfOwns(f)){ const s=bbfSeats()[o.seat|0]; if(s){ M.seat=s.i; M.peek=-1; M.pend=null; M.fansHere=0; M.st='go'; M.goal={ x:s.x, y:s.y }; } }   
   return { cv:GVT_CV, on:BBF.on, raid:bbsOn()?1:0, owns:f? (bbfOwns(f)?1:0) : null, bill:f? { x:Math.round(f.x), y:Math.round(f.y), hp:Math.round(f.hp), max:f.hpMax, st:f.bbs? f.bbs.st : null, ride:f.bbsRide|0, faceX:f.faceX||0, fz:bbfFz(f) } : null, m:f? bbfRead(f,1) : null, seats:bbfSeats().map(q=>({ i:q.i, x:q.x, y:q.y, side:q.side, key:q.key, peeks:q.peeks })), stats:Object.assign({}, BBF_STATS), wire:(S.raid && S.raid.bbs)? { top:S.raid.bbs.bbfTop==null? null : S.raid.bbs.bbfTop, got:Object.keys(S.raid.bbs.bbfW||{}).length } : null, dials:{ walk:BBF.walk, run:BBF.run, tell:BBF.tell, fans:BBF.fans, crowdR:BBF.crowdR, crowdN:BBF.crowdN, mz:BBF.mz, tr:BBF.tr, kick:BBF.kick, cyl:BBF.cyl }, fx:S.fx.filter(e=>e.k==='bbf').length, guest:bbfGuest()?1:0 }; }
 setTimeout(function(){ try{ if(window.GVT && !GVT.bbf) GVT.bbf=function(o){ return bbfRig(o); }; }catch(e){} }, 0);   
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const BQ6={ on:(function(){ try{ const q=/[?&]bq6=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_bq6','0'); else localStorage.removeItem('gvt_bq6'); } return localStorage.getItem('gvt_bq6')==='0'? 0 : 1; }catch(e){ return 1; } })(),   
+  rally:1,   
+  n:{ fan:0, rally:0, spray:0, air:0, miss:0 }, log:[] };   
+function bq6Fl(f){ const a0=f.flA, t0=f.flAt; let fl=false; try{ fl=foeFl(f); }catch(e){ fl=false; } finally{ f.flA=a0; f.flAt=t0; }   
+  try{ return !!crAimFl(f, foeCmdFl(f, fl)); }catch(e){ return !!fl; } }   
+function bq6Foot(f,i){ const m=BBS_FAN_MZ[i&1]||BBS_FAN_MZ[0], fz=bq6Fl(f)? 1 : -1; return { x:f.x-m.x*fz, y:f.y+m.y, fz:fz }; }   
+function bq6Horse(f,b,i){ const m=BBS_FAN_MZ[i&1]||BBS_FAN_MZ[0], hw=BBS3.hw, bw=BBS3.bw, k=bw/FDEF.bbshow.w, RM=reducedMotion(), flip=b.dir>0, sx=flip? -1 : 1, mv=(b.ve>20 && !b.skid)? 1 : 0, d=b.dist;   
+  const bob=RM? 0 : Math.abs(Math.sin(d/9+f.wob))*3.5*mv, lean=(RM? 0 : Math.sin(d/9+f.wob)*0.05*mv)+(b.skid>0? -0.14*b.dir : 0), a=lean-0.05, c=Math.cos(a), s=Math.sin(a), px=m.x*k, py=m.y*k;   
+  const x=f.x+(10*hw/120+2*bw/120)*sx+sx*(c*px-s*py), y=f.y-bob+(-60.8*hw/120+29.8*bw/120)+(s*px+c*py);   
+  return (isFinite(x) && isFinite(y))? { x:x, y:y, fz:flip? 1 : -1 } : null; }
+function bq6Move(A,n0,mx,my,bx0,to,keepY2){ const dx=to.x-mx, dy=to.y-my; let hit=0;   
+  for(let j=Math.max(0, Math.min(n0, A.length)); j<A.length; j++){ const e=A[j]; if(!e) continue;
+    if(!(hit&1) && e.k==='slugtr' && e.x1===mx && e.y1===my){ e.x1=to.x; e.y1=to.y; e.x2+=dx; if(!keepY2) e.y2+=dy; hit|=1; }   
+    else if(!(hit&2) && e.k==='flash' && e.x===mx && e.y===my){ e.x=to.x; e.y=to.y; hit|=2; }   
+    else if(!(hit&4) && e.k==='shell' && e.x===bx0 && e.y===my-2){ e.x=to.x-3*to.fz; e.y=to.y-2; hit|=4; } }   
+  return hit; }
+function bq6Log(kind,i,mx,my,to,hit){ BQ6.n[kind]++; BQ6.log.push([+S.t.toFixed(3), kind, i, +mx.toFixed(2), +my.toFixed(2), +to.x.toFixed(2), +to.y.toFixed(2), to.fz, hit]); if(BQ6.log.length>120) BQ6.log.shift(); }
+function bq6Fan(f,b,A,n0){ const i=b.n&1, m=BBS_FAN_MZ[i], fz=foeFaceX(f), mx=f.x+m.x*fz, my=f.y+m.y;   
+  let any=false; for(let j=Math.max(0, Math.min(n0, A.length)); j<A.length; j++){ const e=A[j]; if(e && e.k==='slugtr' && e.x1===mx && e.y1===my){ any=true; break; } } if(!any) return 0;   
+  const to=bq6Foot(f,i), hit=bq6Move(A,n0,mx,my,mx-3*fz,to,1); bq6Log('fan',i,mx,my,to,hit); return hit; }
+function bq6Spray(f,b,sp,A,n0){ const i=sp.n&1, fz=(b.dir>0)? 1 : -1, m=BBS_FAN_MZ[i], mx=f.x+m.x*fz, my=f.y+m.y-22, to=bq6Horse(f,b,i);   
+  if(!to){ BQ6.n.miss++; return 0; } const hit=bq6Move(A,n0,mx,my,mx-3*fz,to,1); if(!(hit&1)) BQ6.n.miss++; bq6Log('spray',i,mx,my,to,hit); return hit; }
+function bq6Air(f,b,A,n0){ const fz=(b.dir>0)? 1 : -1, m=BBS_FAN_MZ[0], mx=f.x+m.x*fz, my=f.y+m.y-22, to=bq6Horse(f,b,0);   
+  if(!to){ BQ6.n.miss++; return 0; } const hit=bq6Move(A,n0,mx,my,mx-3*fz,to,0); if(!(hit&1)) BQ6.n.miss++; bq6Log('air',0,mx,my,to,hit); return hit; }
+function bq6Rally(A,n0){ const f=bbsBill(); if(!f) return 0; const fz=foeFaceX(f); let hit=0;   
+  for(let i=0;i<2;i++){ const m=BBS_FAN_MZ[i], mx=f.x+m.x*fz, my=f.y+m.y-14; for(let j=Math.max(0, Math.min(n0, A.length)); j<A.length; j++){ const e=A[j];
+      if(e && e.k==='flash' && e.R===14 && e.x===mx && e.y===my){ const to=bq6Foot(f,i); e.x=to.x; e.y=to.y-14; hit++; bq6Log('rally',i,mx,my,{ x:to.x, y:to.y-14, fz:to.fz },1); break; } } }
+  return hit; }
+if(BQ6.on){
+  { const tk0=bbsTick; bbsTick=function(dt){ const A=S.fx, n0=A? A.length : 0, f=bbsBill(), b=f && f.bbs, r0=b? (b.rounds|0) : 0; const r=tk0.apply(this, arguments);   
+      if(f && b && f.bbs===b && !f.dead && !f.bbsRide && (b.rounds|0)>r0 && A===S.fx){ try{ bq6Fan(f,b,A,n0); }catch(e){} } return r; }; }
+  { const rs0=bbsRallyStart; bbsRallyStart=function(B){ const A=S.fx, n0=A? A.length : 0; const r=rs0.apply(this, arguments); if(BQ6.rally && A===S.fx){ try{ bq6Rally(A,n0); }catch(e){} } return r; }; }   
+  { const sp0=bbsSprayTick; bbsSprayTick=function(f,dt,B,b){ const A=S.fx, n0=A? A.length : 0, sp=b && b.spray, k0=sp? sp.n : 0; const r=sp0.apply(this, arguments); if(sp && sp.n>k0 && A===S.fx){ try{ bq6Spray(f,b,sp,A,n0); }catch(e){} } return r; }; }   
+  { const as0=bbsAirShot; bbsAirShot=function(f,b){ const A=S.fx, n0=A? A.length : 0; const r=as0.apply(this, arguments); if(f && b && A===S.fx){ try{ bq6Air(f,b,A,n0); }catch(e){} } return r; }; }
+}
+function bq6Rig(o){ o=o||{}; if(o.rally!=null) BQ6.rally=o.rally? 1 : 0; if(o.clear){ BQ6.log.length=0; for(const k in BQ6.n) BQ6.n[k]=0; }   
+  const f=bbsBill(), b=f && f.bbs, ride=!!(f && f.bbsRide && b && b.st==='ride');
+  return { cv:GVT_CV, on:BQ6.on, rally:BQ6.rally, n:Object.assign({}, BQ6.n), log:BQ6.log.slice(-60), mz:BBS_FAN_MZ.map(m=>({ x:m.x, y:m.y })), bill:f? { x:+f.x.toFixed(2), y:+f.y.toFixed(2), ride:ride? 1 : 0, st:b? b.st : null, fz:ride? (b.dir>0? 1 : -1) : (bq6Fl(f)? 1 : -1) } : null, irons:f? [0,1].map(i=>ride? bq6Horse(f,b,i) : bq6Foot(f,i)) : null }; }
+setTimeout(function(){ try{ if(window.GVT && !GVT.bq6) GVT.bq6=function(o){ return bq6Rig(o); }; }catch(e){} }, 0);   
 
 window.GVT = {
   cks(o){ if(o && o.pct!=null) CKS.pct=+o.pct||0; const R=[0,1,10,20,25,50,75,99,100], t={}; for(const r of R) t[r]={ mul:+cksMul(r).toFixed(4), hit:+hitDmgNowAt('kingcroak',r).toFixed(4), whole:hitWhole(hitDmgNowAt('kingcroak',r)) }; return { cv:GVT_CV, pct:CKS.pct, at:CKS.at, ck:HHB.ck, slope:HERO_DMG_RANK, mine:(META.up.kingcroak||0)|0, table:t }; },   
