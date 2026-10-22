@@ -69492,7 +69492,46 @@ const SKY_MOOR=[560,121], SKY_RIDGE_Y=172;
 const SKY_AIR_OK={ rifleman:1, mgunner:1, bazooka:1, commando:1, grenadier:1, riflemanbaker:1, riflemanrg:1, aagun:1 };       
 function airOk(u){ if(!u || !u.type) return false; if(u.def && u.def.fly) return false; if(SKY_AIR_OK[u.type]) return true;
   if(u.type==='sarge'){ const w=(u.coopSW && u.coopSW.wk) || META.sargeWeapon || 'pistol'; return w!=='lightsaber'; }   
+  if(u.type==='medic') return medrOn(u);    
+  if(u.type==='jane') return true;    
   return false; }   
+
+
+
+
+
+
+
+
+
+
+
+
+
+const SKW={ bag:5, flight:0.16, lift:0.42, pad:28, padR:30, arc0:-0.262, arc:3.665, janeAim:18 };   
+function skwPlane(f){ return !!(f && !f.dead && !f.pendDie && !f.skyGone && !(f.hp<=0) && f.def && f.def.fly && !f.skyDrop && !hrtS3Grd(f)); }   
+function skwEye(u){ return { type:'rifleman', def:UDEF.rifleman, side:u.side, seat:u.seat, x:u.x, y:u.y }; }   
+function skwTankPick(u,R){ if(S.bf || !tkrTank(u) || !skyOn()) return null; const e=skwEye(u); let best=null, bd=1e9;   
+  for(const f of S.foes){ if(!skwPlane(f) || f.x>W-10 || f.x<-40) continue; if(!bfCanTarget(e,f)) continue; const d=Math.hypot(f.x-u.x,f.y-u.y); if(d>R || d>=bd) continue; bd=d; best=f; }
+  return best; }
+function skwSkyShot(u,f){ return !!(!S.bf && tkrTank(u) && skwPlane(f) && skyOn()); }   
+function skwDie(n,k){ let h=Math.imul((n|0)+1,0x9E3779B1)^Math.imul((k|0)+1,0x85EBCA6B); h^=h>>>15; h=Math.imul(h,0x2C1B3C6D); h^=h>>>12; h=Math.imul(h,0x297A2D39); h^=h>>>15; return (h>>>0)/4294967296; }   
+function skwHit(n,k){ const b=Math.max(1,SKW.bag|0), i=(n|0)-1; return (i%b)===Math.floor(skwDie(Math.floor(i/b),k)*b); }   
+function skwBody(f){ const w=(f.def && f.def.w) || 80, im=foeImg(f.type), h=w*((im && im.width)? im.height/im.width : 0.42); return { x:f.x, y:skyAirY(f)-h*SKW.lift, w, h }; }   
+function skwJaneH(f){ return (f && f.def && f.def.fly && !f.skyDrop && skyOn())? SKW.janeAim : null; }   
+function skwFlak(u,f,dmg,mzl){   
+  const n=u.skwN=(u.skwN|0)+1, k=((u.seat|0)*8)+((u.type==='tank3')? 3 : (u.type==='tank2')? 2 : 1), hit=skwHit(n,k), B=skwBody(f), RM=reducedMotion();
+  bfSfx(SFX.boom, u.x, u.y); if(bfVis(u.x,u.y) && !RM) S.shake=Math.max(S.shake,0.11);
+  let tx=B.x, ty=B.y; if(!hit){ const a=SKW.arc0+skwDie(n,k+101)*SKW.arc, ca=Math.cos(a), sa=Math.sin(a), P=SKW.pad+skwDie(n,k+202)*SKW.padR, d=1/Math.max(Math.abs(ca)/(B.w*0.5+P), Math.abs(sa)/(B.h*0.5+P)); tx=B.x+ca*d; ty=B.y+sa*d; }   
+  unitAim(u,{ x:tx, y:ty }); const m9=unitFaceX(u), mzx=u.x+42*m9, mzy=u.y-44, ang=Math.atan2(ty-mzy,tx-mzx), T=SKW.flight;   
+  S.fx.push({k:'puff',x:mzx,y:mzy,t:0,dur:0.4,R:14}); S.fx.push({k:'flash',x:mzx,y:mzy,ang,R:20,lw:3.2,t:0,dur:0.13});   
+  S.fx.push({k:'tracer',x1:mzx,y1:mzy,x2:tx,y2:ty,t:0,dur:T+0.08,col:'#FFB25A',w:4,a:0.3}); if(!RM) S.fx.push({k:'slug',x1:mzx,y1:mzy,x2:tx,y2:ty,t:0,dur:T,col:'#6B6152',colH:'#FFE39A'});   
+  for(let i=0;i<3;i++){ const jx=((n*7+i*13)%11)-5, jy=((n*5+i*17)%9)-4; S.fx.push({k:'puff',x:tx+jx*2,y:ty+jy*2,t:-T,dur:0.8,R:18+i*4,col:'#1E1B18'}); }   
+  S.fx.push({k:'flash',x:tx,y:ty,ang,R:RM? 12 : 22,lw:3,t:-T,dur:0.14}); S.fx.push({k:'ring',x:tx,y:ty,r:6,R:hit? 46 : 32,t:-T,dur:0.3,col:hit? '#FFD24A' : '#B9B2A6'});
+  S.skwN=(S.skwN|0)+1; if(hit) S.skwHit=(S.skwHit|0)+1;   
+  if(!hit) return false;
+  const s9=tkdShot(u,dmg); hurt(f,s9.d,u); if(s9.c){ try{ critFx({ x:tx, y:ty }); }catch(e){} } return true; }   
+function skwRig(){ return { bag:SKW.bag, shots:S.skwN|0, hits:S.skwHit|0, air:{ medic:airOk({type:'medic'}), jane:airOk({type:'jane'}), bftank:airOk({type:'bftank'}) }, sky:skyOn() }; }   
 function skyOn(){ return !!(S.raid && S.raid.k==='sky' && S.raid.cfg===S.cfg); }
 function skyTier(){ return (S.raid && S.raid.k==='sky' && SKY_T[S.raid.t])? S.raid.t : 'e'; }
 function skyMegaOpen(){ return !!(META.sky && META.sky.h); }
@@ -90194,7 +90233,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='26.01';        
+let GVT_CV='26.02';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -122049,6 +122088,7 @@ function update(dt){
     }
     if(hsm9){ const air9=hsmAirPick(u,hsmR); if(air9 && air9.d<hsmBs){ hsmBest=air9.o; hsmK=air9.k; } else if(hsmBest) hsmK=S.bf? 'unit' : 'foe'; if(hsmBest) best=hsmBest; }   
     const ggPick9=(gg9 && ggTgt9)? ggTgt9 : null; if(ggPick9) best=ggPick9;   
+    if(!best && !S.bf && tkrTank(u)) best=skwTankPick(u, def.rng*rngMul+tkSilvRng(u)+bakRng(u));    
     if(S.bf && !def.mine && !hsmK && dfBfGun(u,rng*rngMul+tkSilvRng(u)+bakRng(u),rate)){ u.cd=tkSlowMul(u)*snowSlowMul(u)*ultHvSlow(u)/(rate*ra.rate); continue; } if(!best) continue;       
     
     
@@ -122176,7 +122216,8 @@ function update(dt){
       continue;
     }
     const mzl=unitFaceX(u);         
-    if(mgtU(u)){ mgtFire(u,best,dmg,mzl);       }
+    if(skwSkyShot(u,best)){ skwFlak(u,best,dmg,mzl); }    
+    else if(mgtU(u)){ mgtFire(u,best,dmg,mzl);       }
     else if(u.type==='bftank' || t3Fam(u)  ){   
       
       
@@ -164318,7 +164359,7 @@ function janeVis(f){
   const cm=(!S.bf && W>VW/zoomZ() && S.cCam)||null;   
   if(!cm) return true;
   const cy=cm.y||0;
-  const im=IMG[f.type], fh=Math.min(JANE_VIS_HMAX, 0.92*((f.def&&f.def.w)||48)*((im&&im.width)? im.height/im.width : 1));
+  const im=IMG[f.type], sk9=skwJaneH(f), fh=(sk9!=null)? sk9 : Math.min(JANE_VIS_HMAX, 0.92*((f.def&&f.def.w)||48)*((im&&im.width)? im.height/im.width : 1));    
   return f.x>=cm.x && f.x<=cm.x+VW/zoomZ() && f.y-fh>=cy+JANE_VIS_TOP && f.y<=cy+H/zoomZ();   
 }
 function janeBurst(u,dt){
