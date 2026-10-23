@@ -57951,6 +57951,50 @@ document.addEventListener('visibilitychange', ()=>{ if(document.hidden) acsPush(
 window.addEventListener('pagehide', ()=>{ acsPush('hide'); });
 
 
+
+
+
+
+
+
+
+
+
+const RIN_OFF=(function(){ try{ const q=/[?&]rin=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_rinoff','1'); else localStorage.removeItem('gvt_rinoff'); } return localStorage.getItem('gvt_rinoff')==='1'; }catch(e){ return false; } })();
+var RIN={ v:1, kc:0, busy:0, asks:0, at:0, res:'', err:0, iv:0 };   
+RIN.kc=(!RIN_OFF && ACS.on && META_FRESH && typeof window.__GVT_KC_DEVICE==='string' && !!window.__GVT_KC_DEVICE && META.deviceId===window.__GVT_KC_DEVICE && !META.ngpU && !META.account)? 1 : 0;
+if(RIN.kc){ try{ acsStore(Object.assign(acsLoad(), { pend:META.deviceId })); }catch(e){ RIN.err++; } }   
+function rinAsk(force){
+  if(!RIN.kc || RIN.busy || ACS.gone || ACS.hold) return;
+  if(!acsPend(acsLoad())){ RIN.kc=0; return; }   
+  if(S.mode!=='menu' && S.mode!=='title') return;   
+  const now=Date.now(); if(!force && RIN.asks && now-RIN.at<ACS_GAP) return;
+  RIN.busy=1; RIN.asks++; RIN.at=now; ACS.hold=now;
+  const dev=META.deviceId, pre=JSON.stringify(META), A=accLoad();
+  const ask=netFetch(NET+'/save/get', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ device:dev, cv:GVT_CV }) }).then(r=>r.json()).catch(()=>null);
+  return Promise.race([ ask, new Promise(r=>setTimeout(()=>r(null), ACS_WAIT)) ]).then(hq=>{
+    RIN.busy=0;
+    if(ACS.gone || !RIN.kc || !acsPend(acsLoad()) || (ACS.hold && ACS.hold!==now)){ if(ACS.hold===now) ACS.hold=0; RIN.res='gone'; RIN.kc=0; return; }   
+    if(!hq || hq.err==='offline' || !hq.ok){ ACS.hold=0; RIN.res='dark'; return; }   
+    let ht=null; if(typeof hq.m==='string' && !hq.none){ try{ ht=JSON.parse(hq.m); }catch(e){ ht=null; } }
+    if(ht && ht.v===1 && typeof hq.uid==='string' && hq.uid && accHasPlay(hq.m)){   
+      RIN.res='back'; const a0=META.account, c0=META.crew;
+      if(!META.account && (ht.account==='apple' || ht.account==='google')) META.account=ht.account;   
+      if(!META.crew && ht.crew && typeof ht.crew.code==='string' && ht.crew.code) META.crew={ code:String(ht.crew.code), name:String(ht.crew.name||'THE SQUAD') };   
+      const res=acsPick(pre, A, hq.uid, hq); ACS.hold=0; RIN.kc=0;
+      if(res==='dark' || !ACS.gone){ META.account=a0; if(c0) META.crew=c0; else delete META.crew; }   
+      return; }
+    RIN.res=ht? 'thin' : 'none'; RIN.kc=0;   
+    const st=acsLoad(); delete st.pend; acsStore(st); ACS.hold=0; acsPush('in');
+  }).catch(()=>{ RIN.busy=0; ACS.hold=0; RIN.err++; });
+}
+function rinTick(){ try{ if(!RIN.kc){ if(RIN.iv){ clearInterval(RIN.iv); RIN.iv=0; } return; } if(!document.hidden) rinAsk(0); }catch(e){ RIN.err++; } }
+if(RIN.kc){ setTimeout(rinTick, 0); RIN.iv=setInterval(rinTick, 1000); }   
+function rinRig(o){ o=o||{}; if(o.ask){ RIN.at=0; rinAsk(1); }
+  return { cv:GVT_CV, v:RIN.v, off:RIN_OFF, kc:RIN.kc, busy:RIN.busy, asks:RIN.asks, res:RIN.res, err:RIN.err, fresh:META_FRESH? 1 : 0, kcDev:(typeof window.__GVT_KC_DEVICE==='string')? window.__GVT_KC_DEVICE : null, pend:acsPend(acsLoad())? 1 : 0, hold:ACS.hold? 1 : 0, gone:ACS.gone? 1 : 0 }; }
+setTimeout(()=>{ try{ if(typeof GVT==='object' && GVT) GVT.rin=rinRig; }catch(e){} }, 0);   
+
+
 window.GVTN = {
   appleSignIn(){ sioGo(); },   
   _appleResult(r){
@@ -90755,7 +90799,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='26.67';        
+let GVT_CV='26.68';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
