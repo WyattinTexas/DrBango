@@ -90728,7 +90728,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='26.17';        
+let GVT_CV='26.18';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -197835,6 +197835,60 @@ if(ftkOn()) try{
   FTK.old.pfTankSVG=pfTankSVG; pfTankSVG=function(){ return ftkTank(FTK.old.pfTankSVG.apply(this, arguments)); };   
   (function(){ const F=SGP_FREEZE['*']; if(F && F.indexOf('ftkfig')<0) F.push('ftkfig'); })();   
 }catch(e){ FTK.err=1; }
+
+
+
+
+
+
+
+
+
+
+
+
+var FTA={ on:(function(){ try{ const q=/[?&]fta=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_fta','0'); else localStorage.removeItem('gvt_fta'); } return localStorage.getItem('gvt_fta')==='0'? 0 : 1; }catch(e){ return 1; } })(), used:0, err:0, miss:[], old:{}, n:0, css:0 };
+const FTA_IDS=['puffer','bass'];   
+const FTA_ORDER=['puffer','bass','betta','goldfish','seahorse'];   
+const FTA_LANES={ goldfish:[34,14], puffer:[76,13], bass:[30,37], betta:[58,37], seahorse:[85,35] };   
+const FTA_S=0.52;   
+const FTA_K={ puffer:{ s:0.26, c:[60,60] }, bass:{ s:0.23, c:[63,41] } };   
+const FTA_BOX={ puffer:[13,11], bass:[13,9], betta:[17,12], goldfish:[17,12], seahorse:[17,12] };   
+const FTA_CSS='.fta-puffer { animation-duration:12s; animation-delay:-3s; } .fta-bass { animation-duration:10s; animation-delay:-6s; } .dec-pftank.r1 .fta-body { animation:pfdartlane 0.9s ease-out; } .dec-pftank .dec-puff.react .pfw { animation-name:ftapuff; }'
+  +' @keyframes ftapuff { 0% { transform:scale(1,1); } 10% { transform:scale(0.94,0.88); } 26% { transform:scale(1.66,1.54); } 34% { transform:scale(1.52,1.65); } 42%,64% { transform:scale(1.6,1.6); } 80% { transform:scale(0.94,1.02); } 100% { transform:scale(1,1); } }';
+function ftaOn(){ return FTA.on===1; }
+function ftaIn(id){ return ftaOn() && FTA_IDS.indexOf(id)>=0 && decorHome('fishtank') && decorHome(id); }   
+function ftaActive(){ return ftaIn('puffer') || ftaIn('bass'); }
+function ftaCss(){ if(FTA.css || !document.head) return; const st=document.createElement('style'); st.id='ftaCss'; st.textContent=FTA_CSS; document.head.appendChild(st); FTA.css=1; }
+function ftaLane(id){   
+  const L=FTA_LANES[id], K=FTA_K[id], t='translate('+(L[0]-K.c[0]*K.s).toFixed(2)+','+(L[1]-K.c[1]*K.s).toFixed(2)+') scale('+K.s+')';
+  const inner= id==='puffer'? '<g class="pfw">'+pufferCoreArt()+'</g>' : '<g class="bsf">'+bassLeapArt()+'</g>';   
+  return '<g class="pft-lane pfa fta-lane fta-'+id+'"><g transform="'+t+'"><g class="dec dec-'+(id==='puffer'? 'puff' : 'bass')+' fta-in fta-body pfa" id="'+DECOR_REACT[id].el+'">'+inner+'</g></g></g>';
+}
+function ftaTank(s){   
+  if(typeof s!=='string' || !ftaActive()) return s;
+  let n=0; s=s.replace(/(<g class="pft-lane[^"]*"><g transform=")translate\([^)]*\) scale\([^)]*\)("><g class="dec dec-pf dec-pf-)(betta|goldfish|seahorse)( )/g, function(m,a,b,id,c){ const L=FTA_LANES[id]; if(!L) return m; n++; return a+'translate('+L[0]+','+L[1]+') scale('+FTA_S+')'+b+id+c; });
+  let add=''; for(const id of FTA_IDS) if(ftaIn(id)) add+=ftaLane(id);
+  const F='<g class="ftkfig ftk-front">'; let at=s.indexOf(F); if(at<0) at=s.indexOf(PF_TANK_POST);
+  if(at<0){ if(FTA.miss.indexOf('front')<0) FTA.miss.push('front'); return s; }
+  FTA.used++; FTA.n=n; ftaCss(); return s.slice(0, at)+add+s.slice(at);
+}
+function ftaFloatToTank(){ const st=document.getElementById('roomStage'); if(!st) return; const fl=st.querySelectorAll('.starfloat.big'), f=fl[fl.length-1]; if(!f) return; const sp=DECOR_SPOTS.fishtank, d=rpXY('fishtank'); f.style.left=(sp.x+sp.w/2+d[0])+'px'; f.style.top=(sp.y-8+d[1])+'px'; }   
+function ftaRead(){ return { on:FTA.on, used:FTA.used, err:FTA.err, miss:FTA.miss.slice(), wraps:Object.keys(FTA.old), active:ftaActive(), in:{ puffer:ftaIn('puffer'), bass:ftaIn('bass') }, lanes:FTA_LANES, s:FTA_S, k:FTA_K, box:FTA_BOX, n:FTA.n, css:FTA.css }; }
+if(ftaOn()) try{
+  FTA.old.pfTankSVG=pfTankSVG; pfTankSVG=function(){ return ftaTank(FTA.old.pfTankSVG.apply(this, arguments)); };   
+  FTA.old.pufferSVG=pufferSVG; pufferSVG=function(){ return ftaIn('puffer')? '' : FTA.old.pufferSVG.apply(this, arguments); };   
+  FTA.old.bassSVG=bassSVG; bassSVG=function(){ return ftaIn('bass')? '' : FTA.old.bassSVG.apply(this, arguments); };
+  FTA.old.decorSpots=decorSpots; decorSpots=function(){ let s=FTA.old.decorSpots.apply(this, arguments); if(typeof s==='string') for(const id of FTA_IDS) if(ftaIn(id)) s=s.replace(new RegExp('<div id="dspot-'+id+'"[^>]*><\\/div>'), ''); return s; };   
+  FTA.old.rdragPick=rdragPick; rdragPick=function(p){ const r=FTA.old.rdragPick.apply(this, arguments); return (r && FTA_IDS.indexOf(r.k)>=0 && ftaIn(r.k))? null : r; };   
+  FTA.old.rdragNear=rdragNear; rdragNear=function(p){ const r=FTA.old.rdragNear.apply(this, arguments); return (r && FTA_IDS.indexOf(r.k)>=0 && ftaIn(r.k))? null : r; };
+  FTA.old.pfTankTapAt=pfTankTapAt; pfTankTapAt=function(x,y){ if(!ftaActive()) return FTA.old.pfTankTapAt.apply(this, arguments);   
+    const sp=DECOR_SPOTS.fishtank, d=rpXY('fishtank'), u=x-sp.x-d[0], v=y-sp.y-d[1];
+    for(const id of FTA_ORDER){ if(!decorHome(id)) continue; const L=FTA_LANES[id], B=FTA_BOX[id]; if(u>=L[0]-B[0] && u<=L[0]+B[0] && v>=L[1]-B[1] && v<=L[1]+B[1]){ if(FTA_IDS.indexOf(id)>=0) decorReact(id); else pfTap(id); return id; } }
+    pfTankTap(); return 'glass'; };
+  FTA.old.puffPurse=puffPurse; puffPurse=function(){ const due=!META.puffStar && ftaIn('puffer'); const r=FTA.old.puffPurse.apply(this, arguments); if(due && META.puffStar) ftaFloatToTank(); return r; };   
+  FTA.old.bassPurse=bassPurse; bassPurse=function(){ const due=!META.bassStar && ftaIn('bass'); const r=FTA.old.bassPurse.apply(this, arguments); if(due && META.bassStar) ftaFloatToTank(); return r; };
+}catch(e){ FTA.err=1; }
 
 window.GVT = {
   cks(o){ if(o && o.pct!=null) CKS.pct=+o.pct||0; const R=[0,1,10,20,25,50,75,99,100], t={}; for(const r of R) t[r]={ mul:+cksMul(r).toFixed(4), hit:+hitDmgNowAt('kingcroak',r).toFixed(4), whole:hitWhole(hitDmgNowAt('kingcroak',r)) }; return { cv:GVT_CV, pct:CKS.pct, at:CKS.at, ck:HHB.ck, slope:HERO_DMG_RANK, mine:(META.up.kingcroak||0)|0, table:t }; },   
