@@ -90744,7 +90744,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='26.50';        
+let GVT_CV='26.51';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -196076,7 +196076,7 @@ function lbwbTick(dt){ const rd=S.raid; if(!rd || rd.k!=='wreck' || rd.cfg!==S.c
   if(S.wave<S.cfg.waves.length || S.queue.length || S.foes.length) return;
   rd.won=true; rd.void=1;   
   if(!coopGuest() && !S.cleared){ S.cleared=true; S.forms.length=0; S.queue.length=0; S.waveActive=false; S.bossKilled=true; startVictoryFlag(120, 1, null, dyeHex()||GREEN, ()=>{ if(S.mode==='play') endBattle(true); }); } }
-{ const b0=crewRaidBoom; crewRaidBoom=function(tier){ if(RAID_CUR==='wreck' && typeof COOP!=='undefined' && COOP && COOP.code && (COOP.members||[]).length>=2){ try{ wtToast(t(LBWB_SOLO)); }catch(e){} return Promise.resolve(true); } return b0.apply(this, arguments); }; }   
+{ const b0=crewRaidBoom; crewRaidBoom=function(tier){ if(RAID_CUR==='wreck' && !(typeof lbwg2Door==='function' && lbwg2Door())   && typeof COOP!=='undefined' && COOP && COOP.code && (COOP.members||[]).length>=2){ try{ wtToast(t(LBWB_SOLO)); }catch(e){} return Promise.resolve(true); } return b0.apply(this, arguments); }; }   
 
 { const r0=renderRaidScene; renderRaidScene=function(){ r0.apply(this, arguments); if(RAID_CUR==='wreck'){ try{ lbwbLobbyDress(); }catch(e){ try{ console.error('CARD-LBW-B lobby', e); }catch(e2){} } } }; }
 function lbwbLobbyDress(){ const sc=document.getElementById('raidscene'); if(!sc) return; sc.classList.add('lbwb');
@@ -196868,6 +196868,41 @@ setTimeout(function(){ try{ if(window.GVT && !GVT.lbwf) GVT.lbwf=function(){ con
   return { cv:GVT_CV, v:LBWF.v, err:LBWF.err, on:lbwfOn()?1:0, held:lbwfHeld()?1:0, lit:landLitList().indexOf('cove')>=0?1:0, sail:LBWF.sail, zones:TMAP_ART.zones().map(z=>z.room),
     bay:el? !!el.querySelector('#lbwf-bay') : null, veil:el? (function(){ const v=el.querySelector('.tm-veil[data-room="cove"]'); return v? { reveal:v.hasAttribute('data-reveal'), lift:v.classList.contains('lift') } : null; })() : null,
     rib:el? (function(){ const g=el.querySelector('.tm-rib[data-room="cove"]'); return g? { dark:g.classList.contains('dark'), text:g.textContent } : null; })() : null, raid:!document.getElementById('raidscene').classList.contains('hidden')? RAID_CUR : null, park:parkSceneOpen()? PARK_CUR : null, room:roomCur() }; }; }catch(e){} }, 0);
+
+
+
+
+
+
+
+
+
+const LBWG2_OFF=(function(){ try{ const q=/[?&]lbwg2=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_lbwg2off','1'); else localStorage.removeItem('gvt_lbwg2off'); } return localStorage.getItem('gvt_lbwg2off')==='1'; }catch(e){ return false; } })();
+var LBWG2={ v:1, plc:'cove', hq:null, asks:0, askT:0, busy:0, held:0, rode:0, err:0 };   
+function lbwg2On(){ return !LBWG2_OFF && !!(typeof RAID_INFO==='object' && RAID_INFO && RAID_INFO.wreck); }
+function lbwg2Door(){ return lbwg2On() && LBWG2.hq===true; }   
+function lbwg2Ask(){ if(!lbwg2On() || LBWG2.hq===true || LBWG2.busy) return; const now=Date.now(); if(LBWG2.asks && now-LBWG2.askT<60000) return;   
+  LBWG2.busy=1; LBWG2.asks++; LBWG2.askT=now;
+  try{ netFetch(NET+'/health', { cache:'no-store' }).then(r=>r.json()).then(j=>{ LBWG2.busy=0; LBWG2.hq=!!(j && j.wreck===true); }, ()=>{ LBWG2.busy=0; }); }catch(e){ LBWG2.busy=0; LBWG2.err++; } }
+if(lbwg2On()){ try{
+  PTY_PLACES[LBWG2.plc]='THE PIRATE COVE';   
+  RAID_INFO.wreck.plc=LBWG2.plc;   
+  RAID_INFO.wreck.pg=1;   
+  RAID_INFO.wreck.ride='wreckRode';   
+  }catch(e){ LBWG2.err++; try{ console.error('CARD-LBW-G2 row', e); }catch(e2){} } }
+function lbwg2RideJoin(){ if(LBWG2.rode || !lbwg2On() || META.pirate) return 0; LBWG2.rode=1; let n=0;   
+  try{ if(typeof lbwaJoin==='function'){ lbwaJoin(); n++; } }catch(e){ LBWG2.err++; }   
+  try{ if(typeof LBWD_SAY==='object' && typeof SB_LINE==='object'){ for(const k in LBWD_SAY) if(!SB_LINE[k]) SB_LINE[k]=LBWD_SAY[k]; n++; } }catch(e){ LBWG2.err++; }   
+  try{ RAID_INFO.wreck.wing='wreck'; n++; }catch(e){ LBWG2.err++; }   
+  return n; }
+{ const o0=openRaidScene; openRaidScene=function(id){ try{ if(id==='wreck' && lbwg2On() && !META.pirate && ptyGuestRaid('wreck')) lbwg2RideJoin(); }catch(e){ LBWG2.err++; } return o0.apply(this, arguments); }; }   
+{ const s0=startRaidBattle; startRaidBattle=function(tier, rk){ try{ if(rk==='wreck' && lbwg2On() && !META.pirate) lbwg2RideJoin(); }catch(e){ LBWG2.err++; } return s0.apply(this, arguments); }; }   
+{ const r0=renderRaidScene; renderRaidScene=function(){ r0.apply(this, arguments); try{ if(RAID_CUR==='wreck') lbwg2Ask(); }catch(e){ LBWG2.err++; } }; }   
+{ const b0=crewRaidBoom; crewRaidBoom=function(tier){ try{ if(RAID_CUR==='wreck' && !lbwg2Door() && typeof COOP!=='undefined' && COOP && COOP.code && (COOP.members||[]).length>=2){ LBWG2.held++; lbwg2Ask(); } }catch(e){ LBWG2.err++; } return b0.apply(this, arguments); }; }   
+function lbwg2Rig(o){ o=o||{}; if(o.hq!==undefined) LBWG2.hq=o.hq; if(o.ask){ LBWG2.askT=0; lbwg2Ask(); } const R=(typeof RAID_INFO==='object' && RAID_INFO)? RAID_INFO.wreck : null;
+  return { cv:GVT_CV, v:LBWG2.v, on:lbwg2On(), door:lbwg2Door(), hq:LBWG2.hq, asks:LBWG2.asks, held:LBWG2.held, err:LBWG2.err, plc:R? R.plc : null, pg:R? R.pg : null, ride:R? (R.ride||null) : null, place:PTY_PLACES[LBWG2.plc]||null, word:(typeof ptyRaidWord==='function')? [1,2,3,4].map(n=>ptyRaidWord('wreck', n)?1:0) : null,
+    key:(typeof raidDoorKey==='function')? raidDoorKey('wreck') : null, mega:(R && R.mega)? !!R.mega() : null, wing:R? R.wing : null, rideJoin:LBWG2.rode, rode:(typeof META==='object' && META && META.wreckRode)? 1 : 0 }; }
+setTimeout(()=>{ try{ if(typeof GVT==='object' && GVT) GVT.lbwg2=lbwg2Rig; }catch(e){} }, 0);   
 
 
 
