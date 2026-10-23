@@ -90728,7 +90728,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='26.20';        
+let GVT_CV='26.21';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -190808,6 +190808,48 @@ if(lpsOn()) try{
   (function(){ const ids=['bunbun','erniedog']; for(let i=0;i<ids.length;i++){ const id=ids[i], s=WB_ART[id], a=s.indexOf('>')+1; LPS.outer[id]=s.slice(0,a); LPS.inner[id]=s.slice(a, s.length-4); LPS.old['WB_ART.'+id]=s; WB_ART[id]=LPS.outer[id]+lpsWbInner(id)+'</g>'; } })();   
   LPS.old.wbAtticSVG=wbAtticSVG; wbAtticSVG=function(){ let v=LPS.old.wbAtticSVG.apply(this, arguments); if(typeof v!=='string' || !v) return v; for(const id in LPS.inner){ if(v.indexOf(LPS.inner[id])>=0) v=v.split(LPS.inner[id]).join(lpsWbInner(id)); } return v; };   
 }catch(e){ LPS.err++; }
+
+
+
+
+
+
+
+
+
+var AFX={ on:(function(){ try{ const q=/[?&]afx=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_afx','0'); else localStorage.removeItem('gvt_afx'); } return localStorage.getItem('gvt_afx')==='0'? 0 : 1; }catch(e){ return 1; } })(), pic:{}, busy:{}, map:null, armed:0, iv:0, bakes:0, swaps:0, drops:0, sweeps:0, err:0, log:[] };
+const AFX_DIM=[0.58,0.56,0.64], AFX_MIN=128, AFX_MAX=2048, AFX_OVER=1.5;   
+function afxOn(){ return AFX.on===1 && typeof LPS==='object' && !!LPS && typeof lpsOn==='function' && lpsOn(); }
+function afxKeys(){ if(AFX.map) return AFX.map; const m=new Map(); try{ for(const id in LPS_ART.ids){ m.set(lpsUri(id,null), id+':b'); const A=LPS_ART.ids[id]; for(let i=0;i<A.floats.length;i++) m.set(lpsUri(id,i), id+':'+i); } }catch(e){ AFX.err++; } return (AFX.map=m); }   
+function afxBucket(px){ let b=AFX_MIN; const want=px*AFX_OVER; while(b<want && b<AFX_MAX) b*=2; return b; }
+function afxNeed(im){ try{ const r=im.getBoundingClientRect(); return Math.max(r.width, r.height)*(window.devicePixelRatio||1); }catch(e){ return 0; } }   
+function afxBake(key, night, bucket){   
+  const ck=key+':'+(night? 'n' : 'd')+':'+bucket; if(AFX.pic[ck]) return Promise.resolve(AFX.pic[ck]); if(AFX.busy[ck]) return AFX.busy[ck];
+  const sp=key.split(':'), p=lpsPiece(sp[0], sp[1]==='b'? null : +sp[1]); if(!p || !p.pic || String(p.mime).indexOf('svg')<0) return Promise.resolve(null);
+  const w=p.w||p.box[2], h=p.h||p.box[3], W=Math.max(1, Math.round(w>=h? bucket : bucket*w/h)), H=Math.max(1, Math.round(w>=h? bucket*h/w : bucket));
+  const doc=String(p.pic).replace(/^\s*<svg\b/, '<svg width="'+W+'" height="'+H+'"');   
+  const pr=new Promise(res=>{ const im=new Image(); im.onload=()=>{ let u=null; try{ const cv=document.createElement('canvas'); cv.width=W; cv.height=H; const cx=cv.getContext('2d'); cx.drawImage(im, 0, 0, W, H);
+      if(night){ const d=cx.getImageData(0, 0, W, H), a=d.data; for(let k=0;k<a.length;k+=4){ a[k]=a[k]*AFX_DIM[0]; a[k+1]=a[k+1]*AFX_DIM[1]; a[k+2]=a[k+2]*AFX_DIM[2]; } cx.putImageData(d, 0, 0); }   
+      u=cv.toDataURL('image/png'); AFX.pic[ck]=u; AFX.bakes++; }catch(e){ AFX.err++; AFX.log.push(['bake', ck, String(e).slice(0,80)]); } delete AFX.busy[ck]; res(u); };
+    im.onerror=()=>{ AFX.err++; AFX.log.push(['load', ck]); delete AFX.busy[ck]; res(null); }; im.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(doc); });   
+  return (AFX.busy[ck]=pr); }
+function afxSet(im, key, night, bucket, u){ im.setAttribute('href', u); im.__afx={ key:key, night:night, bucket:bucket }; im.setAttribute('data-afx', key); AFX.swaps++; }
+function afxDrop(){ for(const g of document.querySelectorAll('g[filter="url(#wb-night)"]')){ let ok=true; for(const im of g.querySelectorAll('image')){ if(!(im.__afx && im.__afx.night)){ ok=false; break; } } if(ok){ g.removeAttribute('filter'); g.setAttribute('data-afx-dim', '1'); AFX.drops++; } } }   
+function afxSweep(){ if(!afxOn()) return; const M=afxKeys(); if(!M.size) return; AFX.sweeps++;
+  for(const im of document.querySelectorAll('image')){ const h=im.getAttribute('href'); if(!h) continue; let key=im.__afx? im.__afx.key : null;
+    if(!key){ if(h.charCodeAt(11)!==115  ) continue; key=M.get(h); if(!key) continue; }
+    const need=afxNeed(im); if(!(need>0)) continue; const night=!!(im.closest && im.closest('g[filter="url(#wb-night)"], g[data-afx-dim]')), bucket=afxBucket(need);
+    if(im.__afx && im.__afx.night===night && im.__afx.bucket>=bucket) continue;   
+    const u=AFX.pic[key+':'+(night? 'n' : 'd')+':'+bucket]; if(u){ afxSet(im, key, night, bucket, u); continue; }
+    afxBake(key, night, bucket).then(u2=>{ if(u2 && im.isConnected && !(im.__afx && im.__afx.night===night && im.__afx.bucket>=bucket)) afxSet(im, key, night, bucket, u2); afxDrop(); }); }
+  afxDrop(); }
+function afxArm(){ if(AFX.armed || !afxOn()) return; AFX.armed=1;
+  try{ const r0=renderMenu; renderMenu=function(){ const v=r0.apply(this, arguments); try{ requestAnimationFrame(afxSweep); }catch(e){} return v; }; }catch(e){ AFX.err++; }   
+  try{ AFX.iv=setInterval(function(){ try{ if(typeof S==='object' && S.mode==='menu' && !document.hidden) afxSweep(); }catch(e){ AFX.err++; } }, 1000); }catch(e){ AFX.err++; } }
+function afxRead(o){ if(o && o.sweep) afxSweep(); const live=[]; for(const im of document.querySelectorAll('image[data-afx]')) live.push(im.getAttribute('data-afx')+':'+(im.__afx? (im.__afx.night? 'n' : 'd')+im.__afx.bucket : '?')+':'+(String(im.getAttribute('href')).slice(5,14)));
+  return { on:afxOn(), armed:AFX.armed, bakes:AFX.bakes, swaps:AFX.swaps, drops:AFX.drops, sweeps:AFX.sweeps, err:AFX.err, pics:Object.keys(AFX.pic).map(k=>k+'='+AFX.pic[k].length), live:live, dims:document.querySelectorAll('[data-afx-dim]').length, filters:document.querySelectorAll('g[filter="url(#wb-night)"]').length, svgLeft:[...document.querySelectorAll('image')].filter(im=>{ const h=im.getAttribute('href')||''; return h.charCodeAt(11)===115 && afxKeys().has(h) && afxNeed(im)>0; }).length, log:AFX.log.slice(-8) }; }
+try{ afxArm(); }catch(e){ AFX.err++; }
+setTimeout(function(){ try{ if(window.GVT && !GVT.afx) GVT.afx=afxRead; }catch(e){} }, 0);   
 
 
 
