@@ -90728,7 +90728,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='26.22';        
+let GVT_CV='26.23';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -100481,7 +100481,7 @@ function rbnTrailStep(u,dt){
   if(d<=RBN_TRAIL_IN){ u.marching=false; return 1; }
   const sp=Math.min(RBN_TRAIL_VMAX, d/Math.max(0.3,(u.rbnGap||0.65)*RBN_TRAIL_LAG)), st=Math.min(d, sp*dt), vx=dx/d*sp;
   u.x+=dx/d*st; u.y+=dy/d*st; u.marching=sp>6;
-  if(vx>20){ u.wkX=1; u.wkT=S.t; } else if(vx<-20){ u.wkX=-1; u.wkT=S.t; }   
+  { const f9=utaFloor(20,(u.def&&u.def.moveSpd)||36); if(vx>f9){ u.wkX=1; u.wkT=S.t; } else if(vx<-f9){ u.wkX=-1; u.wkT=S.t; } }   
   return 1; }
 function rbnZig(u){   
   if(u.zigS==null){ let h=2166136261>>>0; const c=String(u.cid||u.id); for(let i=0;i<c.length;i++){ h^=c.charCodeAt(i); h=Math.imul(h,16777619)>>>0; } u.zigS=h; }
@@ -100842,14 +100842,14 @@ function owTwinStep(u,dt){
     const ex=u.owPx-u.x, ey=u.owPy-u.y, e=Math.hypot(ex,ey);
     if(e<=OW_IN) return 2;
     const sp=Math.min(smax, Math.max(30, e/OW_TAU)), st=Math.min(e, sp*dt);
-    u.x+=ex/e*st; u.y+=ey/e*st; if(ex/e*sp>20){ u.wkX=1; u.wkT=S.t; } else if(ex/e*sp<-20){ u.wkX=-1; u.wkT=S.t; }
+    u.x+=ex/e*st; u.y+=ey/e*st; { const f9=utaFloor(20,(u.def&&u.def.moveSpd)||60); if(ex/e*sp>f9){ u.wkX=1; u.wkT=S.t; } else if(ex/e*sp<-f9){ u.wkX=-1; u.wkT=S.t; } }
     u.marching=true; return 1; }
   
   const ox=u.owEx||0, oy=u.owEy||0, o=Math.hypot(ox,oy);
   if(u.owFw? (o>5) : (o>OW_FOLLOW)){ u.owFw=1;   
     const h9=u.owH||(u.owH=[]); let cx=owVx(u)+ox/OW_TAU, cy=owVy(u)+oy/OW_TAU; const c=Math.hypot(cx,cy); if(c>smax){ cx*=smax/c; cy*=smax/c; }
     const dx=ox*Math.min(1,dt/OW_TAU), dy=oy*Math.min(1,dt/OW_TAU);
-    u.x+=cx*dt; u.y+=cy*dt; u.owEx=ox-dx; u.owEy=oy-dy; if(cx>20){ u.wkX=1; u.wkT=S.t; } else if(cx<-20){ u.wkX=-1; u.wkT=S.t; }
+    u.x+=cx*dt; u.y+=cy*dt; u.owEx=ox-dx; u.owEy=oy-dy; { const f9=utaFloor(20,(u.def&&u.def.moveSpd)||60); if(cx>f9){ u.wkX=1; u.wkT=S.t; } else if(cx<-f9){ u.wkX=-1; u.wkT=S.t; } }
     if(!h9.length || S.t-h9[h9.length-1][0]>=OW_HZ){ h9.push([S.t,u.x+u.owEx,u.y+u.owEy]); while(h9.length>34) h9.shift(); }
     u.marching=true; return 1; }
   u.owFw=0;
@@ -104326,7 +104326,7 @@ function bfMarch(u,dt,goal){
   
   
   
-  const wkv=nx*sp*v2m, wkf=u.cmdWkF?7:(u.type==='jane'? JANE_WKF : u.type==='kingbear'? KB_HERO_WKF : 20);   
+  const wkv=nx*sp*v2m, wkf=utaFloor(u.cmdWkF?7:(u.type==='jane'? JANE_WKF : u.type==='kingbear'? KB_HERO_WKF : 20), sp*v2m);       
   if(u.coopBy && u.glOn && GLIDE_FACE){   }
   else wkStride(u,wkv,wkf,dt);   
   for(const rk of S.cfg.terrain.rocks){          
@@ -126006,6 +126006,16 @@ function flChair(o,v){ return (o.flAt!=null && o.flA!==v && S.t-o.flAt<CFP.grace
 function cfpRig(o){ if(o){ if(o.step!=null) CFP.step=+o.step; if(o.grace!=null) CFP.grace=+o.grace; }   
   const U=(o&&o.id!=null)? S.units.find(q=>q.id===o.id) : null;
   return { cv:GVT_CV, step:CFP.step, grace:CFP.grace, hold:WKF_HOLD, u:U? { id:U.id, wkX:U.wkX==null? null : U.wkX, wkAge:U.wkT==null? null : +(S.t-U.wkT).toFixed(3), wkS:U.wkS==null? null : U.wkS, wkSD:U.wkSD==null? null : +U.wkSD.toFixed(2), flA:U.flA==null? null : !!U.flA, flAge:U.flAt==null? null : +(S.t-U.flAt).toFixed(3), fl:!!unitFl(U) } : null }; }
+
+
+
+
+
+
+
+
+const UTA={ on:(function(){ try{ return /[?&]uta=0/.test(location.search||'')? 0 : 1; }catch(e){ return 1; } })(), frac:0.4, min:3 };
+function utaFloor(base,pace){ return UTA.on? Math.min(base, Math.max(UTA.min, UTA.frac*Math.abs(pace||0))) : base; }   
 
 const WKF_HOLD=0.15;
 function wkBack(o,dir){ return !!(o.wkT && S.t-o.wkT<WKF_HOLD && o.wkX===-dir); }
