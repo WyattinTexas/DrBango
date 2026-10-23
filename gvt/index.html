@@ -90728,7 +90728,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='26.19';        
+let GVT_CV='26.20';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -197442,6 +197442,40 @@ const OTS_TM={ tagK:0.75, tMax:10, pad:0.4, tag0:null, mice:0 };
       f.mzT=Math.max(sk.t, Math.min(OTS_TM.tMax, need)); f.burrow=true; f.mzLaid=false; OTS_TM.mice++; } }catch(e){}
     return s0.apply(this, arguments); }; }
 setTimeout(function(){ try{ if(window.GVT && !GVT.otsTM) GVT.otsTM=function(){ return { tagK:OTS_TM.tagK, table:BBS_TAGX.slice(), table0:OTS_TM.tag0, mice:OTS_TM.mice, tMax:OTS_TM.tMax }; }; }catch(e){} }, 0);
+
+
+
+
+
+
+
+
+
+
+
+
+const BSH={ on:(function(){ try{ const q=/[?&]shield=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_bsh','0'); else localStorage.removeItem('gvt_bsh'); } return localStorage.getItem('gvt_bsh')==='0'? 0 : 1; }catch(e){ return 1; } })(), n:5, flash:0.15, st:{ born:0, spent:0, down:0 } };   
+function bshMan(type){ return type==='tanshotgun' || type==='bbshotgun'; }   
+{ const s0=spawnFoe; spawnFoe=function(type,x,y,form,gu){ const f=s0.apply(this, arguments); try{ if(f && BSH.on && bshMan(type) && bbsOn()){ f.bshN=BSH.n; f.bshMax=BSH.n; BSH.st.born++; } }catch(e){} return f; }; }   
+function bshTake(f,src,fire9){ if(!(f.bshN>0)) return false; f.bshN--; f.bshHitT=S.t; BSH.st.spent++; const last=!(f.bshN>0);   
+  bfSfx(SFX.thock, f.x, f.y); if(!reducedMotion()) S.fx.push({ k:'ring', x:f.x, y:f.y-28, r:5, R:last? 40 : 26, t:0, dur:last? 0.45 : 0.22, col:'#D8D8D8' });   
+  if(last){ BSH.st.down++; S.floats.push({ x:f.x, y:f.y-80, txt:'SHIELDS DOWN!', t:0, col:'#DFE6EA' }); }   
+  return true; }
+{ const h0=hurt; hurt=function(f,dmg,src,fire9){ if(f && f.bshN>0 && !f.dead && BSH.on && bshTake(f,src,fire9)) return; return h0.apply(this, arguments); }; }   
+function bshDrawPlate(f){ const n=f.bshN|0; if(n<=0) return; const w=f.def.w||56, h=w*(140/120), wbk=foeFl(f), dir=wbk? 1 : -1, lift=(f.hopZ||0)+(f.airB||0);   
+  const pw=w*0.34, ph=w*0.56, px=f.x+dir*w*0.25, py=f.y-lift-h*0.46, hit=(f.bshHitT!=null && S.t-f.bshHitT<BSH.flash), r=3, L=-pw/2, T=-ph/2;
+  cx.save(); cx.translate(px,py); cx.rotate(dir*0.10);
+  const path=()=>{ cx.beginPath(); cx.moveTo(L+r,T); cx.lineTo(L+pw-r,T); cx.quadraticCurveTo(L+pw,T,L+pw,T+r); cx.lineTo(L+pw,T+ph-r); cx.quadraticCurveTo(L+pw,T+ph,L+pw-r,T+ph); cx.lineTo(L+r,T+ph); cx.quadraticCurveTo(L,T+ph,L,T+ph-r); cx.lineTo(L,T+r); cx.quadraticCurveTo(L,T,L+r,T); cx.closePath(); };
+  path(); cx.fillStyle=hit? '#E9EEF2' : '#5E7284'; cx.fill();   
+  cx.save(); cx.clip(); cx.fillStyle=hit? '#F6F8FA' : '#8DA2B3'; cx.fillRect(L,T,pw,ph*0.46); cx.restore();   
+  path(); cx.strokeStyle='rgba(52,65,78,0.55)'; cx.lineWidth=1.2; cx.stroke();   
+  const rx=pw*0.26, ry=ph*0.30, seats=[[-rx,-ry],[rx,-ry],[0,0],[-rx,ry],[rx,ry]];   
+  for(let i=0;i<5;i++){ const s=seats[i]; if(i<n){ cx.fillStyle='#E6ECF0'; cx.beginPath(); cx.arc(s[0],s[1],2.1,0,7); cx.fill(); cx.strokeStyle='rgba(52,65,78,0.55)'; cx.lineWidth=0.8; cx.stroke(); } else { cx.strokeStyle='rgba(38,48,58,0.6)'; cx.lineWidth=1; cx.beginPath(); cx.arc(s[0],s[1],1.7,0,7); cx.stroke(); } }
+  cx.restore(); }
+{ const a0=tanAimTell; tanAimTell=function(f){ a0.apply(this, arguments); try{ if(f && f.bshN>0 && !f.dead && !f.falling && BSH.on) bshDrawPlate(f); }catch(e){} }; }   
+setTimeout(function(){ try{ if(window.GVT && !GVT.bsh) GVT.bsh=function(o){ o=o||{}; if(o.on!=null) BSH.on=o.on? 1 : 0;   
+  const men=S.foes.filter(f=>!f.dead && bshMan(f.type)); return { cv:GVT_CV, on:BSH.on, n:BSH.n, st:Object.assign({}, BSH.st), bbs:bbsOn(), men:men.length, shielded:men.filter(f=>f.bshN>0).length,
+    list:men.slice(0,12).map(f=>({ id:f.id, t:f.type, x:Math.round(f.x), y:Math.round(f.y), hp:f.hp, max:f.hpMax, sh:f.bshN|0 })), wraps:{ spawn:String(spawnFoe).indexOf('bshMan')>=0, hurt:String(hurt).indexOf('bshTake')>=0, tell:String(tanAimTell).indexOf('bshDrawPlate')>=0 } }; } }catch(e){} }, 0);
 
 
 
