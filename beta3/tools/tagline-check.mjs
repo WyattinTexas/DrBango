@@ -2,13 +2,16 @@
 // doors · v0.51.0 THE HOME RESHAPE · v0.52.0 LEADERBOARD INTO THE PROFILE,
 // Wyatt 8/25):
 //
-//   [CONTINUE GAME while a climb stands] · NEW GAME · ENDLESS · VERSUS
+//   [CONTINUE GAME while a climb stands] · NEW GAME · ENDLESS · VERSUS · DAILY
 //
 // - LEADERBOARD's button left the meadow (v0.52.0): the board is a door in
 //   the PROFILE now (under the star rating), its back link returning to the
 //   profile, and from there to the meadow. The column is play modes only:
-//   ENDLESS joined it in v0.68.0 — four rows read 429..615 (62 apart) with
-//   a checkpoint, three read 454..590 (68 apart) without.
+//   ENDLESS joined it in v0.68.0; the DAILY door joined under VERSUS in
+//   v0.123.0 (the home corners — the red corner chip became a door): four
+//   58-tall rows read 421..607 (62 apart) without a checkpoint, five 48-tall
+//   rows read 404..612 (52 apart) with one — the column never sinks past 636,
+//   the head of a full duel strip.
 //
 // - CONTINUE GAME (contCamp) exists ONLY while a checkpoint stands. Without
 //   one it is NOT RENDERED AT ALL — no grey dress, no dead input, no gap: the
@@ -18,7 +21,7 @@
 //   standing climb's level, the best ever, or the mode's own verb (the one
 //   deliberate exception to the live-lines-only law: a brand-new player is
 //   told what the door is).
-// - QUICK PLAY's button left the meadow. The MODE lives on (daily chip,
+// - QUICK PLAY's button left the meadow. The MODE lives on (daily door,
 //   m:'quick' leaderboard rows, ?quick=1 boots a quick run for harnesses) —
 //   only the door is gone, and the column reflows over the hole.
 // - The campaign wording became game wording: NEW GAME / CONTINUE GAME and
@@ -103,15 +106,14 @@ const ROWS = `(() => { const h = ${H};
       sub: s ? (s.visible ? s.text : null) : undefined, subColor: s && s.visible ? s.style.color : null,
       hit: !!b.input && b.input.enabled, alpha: +b.alpha.toFixed(2), labA: +t.alpha.toFixed(2),
       hand: !!b.input && b.input.cursor === 'pointer' }; };
-  return JSON.stringify({ campaign: row('campaign'), newcamp: row('newcamp'), endless: row('endless'), board: row('board'), versus: row('versus'),
+  return JSON.stringify({ campaign: row('campaign'), newcamp: row('newcamp'), endless: row('endless'), board: row('board'), versus: row('versus'), daily: row('daily'),
     quickBtn: 'quick' in h.rowBtns, quickTxt: h.children.list.some(o => o.type === 'Text' && o.text === SS_T('quick')),
     boardBtn: 'board' in h.rowBtns, boardTxt: h.children.list.some(o => o.type === 'Text' && o.text === SS_T('board')),
-    daily: h.dailyChipT.text,
     flavour: h.children.list.filter(o => o.type === 'Text' && /four acts|long night anew|then the Star Eater|duel beneath/.test(o.text)).length }) })()`;
-// the visible column: rowYs in order, centred on 522, no gap — three rows
-// sit 68 apart (454..590), four tighten to 62 (429..615)
-const column = (g) => ['campaign', 'newcamp', 'endless', 'board', 'versus'].filter(k => g[k] && g[k].vis).map(k => g[k].rowY);
-const COLN = [454, 522, 590], COLC = [429, 491, 553, 615];
+// the visible column: rowYs in order, no gap — four rows sit 62 apart
+// (421..607), five drop to 48-tall doors 52 apart (404..612); never past 636
+const column = (g) => ['campaign', 'newcamp', 'endless', 'board', 'versus', 'daily'].filter(k => g[k] && g[k].vis).map(k => g[k].rowY);
+const COLN = [421, 483, 545, 607], COLC = [404, 456, 508, 560, 612];
 const same = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
 /* ---- the tagline, gone -----------------------------------------------------
    v0.90.0: the line under the braid retired for real. The five old phrases
@@ -177,18 +179,20 @@ ok('QUICK PLAY is gone from the meadow: no button, no label', !g.quickBtn && !g.
 ok('…but the quick MODE keeps its string in every language (Wyatt may bring it back)',
   await ev(`Object.keys(SS_STR).every(L => typeof SS_STR[L].quick === 'string' && SS_STR[L].quick.length > 0)`) === true);
 ok('NO CHECKPOINT → CONTINUE GAME is not rendered at all: invisible, input off', g.campaign && !g.campaign.vis && !g.campaign.hit, JSON.stringify(g.campaign));
-ok('the column closes ranks — NEW GAME · ENDLESS · VERSUS at 454/522/590, no gap', same(column(g), COLN), JSON.stringify(column(g)));
+ok('the column closes ranks — NEW GAME · ENDLESS · VERSUS · DAILY at 421/483/545/607, no gap', same(column(g), COLN), JSON.stringify(column(g)));
 ok('the ENDLESS door speaks its verb on a virgin meadow (sub live, label lifted 9)',
   g.endless && g.endless.vis && g.endless.sub === await ev(`SS_T('endlessSub')`) && g.endless.lift === 9 && g.endless.hit, JSON.stringify(g.endless));
 for (const k of ['newcamp', 'versus'])
   ok(k + ': 58-tall button, label dead-centre, no sub-line showing', g[k].h === 58 && g[k].lift === 0 && !g[k].sub && g[k].hit, JSON.stringify(g[k]));
 ok('LEADERBOARD is gone from the meadow (v0.52.0): no row, no label — it lives in the profile', !g.board && !g.boardBtn && !g.boardTxt, JSON.stringify({ btn: g.boardBtn, txt: g.boardTxt }));
 ok('NEW GAME wears its new name', g.newcamp.label === await ev(`SS_T('newCamp')`) && g.newcamp.label === 'NEW GAME', g.newcamp.label);
-ok('the daily chip still carries its countdown / tick', !!g.daily && g.daily.length > 1, g.daily);
+ok('the DAILY door closes the column — its line names tonight\'s sky and its countdown',
+  g.daily && g.daily.vis && g.daily.hit && g.daily.lift === 9 && g.daily.label === await ev(`SS_T('daily')`)
+  && /\d+:\d\d:\d\d$/.test(g.daily.sub || '') && (g.daily.sub || '').startsWith(await ev(`ssSkyToday() ? SS_T(ssSkyToday().nameKey) : ''`)), JSON.stringify(g.daily));
 // a REAL tap on the empty sky where the door once stood opens nothing
 const empty = JSON.parse(await ev(`(() => { const h = ${H}; const cam = h.cameras.main, b = h.rowBtns.newcamp.getBounds();
   const D = game.scale.width / innerWidth; const U = h.rowBtns.versus.displayWidth / 300;
-  return JSON.stringify({ x: b.centerX / D, y: (b.centerY - 68 * U - cam.scrollY) / D }) })()`));
+  return JSON.stringify({ x: b.centerX / D, y: (b.centerY - 62 * U - cam.scrollY) / D }) })()`));
 await tapXY(empty.x, empty.y);
 await sleep(900);
 ok('a REAL tap where CONTINUE GAME once stood opens nothing (no sheet, no map, no ascent)',
@@ -239,10 +243,10 @@ g = JSON.parse(await ev(ROWS));
 const CONT = await ev(`SS_T('contCamp')`);
 const fight3 = await ev(`SS_T('fightN', 3)`);
 const act1 = await ev(`SS_ACT_N(SS_ACTS[0]).split('·')[0].trim()`);
-ok('CONTINUE GAME is rendered at the head of the column — four doors, 429..615, no gap', g.campaign.vis && same(column(g), COLC), JSON.stringify(column(g)));
+ok('CONTINUE GAME is rendered at the head of the column — five doors, 404..612, no gap', g.campaign.vis && same(column(g), COLC), JSON.stringify(column(g)));
 ok('it reads CONTINUE GAME (contCamp, not the in-run "' + await ev(`SS_T('cont')`) + '")', g.campaign.label === CONT && CONT === 'CONTINUE GAME' && CONT !== await ev(`SS_T('cont')`), g.campaign.label);
-ok('…carries "' + act1 + ' · ' + fight3 + '" under it (progress, not flavour) and lifts 9',
-  g.campaign.sub === act1 + '  ·  ' + fight3 && g.campaign.lift === 9, JSON.stringify(g.campaign));
+ok('…carries "' + act1 + ' · ' + fight3 + '" under it (progress, not flavour) and lifts 7 (the five-door column\'s 48-tall slab)',
+  g.campaign.sub === act1 + '  ·  ' + fight3 && g.campaign.lift === 7 && g.campaign.h === 48, JSON.stringify(g.campaign));
 ok('…and is fully alive: lit, input on, hand cursor', g.campaign.hit && g.campaign.hand && g.campaign.alpha === 1 && g.campaign.labA === 1, JSON.stringify(g.campaign));
 await snap('campaign-checkpoint');
 // a REAL tap on CONTINUE → the star chart at fight 3 → the node → the ascent resumes THAT fight
@@ -283,7 +287,7 @@ ok('NEW wipes the climb and opens the sign sheet — the normal fresh flow', awa
 ok('the old checkpoint is GONE', await ev(`localStorage.getItem('beta3.campaign') === null`) === true);
 await sleep(700);   // the 220ms reflow glide settles behind the sheet
 g = JSON.parse(await ev(ROWS));
-ok('…and the door VANISHES at once — not rendered, and the column closes to 454/522/590',
+ok('…and the door VANISHES at once — not rendered, and the column closes to 421/483/545/607',
   !g.campaign.vis && !g.campaign.hit && same(column(g), COLN), JSON.stringify({ vis: g.campaign.vis, col: column(g) }));
 
 // ---------------------------------------------------------------- an older build's checkpoint (no actIdx)
@@ -352,14 +356,14 @@ ok('?quick=1 boots straight into a quick run (no intro, no meadow tap)', await u
 await nav(BASE + '?fps=0&lang=de', 12000);
 ok('the German meadow stands', await until(HOME_REST)); await sleep(600);
 g = JSON.parse(await ev(ROWS));
-ok('de, no checkpoint: NEUES SPIEL heads a three-row column, CONTINUE not rendered',
+ok('de, no checkpoint: NEUES SPIEL heads a four-row column, CONTINUE not rendered',
   !g.campaign.vis && g.newcamp.label === 'NEUES SPIEL' && same(column(g), COLN), JSON.stringify({ label: g.newcamp.label, col: column(g) }));
 await noTag('de');
 await ev(`localStorage.setItem('beta3.campaign', ${CK}); 1`);
 await nav(BASE + '?fps=0&lang=es', 12000);
 ok('the Spanish meadow stands', await until(HOME_REST)); await sleep(600);
 g = JSON.parse(await ev(ROWS));
-ok('es, with checkpoint: CONTINUAR PARTIDA heads the four-row column, alive with its progress line',
+ok('es, with checkpoint: CONTINUAR PARTIDA heads the five-door column, alive with its progress line',
   g.campaign.vis && g.campaign.hit && g.campaign.label === 'CONTINUAR PARTIDA' && g.newcamp.label === 'NUEVA PARTIDA' && !!g.campaign.sub && same(column(g), COLC),
   JSON.stringify({ cont: g.campaign.label, neu: g.newcamp.label, col: column(g) }));
 await noTag('es');

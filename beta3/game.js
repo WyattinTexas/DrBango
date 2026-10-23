@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.122.1';
+const BUILD = 'STARSPELL v0.123.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -465,7 +465,10 @@ function ssLoadArt() {
   // verdict: B3 Gold Face v3) — the meadow's column is the first thing an
   // open shows, so they ride the same bounded wait; absent, ssDoor falls
   // back to the shared painted button
-  const soft = ['nightsky', 'title', 'hbtn', 'hbtndark'];
+  // …and the profile crest (v0.123.0, cut from the door's own gold by
+  // tools/make-crest-asset.py) — the meadow's top-right corner; absent,
+  // ssCrestTex draws the medallion
+  const soft = ['nightsky', 'title', 'hbtn', 'hbtndark', 'crest'];
   const softP = Promise.all(soft.map((n) => new Promise((res) => {
     const im = new Image();
     im.onload = () => { SSART.img[n] = im; res(true); };
@@ -926,19 +929,8 @@ function ssMakeTextures(scene) {
     g2.addColorStop(0, 'rgba(159,176,232,0.11)'); g2.addColorStop(1, 'rgba(159,176,232,0)');
     c.beginPath(); c.roundRect(2.5, 2.5, w - 5, h - 5, 13); c.fillStyle = g2; c.fill();
   }, R);
-  // the daily herald's chip — a small crimson pill with an ember rim, up in
-  // the home screen's corner where notifications live
-  mk('chipred', 128, 32, (c, w, h) => {
-    c.beginPath(); c.roundRect(1.5, 1.5, w - 3, h - 3, (h - 3) / 2);
-    const g = c.createLinearGradient(0, 0, 0, h);
-    g.addColorStop(0, '#a32433'); g.addColorStop(0.55, '#7c1626'); g.addColorStop(1, '#570e1b');
-    c.fillStyle = g; c.fill();
-    c.lineWidth = 1.5; c.strokeStyle = 'rgba(255,138,110,0.6)'; c.stroke();
-    c.beginPath(); c.roundRect(6, 3.5, w - 12, h * 0.4, h * 0.22);
-    const g2 = c.createLinearGradient(0, 3, 0, h * 0.5);
-    g2.addColorStop(0, 'rgba(255,255,255,0.28)'); g2.addColorStop(1, 'rgba(255,255,255,0)');
-    c.fillStyle = g2; c.fill();
-  }, R);
+  // (the daily herald's crimson corner chip, 'chipred', retired in v0.123.0:
+  // the daily is a door in the meadow's column now)
   /* THE STREAK LANTERN — the little iron-and-glass lamp that stands beside the
      daily herald and carries the number of nights. FIVE baked textures rather
      than one tinted image, because setTint is a silent no-op under the Canvas
@@ -2004,6 +1996,28 @@ function ssDoor(scene, dark, w, h) {
 const DOOR_ART = () => !!(ART && SSART.ready && SSART.img.hbtn);
 const DOOR_INK = (dark) => (dark ? '#ffe3a0' : '#fff7e2');
 const DOOR_INK2 = (dark) => (dark ? '#e3c98e' : '#fff0c4');
+// the daily door's ember (v0.123.0), the breath's crest and trough. It lies
+// UNDER the slab, so only the warmth spilling round the door's edge shows —
+// it runs warmer than the corner chip's 0.13 ceiling did, and still never
+// lies over a word
+const DAILY_EMBER = [0.42, 0.16];
+// …and its light: a soft ember halo shaped to the door (a rounded slab with
+// a blurred spill M units deep), baked in its own colour — setTint is a
+// silent no-op under the Canvas renderer
+function ssDoorAuraTex(scene, w, h) {
+  const M = 26, key = 'dooraura@' + w + 'x' + h;
+  if (scene.textures.exists(key)) return key;
+  const R = ssTexRes(scene), W = w + 2 * M, H = h + 2 * M;
+  const t = scene.textures.createCanvas(key, Math.round(W * R), Math.round(H * R));
+  t.context.scale(R, R);
+  ssBake(t, key, W, H, (c) => {
+    c.clearRect(0, 0, W, H);
+    c.fillStyle = c.shadowColor = 'rgb(255,122,54)';
+    c.shadowBlur = 13 * R;   // canvas px: the blur ignores the transform
+    c.beginPath(); c.roundRect(M, M, w, h, h * 0.36); c.fill();
+  });
+  return key;
+}
 // the keyline — a burnt umber edge on the gold, a deeper one on the bronze.
 // v0.122.1: it is a tight dense SHADOW halo, never setStroke — v0.122.0's
 // stroked labels reached Skylar's iPhone (10/20) with every door word and
@@ -2014,6 +2028,54 @@ function ssDoorInk(t, dark, size) {
   const blur = size * (dark ? 0.1 : 0.12), pad = Math.ceil(blur);
   return t.setPadding(pad, 0, pad, 0)
     .setShadow(0, Math.max(1, size * 0.05), dark ? 'rgba(42,18,4,1)' : 'rgba(91,36,8,1)', blur);
+}
+
+/* THE PROFILE CREST (v0.123.0, the home corners — Skylar 10/23: "the
+   profile button in the top right doesn't fit either"). A small round
+   medallion in the doors' own gold: art/crest.webp is cut from the door
+   painting by tools/make-crest-asset.py — the door end's bevel bent round
+   a circle, the slab's plain middle for a face, the plum surround and its
+   hairline, one glint. The player's initial is drawn on it live (ssInitial).
+   Baked once at device resolution, like ssDoor: the 256px painting is
+   resampled into the canvas a single time rather than filtered every frame.
+   Absent the art, the same medallion is drawn. */
+function ssCrestTex(scene, d) {
+  const img = ART && SSART.ready && SSART.img.crest;
+  // the drawn stand-in keeps its own key, so art that lands after a slow
+  // boot's grace paints the next meadow (as the doors do)
+  const key = (img ? 'crest@' : 'crestd@') + d;
+  if (scene.textures.exists(key)) return key;
+  const R = ssTexRes(scene), P = Math.round(d * R);
+  const t = scene.textures.createCanvas(key, P, P);
+  const drawn = (c) => {
+    const m = P / 2, ro = m - R * 0.6, r = ro * 0.86;
+    // the plum surround under a gold hairline
+    c.beginPath(); c.arc(m, m, ro, 0, Math.PI * 2);
+    c.fillStyle = '#22101e'; c.fill();
+    c.lineWidth = Math.max(1, R * 0.8); c.strokeStyle = '#efc27a'; c.stroke();
+    // the gold, lit from above as the doors are
+    const g = c.createLinearGradient(0, m - r, 0, m + r);
+    g.addColorStop(0, '#fff0b4'); g.addColorStop(0.14, '#f7bb2c'); g.addColorStop(0.62, '#d38a1f'); g.addColorStop(1, '#7c3f0c');
+    c.beginPath(); c.arc(m, m, r, 0, Math.PI * 2); c.fillStyle = g; c.fill();
+    // the raised rim: the face sits a step inside it
+    c.beginPath(); c.arc(m, m, r * 0.78, 0, Math.PI * 2);
+    c.lineWidth = Math.max(1, R * 1.2); c.strokeStyle = 'rgba(120,58,10,0.5)'; c.stroke();
+  };
+  ssBake(t, key, P, P, img ? (c) => {
+    c.imageSmoothingEnabled = true; c.imageSmoothingQuality = 'high';
+    c.drawImage(img, 0, 0, P, P);
+  } : drawn, drawn);
+  return key;
+}
+// a name's initial for the crest: its first GRAPHEME (an accent stays on its
+// letter, a non-Latin name keeps its whole first character), uppercased by
+// the string's own case rules — where a script has no case, it stands as is
+function ssInitial(name) {
+  const s = String(name || '').trim();
+  if (!s) return '✦';
+  let g = '';
+  try { if (typeof Intl !== 'undefined' && Intl.Segmenter) g = new Intl.Segmenter().segment(s)[Symbol.iterator]().next().value.segment; } catch (e) { }
+  return (g || Array.from(s)[0]).toLocaleUpperCase();
 }
 
 function ssStarfield(scene, count) {
@@ -6705,6 +6767,8 @@ class Home extends Phaser.Scene {
     this.langC = null; this.dailyC = null; this.mapC = null; this.confirmC = null; this.signC = null; this.setC = null;
     this.streakC = null; this.riteC = null; this.riteTimer = null; this.sigTimer = null; this.signLvTimer = null;
     this.showZone = null; this.showFx = null;   // last run's showcase died with its scene
+    this.dailyGlow = null;   // …and so did the daily door's ember (idleTweens runs before the column is built)
+    this.leaving = false;    // the crest's pop-then-profile in flight (see the crest; busy() reads it)
     this.ftueBare = false;   // the wordless first open re-arms it below if owed
 
     // Everything at the meadow (showcase, title, buttons, chip, footer) is a
@@ -6737,9 +6801,9 @@ class Home extends Phaser.Scene {
     else if (entry) this.time.delayedCall(0, () => { if (this.sys.isActive()) this.buildMeadowUi(l); });
     else if (intro) this.playIntro(l);
     else this.buildMeadowUi(l);
-    // the daily chip's clock ticks every second while the meadow sits open.
+    // the daily door's clock ticks every second while the meadow sits open.
     // Ticking also carries it across midnight UTC on its own: dayKey() moves,
-    // today's score stops matching, and the chip lights back up for the new
+    // today's score stops matching, and the door lights back up for the new
     // sky without a reload.
     this.time.addEvent({ delay: 1000, loop: true, callback: () => this.updateDailyChip() });
 
@@ -6943,11 +7007,11 @@ class Home extends Phaser.Scene {
         this.time.delayedCall(Math.random() * 2400, flash);
       }
       if (this.flare) this.flare.wake(!gentle);
-      // the daily herald's ember breath (guarded: the first idleTweens call
-      // runs before the chip is built; the wake path re-arms it here)
+      // the daily door's ember breath (guarded: the first idleTweens call
+      // runs before the column is built; the wake path re-arms it here)
       if (this.dailyGlow) {
-        this.dailyGlow.setAlpha(0.13);
-        this.tweens.add({ targets: this.dailyGlow, alpha: 0.05, duration: 1100, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+        this.dailyGlow.setAlpha(DAILY_EMBER[0]);
+        this.tweens.add({ targets: this.dailyGlow, alpha: DAILY_EMBER[1], duration: 1600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
       }
     };
     this.idleTweens();
@@ -7008,6 +7072,23 @@ class Home extends Phaser.Scene {
       return b > 0 ? SS_T('endlessBest', b, e.bestScore | 0) : SS_T('endlessSub');
     };
     this.endRow = endRow;
+    /* THE DAILY DOOR (v0.123.0, the home corners — Skylar 10/23: "the red
+       box in the top left for the daily seems out of place … we still want
+       people to be able to play the daily"). The corner chip became a door
+       in the column, under VERSUS, on the doors' own gold slab. Its
+       sub-line is the herald the chip was — tonight's sky by name and the
+       time it has left, ticking (updateDailyChip) — and the ember that
+       breathed behind the chip breathes behind the door. Hunted, the door
+       goes quiet: NEW GAME's bronze cut, no ember, and the line counts down
+       to the next sky. Same door as the chip: the daily sheet. */
+    const dailyRow = () => {
+      const played = !!SS.prof.daily[String(SSNET.dayKey())];
+      const sky = played ? null : ssSkyToday();
+      return { played, name: sky ? SS_T(sky.nameKey) : '', clock: ssClock(SSNET.msToNextDay()) };
+    };
+    const dailyLine = (d, name) => (d.played ? '✓ ' + SS_T('lbNewSky', d.clock) : (name ? name + '  ·  ' : '') + d.clock);
+    this.dailyRow = dailyRow;
+    const dr = dailyRow();
     const rows = [
       // CONTINUE GAME opens the star chart at the standing checkpoint —
       // rendered only while one stands (refreshCampDoor is the one door)
@@ -7020,19 +7101,29 @@ class Home extends Phaser.Scene {
       // picker for a new climb.
       { y: 556, h: 58, label: SS_T('endless'), sub: endRow(), key: 'endless', fn: () => this.endlessDoor() },
       // LEADERBOARD left the meadow for the profile (v0.52.0): the column is
-      // play modes only — the profile chip up in the corner is the door to
+      // play modes only — the profile crest up in the corner is the door to
       // the night's finest now.
-      // PROFILE moved to the chip up in the corner, which frees this row for
+      // PROFILE moved up into the corner, which frees this row for
       // VERSUS — it is a play mode, so it gets a real button like the rest.
       // Its sub-line is the live friends counter, and nothing else.
       { y: 624, h: 58, label: SS_T('versus'), sub: '', key: 'versus', fn: () => { SFX.ui(); this.scene.start('vsmenu'); } },
+      // DAILY (v0.123.0): tonight's hunt — see dailyRow above
+      { y: 692, h: 58, label: SS_T('daily'), sub: dailyLine(dr, dr.name), key: 'daily', dark: dr.played, fn: () => this.dailySheet() },
     ];
     this.rowSubs = {};
     this.rowLabels = {};
     this.rowBtns = {};
     this.menuRows = [];
+    // the daily door's ember: the chip's warm breath, moved under its door.
+    // Born before the column, so every slab sits on top of it — the warmth
+    // spills round the door's ends and under it, never over a word
+    this.dailyGlow = ui(this.add.image(l.x(0), l.y(692), ssDoorAuraTex(this, 300, 58))
+      .setDisplaySize(l.u(352), l.u(110)).setAlpha(DAILY_EMBER[0]).setBlendMode('ADD').setVisible(!dr.played));
+    this.dailyGlow.doorH = 58;
+    this.tweens.add({ targets: this.dailyGlow, alpha: DAILY_EMBER[1], duration: 1600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     for (const r of rows) {
       const b = ui(this.add.image(l.x(0), l.y(r.y), ssDoor(this, r.dark, 300, r.h)).setDisplaySize(l.u(300), l.u(r.h)).setInteractive({ useHandCursor: true }));
+      b.doorH = r.h; b.doorDark = !!r.dark;   // the slab's baked height and cut (sizeDoor / dressDaily re-bake them)
       const live = !!r.sub;
       const door = DOOR_ART();
       const lab = ui(ssTxt(this, l.x(0), l.y(r.y - (live ? 9 : 0)), r.label, l.u(16), door ? DOOR_INK(r.dark) : r.dark ? '#9fb0e8' : BTN_INK()).setOrigin(0.5));
@@ -7062,39 +7153,69 @@ class Home extends Phaser.Scene {
         // on the gold door the pale blades vanish — they take the keyline's umber
         if (door) for (const g of lab.vsGlyphs) g.setTint(0x5b2408).setAlpha(1);
       }
-      this.menuRows.push({ key: r.key, b, lab, sub: this.rowSubs[r.key] });
+      this.menuRows.push({ key: r.key, b, lab, sub: this.rowSubs[r.key], glow: r.key === 'daily' ? this.dailyGlow : null });
       b.on('pointerdown', () => { if (this.busy() || (r.key === 'campaign' && !this.campAlive)) return; SFX.ensure(); this.bloomBtn = b; r.fn(); });
       b.on('pointerover', () => b.setScale(b.scaleX * 1.03, b.scaleY * 1.03));
-      b.on('pointerout', () => b.setDisplaySize(l.u(300), l.u(r.h)));
+      b.on('pointerout', () => b.setDisplaySize(l.u(300), l.u(b.doorH)));
     }
-    /* the column owns its shape (v0.51.0): the rows that stand are laid 68
-       apart, centred on the band's middle (522) — three rows read 454..590,
-       two read 488..556, and no gap is ever left where a hidden door
-       would be. Four rows (v0.68.0: ENDLESS joined the column) tighten to
-       62 apart — 429..615 — so the foot still clears the meadow's grass.
+    // the daily door keeps the corner chip's handle: two dozen harnesses
+    // read dailyChipB as the meadow-settled sentinel (and tap it)
+    this.dailyChipB = this.rowBtns.daily;
+    /* the column owns its shape (v0.51.0): the rows that stand are laid
+       evenly — no gap is ever left where a hidden door would be. Three rows
+       sit 68 apart, four 62 (v0.68.0: ENDLESS joined), all 58 tall. FIVE
+       (v0.123.0: DAILY joined under VERSUS, so a standing CONTINUE GAME
+       makes five) is more than the band holds at full height: the doors
+       drop to 48 tall, 52 apart — a smaller painting, never a squashed one
+       (sizeDoor re-bakes the three-slice), the words riding a lift and a
+       sub-line scaled to match. The column centres on 522 but never sinks
+       past 636, the head of the duel strip at its fullest (five rows from
+       648), so the doors and the duels never touch in any state: four rows
+       read 421..607, five 404..612 (the wordmark's foot is 368).
        `snap` skips the glide (first paint, any change under a
        veil); a live change slides the meadow's furniture, never jumps it. */
+    this.sizeDoor = (b, h) => {
+      if (b.doorH === h) return;
+      b.doorH = h;
+      this.tweens.killTweensOf(b);
+      b.setTexture(ssDoor(this, b.doorDark, 300, h)).setDisplaySize(l.u(300), l.u(h));
+      ssHitPad(b, 44);   // the new frame's own hit rect (the old one was the taller slab's)
+    };
     this.layoutMenu = (snap) => {
       const vis = this.menuRows.filter((m) => m.b.visible);
-      const gap = vis.length >= 4 ? 62 : 68;
-      let ry = 522 - (vis.length - 1) * gap / 2;
+      const n = vis.length, five = n >= 5;
+      const h = five ? 48 : 58, gap = five ? 52 : n >= 4 ? 62 : 68;
+      const lift = Math.round(9 * h / 58), subDy = Math.round(13 * h / 58);
+      let ry = Math.min(522 - (n - 1) * gap / 2, 636 - h / 2 - (n - 1) * gap);
       for (const m of vis) {
-        m.lab.rowY = ry;
-        const lift = m.sub && m.sub.visible ? 9 : 0;
-        const move = [[m.b, l.y(ry)], [m.lab, l.y(ry - lift)]];
-        if (m.lab.vsGlyphs) for (const g of m.lab.vsGlyphs) move.push([g, l.y(ry - lift)]);
-        if (m.sub) move.push([m.sub, l.y(ry + 13)]);
+        this.sizeDoor(m.b, h);
+        m.lab.rowY = ry; m.lab.rowLift = lift;
+        const up = m.sub && m.sub.visible ? lift : 0;
+        const move = [[m.b, l.y(ry)], [m.lab, l.y(ry - up)]];
+        if (m.lab.vsGlyphs) for (const g of m.lab.vsGlyphs) move.push([g, l.y(ry - up)]);
+        if (m.sub) move.push([m.sub, l.y(ry + subDy)]);
         for (const [o, ty] of move) {
           this.tweens.killTweensOf(o);
           if (snap || Math.abs(o.y - ty) < 0.5) o.setY(ty);
           else this.tweens.add({ targets: o, y: ty, duration: 220, ease: 'Sine.easeInOut' });
         }
+        // the ember glides with its door (re-baked to the door's height), but
+        // its breath is never killed
+        if (m.glow && m.glow.active) {
+          if (m.glow.doorH !== h) {
+            m.glow.doorH = h;
+            m.glow.setTexture(ssDoorAuraTex(this, 300, h)).setDisplaySize(l.u(352), l.u(h + 52));
+          }
+          if (m.glow.yTw) { m.glow.yTw.remove(); m.glow.yTw = null; }
+          if (snap || Math.abs(m.glow.y - l.y(ry)) < 0.5) m.glow.setY(l.y(ry));
+          else m.glow.yTw = this.tweens.add({ targets: m.glow, y: l.y(ry), duration: 220, ease: 'Sine.easeInOut' });
+        }
         ry += gap;
       }
     };
     /* set (or clear) a row's live sub-line. The label re-centres when the
-       line is empty and lifts 9 when one is live; `snap` skips the glide
-       (first paint, the wake path under a veil). */
+       line is empty and lifts (9, or the five-door column's 7) when one is
+       live; `snap` skips the glide (first paint, the wake path under a veil). */
     this.setRowSub = (key, text, color, snap) => {
       const sub = this.rowSubs[key], lab = this.rowLabels[key];
       if (!sub || !sub.active || !lab || !lab.active) return;
@@ -7102,7 +7223,7 @@ class Home extends Phaser.Scene {
       sub.setText(text || '');
       if (color) sub.setColor(color);
       sub.setVisible(live);
-      const ty = l.y(lab.rowY - (live ? 9 : 0));
+      const ty = l.y(lab.rowY - (live ? lab.rowLift || 9 : 0));
       for (const o of [lab, ...(lab.vsGlyphs || [])]) {
         this.tweens.killTweensOf(o);
         if (snap || Math.abs(o.y - ty) < 0.5) o.setY(ty);
@@ -7125,7 +7246,7 @@ class Home extends Phaser.Scene {
       this.campAlive = r.alive;
       lab.setText(r.label);
       this.tweens.killTweensOf(b);
-      b.setDisplaySize(l.u(300), l.u(58));
+      b.setDisplaySize(l.u(300), l.u(b.doorH));
       if (r.alive) {
         b.setVisible(true).setInteractive({ useHandCursor: true });
         lab.setVisible(true);
@@ -7146,40 +7267,86 @@ class Home extends Phaser.Scene {
       this.setRowSub('endless', this.endRow(), DOOR_ART() ? DOOR_INK2(false) : BTN_INK2(), snap);
     };
     this.refreshCampDoor(true);
-    // Profile chip — the stargazer's name, up in the corner on the same line as
-    // every other scene's back link. Long or non-Latin names are trimmed to the
-    // chip rather than sized to it, so the pill keeps one baked texture.
-    const CW = 152, CH = 30;
-    const chip = this.profileChip = ui(this.add.image(l.x(195), l.y(26), ssBtn(this, true, CW, CH))
-      .setDisplaySize(l.u(CW), l.u(CH)).setOrigin(1, 0.5).setInteractive({ useHandCursor: true }));
-    const chipT = ui(ssTxt(this, l.x(195 - CW / 2), l.y(26), '✦ ' + SSNET.myName(), l.u(11), '#9fb0e8').setOrigin(0.5));
-    let nm = SSNET.myName();
-    while (chipT.width > l.u(CW - 18) && nm.length > 2) { nm = nm.slice(0, -1); chipT.setText('✦ ' + nm + '…'); }
-    chip.on('pointerdown', () => { if (this.busy()) return; SFX.ensure(); SFX.ui(); this.scene.start('profile'); });
-    chip.on('pointerover', () => chip.setScale(chip.scaleX * 1.04, chip.scaleY * 1.04));
-    chip.on('pointerout', () => chip.setDisplaySize(l.u(CW), l.u(CH)));
-    /* The star-rating pill that hung beneath the chip left the meadow in
-       v0.78.0 (Skylar 9/2: "get rid of the rating button and the text
-       underneath it") — the chip stands alone, and the rating lives on
-       inside the profile (its line, the rating card, the veil toggle). */
+    /* the daily door's line fits the slab's clear middle (the label's own
+       172): worked out once per wording — the sky, the state, the tongue —
+       with every digit at its widest, so the line never twitches in size as
+       the seconds run. A long sky name steps the type down (never under
+       7.5), then gives up letters; the clock is never cut. */
+    this.fitDailyLine = (d) => {
+      const sub = this.rowSubs.daily;
+      if (!sub || !sub.active) return;
+      const wide = (s) => s.replace(/\d/g, '8');
+      const key = d.played + '|' + d.name + '|' + wide(d.clock);
+      if (sub.fitKey !== key) {
+        sub.fitKey = key;
+        const room = l.u(172);
+        let name = d.name;
+        sub.setFontSize(l.u(10) + 'px').setText(wide(dailyLine(d, name)));
+        if (sub.width > room) sub.setFontSize(Math.max(Math.ceil(l.u(7.5)), Math.floor(l.u(10) * room / sub.width)) + 'px');
+        for (let k = 1; sub.width > room && k < d.name.length - 3; k++) {
+          name = d.name.slice(0, d.name.length - k).trimEnd() + '…';
+          sub.setText(wide(dailyLine(d, name)));
+        }
+        sub.fitName = name;
+      }
+      const text = dailyLine(d, sub.fitName);
+      if (sub.text !== text) sub.setText(text);
+    };
+    /* hunted ⇄ unhunted: the slab's cut and the inks follow the night (the
+       bronze is NEW GAME's cut — the quiet door), and the ember breathes only
+       under an unhunted sky. Midnight UTC flips it back on its own. */
+    this.dressDaily = (played) => {
+      const b = this.rowBtns.daily, lab = this.rowLabels.daily, sub = this.rowSubs.daily;
+      if (!b || !b.active || !lab || !sub) return;
+      b.doorDark = played;
+      this.tweens.killTweensOf(b);
+      b.setTexture(ssDoor(this, played, 300, b.doorH)).setDisplaySize(l.u(300), l.u(b.doorH));
+      ssHitPad(b, 44);
+      const door = DOOR_ART();
+      lab.setColor(door ? DOOR_INK(played) : played ? '#9fb0e8' : BTN_INK());
+      sub.setColor(door ? DOOR_INK2(played) : played ? '#5a6390' : BTN_INK2());
+      if (door) { ssDoorInk(lab, played, l.u(16)); ssDoorInk(sub, played, l.u(10)); }
+      if (this.dailyGlow && this.dailyGlow.active) this.dailyGlow.setVisible(!played);
+    };
+    /* THE PROFILE CREST (v0.123.0, the home corners — Skylar 10/23: "the
+       profile button in the top right doesn't fit either … we want people
+       to be able to access their profiles"). The name pill became a small
+       round medallion in the doors' gold (ssCrestTex) bearing the
+       stargazer's initial; the full name lives in the profile itself. It
+       keeps the pill's seat on the top line every other scene's back link
+       holds (right edge at 195), and the top-left corner stays EMPTY — the
+       sky breathes there now that the daily is a door. A tap swells it
+       once, then the profile opens. (The star-rating pill that hung under
+       the old chip left in v0.78.0; the rating lives in the profile.) */
+    const CR = 46;
+    const crest = this.profileChip = ui(this.add.image(l.x(195 - CR / 2), l.y(26), ssCrestTex(this, CR))
+      .setDisplaySize(l.u(CR), l.u(CR)).setInteractive({ useHandCursor: true }));
+    const crestT = this.crestT = ui(ssTxt(this, crest.x, l.y(27), ssInitial(SSNET.myName()), l.u(21), DOOR_INK(false)).setOrigin(0.5));
+    ssDoorInk(crestT, false, l.u(21));
+    crest.on('pointerdown', () => {
+      if (this.busy()) return;
+      // the meadow is LEAVING: busy() holds through the pop, so no door,
+      // sheet or grass-side rite (a sign level, a sigil, a mark) can start
+      // in the gap — a rite born under the pop used to eat the tap
+      this.leaving = true;
+      SFX.ensure(); SFX.ui();
+      // the pop drives the axes apart — never tween `scale` on a
+      // setDisplaySize'd image (see beginAscent's bloom). It is only the
+      // look: the door opens on its own clock, so a killed tween can never
+      // strand the crest
+      const sx = crest.scaleX, sy = crest.scaleY, tx = crestT.scaleX, ty = crestT.scaleY;
+      this.tweens.killTweensOf([crest, crestT]);
+      this.tweens.add({ targets: crest, scaleX: sx * 1.12, scaleY: sy * 1.12, duration: 80, yoyo: true, ease: 'Sine.easeOut' });
+      this.tweens.add({ targets: crestT, scaleX: tx * 1.12, scaleY: ty * 1.12, duration: 80, yoyo: true, ease: 'Sine.easeOut' });
+      this.time.delayedCall(150, () => {
+        this.leaving = false;
+        if (this.sys.isActive() && !this.busy()) this.scene.start('profile');
+      });
+    });
+    crest.on('pointerover', () => { if (!this.leaving) { crest.setDisplaySize(l.u(CR * 1.06), l.u(CR * 1.06)); crestT.setScale(1.06); } });
+    crest.on('pointerout', () => { if (!this.leaving) { crest.setDisplaySize(l.u(CR), l.u(CR)); crestT.setScale(1); } });
 
-    // Daily hunt herald — a small red chip in the top-left corner, counting
-    // tonight's sky down second by second. Alive while the hunt is unplayed
-    // (ember glow breathing behind it), quiet with a ✓ once you've hunted.
-    // Tapping it opens the daily pre-screen, same door as the old button.
-    const DW = 108, DH = 26;
-    this.dailyGlow = ui(this.add.image(l.x(-195 + DW / 2), l.y(26), 'glowbig')
-      .setDisplaySize(l.u(DW * 1.8), l.u(62)).setTint(0xff5e4d).setAlpha(0.13).setBlendMode('ADD'));
-    const dchip = this.dailyChipB = ui(this.add.image(l.x(-195), l.y(26), 'chipred')
-      .setDisplaySize(l.u(DW), l.u(DH)).setOrigin(0, 0.5).setInteractive({ useHandCursor: true }));
-    this.dailyChipT = ui(ssTxt(this, l.x(-195 + DW / 2), l.y(26), '', l.u(10.5), '#ffe2c9').setOrigin(0.5)
-      .setShadow(0, l.u(1), 'rgba(40,4,10,0.8)', l.u(1.5)));
-    dchip.on('pointerdown', () => { if (this.busy()) return; SFX.ensure(); this.dailySheet(); });
-    dchip.on('pointerover', () => dchip.setScale(dchip.scaleX * 1.05, dchip.scaleY * 1.05));
-    dchip.on('pointerout', () => dchip.setDisplaySize(l.u(DW), l.u(DH)));
-    this.tweens.add({ targets: this.dailyGlow, alpha: 0.05, duration: 1100, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-
-    /* The streak lantern hung beside the herald here from v0.39.0 until
+    /* The streak lantern hung beside the old corner chip from v0.39.0 until
        v0.86.0 (Skylar: "just remove the lantern"). The streak itself keeps
        counting underneath — the engine, the grace night, the marks and the
        ceremony all stand; its sheet now opens from the daily sheet's own
@@ -7484,16 +7651,16 @@ class Home extends Phaser.Scene {
     this.beginAscent({ mode: 'quick', resume: null, ascended: true, ftue: 1 });
   }
 
-  // Subtitle under DAILY HUNT. Unplayed, it invites and shows how long the sky
-  // stays up; played, it shows today's score and when the next one lands.
-  // the herald's second-by-second clock; also flips the chip between its
-  // alive (unplayed — ember glow) and quiet (✓ hunted) dress
+  /* the DAILY door's herald, every second while the meadow stands and on
+     every wake (the name is the corner chip's — the harnesses call it):
+     unhunted, the sub-line names tonight's sky and the time it has left;
+     hunted, the door goes bronze and counts down to the next sky. */
   updateDailyChip() {
-    if (this.dailyChipT && this.dailyChipT.active) {
-      const played = !!SS.prof.daily[String(SSNET.dayKey())];
-      this.dailyChipT.setText((played ? '✓ ' : '☀ ') + ssClock(SSNET.msToNextDay()));
-      if (this.dailyGlow && this.dailyGlow.active) this.dailyGlow.setVisible(!played);
-    }
+    const b = this.rowBtns && this.rowBtns.daily;
+    if (!b || !b.active || !this.dailyRow) return;   // the wordless first open has no column
+    const d = this.dailyRow();
+    if (d.played !== b.doorDark) this.dressDaily(d.played);
+    this.fitDailyLine(d);
   }
   /* ---------- THE MARKS: the lantern grows ----------
      Crossing 7 / 30 / 100 nights re-dresses the lamp, and a change that big
@@ -8135,7 +8302,7 @@ class Home extends Phaser.Scene {
       if (this.busy()) return;
       SFX.ui();
       closeSheet();
-      this.bloomBtn = this.dailyChipB;   // the corner chip blooms as we lift off
+      this.bloomBtn = this.dailyChipB;   // the daily door blooms as we lift off
       this.startMode('daily');
     });
 
@@ -8709,7 +8876,7 @@ class Home extends Phaser.Scene {
     if (!SS_ACTS[ck.actIdx]) ck.actIdx = Math.min(SS_ACTS.length - 1, Math.floor(ck.fightIdx / 5));
     return ck;
   }
-  busy() { return this.ascending || this.descending || this.introPlaying || SS_RITE.busy; }
+  busy() { return this.ascending || this.descending || this.introPlaying || SS_RITE.busy || this.leaving; }
   startMode(mode) {
     if (this.busy()) return;
     SFX.ui();

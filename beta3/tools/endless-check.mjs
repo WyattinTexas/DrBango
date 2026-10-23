@@ -254,7 +254,8 @@ await boot('gate=0');
 ok('the meadow stands', await until(HOME, 30000));
 await sleep(1200);
 const menu = await evj(`JSON.stringify(${H}.menuRows.filter((m) => m.b.visible).map((m) => ({ k: m.key, y: Math.round(m.lab.rowY) })))`);
-ok('no climb standing: NEW GAME · ENDLESS · VERSUS at 454/522/590', JSON.stringify(menu) === JSON.stringify([{ k: 'newcamp', y: 454 }, { k: 'endless', y: 522 }, { k: 'versus', y: 590 }]), JSON.stringify(menu));
+// v0.123.0: the DAILY door closes the column under VERSUS (the home corners)
+ok('no climb standing: NEW GAME · ENDLESS · VERSUS · DAILY at 421/483/545/607', JSON.stringify(menu) === JSON.stringify([{ k: 'newcamp', y: 421 }, { k: 'endless', y: 483 }, { k: 'versus', y: 545 }, { k: 'daily', y: 607 }]), JSON.stringify(menu));
 ok('the virgin door speaks its verb', await ev(`${H}.rowSubs.endless.text === SS_T('endlessSub')`), await ev(`${H}.rowSubs.endless.text`));
 const doorFit = await evj(`(() => { const h = ${H}; const D = game.scale.width / innerWidth;
   const b = h.rowBtns.endless;
@@ -522,15 +523,15 @@ ok('the climber stands on their own board', brd.me);
 await shot('endless-board-tab');
 ok('no page errors (the board)', errs.length === 0, errs.join(' | ').slice(0, 200));
 
-/* ================= 8. four doors when a campaign stands ================= */
-console.log('\n— THE COLUMN OF FOUR —');
+/* ================= 8. five doors when a campaign stands ================= */
+console.log('\n— THE COLUMN OF FIVE —');
 errs.length = 0;
 await ev(`localStorage.setItem('beta3.campaign', JSON.stringify({ fightIdx: 3, actIdx: 0, hp: 40, hpMax: 50, sigils: [], words: 5, longest: 'moth', totalDmg: 120, scried: false, featherUsed: false, letters: 20, bigHit: 20, playMs: 60000, clockV: 2 })); 'ok'`);
 await reboot('');
 await until(HOME, 30000);
 await sleep(1200);
 const menu4 = await evj(`JSON.stringify(${H}.menuRows.filter((m) => m.b.visible).map((m) => ({ k: m.key, y: Math.round(m.lab.rowY) })))`);
-ok('a standing campaign makes four doors — 62 apart, 429..615', JSON.stringify(menu4) === JSON.stringify([{ k: 'campaign', y: 429 }, { k: 'newcamp', y: 491 }, { k: 'endless', y: 553 }, { k: 'versus', y: 615 }]), JSON.stringify(menu4));
+ok('a standing campaign makes five doors — 48 tall, 52 apart, 404..612', JSON.stringify(menu4) === JSON.stringify([{ k: 'campaign', y: 404 }, { k: 'newcamp', y: 456 }, { k: 'endless', y: 508 }, { k: 'versus', y: 560 }, { k: 'daily', y: 612 }]), JSON.stringify(menu4));
 ok('the endless door remembers the high score — level first, then score', await ev(`${H}.rowSubs.endless.text === SS_T('endlessBest', SS.prof.endless.bestLevel, SS.prof.endless.bestScore)`), await ev(`${H}.rowSubs.endless.text`));
 await shot('meadow-four-doors');
 // the Spanish dress fits the door and the tab
