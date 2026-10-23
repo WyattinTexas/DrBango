@@ -90742,7 +90742,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='26.37';        
+let GVT_CV='26.38';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -151905,7 +151905,7 @@ var SLB=(function(){
 const CLR=(function(){
 const E=s=>escH(String(s)), me=()=>(dyeHex()||GREEN), safe=f=>{ try{ return f()||''; }catch(e){ return ''; } };
 const img=(u,cls)=>u? '<img'+(cls? ' class="'+cls+'"' : '')+' src="'+u+'" alt="">' : '';
-const HERO={ rex:'kingrex', yeti:'kingyeti', croak:'kingcroak', bear:'kingbear', princess:'princess' };
+const HERO={ rex:'kingrex', yeti:'kingyeti', croak:'kingcroak', bear:'kingbear', princess:'princess', kraken:'kingkraken'   };
 const CROP={ head:'22 -4 76 76', face:'28 6 64 64', chest:'22 26 76 76', trim:'22 26 76 76', legs:'20 58 80 80', feet:'20 66 80 80' };   
 const FIT={ bakerrifle:'riflemanbaker', runninggun:'riflemanrg', goldengun:'grenadiergg'  , cannon:'mortarcannon' };   
 const BLADE={ flameblade:'flameblade', iceblade:'iceblade' };      
@@ -183226,7 +183226,34 @@ const HJ_PR={ id:'princess', hero:1, cmd:1, men:5, l1(){ return heroName('prince
       lt:lt, fig:hjFig(F), men:[hjMan(M[2],kd[2],t,{ far:30, lt:ltm }),hjMan(M[1],kd[1],t,{ far:26, lt:ltm }),hjMan(M[0],kd[0],t,{ far:30, lt:ltm })].concat(frogs),   
       fx:fx, bars:EZ.out(seg(t,0,0.3)), flash:{ c:'#FFF4D8', a:.14*fl }, shake:[0,4*hit(t,2.0,0.02,0.2)*Math.sin(t*80)] }; } };
 
-const M={ shotgun:SG, sniper:SN, lightsaber:SB, claymore:CM, pistol:DP, kingyeti:HJ_KY, kingrex:HJ_RX, kingcroak:HJ_CK, jane:HJ_JN, kingbear:HJ_BR, princess:HJ_PR };   
+
+
+
+const HJ_KKB=[0,0,140,140], HJ_KKFT=[70,130], HJ_KKM=[560,640,720,800], HJ_KKD=[1.0,1.4,-1,2.35];   
+const HJ_KK={ id:'kingkraken', hero:1, cmd:1, men:4, l1:'KING KRAKEN', l1s:84, lane:472, unl:'JOINS YOUR ARMY', take:'hjmLater', box:HJ_KKB, ft:HJ_KKFT, holdS:2.2, shw:110, T:{ slam:2.9, end:3.9 },   
+  hue:{ w0:'#04101a', w1:'#0e2a3e', f0:'#0b2233', f1:'#04101a', lamp:'#3FB8AF', key:'#DFF7F4', ray:'#3FB8AF', az:300 },
+  cues:[[0.2,'thock'],[0.6,'squeak'],[1.0,'thwack'],[1.4,'thwack'],[1.7,'squeak'],[1.95,'swish'],[2.2,'thump'],[2.9,'boom'],[2.9,'fanfare']],
+  band(){ return HERO_ROLE.kingkraken; },   
+  at(t,st){ const ts=this.T.slam; if(t>=ts) return hjHold(this,t,st);
+    const la=EZ.out(seg(t,0.05,0.5)), S9=2.2, rise=EZ.back(seg(t,0.6,1.0)), x=HJ_HX+20;
+    const sw=(t>=0.95 && t<1.2) || (t>=1.35 && t<1.6), gr=t>=1.65 && t<2.1, ik=t>=2.15 && t<2.6;
+    const F={ k:sw? 'kingkrakensweep' : gr? 'kingkrakengrab' : ik? 'kingkrakenink' : 'kingkraken', x:x, fy:FLOOR, s:S9*(0.35+0.65*rise), a:Math.min(1,0.15+rise), mir:true, hop:(t>=0.6 && t<1.0? 18*Math.sin(Math.PI*seg(t,0.6,1.0)) : 0), box:HJ_KKB, ft:HJ_KKFT, shw:110 };
+    const kd=HJ_KKM.map((m,i)=>(HJ_KKD[i]>=0 && t>=HJ_KKD[i])? seg(t,HJ_KKD[i],HJ_KKD[i]+0.7) : -1);   
+    const lit=seg(t,0.7,1.1), fl=Math.max(hit(t,1.0,0.02,0.15),hit(t,1.4,0.02,0.15),hit(t,2.2,0.02,0.2)), amb=[lerp(.16,.66,lit)+.2*fl,lerp(.26,.84,lit)+.2*fl,lerp(.34,.92,lit)+.12*fl], lt={ amb:amb, key:this.hue.key, az:300, k:(.25+.9*lit)*la+1.1*fl }, ltm=hjLq(lt);
+    let fx='';
+    for(let i=0;i<3;i++){ const k=seg(t,0.2+i*0.18,0.95+i*0.18); if(k>0 && k<1) fx+=hjRing([x,FLOOR+4],30+170*k,4*(1-k),'#BFE9FF',.9*(1-k)); }   
+    if(t>=0.6 && t<1.25){ const k=seg(t,0.6,1.25); for(let i=0;i<7;i++){ const a=-Math.PI*(0.15+0.7*i/6), r=40+120*k; fx+='<circle cx="'+f(x+Math.cos(a)*r)+'" cy="'+f(FLOOR-60+Math.sin(a)*r*0.8+200*k*k)+'" r="'+f(5*(1-k)+1)+'" fill="#CFEFFF" opacity="'+f(.85*(1-k))+'"/>'; } }   
+    [[0.95,1.3],[1.35,1.7]].forEach(w=>{ const k=seg(t,w[0],w[1]); if(t>=w[0] && k<1){ const c=hjP(F,[70,96]); fx+=hjArc(c,190,-1.2,0.95,k,'#E9552B',16); } });   
+    const gk=seg(t,1.65,2.25), up=EZ.out(Math.min(1,gk/0.4)), fly=Math.max(0,(gk-0.45)/0.55);   
+    const gm=(t>=1.65)? (fly>=1? null : hjFig({ k:'tanrifle', s:HJ_MS, dye:TAN, box:HJ_MEN_BOX, ft:HJ_FT, lt:ltm, x:HJ_KKM[2]+fly*520, fy:FLOOR, hop:90*up+360*fly*(1-0.35*fly), rot:-20*up+420*fly, a:1-Math.max(0,(fly-0.7)/0.3), shx:HJ_KKM[2], sha:.3*(1-up) })) : null;
+    if(t>=1.65 && t<2.0){ const a=hjP(F,[114,46]), b=[HJ_KKM[2]-4,FLOOR-90*up-60]; fx+='<path d="M'+f(a[0])+' '+f(a[1])+' Q'+f((a[0]+b[0])/2)+' '+f(Math.min(a[1],b[1])-60)+' '+f(b[0])+' '+f(b[1])+'" stroke="#E9552B" stroke-width="22" fill="none" stroke-linecap="round" opacity=".92"/>'; }   
+    { const k=seg(t,2.2,2.95); if(t>=2.2 && k<1){ const cx9=HJ_KKM[3]-6, cy9=FLOOR-70, a=Math.min(1,k*4)*(1-Math.max(0,(k-0.55)/0.45)); for(let i=0;i<6;i++){ const q=i*1.05+t*1.8; fx+='<circle cx="'+f(cx9+Math.cos(q)*44*(0.5+k))+'" cy="'+f(cy9+Math.sin(q)*30*(0.5+k))+'" r="'+f(38+16*Math.sin(i+t*3))+'" fill="#2B1C3A" opacity="'+f(.82*a)+'"/>'; } } }   
+    fx+=hjMotes(t,HJ_HX+140,this.hue.lamp,la*.7,14);
+    const men=[hjMan(HJ_KKM[3],kd[3],t,{ far:30, lt:ltm }),gm,hjMan(HJ_KKM[1],kd[1],t,{ far:26, lt:ltm }),hjMan(HJ_KKM[0],kd[0],t,{ far:22, lt:ltm })];   
+    return { pal:Object.assign(dark(this,la),{ lampX:HJ_HX+80 }), cam:{ x:tr([[0,470],[0.6,480,'io'],[1.6,540,'io'],[2.2,600,'io'],[2.7,560,'io']],t), y:tr([[0,262],[0.6,250,'io']],t), z:tr([[0,1.42],[0.6,1.3,'io'],[1.65,1.34,'io'],[2.7,1.3,'io']],t) },
+      lt:lt, fig:hjFig(F), men:men, fx:fx, bars:EZ.out(seg(t,0,0.3)), flash:{ c:'#E6FBF8', a:.16*fl }, shake:[0,6*fl*Math.sin(t*80)] }; } };
+
+const M={ shotgun:SG, sniper:SN, lightsaber:SB, claymore:CM, pistol:DP, kingyeti:HJ_KY, kingrex:HJ_RX, kingcroak:HJ_CK, jane:HJ_JN, kingbear:HJ_BR, princess:HJ_PR, kingkraken:HJ_KK   };   
 
 
 const SB5=Object.assign(Object.create(SB), { l1:'TELEKINESIS', l1s:96, lane:572, eq:['wep','lightsaber'], take:'mileTake', band(){ return 'RANK '+mileLvl('sab5')+'!'; }, tv:'saber' });
@@ -196399,6 +196426,140 @@ setTimeout(function(){ try{ if(window.GVT && !GVT.lbwc2) GVT.lbwc2=function(v){ 
     cut:{ at:ENH_ORDER.indexOf('cutlass'), n:ENH_ORDER.length, own:enhOwns('cutlass')?1:0, on:enhOn('cutlass')?1:0, trophy:!!TROPHY_IDS.cutlass, cost:ENH_COST.cutlass, room:LAB_ARM.cutlass, foot:vdPartFoot('cutlass'), fresh:freshIs('enh','cutlass')?1:0, art:sargeArtW('commander'), svg:enhPartSVG('cutlass').length, hand:(SARGE_ART.cutlass||'').length },
     wheel:{ own:decOwns('shipswheel')?1:0, home:decorHome('shipswheel')?1:0, inOrder:DECOR_EARN_ORDER.indexOf('shipswheel'), due:DECOR_EARN.shipswheel.due()?1:0, nw:chestNew().indexOf('shipswheel')>=0?1:0, raid:(CTL_LANDS.find(l=>l.v==='raid')||{ ids:()=>[] }).ids().indexOf('shipswheel')>=0?1:0, seat:Object.assign({}, DECOR_SPOTS.shipswheel), pos:rpXY('shipswheel'), dom:!!e, cls:e? String(e.className.baseVal||e.getAttribute('class')||'') : null,
       rdec:(META.rdec && META.rdec.bedroom || []).indexOf('shipswheel')>=0?1:0 } }; }; }catch(e){} }, 0);
+
+
+
+
+
+
+
+
+
+const LBWE={ v:1, joined:0, err:0, ink:[], seat:[993,306,96,96] };   
+const LBWE_T={ sw0:2.2, swCd:5.2, swR:170, swDy:92, swDmg:4, swPush:70, grab0:3.8, grabCd:8.5, grabR:210, grabHold:0.7, grabLift:30, grabDmg:5, grabToss:230, ink0:5.6, inkCd:9.5, inkR:280, inkPatch:84, inkT:5.0, inkX:0.5, tell:0.32, poseT:0.6 };   
+const LBWE_ROLE='THE TERROR OF THE TUB';
+function lbweOn(){ return !!(LBWE.joined && META.pirate); }
+
+function lbweJoin(){ if(LBWE.joined || !META.pirate) return 0; LBWE.joined=1; let n=0; const st=f=>{ try{ f(); n++; }catch(e){ LBWE.err++; try{ console.error('CARD-LBW-E join', e); }catch(e2){} } };   
+  st(()=>{ if(HEROES.indexOf('kingkraken')<0) HEROES.push('kingkraken'); });   
+  st(()=>{ UDEF.kingkraken={ rng:200, rate:0.55, dmg:3, air:true, grit:80, name:'KING KRAKEN' }; });   
+  st(()=>{ COSTS.kingkraken=300; CAMP_SPD.kingkraken=CAMP_SPD.rifleman; });   
+  st(()=>{ if(BF_TYPES.indexOf('kingkraken')<0) BF_TYPES.push('kingkraken'); BF_MOVE.kingkraken={ moveSpd:Math.round((CAMP_SPD.kingkraken||26)*BF_PACE), hp:Math.round(UDEF.kingkraken.grit*HERO_BF_HP_X) }; BF_BOUNTY.kingkraken=Math.ceil(COSTS.kingkraken/2); });   
+  st(()=>{ HP_RANK100.kingkraken=HP_RANK100.kingyeti; });   
+  st(()=>{ if(SOUL_EXTRA.indexOf('kingkraken')<0) SOUL_EXTRA.push('kingkraken'); });
+  st(()=>{ CQBAN.kingkraken=1; UNIT_WEST.kingkraken=1; });   
+  st(()=>{ HERO_ROLE.kingkraken=LBWE_ROLE; HERO_EARN.kingkraken=['KING KRAKEN','THE SUNKEN SHIP']; JF_PRON.kingkraken='him'; });
+  st(()=>{ CLASSINFO.kingkraken={ tid:'The king of the tub: one arm sweeps the line, one grabs a man and tosses him, and his ink slows the rest.' }; });
+  st(()=>{ if(FH_CAR_ORDER.indexOf('kingkraken')<0){ const i=FH_CAR_ORDER.indexOf('kingyeti'); FH_CAR_ORDER.splice(i>=0? i : FH_CAR_ORDER.length, 0, 'kingkraken'); } });   
+  st(()=>{ if(FH_HERO_ROW.indexOf('kingkraken')<0) FH_HERO_ROW.push('kingkraken'); { const y9=FH_KING_SEATS.kingyeti; if(y9) LBWE.seat=[Math.round(y9[0]-92), Math.round(y9[1]+y9[3]-96), 96, 96]; } FH_KING_SEATS.kingkraken=LBWE.seat.slice(); FH_KING_LUNGE.kingkraken=-8; FR_PACE.kingkraken=45; });   
+  st(()=>{ if(FZB_CAST.hero.indexOf('kingkraken')<0) FZB_CAST.hero.push('kingkraken'); FZB_BOX.kingkraken='0 0 140 140'; });
+  st(()=>{ if(PREM_UNITS.indexOf('kingkraken')<0) PREM_UNITS.push('kingkraken'); });
+  st(()=>{ HAU_WORLD.kingkraken={ n:'THE PIRATE COVE', a:'#3FB8AF', sky:['#06182a','#123e5e'], gnd:'#1c3446' }; HAU_SND.kingkraken=[[600,'squeak'],[1050,'thwack'],[1700,'swish'],[2600,'thump']]; });   
+  st(()=>{ MN_HERO.kingkraken=LBWE_MN; MN_SCENES.kingkraken=LBWE_MN0; });   
+  return n; }
+
+{ const o0=unitOwned; unitOwned=function(k){ if(k==='kingkraken') return lbweOn() && (o0.apply(this, arguments) || !!(META.wreck && META.wreck.g)); return o0.apply(this, arguments); }; }
+{ const o0=ownedUnits; ownedUnits=function(){ const L=o0.apply(this, arguments); if(lbweOn() && unitOwned('kingkraken') && L.indexOf('kingkraken')<0) L.splice(L.length-(L.indexOf('sarge')>=0?1:0), 0, 'kingkraken'); return L; }; }
+
+{ const p0=lbwcPrizeRows; lbwcPrizeRows=function(prizes, tb9){ const at=prizes.length, r=p0.apply(this, arguments);
+  try{ if(tb9==='g' && lbweJoin()>=0 && lbweOn()){ if(META.unlocked.indexOf('kingkraken')<0){ grantOwned('hero','kingkraken'); jfOwe('kingkraken'); }
+      for(let i=at;i<prizes.length;i++){ if(prizes[i] && prizes[i].f==='lbwcg') prizes[i].s=t('JOINS YOUR ARMY'); } } }catch(e){ LBWE.err++; }
+  return r; }; }
+
+{ const i0=isdTick; isdTick=function(u,dt){ i0.apply(this, arguments); if(LBWE.ink.length){ try{ lbweInkTick(dt); }catch(e){ LBWE.err++; } } if(u && u.type==='kingkraken'){ try{ lbweTick(u,dt); }catch(e){ LBWE.err++; } } }; }
+function lbweFace(u){ return (S.bf && u.side==='foe')? -1 : 1; }   
+function lbweFoes(u){ const out=[]; for(const f of TGTC(u)){ if(!f || f.dead || (f.hp!=null && f.hp<=0) || f.burrow || f.jetT>0 || f.falling || f.retreat) continue; if(!bfCanTarget(u,f)) continue; out.push(f); } return out; }
+function lbweBusy(u){ return !!(u.dead || u.falling || u.dropT>0 || u.jetT>0 || u.duckT>0 || u.kyHeldT>0 || u.shv || u.cloakT>0 || u.trk || (S.drag && S.drag.unit===u)); }
+function lbweTick(u,dt){ if(!lbweOn()) return;
+  const T=LBWE_T, K=u.lbwe||(u.lbwe={ sw:T.sw0, gr:T.grab0, ik:T.ink0, act:null, n:{ sweep:0, grab:0, ink:0, hit:0, tossed:0, inked:0 } });
+  lbweInkTick(dt);
+  if(K.act){ lbweAct(u,K,dt); return; }
+  K.sw-=dt; K.gr-=dt; K.ik-=dt;
+  if(lbweBusy(u) || S.mode!=='play') return;
+  const F=lbweFoes(u), dir=lbweFace(u);
+  if(!F.length) return;
+  if(K.sw<=0){ const hit=F.filter(f=>{ const dx=(f.x-u.x)*dir; return dx>-30 && dx<T.swR && Math.abs(f.y-u.y)<T.swDy; }); if(hit.length){ K.act={ k:'sweep', t:0, dir, done:0 }; lbwePose(u,'sweep'); K.sw=T.swCd; return; } K.sw=0.6; }
+  if(K.gr<=0){ let g=null, gd=1e9; for(const f of F){ if(!ggCanShove(f) || f.kyHeldT>0 || f.lbweHeld) continue; const d=Math.hypot(f.x-u.x,f.y-u.y); if(d<T.grabR && d<gd){ g=f; gd=d; } }
+    if(g){ K.act={ k:'grab', t:0, dir, f:g, done:0 }; g.lbweHeld=1; lbwePose(u,'grab'); K.gr=T.grabCd; return; } K.gr=0.8; }
+  if(K.ik<=0){ let best=null, bn=0; for(const f of F){ if(Math.hypot(f.x-u.x,f.y-u.y)>T.inkR) continue; let n=0; for(const o of F) if(Math.hypot(o.x-f.x,o.y-f.y)<T.inkPatch) n++; if(n>bn){ bn=n; best=f; } }
+    if(best){ K.act={ k:'ink', t:0, dir, x:best.x, y:best.y, done:0 }; lbwePose(u,'ink'); K.ik=T.inkCd; return; } K.ik=1.0; }
+}
+function lbwePose(u,k){ u.lbwePose=k; u.lbwePoseT=S.t+LBWE_T.poseT; }
+function lbweFloat(x,y,txt,col){ try{ S.floats.push({ x, y, txt, t:0, col:col||'#FFD24A' }); }catch(e){} }
+function lbweAct(u,K,dt){ const A=K.act, T=LBWE_T; A.t+=dt;
+  if(A.k==='sweep'){ if(!A.done && A.t>=T.tell){ A.done=1; K.n.sweep++; lbweFloat(u.x, u.y-120, 'THE SWEEP!');
+      const sh={}; for(const f of lbweFoes(u)){ const dx=(f.x-u.x)*A.dir; if(dx>-30 && dx<T.swR && Math.abs(f.y-u.y)<T.swDy){ hurt(f,T.swDmg,u); K.n.hit++; if(!f.dead && ggCanShove(f)) ggShove(f, u.x-A.dir*40, u.y-18, u, sh, T.swPush); } }
+      S.fx.push({ k:'arc', x:u.x+A.dir*40, y:u.y-30, R:T.swR*0.62, a0:A.dir>0? -1.1 : Math.PI-0.9, a1:A.dir>0? 0.9 : Math.PI+1.1, t:0, dur:0.32, c1:'#E9552B', c2:'#FFE2D6', lw:14 });
+      try{ bfSfx(SFX.thwack, u.x, u.y); }catch(e){} }
+    if(A.t>=T.tell+0.3) K.act=null; return; }
+  if(A.k==='grab'){ const f=A.f, gone=!f || f.dead || (f.hp!=null && f.hp<=0) || (S.bf? S.units : S.foes).indexOf(f)<0;
+    if(gone){ if(f) f.lbweHeld=0, f.lbweLift=0; K.act=null; return; }
+    if(A.t<T.grabHold){ f.kyHeldT=Math.max(f.kyHeldT||0, 0.12); f.lbweLift=T.grabLift*Math.min(1, A.t/0.25); if(!A.said){ A.said=1; lbweFloat(u.x, u.y-120, 'THE GRAB!'); try{ bfSfx(SFX.squeak, u.x, u.y); }catch(e){} } return; }
+    f.lbweHeld=0; f.lbweLift=0; f.kyHeldT=0; K.n.grab++; K.n.tossed++;
+    hurt(f,T.grabDmg,u); if(!f.dead && ggCanShove(f)) ggShove(f, u.x, u.y-18+(f.y-u.y)*0.2, u, {}, T.grabToss);
+    lbweFloat(f.x, f.y-50, 'TOSSED!', '#FFFFFF'); S.fx.push({ k:'ring', x:f.x, y:f.y-16, r:6, R:40, t:0, dur:0.3, col:'#E9552B' });
+    try{ bfSfx(SFX.swish||SFX.jet, f.x, f.y); }catch(e){} K.act=null; return; }
+  if(A.k==='ink'){ if(!A.done && A.t>=T.tell+0.15){ A.done=1; K.n.ink++; LBWE.ink.push({ x:A.x, y:A.y, r:T.inkPatch, t:0, dur:T.inkT, by:u.side||'me', cfg:S.cfg });
+      lbweFloat(A.x, A.y-50, 'THE INK!', '#C9B6E8'); for(let i=0;i<5;i++) S.fx.push({ k:'puff', x:A.x+Math.cos(i*1.26)*30, y:A.y-6+Math.sin(i*1.26)*12, t:0, dur:0.4, R:18 });
+      try{ bfSfx(SFX.thump, A.x, A.y); }catch(e){} }
+    if(A.t>=T.tell+0.45) K.act=null; return; } }
+function lbweInkTick(dt){ if(LBWE.inkT===S.t) return; LBWE.inkT=S.t;   
+  const L=LBWE.ink; for(let i=L.length-1;i>=0;i--){ const P=L[i]; P.t+=dt; if(P.t>=P.dur || P.cfg!==S.cfg){ L.splice(i,1); continue; }
+    const foes=S.bf? S.units.filter(o=>!o.dead && (o.side||'me')!==P.by) : S.foes;
+    for(const f of foes){ if(!f || f.dead || (f.def && (f.def.boss || f.def.vehicle)) || f.boss) continue; if(Math.hypot(f.x-P.x,(f.y-P.y)*1.6)>P.r) continue;
+      const on=(f.chillT||0)>0 && f.chillX>0; f.chillX=Math.min(on? f.chillX : 1, LBWE_T.inkX); f.chillT=Math.max(f.chillT||0, 0.25); if(!f.lbweInked){ f.lbweInked=1; try{ const u=S.units.find(q=>q.type==='kingkraken' && q.lbwe); if(u) u.lbwe.n.inked++; }catch(e){} } } } }
+function lbweInkDraw(){ const L=LBWE.ink; if(!L.length) return; const RM=reducedMotion();
+  for(const P of L){ if(P.cfg!==S.cfg) continue; const a=Math.min(1, P.t/0.25)*Math.min(1, (P.dur-P.t)/0.6);
+    cx.save(); cx.globalAlpha=0.62*a; cx.fillStyle='#2B1C3A'; cx.beginPath(); cx.ellipse(P.x, P.y, P.r, P.r*0.42, 0, 0, 7); cx.fill();
+    cx.globalAlpha=0.5*a; cx.fillStyle='#43305A'; for(let i=0;i<4;i++){ const ph=RM? 0 : S.t*1.3+i*1.7; cx.beginPath(); cx.ellipse(P.x+Math.cos(i*1.57+0.4)*P.r*0.5, P.y+Math.sin(i*1.57+0.4)*P.r*0.2, P.r*(0.26+0.04*Math.sin(ph)), P.r*0.11, 0, 0, 7); cx.fill(); }
+    cx.globalAlpha=0.35*a; cx.strokeStyle='#C9B6E8'; cx.lineWidth=1.5; cx.beginPath(); cx.ellipse(P.x, P.y, P.r, P.r*0.42, 0, 0, 7); cx.stroke(); cx.restore(); } }
+{ const r0=rfDraw; rfDraw=function(c){ const r=r0.apply(this, arguments); try{ if(LBWE.ink.length) lbweInkDraw(); }catch(e){} return r; }; }   
+{ const d0=drawFoe; drawFoe=function(f){ if(f && f.lbweLift>0){ cx.save(); cx.translate(0,-f.lbweLift); try{ return d0.apply(this, arguments); } finally{ cx.restore(); } } return d0.apply(this, arguments); }; }   
+{ const m0=unitImg; unitImg=function(k,u){ if(k==='kingkraken' && u && u.lbwePose && S.t<u.lbwePoseT){ const im=IMG['kingkraken'+u.lbwePose]; if(im && im.width>0) return im; } return m0.apply(this, arguments); }; }   
+{ const w0=unitW; unitW=function(t){ return t==='kingkraken'? LBWA_W.kingkraken : w0.apply(this, arguments); }; }   
+
+function lbweMnFig(c,pose,x,y,w,rot){ mnSprite(c,mnImg(pose? 'kingkraken'+pose : 'kingkraken'),x,y,w,rot,true); }
+const LBWE_MN={ T:3.8, f(c,p,now,still){ const w=86, tx=146, sw=mnAt(p,0.7,0.5), gr=mnAt(p,1.5,0.9), ik=mnAt(p,2.6,0.8), x=MN_FX+6, fin=q=>Math.min(1,Math.max(0,q/0.2));   
+    if(still) mnFoe(c,tx,-1,now,true,1,14);
+    else if(p<1.45) mnFoe(c,tx,p<0.85? -1 : (p-0.85)/0.6,now,false,fin(p),14);
+    else if(p<2.4){ const lift=Math.min(1,Math.max(0,gr)/0.35), toss=Math.max(0,(Math.max(0,gr)-0.55)/0.45), mx=tx+toss*70, my=MN_GY-18*lift-46*Math.sin(Math.PI*Math.min(1,toss));
+      c.globalAlpha=0.25*(1-toss); c.fillStyle='#000'; c.beginPath(); c.ellipse(tx,MN_GY+1,13,4,0,0,7); c.fill(); c.globalAlpha=1; mnSprite(c,mnImgT('tanrifle'),mx,my,MN_TAN_W,toss*4,false,fin(p-1.45)*(1-Math.min(1,toss)*0.9)); }
+    else mnFoe(c,tx,(p<2.95? -1 : Math.min(1,(p-2.95)/0.6)),now,false,fin(p-2.4),14);
+    mnShadow(c,x,MN_GY,30);
+    const pose=still? '' : (sw>=0? 'sweep' : gr>=0 && gr<0.6? 'grab' : ik>=0? 'ink' : '');
+    lbweMnFig(c,pose,x,MN_GY,w,still? 0 : MN_IDLE(now));
+    if(still) return;
+    if(sw>=0 && sw<0.6){ c.save(); c.globalAlpha=1-sw/0.6; c.strokeStyle='#E9552B'; c.lineWidth=8; c.lineCap='round'; c.beginPath(); c.arc(x+30,MN_GY-24,58,-0.9+sw*0.6,0.7+sw*0.6); c.stroke(); c.restore(); }
+    if(ik>=0){ const a=Math.min(1,ik/0.2)*(1-Math.max(0,(ik-0.6)/0.4)); c.save(); c.globalAlpha=0.7*a; c.fillStyle='#2B1C3A'; c.beginPath(); c.ellipse(tx,MN_GY-6,30,14,0,0,7); c.fill(); c.beginPath(); c.arc(tx-14,MN_GY-20,12,0,7); c.arc(tx+12,MN_GY-22,10,0,7); c.fill(); c.restore(); } } };
+const LBWE_MN0={ T:2.8, f(c,p,now){ const sw=mnAt(p,0.8,0.5); mnShadow(c,MN_FX,MN_GY,28); lbweMnFig(c,sw>=0? 'sweep' : '',MN_FX,MN_GY,80,MN_IDLE(now)); if(sw>=0 && sw<0.6){ c.save(); c.globalAlpha=1-sw/0.6; c.strokeStyle='#E9552B'; c.lineWidth=7; c.lineCap='round'; c.beginPath(); c.arc(MN_FX+30,MN_GY-24,54,-0.9+sw*0.6,0.7+sw*0.6); c.stroke(); c.restore(); } } };
+
+{ const k0=fhKingsArt; fhKingsArt=function(hex,ink,dye){ let v=k0.apply(this, arguments); try{ v+=lbweFortArt(dye); }catch(e){ LBWE.err++; } return v; }; }
+function lbweFortArt(dye){ const k='kingkraken'; if(!lbweOn() || !unitOwned(k) || k===capStandK() || !FH_KING_SEATS[k]) return '';
+  const q=FH_KING_SEATS[k], sel=(k===heroSel()), motion=!reducedMotion(), cls='fh-king'+(sel? ' sel' : (motion? ' idle' : ''));
+  const body=fhImg(sprURI(k,dye,'0 0 140 140'),q[0],q[1],q[2],q[3],' data-fh="king" data-k="'+k+'"');
+  const fx='<g data-fx="ink" fill="#2B1C3A">'+'<circle cx="'+(q[0]+4)+'" cy="'+(q[1]+q[3]*0.62)+'" r="7" opacity=".7"/><circle cx="'+(q[0]-8)+'" cy="'+(q[1]+q[3]*0.56)+'" r="5" opacity=".55"/><circle cx="'+(q[0]-18)+'" cy="'+(q[1]+q[3]*0.5)+'" r="3.4" opacity=".4"/></g>';
+  return (sel? fhSelMark(q[0]+q[2]/2,q[1]+q[3]+2,q[2]) : '')+'<g class="'+cls+'" id="fhKing-'+k+'" data-k="'+k+'" style="--lunge:'+FH_KING_LUNGE[k]+'px">'+(sel? '<g class="fh-lift">'+body+'<g class="fh-atk">'+fx+'</g></g>' : body+'<g class="fh-atk">'+fx+'</g>')+(sel? fhPennant(q[0]+q[2]/2,q[1]-14) : '')+'</g>'; }
+
+{ const t0=lg3TierTable; lg3TierTable=function(){ const T=t0.apply(this, arguments); try{ const g=T && T.wreck && T.wreck.find(r=>r[0]==='g'); if(g && g[1][0] && g[1][0][0]==='man' && g[1][0][1]==='kingkraken') g[1][0]=['hero','kraken']; }catch(e){} return T; }; }
+{ const p0=lg3Pic; lg3Pic=function(kind,id){ if(kind==='hero' && id==='kraken') return lg3King('kingkraken'); return p0.apply(this, arguments); }; }
+LG3_KING.kingkraken='12 2 116 116';   
+
+{ const j0=lbwbJoin; lbwbJoin=function(){ const r=j0.apply(this, arguments); try{ lbweJoin(); }catch(e){ LBWE.err++; } return r; }; }
+if(META.pirate){ try{ lbweJoin(); }catch(e){ LBWE.err++; } }
+
+Object.assign(TR.ja||(TR.ja={}), {"THE TERROR OF THE TUB":"おふろの きょうふ","The king of the tub: one arm sweeps the line, one grabs a man and tosses him, and his ink slows the rest.":"おふろの おうさま：いっぽんの うでで れつを なぎはらい、もう いっぽんで ひとりを つかんで なげとばし、スミで のこりを のろくする。"});
+Object.assign(TR.ko||(TR.ko={}), {"THE TERROR OF THE TUB":"욕조의 공포","The king of the tub: one arm sweeps the line, one grabs a man and tosses him, and his ink slows the rest.":"욕조의 왕: 한 팔로 줄을 휩쓸고, 다른 팔로 한 명을 붙잡아 던져 버리고, 먹물로 나머지를 느리게 만든다."});
+Object.assign(TR["zh-Hans"]||(TR["zh-Hans"]={}), {"THE TERROR OF THE TUB":"浴缸里的恐怖","The king of the tub: one arm sweeps the line, one grabs a man and tosses him, and his ink slows the rest.":"浴缸之王：一条触手横扫整排，一条抓起一个人扔出去，他的墨汁让其余的人慢下来。"});
+Object.assign(TR.de||(TR.de={}), {"THE TERROR OF THE TUB":"DER SCHRECKEN DER BADEWANNE","The king of the tub: one arm sweeps the line, one grabs a man and tosses him, and his ink slows the rest.":"Der König der Badewanne: Ein Arm fegt die Reihe weg, einer packt einen Mann und wirft ihn fort, und seine Tinte bremst den Rest."});
+Object.assign(TR.ru||(TR.ru={}), {"THE TERROR OF THE TUB":"УЖАС ВАННОЙ","The king of the tub: one arm sweeps the line, one grabs a man and tosses him, and his ink slows the rest.":"Король ванны: одно щупальце сметает строй, другое хватает солдата и швыряет его прочь, а чернила замедляют остальных."});
+Object.assign(TR.es||(TR.es={}), {"THE TERROR OF THE TUB":"EL TERROR DE LA BAÑERA","The king of the tub: one arm sweeps the line, one grabs a man and tosses him, and his ink slows the rest.":"El rey de la bañera: un brazo barre la fila, otro agarra a un soldado y lo lanza lejos, y su tinta frena al resto."});
+Object.assign(TR.ar||(TR.ar={}), {"THE TERROR OF THE TUB":"رعب حوض الاستحمام","The king of the tub: one arm sweeps the line, one grabs a man and tosses him, and his ink slows the rest.":"ملك حوض الاستحمام: ذراع تكنس الصف، وذراع تمسك جنديًا وترميه بعيدًا، وحبره يبطئ الباقين."});
+
+setTimeout(function(){ try{ if(window.GVT && !GVT.lbwe) GVT.lbwe=function(o){ o=o||{};
+  const us=S.units? S.units.filter(u=>u.type==='kingkraken') : [], u=us.find(q=>!q.dead)||null;
+  return { cv:GVT_CV, v:LBWE.v, err:LBWE.err, joined:LBWE.joined, pirate:META.pirate?1:0, heroes:HEROES.slice(), owned:unitOwned('kingkraken')?1:0, sel:heroSel(), roster:ownedUnits().indexOf('kingkraken'), unlocked:(META.unlocked||[]).indexOf('kingkraken')>=0?1:0, fresh:freshIs('hero','kingkraken')?1:0, owed:(META.jfOwed||[]).indexOf('kingkraken')>=0?1:0,
+    role:heroRole('kingkraken'), udef:UDEF.kingkraken? Object.assign({}, UDEF.kingkraken) : null, cost:COSTS.kingkraken, bf:BF_TYPES.indexOf('kingkraken'), bfMove:BF_MOVE.kingkraken? Object.assign({}, BF_MOVE.kingkraken) : null, moment:!!(WPM.M && WPM.M.kingkraken), trailer:!!MN_HERO.kingkraken, seat:FH_KING_SEATS.kingkraken||null, ink:LBWE.ink.length,
+    unit:u? { x:Math.round(u.x), y:Math.round(u.y), hp:u.hp, hpMax:u.hpMax, hits:u.hits|0, grit:gritCap(u), pose:(u.lbwePose && S.t<u.lbwePoseT)? u.lbwePose : '', act:u.lbwe && u.lbwe.act? u.lbwe.act.k : null, n:u.lbwe? Object.assign({}, u.lbwe.n) : null, cd:u.lbwe? { sw:+u.lbwe.sw.toFixed(2), gr:+u.lbwe.gr.toFixed(2), ik:+u.lbwe.ik.toFixed(2) } : null } : null }; }; }catch(e){} }, 0);
 
 buildSprites(()=>{ ready=true;
   
