@@ -90728,7 +90728,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='26.21';        
+let GVT_CV='26.22';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -119935,6 +119935,7 @@ function endBattle(win){
         else if(S.raid.k==='chess'){   }   
         else if(S.raid.k==='sweets'){ ncbSweetsPrize(prizes); }   
         else if(S.raid.k==='bbs'){ bbsPrizeRows(prizes, tb9); }   
+        else if(S.raid.k==='wreck'){ lbwcPrizeRows(prizes, tb9); }   
         else if(S.raid.k==='gmy'){ gmyPrizeRows(prizes, tb9); }   
         else if(S.raid.k==='sky'){ const rs9=SKY_RANSOM[tb9]|0; if(rs9>0){ const w9=starX(rs9); META.starBank+=w9; META.starsLifetime+=w9; prizes.push({ o:5, t:"THE MARSHAL'S RANSOM", f:'bank', a:skyStarArt(w9), n:w9 }); } }       
         else if(S.raid.k==='bone'){
@@ -195473,6 +195474,302 @@ setTimeout(function(){ try{ if(window.GVT && !GVT.lbwb) GVT.lbwb=function(o){ o=
     tables:{ decor:!!DECOR_INFO.shipswheel, wall:!!(WPAP.kraken && WPAP_PAINT.kraken), part:!!ENH_INFO.cutlass, outfit:!!OUTFIT_INFO.captainshat, unit:!!UDEF.kingkraken }, shelf:{ ch:LG_CH.some(c=>c.id==='wreck'), pages:LG_PAGES.indexOf('wreck'), order:SLB.ORDER.indexOf('wreck'), pg:SLB.PG.wreck||null, name:LG3_NAME.wreck||null, throne:!!LG3_THRONE.wreck, tiers:T.map(r=>r[0]), done:lgDone('wreck') },
     fight:S.raid? { k:S.raid.k, t:S.raid.t, won:S.raid.won?1:0, void:S.raid.void?1:0, wave:S.wave, waves:S.cfg? S.cfg.waves.length : 0, foes:S.foes.filter(f=>!f.dead).length, queue:S.queue.length, cleared:S.cleared?1:0, mode:S.mode, lbwb:!!(S.cfg && S.cfg.lbwb), ground:S.cfg && S.cfg.terrain? S.cfg.terrain.ground : null } : null,
     wreck:META.wreck? JSON.parse(JSON.stringify(META.wreck)) : null, bank:META.starBank|0, raidDay:META.raidDay? JSON.parse(JSON.stringify(META.raidDay)) : null }; }; }catch(e){} }, 0);
+
+
+
+
+
+
+
+
+
+
+
+
+const LBWC={ v:1, rv:{ x:1000, w:150 }, hold:{ x:1790, y:360 }, popUp:1.5, snapAt:0.45, popReach:84, rail:6, shove:0.5, daze:0.55, toss:0.95, inkSlow:2, joined:0, cache:null, cacheKey:'' };   
+const LBWC_T={   
+  e:{ ys:[360], bw:124, hp:160, cd:6.2, pops:['crab'], popCd:2.8, moves:['sweep'], lanes:1, grabN:1, inkT:0, inkR:0, dives:1, tan:[['tanrifle',4],['tanmg',2]], gates:[[0.7,[['tanrifle',4],['tanshotgun',1]]],[0.35,[['tanrifle',4],['tanmg',2]]]] },
+  m:{ ys:[230,490], bw:100, hp:240, cd:5.6, pops:['crab','clam'], popCd:2.4, moves:['sweep','grab'], lanes:1, grabN:1, inkT:0, inkR:0, dives:1, tan:[['tanrifle',5],['tanshotgun',2]], gates:[[0.7,[['tanrifle',5],['tanmg',2]]],[0.35,[['tanrifle',5],['tanflame',2]]]] },
+  h:{ ys:[170,360,550], bw:78, hp:352, cd:5.0, pops:['crab','clam','jelly'], popCd:2.0, moves:['sweep','grab','ink'], lanes:1, grabN:1, inkT:6, inkR:120, dives:1, tan:[['tanrifle',6],['tanmg',2],['tanflame',1]], gates:[[0.7,[['tanrifle',6],['tansniper',1]]],[0.35,[['tanrifle',6],['tanmortar',1],['tanshotgun',2]]]] },
+  g:{ ys:[170,360,550], bw:78, hp:422, cd:4.4, pops:['crab','clam','jelly','arm'], popCd:1.7, moves:['sweep','grab','ink'], lanes:2, grabN:2, inkT:9, inkR:150, dives:2, tan:[['tanrifle',6],['tanmg',3],['tanflame',1]], gates:[[0.7,[['tanrifle',6],['tansniper',2]]],[0.35,[['tanrifle',6],['tanmortar',1],['tanshotgun',3]]]] } };
+const LBWC_POP={ crab:{ up:'crab', under:'crabunder', w:56, hp:3 }, clam:{ up:'clam', under:'clamunder', w:56, hp:4 }, jelly:{ up:'jelly', under:'jellyunder', w:56, hp:3, sting:3.5 }, arm:{ up:'krakenarm', under:'crabunder', w:84, hp:6, all:1 } };   
+FDEF.kingkraken={ hp:160, spd:20, bounty:250, leak:0, w:140, boss:true, lbwc:1 };   
+['crab','clam','jelly','arm'].forEach(function(k){ FDEF['lbwc'+k]={ hp:LBWC_POP[k].hp, spd:0, bounty:6, leak:0, w:LBWC_POP[k].w, lbwc:1, lbwcPop:k }; });   
+BOSSDEF.kingkraken={ title:'KING KRAKEN', wave:'KING KRAKEN RISES', bar:'KING KRAKEN' };   
+SHAKE_LINE.kingkraken='You defeated KING KRAKEN!';
+function lbwcOn(){ const rd=S.raid; return !!(rd && rd.k==='wreck' && rd.cfg===S.cfg && S.cfg && S.cfg.lbwc && !S.bf); }   
+function lbwcTier(){ return (lbwcOn() && LBWC_T[S.raid.t])? S.raid.t : 'e'; }
+function lbwcRV(){ return (S.cfg && S.cfg.terrain && S.cfg.terrain.river && S.cfg.terrain.river.lbwcYs)? S.cfg.terrain.river : null; }
+function lbwcRng(seed){ let s=(seed>>>0)||1; return function(){ s=(Math.imul(s,1664525)+1013904223)>>>0; return s/4294967296; }; }   
+
+{ const c0=raidCfg; raidCfg=function(tier,rk){ if(rk && RAID_INFO[rk] && RAID_INFO[rk].k==='wreck') return lbwcCfg(tier); return c0.apply(this, arguments); }; }
+function lbwcCfg(tier){ tier=LBWC_T[tier]? tier : 'e'; const T=LBWC_T[tier], ax=parkCampAxes(40), cn=RAID_CNT_MUL[tier]||1, c=n=>Math.max(1,Math.round(n*cn));
+  const RV={ x:LBWC.rv.x, w:LBWC.rv.w, bridgeY:T.ys[0], bw:T.bw, lbwcYs:T.ys.slice() }; if(T.ys.length>1) RV.bridgeY2=T.ys[1];   
+  const cfg={ n:0, oneBoss:1, hpMul:ax.hpMul*(RAID_HP_MUL[tier]||1), cntMul:1, bossF:1, rateMul:ax.rateMul, waves:[], terrain:{ rocks:[], river:RV, ground:'sand', lbwc:1 }, lbwc:1, lbwcTier:tier };
+  const E=['right','right-top','right-bottom'];
+  cfg.waves.push({ name:'THE SUNKEN SHIP', groups:T.tan.map((g,i)=>({ f:i? 'line' : 'column', t:g[0], n:c(g[1]), e:E[i%3], at:i*2.2 })) });   
+  cfg.waves.push({ name:'KING KRAKEN RISES', boss:'kingkraken', groups:[ { f:'spout', t:'kingkraken', n:1, raw:1, pin:1, quiet:1, at:0.5, pts:[[LBWC.hold.x, LBWC.hold.y]] }, { f:'column', t:'tanrifle', n:c(3), e:'right-top', at:3.5 } ] });   
+  T.gates.forEach(function(gt){ cfg.waves.push({ name:'THE TAN BOARD THE BRIDGES!', hpGate:{ t:'kingkraken', k:gt[0], bark:null }, groups:gt[1].map((g,i)=>({ f:i? 'line' : 'column', t:g[0], n:c(g[1]), e:E[(i+1)%3], at:i*1.6 })) }); });   
+  BOSSDEF.kingkraken.bar=(tier==='g')? 'MEGA KING KRAKEN' : 'KING KRAKEN';   
+  return cfg; }
+{ const r0=rvBridges; rvBridges=function(RV){ return (RV && RV.lbwcYs)? RV.lbwcYs.slice() : r0.apply(this, arguments); }; }   
+{ const b0=lbwbTick; lbwbTick=function(dt){ if(S.cfg && S.cfg.lbwc) return; return b0.apply(this, arguments); }; }   
+
+{ const s0=campUnitStep; campUnitStep=function(u,dt){ if(!lbwcOn()) return s0.apply(this, arguments);
+  if(u.lbwcFly){ lbwcFlyStep(u,dt); u.marching=false; return false; }
+  if(u.lbwcDazeT>0){ u.lbwcDazeT-=dt; u.marching=false; return false; }
+  u.wade=null; u.squeeze=false;   
+  let g9=null; if(u.lbwcSlowT>0){ u.lbwcSlowT-=dt; g9=u.gait; u.gait=(u.gait||1)*0.5; }
+  const r=s0.apply(this, arguments);
+  if(g9!==null) u.gait=g9;
+  lbwcDry(u, true); return r; }; }
+function lbwcOnPlanks(RV,x,y){ if(x<RV.x-4 || x>RV.x+RV.w+4) return true; const ys=RV.lbwcYs; for(const by of ys) if(Math.abs(y-by)<=RV.bw*0.5+LBWC.rail) return true; return false; }   
+function lbwcDry(o, green){ const RV=lbwcRV(); if(!RV || o.dead || o.lbwcFly || (o.def && (o.def.fly || o.def.lbwcPop)) || o.boss || o.jetT>0 || o.falling) return;   
+  if(o.x<RV.x-4 || o.x>RV.x+RV.w+4) return; let by=RV.lbwcYs[0]; for(const y of RV.lbwcYs) if(Math.abs(o.y-y)<Math.abs(o.y-by)) by=y; const d=o.y-by, half=RV.bw*0.5;
+  if(Math.abs(d)<=half) return; if(Math.abs(d)<=half+30){ o.y=by+Math.sign(d)*(half-1); return; }   
+  const west=o.x<RV.x+RV.w/2; o.x=west? RV.x-6 : RV.x+RV.w+6;
+  if(green){ o.wp=null; } else { if(!west){ o.crossed=false; o.squeeze=false; o.stall=0; } } }
+
+function lbwcShove(u, tx, ty, dur, arc){ if(!u || u.dead || u.jetT>0 || u.dropT>0 || u.falling || u.lbwcFly) return false;
+  u.lbwcFly={ x0:u.x, y0:u.y, x1:tx, y1:ty, t:0, dur:dur||LBWC.shove, arc:arc||0 }; u.wp=null; u.wade=null; u.marching=false;
+  S.fx.push({ k:'ring', x:u.x, y:u.y-4, r:6, R:30, t:0, dur:0.4, col:'#E6F6FF' }); return true; }
+function lbwcFlyStep(u,dt){ const F=u.lbwcFly; F.t+=dt; const k=Math.min(1,F.t/F.dur), e=1-Math.pow(1-k,2);
+  u.x=F.x0+(F.x1-F.x0)*e; u.y=F.y0+(F.y1-F.y0)*e-(F.arc? F.arc*4*k*(1-k) : 0);
+  if(k>=1){ u.y=F.y1; u.lbwcFly=null; u.lbwcDazeT=LBWC.daze; u.laneY=u.y; u.wp=null; S.fx.push({ k:'ring', x:u.x, y:u.y-2, r:5, R:22, t:0, dur:0.35, col:'#EAD9AE' }); } }
+
+{ const t0=raidTick; raidTick=function(dt){ t0.apply(this, arguments); try{ lbwcTick(dt); }catch(e){ try{ console.error('CARD-LBW-C tick', e); }catch(e2){} } }; }
+function lbwcTick(dt){ if(!lbwcOn() || S.mode!=='play') return; const rd=S.raid, T=LBWC_T[lbwcTier()], RV=lbwcRV(); if(!RV) return;
+  const L=rd.lbwc||(rd.lbwc={ t:0, rng:lbwcRng(7919*(['e','m','h','g'].indexOf(rd.t)+1)+13), br:T.ys.map((y,i)=>({ y, cd:1.2+i*0.6, pop:null, n:0 })), pops:0, kinds:{}, snaps:0, shoved:0, ducked:0, shot:0, stung:0, moves:{ sweep:0, grab:0, ink:0, dive:0, back:0 }, tossed:0, swept:0, ink:[], fx:[], king:null, mv:0, cd:3.0, act:null, dives:0, kingT:0 });
+  L.t+=dt;
+  const king=S.foes.find(f=>f.type==='kingkraken' && !f.dead);
+  if(!rd.p3King && king){ rd.p3=true; rd.p3King=true; rd.p3kT=Math.round(S.t-(rd.t0||0)); if(rd.p3T==null) rd.p3T=rd.p3kT; }   
+  if(rd.kingDown && S.wave<S.cfg.waves.length && sqRef()){ S.wave=S.cfg.waves.length; S.queue.length=0; }   
+  for(const f of S.foes){ if(!f.dead && !f.boss && !(f.def && (f.def.fly || f.def.lbwcPop))) lbwcDry(f, false); }   
+  lbwcPopsTick(L,T,RV,dt);
+  if(king) lbwcKingTick(king,L,T,RV,dt);
+  for(let i=L.ink.length-1;i>=0;i--){ const c=L.ink[i]; c.t+=dt; if(c.t>=c.dur) L.ink.splice(i,1); }
+  for(let i=L.fx.length-1;i>=0;i--){ const q=L.fx[i]; q.t+=dt; if(q.t>=q.dur) L.fx.splice(i,1); } }
+function lbwcMenOn(RV,by){ return S.units.filter(u=>!u.dead && !u.lbwcFly && !(u.jetT>0) && !(u.dropT>0) && !u.falling && u.x>=RV.x-2 && u.x<=RV.x+RV.w+2 && Math.abs(u.y-by)<=RV.bw*0.55); }   
+function lbwcPopsTick(L,T,RV,dt){
+  for(let i=0;i<L.br.length;i++){ const B=L.br[i];
+    if(B.pop){ const P=B.pop, f=P.f; P.t+=dt;
+      if(f.dead || S.foes.indexOf(f)<0){ B.pop=null; B.cd=T.popCd+L.rng()*1.2; continue; }   
+      if(!P.snapped && P.t>=LBWC.snapAt){ P.snapped=1; lbwcSnap(L,T,RV,B,P); }
+      if(P.t>=LBWC.popUp){ lbwcDuck(f, false); B.pop=null; B.cd=T.popCd+L.rng()*1.2; }
+      continue; }
+    B.cd-=dt; if(B.cd>0) continue;
+    const men=lbwcMenOn(RV,B.y); if(!men.length) continue;
+    const m=men[0], kind=T.pops[Math.floor(L.rng()*T.pops.length)], r9=L.rng(), side=(B.y<WORLD_H*0.4)? 1 : (B.y>WORLD_H*0.6)? -1 : (r9<0.5? -1 : 1), x=Math.max(RV.x+24, Math.min(RV.x+RV.w-24, m.x+(L.rng()-0.5)*30)), y=B.y+side*(RV.bw*0.5+20);
+    const f=spawnFoe('lbwc'+kind, x, y, null, false); if(!f) continue;
+    f.hp=f.hpMax=Math.max(1, Math.round(LBWC_POP[kind].hp*(1+(RAID_HP_MUL[lbwcTier()]-1)*0.5))); f.lbwcSide=side; f.spdMul=1e-6;
+    B.pop={ f, t:0, kind, snapped:0 }; B.n++; L.pops++; L.kinds[kind]=(L.kinds[kind]|0)+1;
+    S.fx.push({ k:'ring', x, y:y+2, r:6, R:34, t:0, dur:0.45, col:'#E6F6FF' }); try{ bfSfx(SFX.thock, x, y); }catch(e){} } }
+function lbwcSnap(L,T,RV,B,P){ const f=P.f, PK=LBWC_POP[P.kind], men=lbwcMenOn(RV,B.y).filter(u=>PK.all || Math.abs(u.x-f.x)<=LBWC.popReach);
+  S.floats.push({ x:f.x, y:f.y-PK.w*0.9, txt:'SNAP!', t:0, col:'#FFD24A' }); try{ bfSfx(SFX.snap, f.x, f.y); }catch(e){} L.snaps++;
+  for(const u of men){ const west=(u.lbwcFrom!=null)? u.lbwcFrom<0 : true; const tx=west? RV.x-36-L.rng()*26 : RV.x+RV.w+36+L.rng()*26;   
+    if(lbwcShove(u, tx, u.y+(L.rng()-0.5)*20, LBWC.shove, 14)){ L.shoved++; if(PK.sting){ u.lbwcSlowT=PK.sting; L.stung++; S.floats.push({ x:u.x, y:u.y-40, txt:'STUNG!', t:0, col:'#F7A9C6' }); } } } }
+function lbwcDuck(f, shot){ const PK=LBWC_POP[f.def.lbwcPop]; const L=S.raid && S.raid.lbwc; if(L){ L.fx.push({ k:'under', mold:PK.under, x:f.x, y:f.y, w:PK.w, t:0, dur:0.6 }); if(shot) L.shot++; else L.ducked++; }
+  S.fx.push({ k:'ring', x:f.x, y:f.y+2, r:5, R:26, t:0, dur:0.4, col:'#E6F6FF' });
+  if(!shot){ const i=S.foes.indexOf(f); if(i>=0) S.foes.splice(i,1); f.dead=true; } }   
+{ const f0=foeFell; foeFell=function(f,u){ const pop=!!(f && f.def && f.def.lbwcPop); const n9=S.fx.length; const r=f0.apply(this, arguments);
+  if(pop){ for(let i=S.fx.length-1;i>=n9;i--){ if(S.fx[i] && S.fx[i].k==='fallen') S.fx.splice(i,1); } try{ lbwcDuck(f, true); }catch(e){} }   
+  return r; }; }
+{ const m0=snowSlowMul; snowSlowMul=function(o){ const k=m0.apply(this, arguments); return (o && lbwcOn() && lbwcInked(o))? k*LBWC.inkSlow : k; }; }   
+function lbwcInked(o){ const L=S.raid && S.raid.lbwc; if(!L || !L.ink.length) return false; for(const c of L.ink) if(Math.hypot(o.x-c.x,(o.y-c.y)*1.4)<=c.r) return true; return false; }
+
+function lbwcKingTick(f,L,T,RV,dt){ const H=LBWC.hold; f.spdMul=1e-6; f.vx=0; f.vy=0;
+  if(!L.king){ L.king={ st:'rise', t:0 }; f.hp=f.hpMax=Math.max(1, Math.round(T.hp*bhpNow())); f.x=H.x; f.y=H.y; try{ SFX.rumble(); }catch(e){} S.shake=Math.max(S.shake,0.3); }
+  const K=L.king; K.t+=dt; L.kingT+=dt; if(K.st!=='under'){ f.x=H.x; f.y=H.y; }
+  if(K.st==='rise'){ f.burrow=K.t<0.6; if(K.t>=1.1){ K.st='idle'; K.t=0; f.burrow=false; if(L.dives) { f.hp=f.hpMax; S.floats.push({ x:f.x, y:f.y-150, txt:'HE IS BACK!', t:0, col:'#FFD24A' }); L.moves.back++; } } return; }
+  if(K.st==='dive'){ if(K.t>=1.0){ K.st='under'; K.t=0; f.burrow=true; } return; }
+  if(K.st==='under'){ f.burrow=true; if(((K.t*2)|0)!==(((K.t-dt)*2)|0)) S.fx.push({ k:'ring', x:H.x, y:H.y, r:10, R:60, t:0, dur:0.6, col:'#E6F6FF' }); if(K.t>=5.0){ K.st='rise'; K.t=0; try{ SFX.rumble(); }catch(e){} } return; }
+  if(K.st==='idle' && L.dives<T.dives && f.hp<=f.hpMax*RAID_RETREAT_F && !rdLbwcForced(L)){ K.st='dive'; K.t=0; L.dives++; L.moves.dive++; S.floats.push({ x:f.x, y:f.y-150, txt:'THE KRAKEN DIVES!', t:0, col:'#BFE9FF' }); try{ bfSfx(SFX.thump, f.x, f.y); }catch(e){} L.act=null; return; }   
+  if(L.act){ lbwcActTick(f,L,T,RV,dt); return; }
+  L.cd-=dt; if(L.cd>0 && !L.force) return;
+  const mv=L.force || T.moves[L.mv % T.moves.length]; L.force=null; L.mv++; L.cd=T.cd+L.rng()*1.2;
+  lbwcActStart(f,L,T,RV,mv); }
+function rdLbwcForced(L){ return !!L.force; }
+function lbwcActStart(f,L,T,RV,mv){ if(T.moves.indexOf(mv)<0){ L.cd=0.5; return; }   
+  const far=S.units.filter(u=>!u.dead && !u.lbwcFly && !(u.jetT>0) && !(u.dropT>0) && u.x>=RV.x-10);   
+  if(mv==='sweep'){ const ys=RV.lbwcYs.slice().sort((a,b)=>far.filter(u=>Math.abs(u.y-b)<70).length-far.filter(u=>Math.abs(u.y-a)<70).length); const lanes=ys.slice(0, Math.min(T.lanes, ys.length));
+    if(T.lanes>1 && ys.length===1) lanes.push(ys[0]+120);
+    L.act={ k:'sweep', t:0, tell:0.9, lanes, done:0 }; }
+  else if(mv==='grab'){ const pick=far.slice().sort((a,b)=>Math.hypot(a.x-f.x,a.y-f.y)-Math.hypot(b.x-f.x,b.y-f.y)).slice(0, T.grabN); if(!pick.length){ L.cd=1.0; return; } L.act={ k:'grab', t:0, tell:0.7, men:pick, done:0 }; }
+  else if(mv==='ink'){ const pool=S.units.filter(u=>!u.dead && u.x>RV.x-420); if(!pool.length){ L.cd=1.0; return; } let best=pool[0], bn=-1; for(const u of pool){ const n=pool.filter(v=>Math.hypot(v.x-u.x,v.y-u.y)<T.inkR).length; if(n>bn){ bn=n; best=u; } } L.act={ k:'ink', t:0, tell:0.6, x:best.x, y:best.y, done:0 }; }
+  else return;
+  L.moves[mv]++; S.floats.push({ x:f.x, y:f.y-150, txt:(mv==='sweep'? 'THE SWEEP!' : mv==='grab'? 'THE GRAB!' : 'THE INK!'), t:0, col:'#FFD24A' }); }
+function lbwcActTick(f,L,T,RV,dt){ const A=L.act; A.t+=dt; const H=LBWC.hold;
+  if(A.k==='sweep'){ if(!A.done && A.t>=A.tell){ A.done=1; try{ bfSfx(SFX.whoosh||SFX.thump, f.x, f.y); }catch(e){} S.shake=Math.max(S.shake,0.35);
+      for(const u of S.units){ if(u.dead || u.lbwcFly || !(u.x>=RV.x-10 && u.x<=H.x-40)) continue; if(!A.lanes.some(y=>Math.abs(u.y-y)<=58)) continue;
+        if(lbwcShove(u, RV.x-40-L.rng()*40, u.y+(L.rng()-0.5)*30, LBWC.shove+0.15, 22)){ L.swept++; u.lbwcFrom=-1; } } }
+    if(A.t>=A.tell+0.45) L.act=null; return; }
+  if(A.k==='grab'){ if(!A.done && A.t>=A.tell){ A.done=1; try{ bfSfx(SFX.squeak||SFX.thock, f.x, f.y); }catch(e){} for(const u of A.men){ if(u.dead) continue; const tx=Math.max(170, campDeployX()-460-L.rng()*120), ty=Math.max(90, Math.min(WORLD_H-110, WORLD_H/2+(L.rng()-0.5)*260)); if(lbwcShove(u, tx, ty, LBWC.toss, 160)){ L.tossed++; S.floats.push({ x:u.x, y:u.y-40, txt:'TOSSED!', t:0, col:'#FFD24A' }); } } }
+    if(A.t>=A.tell+0.5) L.act=null; return; }
+  if(A.k==='ink'){ if(!A.done && A.t>=A.tell){ A.done=1; L.ink.push({ x:A.x, y:A.y, r:T.inkR, t:0, dur:T.inkT }); try{ bfSfx(SFX.plop||SFX.thump, A.x, A.y); }catch(e){} S.floats.push({ x:A.x, y:A.y-50, txt:'INKED!', t:0, col:'#C9B6E8' }); }
+    if(A.t>=A.tell+0.5) L.act=null; return; } }
+
+{ const l0=lagRugBand; lagRugBand=function(){ const r=l0.apply(this, arguments); try{ if(lbwcOn()) lbwcFloor(); }catch(e){} return r; }; }
+function lbwcFloor(){ const RV=lbwcRV(); if(!RV) return; const key=W+'x'+WORLD_H+'|'+RV.lbwcYs.join(',')+'|'+RV.bw;
+  if(!LBWC.cache || LBWC.cacheKey!==key){ const c=document.createElement('canvas'), k=Math.min(1.5, Math.max(1, window.devicePixelRatio||1)); c.width=Math.round(W*k); c.height=Math.round(WORLD_H*k); const g=c.getContext('2d'); g.scale(k,k); lbwcPaint(g, RV, W, WORLD_H); LBWC.cache=c; LBWC.cacheKey=key; }   
+  cx.drawImage(LBWC.cache, 0, 0, W, WORLD_H); }
+function lbwcPaint(g, RV, WD, HT){ const x0=RV.x, x1=RV.x+RV.w, I='#4A2E18';
+  const grad=(a,b)=>{ const q=g.createLinearGradient(0,0,0,HT); q.addColorStop(0,a); q.addColorStop(1,b); return q; };
+  g.fillStyle=grad('#F0DCA9','#DDBE82'); g.fillRect(0,0,x0,HT);   
+  g.fillStyle='rgba(176,138,82,0.35)'; for(let i=0;i<70;i++){ const x=(i*137)%Math.max(1,x0-40)+10, y=(i*263)%HT; g.beginPath(); g.ellipse(x,y,2.2,1.4,0,0,7); g.fill(); }   
+  g.fillStyle='#F7EAD0'; g.strokeStyle='#C9A270'; g.lineWidth=1.2; [[260,120],[540,610],[820,180],[380,470]].forEach(p=>{ g.beginPath(); g.moveTo(p[0]-7,p[1]+4); g.quadraticCurveTo(p[0],p[1]-9,p[0]+7,p[1]+4); g.closePath(); g.fill(); g.stroke(); });   
+  g.fillStyle='#CDAE74'; g.fillRect(x0-34,0,34,HT);   
+  g.fillStyle=grad('#5DB3E6','#2F7FB8'); g.fillRect(x0,0,RV.w,HT);   
+  g.strokeStyle='rgba(230,246,255,0.55)'; g.lineWidth=2; for(let y=24;y<HT;y+=46){ const ox=((y*7)%40); g.beginPath(); g.moveTo(x0+12+ox,y); g.quadraticCurveTo(x0+26+ox,y-6,x0+40+ox,y); g.stroke(); g.beginPath(); g.moveTo(x0+80-ox*0.5,y+20); g.quadraticCurveTo(x0+94-ox*0.5,y+14,x0+108-ox*0.5,y+20); g.stroke(); }   
+  g.strokeStyle='#F4FBFF'; g.lineWidth=3; for(const xx of [x0+3,x1-3]){ g.beginPath(); for(let y=0;y<=HT;y+=12){ const dx=Math.sin(y*0.21)*2.5; if(y===0) g.moveTo(xx+dx,y); else g.lineTo(xx+dx,y); } g.stroke(); }   
+  g.fillStyle=grad('#A9733F','#80522C'); g.fillRect(x1,0,WD-x1,HT);   
+  g.strokeStyle='rgba(74,46,24,0.75)'; g.lineWidth=1.6; for(let y=30;y<HT;y+=30){ g.beginPath(); g.moveTo(x1,y); g.lineTo(WD,y); g.stroke(); const off=((y/30)|0)%2? 90 : 0; for(let x=x1+40+off;x<WD;x+=180){ g.beginPath(); g.moveTo(x,y-30); g.lineTo(x,y); g.stroke(); } }   
+  g.fillStyle='rgba(74,46,24,0.55)'; for(let y=15;y<HT;y+=30) for(let x=x1+52;x<WD;x+=180){ g.beginPath(); g.arc(x,y,1.6,0,7); g.fill(); }   
+  g.fillStyle='#5E3A1C'; g.fillRect(x1,0,12,HT); g.fillStyle='rgba(255,255,255,0.18)'; g.fillRect(x1+12,0,3,HT);   
+  const H=LBWC.hold; g.fillStyle='#2A1A0E'; g.strokeStyle=I; g.lineWidth=3; g.beginPath(); g.roundRect? g.roundRect(H.x-78,H.y-58,156,104,10) : g.rect(H.x-78,H.y-58,156,104); g.fill(); g.stroke();   
+  g.fillStyle='rgba(61,147,204,0.55)'; g.beginPath(); g.ellipse(H.x,H.y,58,30,0,0,7); g.fill(); g.strokeStyle='rgba(230,246,255,0.5)'; g.lineWidth=2; g.beginPath(); g.ellipse(H.x,H.y,40,18,0,0,7); g.stroke();   
+  g.strokeStyle='#8B5A2B'; g.lineWidth=5; g.strokeRect(H.x-78,H.y-58,156,104);   
+  const barrel=(x,y)=>{ g.fillStyle='#8E5B2E'; g.strokeStyle=I; g.lineWidth=2; g.beginPath(); g.ellipse(x,y,20,26,0,0,7); g.fill(); g.stroke(); g.strokeStyle='#3F4247'; g.lineWidth=3; g.beginPath(); g.moveTo(x-19,y-10); g.lineTo(x+19,y-10); g.moveTo(x-19,y+10); g.lineTo(x+19,y+10); g.stroke(); };
+  barrel(1700,92); barrel(1742,108); barrel(1640,650);   
+  g.fillStyle='#6E4A2B'; g.strokeStyle=I; g.lineWidth=3; g.beginPath(); g.arc(1560,110,24,0,7); g.fill(); g.stroke(); g.fillStyle='#8B5A2B'; g.beginPath(); g.arc(1560,110,15,0,7); g.fill();   
+  g.strokeStyle='#D9C08A'; g.lineWidth=5; for(let r=8;r<=26;r+=6){ g.beginPath(); g.arc(1500,628,r,0,7); g.stroke(); }   
+  for(const by of RV.lbwcYs){ const bw=RV.bw, a=x0-16, b=x1+16, y0=by-bw/2;   
+    g.fillStyle='rgba(0,0,0,0.18)'; g.fillRect(a+4,y0+6,b-a,bw);
+    for(let x=a,i=0;x<b;x+=14,i++){ g.fillStyle=(i%2)? '#B98450' : '#A6733F'; g.fillRect(x,y0,Math.min(14,b-x),bw); g.strokeStyle='rgba(74,46,24,0.6)'; g.lineWidth=1.2; g.strokeRect(x,y0,Math.min(14,b-x),bw); }
+    g.strokeStyle=I; g.lineWidth=2.2; g.strokeRect(a,y0,b-a,bw);
+    g.strokeStyle='#E2CB94'; g.lineWidth=3; for(const yy of [y0-2, y0+bw+2]){ g.beginPath(); g.moveTo(a,yy); g.quadraticCurveTo((a+b)/2,yy+7,b,yy); g.stroke(); }
+    g.fillStyle='#6E4A2B'; for(const px of [a,b]) for(const py of [y0-2,y0+bw+2]){ g.beginPath(); g.arc(px,py,5,0,7); g.fill(); } } }
+{ const d0=drawFoe; drawFoe=function(f){ if(f && f.def && f.def.lbwc && !S.bf){ try{ lbwcPaintFoe(f); }catch(e){} return; } return d0.apply(this, arguments); }; }
+function lbwcImg(k){ return (typeof IMG!=='undefined' && IMG[k])? IMG[k] : null; }
+function lbwcPaintFoe(f){ const mega=lbwcTier()==='g';
+  if(f.def.lbwcPop){ const P=f.def.lbwcPop, PK=LBWC_POP[P], key=(P==='arm' && mega)? 'megakrakenarm' : PK.up, im=lbwcImg(key); const L=S.raid && S.raid.lbwc; let rise=1; if(L){ for(const B of L.br) if(B.pop && B.pop.f===f) rise=Math.min(1,B.pop.t/0.25); }
+    if(im){ cx.save(); cx.globalAlpha=Math.max(0.2,rise); drawSprite(key, f.x, f.y+(1-rise)*16, PK.w, 0, 0, im, (f.lbwcSide||1)<0); cx.restore(); } return; }
+  if(f.type!=='kingkraken') return; const L=S.raid && S.raid.lbwc, K=L && L.king, A=L && L.act, w=mega? 175 : 140;
+  if(K && K.st==='under') return;
+  let pose=''; if(K && (K.st==='rise' || K.st==='dive')) pose='dive'; else if(A && A.k==='sweep') pose='sweep'; else if(A && A.k==='grab') pose='grab'; else if(A && A.k==='ink') pose='ink';
+  const key=(mega? 'megakraken' : 'kingkraken')+pose, im=lbwcImg(key)||lbwcImg(mega? 'megakraken' : 'kingkraken'); if(!im) return;
+  let dy=0; if(K && K.st==='rise') dy=(1-Math.min(1,K.t/1.1))*70; else if(K && K.st==='dive') dy=Math.min(1,K.t/1.0)*70;
+  cx.save(); if(dy){ cx.beginPath(); cx.rect(f.x-w, f.y-w*1.4, w*2, w*1.4+4); cx.clip(); } drawSprite(key, f.x, f.y+dy+(reducedMotion()? 0 : Math.sin(S.t*2.2)*2), w, 0, 0, im, false); cx.restore(); }
+{ const o0=olvActors; olvActors=function(A){ const r=o0.apply(this, arguments); try{ if(lbwcOn()) lbwcActors(A); }catch(e){} return r; }; }
+function lbwcActors(A){ const L=S.raid && S.raid.lbwc; if(!L) return; const RV=lbwcRV(), H=LBWC.hold, mega=lbwcTier()==='g';
+  A.push({ y:-1e6, f:()=>{ const a=L.act; if(!a || a.done) return; const k=Math.min(1,a.t/a.tell), pul=0.35+0.35*Math.abs(Math.sin(S.t*12));   
+      cx.save(); cx.globalAlpha=pul; cx.fillStyle='rgba(217,52,43,0.35)'; cx.strokeStyle='rgba(217,52,43,0.9)'; cx.lineWidth=3; cx.setLineDash([12,8]);
+      if(a.k==='sweep') for(const y of a.lanes){ cx.fillRect(RV.x-10, y-58, (H.x-40)-(RV.x-10), 116); cx.strokeRect(RV.x-10, y-58, (H.x-40)-(RV.x-10), 116); }
+      else if(a.k==='grab') for(const u of a.men){ if(u.dead) continue; cx.beginPath(); cx.arc(u.x, u.y, 26-10*k, 0, 7); cx.stroke(); }
+      else if(a.k==='ink'){ cx.fillStyle='rgba(43,28,58,0.25)'; cx.beginPath(); cx.arc(a.x, a.y, LBWC_T[lbwcTier()].inkR*k, 0, 7); cx.fill(); }
+      cx.restore(); } });
+  for(const q of L.fx){ if(q.k!=='under') continue; A.push({ y:q.y, f:()=>{ const im=lbwcImg(q.mold); if(!im) return; cx.save(); cx.globalAlpha=Math.max(0,1-q.t/q.dur); drawSprite(q.mold, q.x, q.y, q.w, 0, 0, im, false); cx.restore(); } }); }
+  A.push({ y:1e6, f:()=>{ const a=L.act;   
+      const C1=mega? '#5B2A8E' : '#E9552B', arm=(x0,y0,x1,y1,wd)=>{ cx.save(); cx.lineCap='round'; cx.strokeStyle=LBWA_INK; cx.lineWidth=wd+5; cx.beginPath(); cx.moveTo(x0,y0); cx.quadraticCurveTo((x0+x1)/2,Math.min(y0,y1)-40,x1,y1); cx.stroke(); cx.strokeStyle=C1; cx.lineWidth=wd; cx.stroke(); cx.fillStyle='#F6D7B0'; for(let i=1;i<6;i++){ const k=i/6, x=x0+(x1-x0)*k, y=y0+(y1-y0)*k-40*4*k*(1-k)*0.5; cx.beginPath(); cx.arc(x,y+wd*0.2,wd*0.16,0,7); cx.fill(); } cx.restore(); };
+      if(a && a.k==='sweep' && a.done){ const k=Math.min(1,(a.t-a.tell)/0.45); for(const y of a.lanes) arm(H.x-40, H.y-20, H.x-40-(H.x-RV.x+30)*k, y, 22); }
+      if(a && a.k==='grab' && !a.done){ const k=Math.min(1,a.t/a.tell); for(const u of a.men){ if(!u.dead) arm(H.x-40, H.y-30, H.x-40+(u.x-(H.x-40))*k, H.y-30+(u.y-14-(H.y-30))*k, 16); } }
+      for(const c of L.ink){ const k=Math.min(1,c.t/0.4), out=Math.max(0,Math.min(1,(c.dur-c.t)/1.0)); cx.save(); cx.globalAlpha=0.42*k*out; cx.fillStyle='#2B1C3A'; for(let i=0;i<7;i++){ const a9=i*0.9+c.x*0.01, rr=c.r*(0.42+0.18*((i*37)%5)/4); cx.beginPath(); cx.arc(c.x+Math.cos(a9)*c.r*0.45, c.y+Math.sin(a9)*c.r*0.3, rr, 0, 7); cx.fill(); } cx.restore(); } } }); }
+
+function lbwcPrizeRows(prizes, tb9){
+  if(tb9==='e'){ prizes.push({ o:5, t:'KING KRAKEN', f:'room', a:'<svg viewBox="0 0 120 80">'+lbwaWallPaint(0,0,120,80)+'</svg>' }); }   
+  else if(tb9==='h'){ lbwcHatRows(); if(!outfitOwns('captainshat')){ META.outfit.own.push('captainshat'); prizes.push({ o:6, t:OUTFIT_INFO.captainshat.name, f:'rack', a:outfitPartSVG('captainshat') }); } }   
+  else if(tb9==='g'){ prizes.push({ o:5, t:'MEGA KING KRAKEN', f:'lbwcg', a:'<img src="'+sprURI('megakraken', null, '0 0 140 140')+'" alt="">', s:t('HE JOINS YOUR ARMY SOON') }); } }   
+VD_FOOT.lbwcg='MEGA BEATEN!';
+function lbwcHatRows(){ const id='captainshat'; if(!OUTFIT_INFO[id]) return 0; if(OUTFIT_ORDER.indexOf(id)<0) OUTFIT_ORDER.push(id); OUTFIT_EARN_RAID[id]={ k:'wreck', t:'h' };   
+  const g=OUTFIT_SLOTS.find(s=>s.key==='head'); if(g && g.ids.indexOf(id)<0){ g.ids.push(id); OUTFIT_EXCL[id]=g.ids.filter(i=>i!==id); for(const i of g.ids){ if(i===id) continue; const x=OUTFIT_EXCL[i]; if(x && x.indexOf(id)<0) x.push(id); } } return 1; }
+function lbwcJoin(){ if(LBWC.joined || !META.pirate) return 0; LBWC.joined=1;
+  try{ if(WPAP.kraken && WPAP_ORDER.indexOf('kraken')<0) WPAP_ORDER.push('kraken'); }catch(e){}
+  try{ lbwcHatRows(); if(META.wreck && (META.wreck.h || META.wreck.g) && META.outfit && !outfitOwns('captainshat')) META.outfit.own.push('captainshat'); }catch(e){}   
+  RAID_INFO.wreck.wing='wreck';   
+  try{ if(LBWC.dino){ const row=LG_CH.find(c=>c.id==='wreck'); if(row) row.note="The bottle in Dino Park's pond holds the deed."; } }catch(e){}   
+  return 1; }
+{ const j0=lbwbJoin; lbwbJoin=function(){ const r=j0.apply(this, arguments); try{ lbwcJoin(); }catch(e){} return r; }; }
+if(META.pirate){ try{ lbwcJoin(); }catch(e){} }
+
+
+
+
+LBWC.dino=1; LBWC.bottle={ x:850, y:556, w:100, h:62 }; LBWC.ship={ x:836, y:556, s:1.2 }; LBWC.lift=1100;   
+function lbwcBottleDue(){ return !!(LBWC.dino && META.pirate && !META.cove); }   
+function lbwcCoveDue(){ return !!(LBWC.dino && lbwbCoveOn()); }
+{ const p0=lbwbPondOn; lbwbPondOn=function(){ return !LBWC.dino && p0.apply(this, arguments); }; }   
+for(const sp of ROOM_SPOTS){ if(sp && sp.id==='lbwcove'){ const d0=sp.due; sp.due=function(){ return !LBWC.dino && (!d0 || d0()); }; } }   
+{ const h0=RAID_INFO.wreck.hall; RAID_INFO.wreck.hall=function(){ return LBWC.dino? lbwcJungleHallSVG() : h0(); }; }
+{ const s0=LGX.scene; LGX.scene=k=>(k==='wreckhall' && LBWC.dino)? (function(){ try{ return lbwcJungleHallSVG(); }catch(e){ return ''; } })() : s0(k); }   
+function lbwcJungleHallSVG(){ let s=lbwaCoveHallSVG(); const A=LBWA_ART, I=LBWA_INK;
+  s=s.replace(/<rect y="236" width="1600" height="80" fill="url\(#lbwHedge\)"\/>[\s\S]*?<rect y="262" width="1600" height="60" fill="#5FAF45"\/>/, function(){ return lbwcJungleBand(); });   
+  s=s.replace(/<path d="M1600 60 Q1460 110 1500 230 Q1530 300 1480 330"[^>]*\/>/g, '').replace(/<path d="M1470 318 L1494 310 L1500 330 L1476 338 Z"[^>]*\/>/, '').replace(/<path d="M1478 340 Q1460 360 1440 372 M1486 344 Q1480 362 1468 380"[^>]*\/>/, '');   
+  const frond=(x,y,a,L,f)=>'<g transform="translate('+x+' '+y+') rotate('+a+')">'+A.P('M0 0 Q'+(L*0.3)+' '+(-L*0.22)+' '+L+' 0 Q'+(L*0.3)+' '+(L*0.2)+' 0 0 Z',f||'#3E9A46',2)+A.LN('M4 0 Q'+(L*0.4)+' -3 '+(L*0.92)+' 0','#8ED674',2,{ opacity:0.8 })+'</g>';
+  s+='<g id="lbwc-shore">'+frond(-20,660,-62,250)+frond(-30,640,-38,230,'#2F7D3A')+frond(10,670,-80,200,'#4FAE52')+frond(1620,660,-118,250)+frond(1630,640,-142,230,'#2F7D3A')+frond(1590,672,-100,190,'#4FAE52')
+    +frond(400,612,-70,90,'#2F7D3A')+frond(404,612,-110,90)+frond(1180,624,-74,80,'#2F7D3A')+frond(1184,624,-106,80)+'</g>';   
+  return s; }
+function lbwcJungleBand(){ const A=LBWA_ART, I=LBWA_INK; let s='';
+  s+=A.P('M1020 306 L1150 168 Q1170 150 1190 156 L1238 156 Q1258 150 1276 168 L1420 306 Z','#7B5A7E',2)+A.P('M1150 168 Q1214 182 1276 168 L1262 180 Q1214 194 1166 180 Z','#F08A3A',1.4)+A.E(1214,128,34,18,'#C9B8C6',0,{ opacity:0.85 })+A.E(1242,100,26,14,'#C9B8C6',0,{ opacity:0.7 });   
+  s+='<rect y="244" width="1600" height="78" fill="#2F7D3A"/>'; for(let x=-40, i=0; x<1700; x+=72, i++) s+=A.C(x, 252+(i%3)*6, 44+(i%2)*10, (i%2)? '#3E9A46' : '#358A40', 0);   
+  s+='<rect y="276" width="1600" height="46" fill="#2A6F35"/>';
+  const palm=(x,h)=>{ let g=A.LN('M'+x+' 310 Q'+(x+14)+' '+(310-h*0.5)+' '+(x+8)+' '+(310-h), I, 10)+A.LN('M'+x+' 310 Q'+(x+14)+' '+(310-h*0.5)+' '+(x+8)+' '+(310-h),'#8B6237',7); const tx=x+8, ty=310-h; for(const a of [-160,-120,-60,-20,-95]) g+='<g transform="translate('+tx+' '+ty+') rotate('+a+')">'+A.P('M0 0 Q30 -12 64 4 Q30 6 0 0 Z','#3E9A46',1.8)+'</g>'; return g; };
+  s+=palm(96,150)+palm(520,128)+palm(1490,140)+palm(880,110);   
+  return s; }
+
+{ const p0=paintParkScene; paintParkScene=function(){ const r=p0.apply(this, arguments); try{ if(PARK_CUR==='dino') lbwcParkDress(); }catch(e){ try{ console.error('CARD-LBW-C park', e); }catch(e2){} } return r; }; }
+{ const l0=parkSceneLayout; parkSceneLayout=function(){ const r=l0.apply(this, arguments); try{ if(PARK_CUR==='dino') lbwcParkSeat(); }catch(e){} return r; }; }
+function lbwcParkDress(){ const bg=document.getElementById('parkBg'); if(!bg) return; for(const id of ['lbwcBottle','lbwcBottleHot','lbwcShip','lbwcCovePill']){ const e=document.getElementById(id); if(e) e.remove(); }
+  const RM=reducedMotion();
+  if(lbwcBottleDue()){ const B=LBWC.bottle;
+    bg.insertAdjacentHTML('beforeend', '<div id="lbwcBottle" style="position:absolute;z-index:2;pointer-events:none"><svg viewBox="-36 -26 72 46" style="display:block;width:100%;overflow:visible"><g id="lbwcBottleG"><g>'+(RM? '' : '<animateTransform attributeName="transform" type="translate" values="0 0;0 -2.5;0 0" dur="2.6s" repeatCount="indefinite"/>')+lbwaBottleLeap()+'</g></g>'+LBWA_ART.RING(0,10,26,6,0.7)+'</svg></div>'
+      +'<button type="button" id="lbwcBottleHot" aria-label="bottle" onclick="lbwcBottleTap()" style="position:absolute;z-index:3;background:transparent;border:none;padding:0;cursor:pointer"></button>'); }
+  else if(lbwcCoveDue()){
+    bg.insertAdjacentHTML('beforeend', '<div id="lbwcShip" onclick="lbwcShipTap()" style="position:absolute;z-index:3;cursor:pointer"><svg viewBox="-46 -54 92 80" style="display:block;width:100%;overflow:visible"><g>'+(RM? '' : '<animateTransform attributeName="transform" type="rotate" values="-2.2 0 0;2.2 0 0;-2.2 0 0" dur="3.6s" repeatCount="indefinite"/>')+LBWA_ART.ship()+'</g></svg></div>'
+      +'<div id="lbwcCovePill" class="roomtag" data-notr onclick="lbwcShipTap()">'+escH(t('TO THE COVE'))+'</div>'); }
+  lbwcParkSeat(); }
+function lbwcParkSeat(){ const bg=document.getElementById('parkBg'); if(!bg || PARK_CUR!=='dino') return; const r=bg.getBoundingClientRect(); if(!r.width || !r.height) return;
+  const meet=heroMeetRect(r.width, r.height), s2=meet? Math.min(r.width/1600, r.height/650) : Math.max(r.width/1600, r.height/650), ox=(1600-r.width/s2)/2, oy=(650-r.height/s2)/2;   
+  const P=(id,x,y,w,h)=>{ const el=document.getElementById(id); if(!el) return; el.style.left=((x-ox)*s2)+'px'; el.style.top=((y-oy)*s2)+'px'; if(w) el.style.width=(w*s2)+'px'; if(h) el.style.height=(h*s2)+'px'; };
+  const B=LBWC.bottle, H=LBWC.ship;
+  P('lbwcBottle', B.x-B.w/2, B.y-B.h*0.6, B.w); P('lbwcBottleHot', B.x-44, B.y-40, 88, 76);   
+  P('lbwcShip', H.x-48*H.s, H.y-56*H.s, 96*H.s);
+  const pl=document.getElementById('lbwcCovePill'); if(pl){ pl.style.left=((H.x-ox)*s2)+'px'; pl.style.top=((H.y+40-oy)*s2)+'px'; } }   
+function lbwcShipTap(){ if(!lbwbCoveOn()) return; audio(); SFX.blip(); openRaidScene('wreck'); }
+function lbwcBottleTap(){ if(!lbwcBottleDue() || LBWC.busy) return; LBWC.busy=1; audio(); try{ SFX.thock(); }catch(e){}
+  const g=document.getElementById('lbwcBottle'), t0=performance.now(), done=()=>{ LBWC.busy=0; lbwcBottleLand(); };
+  if(!g || reducedMotion()){ done(); return; }
+  const step=()=>{ const k=Math.min(1,(performance.now()-t0)/LBWC.lift), e=1-Math.pow(1-k,3); g.style.transform='translateY('+(-60*e)+'px) rotate('+(30*e)+'deg) scale('+(1+0.3*e)+')'; if(k<1 && g.isConnected) requestAnimationFrame(step); else done(); };
+  requestAnimationFrame(step); }
+function lbwcBottleLand(){ if(!lbwcBottleDue()) return; META.cove=1; saveMeta(); try{ SFX.snap(); }catch(e){} if(parkSceneOpen() && PARK_CUR==='dino') paintParkScene(true); lbwbCard(); }   
+{ const c0=wlCast; wlCast=function(){ if(PARK_CUR==='dino' && lbwcBottleDue() && !FISH_BUSY && parkSceneOpen()) return lbwcCast(); return c0.apply(this, arguments); }; }   
+function lbwcCast(){ if(reducedMotion()){ SFX.snap(); lbwcBottleLand(); return; }
+  const bg=document.getElementById('parkBg'), pb=wlPondBox(); if(!bg || !pb){ SFX.snap(); lbwcBottleLand(); return; }
+  FISH_BUSY=1; const o=document.createElement('div'); o.id='wlover'; o.style.cssText='position:absolute;left:'+pb.x+'px;top:'+pb.y+'px;width:'+pb.w+'px;height:'+pb.h+'px;pointer-events:none;z-index:5;'; bg.appendChild(o);
+  const paint=h=>{ o.innerHTML='<svg viewBox="0 0 260 150" style="width:100%;height:100%;display:block;overflow:visible">'+h+'</svg>'; };
+  const LINE='<path id="wlLn" d="" stroke="#EAF3FA" stroke-width="2" fill="none" opacity="0.9"/>', BOB='<circle cx="128" cy="86" r="3.2" fill="#A63B2A" stroke="#6d2418" stroke-width="1.2"/>', RIP='<ellipse cx="128" cy="88" rx="13" ry="3" fill="none" stroke="#dff0ff" stroke-width="1.6" opacity="0.7" class="wlrip"/>';
+  const rc=k=>{ const rb=document.getElementById('rodBody'); if(!rb) return; rb.classList.remove('rcast','rtug','rsnap'); if(k){ void rb.getBoundingClientRect(); rb.classList.add(k); } };
+  rc('rcast'); SFX.thock(); paint(LINE+BOB); if(!WL_RAF) WL_RAF=requestAnimationFrame(wlLineTick);
+  setTimeout(()=>{ rc('rtug'); SFX.thump(); paint(LINE+BOB+RIP); const b=document.getElementById('lbwcBottle'); if(b) b.style.visibility='hidden'; }, 900);   
+  setTimeout(()=>{ rc('rsnap'); SFX.snap(); paint('<g class="wlfish"><g transform="translate(128,86) scale(1.6)">'+lbwaBottleLeap()+'<circle id="wlMouthM" cx="-20" cy="0" r="0.1" fill="none"/></g></g>'+LINE+'<path d="M96 92 l-8 -6 M164 90 l8 -6 M118 100 l-6 6 M148 100 l6 6" stroke="#dff0ff" stroke-width="2" opacity="0.8"/>'); }, 2000);   
+  setTimeout(()=>{ rc(null); if(WL_RAF){ cancelAnimationFrame(WL_RAF); WL_RAF=0; } try{ o.remove(); }catch(err){} FISH_BUSY=0; lbwcBottleLand(); }, 3200); }
+
+const LBWC_TOAST='SOMETHING WASHED UP IN DINO PARK\'S POND…';
+{ const c0=codeRedeem; codeRedeem=function(){ try{ if(LBWC.dino){ const inp=document.getElementById('shCodeIn'); const word=inp? codeNorm(inp.value) : '';
+    if(word==='PIRATE' || word==='CODEPIRATE'){ inp.value=''; try{ inp.blur(); }catch(e){} codeSay(t(LBWC_TOAST),'yes'); SFX.fanfare(); codeShut(1); META.pirate=1; saveMeta(); lbwbJoin(); if(S.mode==='menu') renderMenu(); if(parkDoorOpen('dino')) openParkScene('dino'); evToast(t(LBWC_TOAST)); return; } } }
+  catch(e){ try{ console.error('CARD-LBW-C code', e); }catch(e2){} }
+  return c0.apply(this, arguments); }; }
+
+(function(){ const W9={
+  ja:{"SOMETHING WASHED UP IN DINO PARK'S POND…":"ダイノパークの いけに なにか ながれついた…","The bottle in Dino Park's pond holds the deed.":"ダイノパークの いけの ボトルに けんりしょが はいっている。","KING KRAKEN RISES":"キング・クラーケン あらわる","MEGA KING KRAKEN":"メガ・キング・クラーケン","THE TAN BOARD THE BRIDGES!":"タンぐんが はしに のりこんだ！","SNAP!":"パチン！","STUNG!":"チクッ！","THE KRAKEN DIVES!":"クラーケンが もぐった！","HE IS BACK!":"もどってきた！","THE SWEEP!":"なぎはらい！","THE GRAB!":"つかみ！","THE INK!":"スミ！","TOSSED!":"ポイッ！","INKED!":"スミまみれ！","MEGA BEATEN!":"メガ クリア！","HE JOINS YOUR ARMY SOON":"まもなく きみの ぐんたいに くわわる"},
+  ko:{"SOMETHING WASHED UP IN DINO PARK'S POND…":"공룡 공원 연못에 뭔가 떠내려왔어…","The bottle in Dino Park's pond holds the deed.":"공룡 공원 연못의 병 속에 권리증이 들어 있어.","KING KRAKEN RISES":"크라켄 왕이 솟아오른다","MEGA KING KRAKEN":"메가 크라켄 왕","THE TAN BOARD THE BRIDGES!":"탄 군이 다리에 올라탔다!","SNAP!":"싹둑!","STUNG!":"따끔!","THE KRAKEN DIVES!":"크라켄이 잠수했다!","HE IS BACK!":"돌아왔다!","THE SWEEP!":"휩쓸기!","THE GRAB!":"움켜잡기!","THE INK!":"먹물!","TOSSED!":"휙!","INKED!":"먹물 범벅!","MEGA BEATEN!":"메가 격파!","HE JOINS YOUR ARMY SOON":"곧 네 군대에 합류한다"},
+  "zh-Hans":{"SOMETHING WASHED UP IN DINO PARK'S POND…":"恐龙公园的池塘里漂来了什么东西……","The bottle in Dino Park's pond holds the deed.":"恐龙公园池塘里的瓶子装着地契。","KING KRAKEN RISES":"海怪国王浮出水面","MEGA KING KRAKEN":"超级海怪国王","THE TAN BOARD THE BRIDGES!":"黄军冲上桥了！","SNAP!":"咔嚓！","STUNG!":"被蜇了！","THE KRAKEN DIVES!":"海怪潜下去了！","HE IS BACK!":"他回来了！","THE SWEEP!":"横扫！","THE GRAB!":"抓取！","THE INK!":"喷墨！","TOSSED!":"扔出去了！","INKED!":"满身是墨！","MEGA BEATEN!":"超级难度通关！","HE JOINS YOUR ARMY SOON":"他很快就会加入你的军队"},
+  de:{"SOMETHING WASHED UP IN DINO PARK'S POND…":"ETWAS IST IM TEICH DES DINO-PARKS ANGESPÜLT WORDEN…","The bottle in Dino Park's pond holds the deed.":"Die Flasche im Teich des Dino-Parks enthält die Urkunde.","KING KRAKEN RISES":"KÖNIG KRAKE TAUCHT AUF","MEGA KING KRAKEN":"MEGA KÖNIG KRAKE","THE TAN BOARD THE BRIDGES!":"DIE BEIGEN STÜRMEN DIE BRÜCKEN!","SNAP!":"SCHNAPP!","STUNG!":"GESTOCHEN!","THE KRAKEN DIVES!":"DER KRAKE TAUCHT AB!","HE IS BACK!":"ER IST ZURÜCK!","THE SWEEP!":"DER SCHWUNG!","THE GRAB!":"DER GRIFF!","THE INK!":"DIE TINTE!","TOSSED!":"GEWORFEN!","INKED!":"VOLL TINTE!","MEGA BEATEN!":"MEGA GESCHAFFT!","HE JOINS YOUR ARMY SOON":"ER SCHLIESST SICH BALD DEINER ARMEE AN"},
+  ru:{"SOMETHING WASHED UP IN DINO PARK'S POND…":"ЧТО-ТО ПРИБИЛО К ПРУДУ В ПАРКЕ ДИНОЗАВРОВ…","The bottle in Dino Park's pond holds the deed.":"В бутылке в пруду парка динозавров лежит купчая.","KING KRAKEN RISES":"КОРОЛЬ КРАКЕН ПОДНИМАЕТСЯ","MEGA KING KRAKEN":"МЕГА КОРОЛЬ КРАКЕН","THE TAN BOARD THE BRIDGES!":"ПЕСОЧНАЯ АРМИЯ НА МОСТАХ!","SNAP!":"ЩЁЛК!","STUNG!":"УЖАЛИЛ!","THE KRAKEN DIVES!":"КРАКЕН НЫРНУЛ!","HE IS BACK!":"ОН ВЕРНУЛСЯ!","THE SWEEP!":"РАЗМАХ!","THE GRAB!":"ХВАТКА!","THE INK!":"ЧЕРНИЛА!","TOSSED!":"ОТБРОШЕН!","INKED!":"В ЧЕРНИЛАХ!","MEGA BEATEN!":"МЕГА ПРОЙДЕН!","HE JOINS YOUR ARMY SOON":"СКОРО ОН ВСТУПИТ В ТВОЮ АРМИЮ"},
+  es:{"SOMETHING WASHED UP IN DINO PARK'S POND…":"ALGO LLEGÓ AL ESTANQUE DEL PARQUE DE DINOSAURIOS…","The bottle in Dino Park's pond holds the deed.":"La botella del estanque del parque de dinosaurios guarda la escritura.","KING KRAKEN RISES":"EL REY KRAKEN EMERGE","MEGA KING KRAKEN":"MEGA REY KRAKEN","THE TAN BOARD THE BRIDGES!":"¡LOS BEIGE ASALTAN LOS PUENTES!","SNAP!":"¡ZAS!","STUNG!":"¡PICADO!","THE KRAKEN DIVES!":"¡EL KRAKEN SE SUMERGE!","HE IS BACK!":"¡HA VUELTO!","THE SWEEP!":"¡EL BARRIDO!","THE GRAB!":"¡EL AGARRE!","THE INK!":"¡LA TINTA!","TOSSED!":"¡LANZADO!","INKED!":"¡ENTINTADO!","MEGA BEATEN!":"¡MEGA SUPERADO!","HE JOINS YOUR ARMY SOON":"PRONTO SE UNIRÁ A TU EJÉRCITO"},
+  ar:{"SOMETHING WASHED UP IN DINO PARK'S POND…":"شيء ما جرفته المياه إلى بركة حديقة الديناصورات…","The bottle in Dino Park's pond holds the deed.":"الزجاجة في بركة حديقة الديناصورات تحمل صك الملكية.","KING KRAKEN RISES":"الملك كراكن يصعد","MEGA KING KRAKEN":"الملك كراكن الضخم","THE TAN BOARD THE BRIDGES!":"الجيش البيج يقتحم الجسور!","SNAP!":"طق!","STUNG!":"لُسع!","THE KRAKEN DIVES!":"الكراكن يغوص!","HE IS BACK!":"لقد عاد!","THE SWEEP!":"الضربة الكاسحة!","THE GRAB!":"القبضة!","THE INK!":"الحبر!","TOSSED!":"قُذف!","INKED!":"غارق في الحبر!","MEGA BEATEN!":"تم التغلب على الضخم!","HE JOINS YOUR ARMY SOON":"سينضم إلى جيشك قريبًا"} };
+  for(const lg in W9){ const tb=TR[lg]||(TR[lg]={}); for(const k in W9[lg]) if(!(k in tb)) tb[k]=W9[lg][k]; } })();
+
+setTimeout(function(){ try{ if(window.GVT && !GVT.lbwc) GVT.lbwc=function(o){ o=o||{}; const rd=S.raid, L=rd && rd.lbwc, king=S.foes.find(f=>f.type==='kingkraken' && !f.dead), RV=lbwcRV();
+  if(L && o.move) L.force=o.move;
+  if(L && o.pop!=null){ const B=L.br[o.pop|0]; if(B) B.cd=0; }
+  if(king && o.hp!=null){ king.hp=Math.max(1, Math.round(king.hpMax*o.hp)); }
+  if(L && o.cd!=null){ L.cd=o.cd; }
+  return { cv:GVT_CV, v:LBWC.v, on:lbwcOn()?1:0, tier:lbwcOn()? rd.t : null, joined:LBWC.joined, wing:RAID_INFO.wreck.wing, river:RV? { x:RV.x, w:RV.w, ys:RV.lbwcYs.slice(), bw:RV.bw, spans:rvBridges(RV) } : null, waves:S.cfg? S.cfg.waves.map(w=>w.name+(w.hpGate? '@'+w.hpGate.k : '')+':'+w.groups.map(g=>g.t+'x'+(g.n||((g.pts||[]).length))).join('+')) : null, wave:S.wave|0,
+    king:king? { x:Math.round(king.x), y:Math.round(king.y), hp:Math.round(king.hp), max:king.hpMax, burrow:!!king.burrow, st:L && L.king? L.king.st : null, bar:BOSSDEF.kingkraken.bar } : null, act:L && L.act? { k:L.act.k, t:+L.act.t.toFixed(2), done:L.act.done } : null,
+    L:L? { pops:L.pops, snaps:L.snaps, shoved:L.shoved, ducked:L.ducked, shot:L.shot, stung:L.stung, swept:L.swept, tossed:L.tossed, moves:Object.assign({}, L.moves), dives:L.dives, ink:L.ink.length, up:L.br.map(B=>B.pop? B.pop.kind : null), br:L.br.map(B=>B.n) } : null,
+    units:S.units.filter(u=>!u.dead).map(u=>({ t:u.type, x:Math.round(u.x), y:Math.round(u.y), fly:!!u.lbwcFly, daze:+(u.lbwcDazeT||0).toFixed(2), slow:+(u.lbwcSlowT||0).toFixed(2), ink:lbwcInked(u)?1:0 })), dead:S.units.filter(u=>u.dead).length,
+    wet:S.units.concat(S.foes).filter(o=>!o.dead && RV && !(o.def && (o.def.fly || o.def.lbwcPop)) && !o.boss && !o.lbwcFly && !lbwcOnPlanks(RV,o.x,o.y)).length,
+    pops:S.foes.filter(f=>f.def && f.def.lbwcPop && !f.dead).map(f=>({ k:f.def.lbwcPop, x:Math.round(f.x), y:Math.round(f.y), hp:f.hp })),
+    rd:rd? { k:rd.k, t:rd.t, won:rd.won?1:0, void:rd.void?1:0, p3King:rd.p3King?1:0, kingDown:rd.kingDown?1:0 } : null, mode:S.mode, wreck:META.wreck? JSON.parse(JSON.stringify(META.wreck)) : null, hat:outfitOwns('captainshat')?1:0, wall:(typeof wpapOwns==='function')? (wpapOwns('kraken')?1:0) : null, wallOrder:WPAP_ORDER.indexOf('kraken'), bank:META.starBank|0, raidDay:META.raidDay? JSON.parse(JSON.stringify(META.raidDay)) : null }; }; }catch(e){} }, 0);
 
 buildSprites(()=>{ ready=true;
   
