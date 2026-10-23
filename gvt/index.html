@@ -90742,7 +90742,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='26.33';        
+let GVT_CV='26.34';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -196173,6 +196173,146 @@ setTimeout(function(){ try{ if(window.GVT && !GVT.lbwc) GVT.lbwc=function(o){ o=
     wet:S.units.concat(S.foes).filter(o=>!o.dead && RV && !(o.def && (o.def.fly || o.def.lbwcPop)) && !o.boss && !o.lbwcFly && !lbwcOnPlanks(RV,o.x,o.y)).length,
     pops:S.foes.filter(f=>f.def && f.def.lbwcPop && !f.dead).map(f=>({ k:f.def.lbwcPop, x:Math.round(f.x), y:Math.round(f.y), hp:f.hp })),
     rd:rd? { k:rd.k, t:rd.t, won:rd.won?1:0, void:rd.void?1:0, p3King:rd.p3King?1:0, kingDown:rd.kingDown?1:0 } : null, mode:S.mode, wreck:META.wreck? JSON.parse(JSON.stringify(META.wreck)) : null, hat:outfitOwns('captainshat')?1:0, wall:(typeof wpapOwns==='function')? (wpapOwns('kraken')?1:0) : null, wallOrder:WPAP_ORDER.indexOf('kraken'), bank:META.starBank|0, raidDay:META.raidDay? JSON.parse(JSON.stringify(META.raidDay)) : null }; }; }catch(e){} }, 0);
+
+
+
+
+
+
+
+
+
+const LBWD={ v:1, clk:75, rimX:1190, barnSpd:12, barnIn:70, snapR:110, snapTell:0.7, snapCd:3.2, snapN:2, gullC:[1450,360], gullR:[170,90], gullAlt:80, gullCd:6.0, gullReach:160, carryR:26, dropX:460, twinX:1310, twinY:[110,490], twinIn:70, volleyCd:4.2, volleyFirst:2.0, ballT:0.9, splashR:72, knockPx:96, volleyReach:760, inkSeat:[1560,360], inkIn:40, inkCd:7.0, inkFirst:3.0, inkTell:0.6, inkR:90, inkT:7.0, inkReach:440, inkSlow:0.5, spawnX:1900, joined:0 };   
+const LBWD_T={ e:{ four:['barnacle'], hp:{ barnacle:48 } }, m:{ four:['barnacle','gull'], hp:{ barnacle:64, gull:48 } }, h:{ four:['barnacle','gull','pcannon','inkling'], hp:{ barnacle:84, gull:64, pcannon:36, inkling:176 } }, g:{ four:['barnacle','gull','pcannon','inkling'], hp:{ barnacle:100, gull:76, pcannon:44, inkling:211 } } };   
+FDEF.barnacle={ hp:48, spd:12, bounty:60, leak:0, w:110, boss:true, lbwc:1, lbwd:'barnacle' };   
+FDEF.gull={ hp:48, spd:20, bounty:60, leak:0, w:96, boss:true, lbwc:1, lbwd:'gull' };
+FDEF.pcannon={ hp:36, spd:20, bounty:40, leak:0, w:100, boss:true, lbwc:1, lbwd:'pcannon' };   
+FDEF.inkling={ hp:176, spd:20, bounty:120, leak:0, w:64, boss:true, lbwc:1, lbwd:'inkling' };
+BOSSDEF.barnacle={ title:'SERGEANT BARNACLE', wave:'SERGEANT BARNACLE CRAWLS OUT', bar:'SERGEANT BARNACLE' };   
+BOSSDEF.gull={ title:'GENERAL GULL', wave:'GENERAL GULL TAKES WING', bar:'GENERAL GULL' };
+BOSSDEF.pcannon={ title:'THE CANNON TWINS', wave:'THE CANNON TWINS ROLL IN', bar:'THE CANNON TWINS' };
+BOSSDEF.inkling={ title:'PRINCE INKLING', wave:'PRINCE INKLING SURFACES', bar:'PRINCE INKLING' };
+const LBWD_SAY={ 'SERGEANT BARNACLE CRAWLS OUT':"Sergeant Barnacle, Soldier. Keep your men off his rim!", 'GENERAL GULL TAKES WING':"General Gull, Soldier. He'll carry your men right off!", 'THE CANNON TWINS ROLL IN':"The Cannon Twins, Soldier. Port and starboard. Spread out!", 'PRINCE INKLING SURFACES':"The prince, Soldier. Mind the ink!" };   
+const LBWD_MOLD={ barnacle:'barnacle', gull:'gull', pcannon:'cannon', inkling:'inkling' };
+function lbwdFour(tier){ return (LBWD_T[tier]||LBWD_T.e).four.slice(); }
+
+function lbwdWave(k){ const B=BOSSDEF[k], ex=LBWD.spawnX, pt=function(p,at){ return { f:'spout', t:k, n:1, raw:1, pin:1, quiet:1, at:at, pts:[p] }; };
+  if(k==='pcannon') return { name:B.wave, boss:k, groups:[ pt([ex, LBWD.twinY[0]], 0.4), pt([ex, LBWD.twinY[1]], 0.9) ] };   
+  return { name:B.wave, boss:k, groups:[ pt([ex, k==='gull'? 140 : 360], 0.4) ] }; }
+function lbwdWaves(cfg, tier){ const ki=cfg.waves.findIndex(w=>w.boss==='kingkraken'); if(ki<0 || cfg.lbwd) return; const ins=[]; let prev=null;
+  for(const k of lbwdFour(tier)){ const w=lbwdWave(k); if(prev) w.hpGate={ t:prev, k:0, clk:LBWD.clk, bark:null }; ins.push(w); prev=k; }
+  const kw=cfg.waves[ki]; if(prev && !kw.hpGate) kw.hpGate={ t:prev, k:0, clk:LBWD.clk, bark:null };   
+  cfg.waves.splice.apply(cfg.waves, [ki, 0].concat(ins)); cfg.lbwd=tier; cfg.lbwdFour=lbwdFour(tier); }
+{ const c0=lbwcCfg; lbwcCfg=function(tier){ const cfg=c0.apply(this, arguments); try{ lbwdWaves(cfg, LBWD_T[tier]? tier : 'e'); }catch(e){ try{ console.error('CARD-LBW-D cfg', e); }catch(e2){} } return cfg; }; }
+
+function lbwdL(){ const rd=S.raid; if(!rd || !rd.lbwc) return null; return rd.lbwd||(rd.lbwd={ t:0, rng:lbwcRng(4919*(['e','m','h','g'].indexOf(rd.t)+1)+29), stood:{}, snaps:0, snapped:0, dives:0, carries:0, drops:0, volleys:0, knocked:0, balls:[], tw:{ cd:LBWD.volleyFirst, turn:0, last:null }, inks:0, inkP:[], force:{} }); }
+{ const t0=lbwcTick; lbwcTick=function(dt){ t0.apply(this, arguments); try{ lbwdTick(dt); }catch(e){ try{ console.error('CARD-LBW-D tick', e); }catch(e2){} } }; }
+function lbwdTick(dt){ if(!lbwcOn() || S.mode!=='play') return; const L=lbwdL(); if(!L) return; const RV=lbwcRV(); if(!RV) return; L.t+=dt; const T=LBWD_T[lbwcTier()]||LBWD_T.e;
+  for(const f of S.foes){ if(f.dead || !f.def || !f.def.lbwd) continue; const k=f.def.lbwd; f.spdMul=1e-6; f.vx=0; f.vy=0; f.burrow=false;
+    if(!f.ld){ f.ld={ st:'in', t:0, cd:0 }; f.hp=f.hpMax=Math.max(1, Math.round((T.hp[k]||f.hpMax)*bhpNow())); L.stood[k]=(L.stood[k]|0)+1; }
+    if(k==='barnacle') lbwdBarnTick(f,L,RV,dt); else if(k==='gull') lbwdGullTick(f,L,RV,dt); else if(k==='pcannon') lbwdCannonTick(f,L,RV,dt); else if(k==='inkling') lbwdInkTick(f,L,RV,dt); }
+  lbwdTwinsTick(L,RV,dt);
+  for(let i=L.balls.length-1;i>=0;i--){ const b=L.balls[i]; b.t+=dt; if(b.t>=b.dur){ L.balls.splice(i,1); lbwdLand(L,RV,b); } }
+  for(let i=L.inkP.length-1;i>=0;i--){ const c=L.inkP[i]; c.t+=dt; if(c.t>=c.dur) L.inkP.splice(i,1); } }
+function lbwdMen(RV, east){ return S.units.filter(u=>!u.dead && !u.lbwcFly && !u.lbwdCarry && !(u.jetT>0) && !(u.dropT>0) && !u.falling && (east==null || u.x>=east)); }   
+function lbwdNearest(list, x, y){ let best=null, bd=1e9; for(const u of list){ const d=Math.hypot(u.x-x,u.y-y); if(d<bd){ bd=d; best=u; } } return best; }
+function lbwdKnot(list, r){ let best=null, bn=-1; for(const u of list){ const n=list.filter(v=>Math.hypot(v.x-u.x,v.y-u.y)<r).length; if(n>bn){ bn=n; best=u; } } return best; }   
+function lbwdMove(f, tx, ty, sp, dt){ const dx=tx-f.x, dy=ty-f.y, d=Math.hypot(dx,dy); if(d<=sp*dt){ f.x=tx; f.y=ty; return true; } f.x+=dx/d*sp*dt; f.y+=dy/d*sp*dt; return false; }
+
+function lbwdBarnTick(f,L,RV,dt){ const B=f.ld, ys=RV.lbwcYs, lo=Math.max(FOE_TOP+30, Math.min.apply(null,ys)-100), hi=Math.min(WORLD_H-40, Math.max.apply(null,ys)+100);
+  B.t+=dt; if(B.cd>0) B.cd-=dt;
+  if(B.st==='in'){ if(lbwdMove(f, LBWD.rimX, ys[0], LBWD.barnIn, dt)){ B.st='patrol'; B.dir=1; B.cd=1.0; } return; }
+  if(B.st==='tell'){ if(B.t>=LBWD.snapTell){ lbwdSnap(f,L,RV); B.st='patrol'; B.t=0; B.cd=LBWD.snapCd; } return; }
+  const near=lbwdMen(RV, RV.x+RV.w*0.5).filter(u=>Math.hypot(u.x-f.x,u.y-f.y)<=LBWD.snapR);
+  if((near.length && B.cd<=0) || L.force.barnacle){ L.force.barnacle=0; B.st='tell'; B.t=0; try{ bfSfx(SFX.rattle, f.x, f.y); }catch(e){} return; }
+  f.y+=B.dir*LBWD.barnSpd*dt; if(f.y>=hi){ f.y=hi; B.dir=-1; } else if(f.y<=lo){ f.y=lo; B.dir=1; } f.x=LBWD.rimX; }
+function lbwdSnap(f,L,RV){ const men=lbwdMen(RV, RV.x+RV.w*0.5).filter(u=>Math.hypot(u.x-f.x,u.y-f.y)<=LBWD.snapR+30).sort((a,b)=>Math.hypot(a.x-f.x,a.y-f.y)-Math.hypot(b.x-f.x,b.y-f.y)).slice(0, LBWD.snapN);
+  L.snaps++; S.floats.push({ x:f.x, y:f.y-110, txt:'SNAP!', t:0, col:'#FFD24A' }); try{ bfSfx(SFX.snap, f.x, f.y); }catch(e){} S.shake=Math.max(S.shake,0.15);
+  for(const u of men){ if(lbwcShove(u, RV.x-40-L.rng()*40, u.y+(L.rng()-0.5)*30, LBWC.shove+0.1, 18)){ L.snapped++; u.lbwcFrom=-1; } } }   
+
+function lbwdGullTick(f,L,RV,dt){ const G=f.ld, C9=LBWD.gullC, R9=LBWD.gullR; G.t+=dt; if(G.cd>0) G.cd-=dt; if(G.alt==null){ G.alt=1; G.ang=Math.PI; G.fx=-1; }
+  const ring=function(){ return [C9[0]+Math.cos(G.ang)*R9[0], C9[1]+Math.sin(G.ang)*R9[1]]; };
+  if(G.st==='in'){ G.alt=1; const p=ring(); G.fx=(p[0]-f.x)>=0? 1 : -1; if(lbwdMove(f, p[0], p[1], FL_GLIDE, dt)){ G.st='circle'; G.cd=LBWD.gullCd*0.6; } return; }
+  if(G.st==='circle'){ G.ang+=FL_GLIDE*dt/((R9[0]+R9[1])/2); const p=ring(); G.fx=(p[0]-f.x)>=0? 1 : -1; f.x=p[0]; f.y=p[1]; G.alt=Math.min(1, G.alt+dt/FL_CLIMB);
+    const pool=lbwdMen(RV, RV.x-LBWD.gullReach); if(pool.length && (G.cd<=0 || L.force.gull)){ L.force.gull=0; const mid=RV.x+RV.w/2; G.tgt=pool.slice().sort((a,b)=>Math.abs(a.x-mid)-Math.abs(b.x-mid))[0]; G.st='dive'; G.t=0; L.dives++; try{ bfSfx(SFX.screech, f.x, f.y); }catch(e){} }   
+    return; }
+  if(G.st==='dive'){ const m=G.tgt; if(!m || m.dead || m.lbwdCarry || m.lbwcFly || G.t>4.0){ G.st='home'; G.t=0; G.tgt=null; return; }
+    G.alt=Math.max(0, G.alt-dt*3.2); G.fx=(m.x-f.x)>=0? 1 : -1;
+    if(lbwdMove(f, m.x, m.y, FL_DIVE, dt) || Math.hypot(m.x-f.x,m.y-f.y)<=LBWD.carryR){ m.lbwdCarry=f; m.wp=null; m.marching=false; G.st='carry'; G.t=0; G.man=m; G.tgt=null; G.drop=[Math.max(170, campDeployX()-LBWD.dropX-L.rng()*120), Math.max(90, Math.min(WORLD_H-110, WORLD_H/2+(L.rng()-0.5)*260))]; L.carries++;
+      S.floats.push({ x:m.x, y:m.y-50, txt:'CARRIED OFF!', t:0, col:'#FFD24A' }); try{ bfSfx(SFX.squeak, m.x, m.y); }catch(e){} }
+    return; }
+  if(G.st==='carry'){ const m=G.man; G.alt=Math.min(1, G.alt+dt/FL_CLIMB); if(!m || m.dead || m.lbwdCarry!==f){ G.st='home'; G.t=0; G.man=null; return; } G.fx=(G.drop[0]-f.x)>=0? 1 : -1;
+    if(lbwdMove(f, G.drop[0], G.drop[1], FL_DIVE*0.6, dt)){ lbwdDrop(f,L,m,1); G.st='home'; G.t=0; } return; }
+  if(G.st==='home'){ G.alt=Math.min(1, G.alt+dt/FL_CLIMB); const p=ring(); G.fx=(p[0]-f.x)>=0? 1 : -1; if(lbwdMove(f, p[0], p[1], FL_HOME, dt)){ G.st='circle'; G.cd=LBWD.gullCd; } return; } }
+function lbwdDrop(f,L,m,far){ if(!m || m.lbwdCarry!==f) return; m.lbwdCarry=null; if(f.ld) f.ld.man=null; const alt=LBWD.gullAlt*((f.ld && f.ld.alt!=null)? f.ld.alt : 1); m.x=f.x; m.y=f.y-alt+30;   
+  if(L) L.drops++; lbwcShove(m, f.x+(L? (L.rng()-0.5)*30 : 0), f.y+(far? 20 : 16), 0.45, 10); m.lbwcFrom=-1; try{ bfSfx(SFX.thump, f.x, f.y); }catch(e){} }   
+
+function lbwdCannonTick(f,L,RV,dt){ const C9=f.ld; C9.t+=dt; if(C9.kick>0) C9.kick-=dt; if(C9.seat==null){ C9.seat=(f.y<WORLD_H/2)? 0 : 1; C9.port=C9.seat===0; }
+  if(C9.st==='in'){ if(lbwdMove(f, LBWD.twinX, LBWD.twinY[C9.seat], LBWD.twinIn, dt)) C9.st='hold'; return; }
+  f.x=LBWD.twinX; f.y=LBWD.twinY[C9.seat]; }
+function lbwdTwinsTick(L,RV,dt){ const guns=S.foes.filter(f=>!f.dead && f.def && f.def.lbwd==='pcannon' && f.ld && f.ld.st==='hold'); if(!guns.length) return; const TW=L.tw; TW.cd-=dt; if(TW.cd>0 && !L.force.pcannon) return;
+  guns.sort((a,b)=>a.ld.seat-b.ld.seat); const g=guns.length>1? guns[TW.turn%2] : guns[0];   
+  const east=lbwdMen(RV, RV.x-20); let m=east.length? lbwdKnot(east, LBWD.splashR) : null;
+  if(!m){ const all=lbwdMen(RV).filter(u=>Math.hypot(u.x-g.x,u.y-g.y)<=LBWD.volleyReach); m=all.length? lbwdNearest(all, g.x, g.y) : null; }
+  if(!m){ TW.cd=1.0; L.force.pcannon=0; return; }
+  TW.cd=LBWD.volleyCd; TW.turn++; TW.last=g.ld.port? 'port' : 'starboard'; L.force.pcannon=0; g.ld.kick=0.25; L.volleys++;
+  L.balls.push({ x0:g.x-40, y0:g.y-6, x1:m.x+(L.rng()-0.5)*24, y1:m.y+(L.rng()-0.5)*16, t:0, dur:LBWD.ballT, port:g.ld.port });
+  S.floats.push({ x:g.x, y:g.y-90, txt:'THE VOLLEY!', t:0, col:'#FFD24A' }); try{ bfSfx(SFX.cotboom||SFX.boom, g.x, g.y); }catch(e){} S.fx.push({ k:'ring', x:g.x-44, y:g.y-30, r:5, R:30, t:0, dur:0.25, col:'#ffffff' }); }
+function lbwdLand(L,RV,b){ S.fx.push({ k:'ring', x:b.x1, y:b.y1, r:8, R:LBWD.splashR, t:0, dur:0.4, col:'#F6E7C8' }); try{ bfSfx(SFX.thock, b.x1, b.y1); }catch(e){} S.shake=Math.max(S.shake,0.18);
+  for(const u of lbwdMen(RV)){ if(Math.hypot(u.x-b.x1,u.y-b.y1)>LBWD.splashR) continue; if(lbwcShove(u, u.x-LBWD.knockPx-L.rng()*20, u.y+(L.rng()-0.5)*24, 0.4, 16)){ L.knocked++; u.lbwcFrom=-1; } } }   
+
+function lbwdInkTick(f,L,RV,dt){ const I=f.ld; I.t+=dt; if(I.cd>0) I.cd-=dt;
+  if(I.st==='in'){ if(lbwdMove(f, LBWD.inkSeat[0], LBWD.inkSeat[1], LBWD.inkIn, dt)){ I.st='hold'; I.cd=LBWD.inkFirst; } return; }
+  f.x=LBWD.inkSeat[0]; f.y=LBWD.inkSeat[1];
+  if(I.st==='tell'){ if(I.t>=LBWD.inkTell){ L.inkP.push({ x:I.tx, y:I.ty, r:LBWD.inkR, t:0, dur:LBWD.inkT }); L.inks++; S.floats.push({ x:I.tx, y:I.ty-50, txt:'THE INK!', t:0, col:'#C9B6E8' }); try{ bfSfx(SFX.bloop||SFX.thump, I.tx, I.ty); }catch(e){} I.st='hold'; I.cd=LBWD.inkCd; } return; }
+  if(I.cd<=0 || L.force.inkling){ const pool=lbwdMen(RV, RV.x-20).filter(u=>Math.hypot(u.x-f.x,u.y-f.y)<=LBWD.inkReach); L.force.inkling=0; if(!pool.length){ I.cd=1.5; return; } const m=lbwdKnot(pool, LBWD.inkR); I.st='tell'; I.t=0; I.tx=m.x; I.ty=m.y; } }
+function lbwdInked(o){ const L=S.raid && S.raid.lbwd; if(!L || !L.inkP.length) return false; for(const c of L.inkP) if(Math.hypot(o.x-c.x,(o.y-c.y)*1.4)<=c.r) return true; return false; }
+
+{ const s0=campUnitStep; campUnitStep=function(u,dt){ if(u && lbwcOn()){ const g=u.lbwdCarry;
+    if(g){ if(g.dead || !g.ld || g.ld.man!==u){ u.lbwdCarry=null; } else { u.x=g.x; u.y=g.y-LBWD.gullAlt*(g.ld.alt||0)+30; u.marching=false; u.wp=null; return false; } }
+    if(lbwdInked(u)){ const g9=u.gait; u.gait=(u.gait||1)*LBWD.inkSlow; u.lbwdInk=1; const r=s0.apply(this, arguments); u.gait=g9; return r; } u.lbwdInk=0; }
+  return s0.apply(this, arguments); }; }
+{ const f0=foeFell; foeFell=function(f,u){ try{ if(f && f.def && f.def.lbwd==='gull' && f.ld && f.ld.man){ lbwdDrop(f, S.raid && S.raid.lbwd, f.ld.man, 0); } }catch(e){} return f0.apply(this, arguments); }; }   
+
+{ const p0=lbwcPaintFoe; lbwcPaintFoe=function(f){ if(f && f.def && f.def.lbwd){ try{ lbwdPaintFoe(f); }catch(e){} return; } return p0.apply(this, arguments); }; }
+function lbwdPaintFoe(f){ const k=f.def.lbwd, D=f.ld||{}, RM=reducedMotion(), bob=function(hz,px){ return RM? 0 : Math.sin(S.t*hz)*px; };
+  if(k==='barnacle'){ const key=(D.st==='tell')? 'barnaclesnap' : 'barnacle', im=lbwcImg(key)||lbwcImg('barnacle'); if(im) drawSprite(key, f.x, f.y+bob(3,1.5), LBWA_W.barnacle, 0, 0, im, false); return; }
+  if(k==='gull'){ const a=(D.alt==null? 1 : D.alt), alt=a*LBWD.gullAlt, key=(D.st==='dive' || D.st==='carry')? 'gulldive' : 'gull', im=lbwcImg(key)||lbwcImg('gull'); if(!im) return;
+    cx.save(); cx.globalAlpha=0.22; cx.fillStyle='#22160F'; cx.beginPath(); cx.ellipse(f.x, f.y, 30-10*a, 10-3*a, 0, 0, 7); cx.fill(); cx.restore();   
+    drawSprite(key, f.x, f.y-alt+bob(6,2), LBWA_W.gull, 0, 0, im, D.fx>0); return; }
+  if(k==='pcannon'){ const im=lbwcImg('cannon'); if(im) drawSprite('cannon', f.x+((D.kick>0)? D.kick*24 : 0), f.y, LBWA_W.cannon, 0, 0, im, false); return; }
+  if(k==='inkling'){ const key=(D.st==='tell')? 'inklingink' : 'inkling', im=lbwcImg(key)||lbwcImg('inkling'); if(im) drawSprite(key, f.x, f.y+bob(2.6,2), LBWA_W.inkling, 0, 0, im, false); return; } }
+{ const a0=lbwcActors; lbwcActors=function(A){ a0.apply(this, arguments); try{ lbwdActors(A); }catch(e){} }; }
+function lbwdActors(A){ const L=S.raid && S.raid.lbwd; if(!L) return;
+  if(L.inkP.length) A.push({ y:-1e6+1, f:function(){ for(const c of L.inkP){ const k=Math.min(1,c.t/0.35), out=Math.max(0,Math.min(1,(c.dur-c.t)/1.0)); cx.save(); cx.globalAlpha=0.55*k*out; cx.fillStyle='#2B1C3A'; cx.beginPath(); cx.ellipse(c.x, c.y, c.r*k, c.r*0.62*k, 0, 0, 7); cx.fill();
+      cx.fillStyle='#4A2F66'; for(let i=0;i<5;i++){ const a9=i*1.26+c.x*0.01; cx.beginPath(); cx.ellipse(c.x+Math.cos(a9)*c.r*0.55*k, c.y+Math.sin(a9)*c.r*0.34*k, c.r*0.22, c.r*0.14, 0, 0, 7); cx.fill(); } cx.restore(); } } });   
+  if(L.balls.length) A.push({ y:1e6-1, f:function(){ for(const b of L.balls){ const k=Math.min(1,b.t/b.dur), x=b.x0+(b.x1-b.x0)*k, yg=b.y0+(b.y1-b.y0)*k, h=110*4*k*(1-k)+28*(1-k);
+      cx.save(); cx.globalAlpha=0.25; cx.fillStyle='#22160F'; cx.beginPath(); cx.ellipse(x, yg+2, 9, 4, 0, 0, 7); cx.fill(); cx.globalAlpha=1; cx.fillStyle='#3F4247'; cx.strokeStyle=LBWA_INK; cx.lineWidth=2; cx.beginPath(); cx.arc(x, yg-h, 9, 0, 7); cx.fill(); cx.stroke(); cx.fillStyle='rgba(255,255,255,0.35)'; cx.beginPath(); cx.arc(x-3, yg-h-3, 3, 0, 7); cx.fill(); cx.restore(); } } }); }   
+
+function lbwdJoin(){ if(LBWD.joined || !META.pirate) return 0; LBWD.joined=1;
+  try{ if(typeof SB_LINE==='object') for(const k in LBWD_SAY) if(!SB_LINE[k]) SB_LINE[k]=LBWD_SAY[k]; }catch(e){}
+  try{ const row=LG_CH.find(c=>c.id==='wreck'); if(row && row.threats && !row.threats.some(r=>r[0]==='barnacle')){ const i=row.threats.findIndex(r=>r[0]==='kingkraken'); row.threats.splice.apply(row.threats, [i<0? 0 : i, 0, ['barnacle','SERGEANT BARNACLE'], ['gull','GENERAL GULL'], ['cannon','THE CANNON TWINS'], ['inkling','PRINCE INKLING']]); } }catch(e){}   
+  return 1; }
+{ const j0=lbwcJoin; lbwcJoin=function(){ const r=j0.apply(this, arguments); try{ lbwdJoin(); }catch(e){} return r; }; }
+if(META.pirate){ try{ lbwdJoin(); }catch(e){} }
+
+(function(){ const W9={
+  ja:{"SERGEANT BARNACLE":"バーナクルぐんそう","GENERAL GULL":"ガルしょうぐん","THE CANNON TWINS":"ふたごの たいほう","PRINCE INKLING":"インクリングおうじ","SERGEANT BARNACLE CRAWLS OUT":"バーナクルぐんそうが はいだしてきた","GENERAL GULL TAKES WING":"ガルしょうぐんが とびたった","THE CANNON TWINS ROLL IN":"ふたごの たいほうが ころがりこんだ","PRINCE INKLING SURFACES":"インクリングおうじが うかびあがった","Sergeant Barnacle, Soldier. Keep your men off his rim!":"バーナクルぐんそうだ、へいし。へりに ちかづくな！","General Gull, Soldier. He'll carry your men right off!":"ガルしょうぐんだ、へいし。へいたいを さらっていくぞ！","The Cannon Twins, Soldier. Port and starboard. Spread out!":"ふたごの たいほうだ、へいし。さゆうから くる。ちらばれ！","The prince, Soldier. Mind the ink!":"おうじだ、へいし。スミに きをつけろ！","CARRIED OFF!":"さらわれた！","THE VOLLEY!":"いっせいしゃげき！"},
+  ko:{"SERGEANT BARNACLE":"바너클 상사","GENERAL GULL":"걸 장군","THE CANNON TWINS":"쌍둥이 대포","PRINCE INKLING":"잉클링 왕자","SERGEANT BARNACLE CRAWLS OUT":"바너클 상사가 기어 나온다","GENERAL GULL TAKES WING":"걸 장군이 날아오른다","THE CANNON TWINS ROLL IN":"쌍둥이 대포가 굴러온다","PRINCE INKLING SURFACES":"잉클링 왕자가 떠오른다","Sergeant Barnacle, Soldier. Keep your men off his rim!":"바너클 상사다, 병사. 병사들을 뱃전에서 떼어 놔!","General Gull, Soldier. He'll carry your men right off!":"걸 장군이다, 병사. 네 병사들을 채 간다!","The Cannon Twins, Soldier. Port and starboard. Spread out!":"쌍둥이 대포다, 병사. 좌현과 우현. 흩어져!","The prince, Soldier. Mind the ink!":"왕자다, 병사. 먹물 조심해!","CARRIED OFF!":"채였다!","THE VOLLEY!":"일제 사격!"},
+  "zh-Hans":{"SERGEANT BARNACLE":"藤壶中士","GENERAL GULL":"海鸥将军","THE CANNON TWINS":"大炮双子","PRINCE INKLING":"小墨王子","SERGEANT BARNACLE CRAWLS OUT":"藤壶中士爬出来了","GENERAL GULL TAKES WING":"海鸥将军起飞了","THE CANNON TWINS ROLL IN":"大炮双子滚进来了","PRINCE INKLING SURFACES":"小墨王子浮出水面","Sergeant Barnacle, Soldier. Keep your men off his rim!":"藤壶中士，士兵。让你的人离船边远点！","General Gull, Soldier. He'll carry your men right off!":"海鸥将军，士兵。他会把你的人叼走！","The Cannon Twins, Soldier. Port and starboard. Spread out!":"大炮双子，士兵。左舷和右舷。散开！","The prince, Soldier. Mind the ink!":"王子来了，士兵。小心墨汁！","CARRIED OFF!":"被叼走了！","THE VOLLEY!":"齐射！"},
+  de:{"SERGEANT BARNACLE":"SERGEANT SEEPOCKE","GENERAL GULL":"GENERAL MÖWE","THE CANNON TWINS":"DIE KANONENZWILLINGE","PRINCE INKLING":"PRINZ TINTLING","SERGEANT BARNACLE CRAWLS OUT":"SERGEANT SEEPOCKE KRIECHT HERAUS","GENERAL GULL TAKES WING":"GENERAL MÖWE HEBT AB","THE CANNON TWINS ROLL IN":"DIE KANONENZWILLINGE ROLLEN AN","PRINCE INKLING SURFACES":"PRINZ TINTLING TAUCHT AUF","Sergeant Barnacle, Soldier. Keep your men off his rim!":"Sergeant Seepocke, Soldat. Halt deine Männer von seiner Reling fern!","General Gull, Soldier. He'll carry your men right off!":"General Möwe, Soldat. Der trägt deine Männer glatt davon!","The Cannon Twins, Soldier. Port and starboard. Spread out!":"Die Kanonenzwillinge, Soldat. Backbord und Steuerbord. Verteilt euch!","The prince, Soldier. Mind the ink!":"Der Prinz, Soldat. Achtung, Tinte!","CARRIED OFF!":"ENTFÜHRT!","THE VOLLEY!":"DIE SALVE!"},
+  ru:{"SERGEANT BARNACLE":"СЕРЖАНТ РАКУШКА","GENERAL GULL":"ГЕНЕРАЛ ЧАЙКА","THE CANNON TWINS":"ПУШКИ-БЛИЗНЕЦЫ","PRINCE INKLING":"ПРИНЦ ЧЕРНИЛКА","SERGEANT BARNACLE CRAWLS OUT":"СЕРЖАНТ РАКУШКА ВЫПОЛЗАЕТ","GENERAL GULL TAKES WING":"ГЕНЕРАЛ ЧАЙКА ВЗЛЕТАЕТ","THE CANNON TWINS ROLL IN":"ПУШКИ-БЛИЗНЕЦЫ ВЫКАТЫВАЮТСЯ","PRINCE INKLING SURFACES":"ПРИНЦ ЧЕРНИЛКА ВСПЛЫВАЕТ","Sergeant Barnacle, Soldier. Keep your men off his rim!":"Сержант Ракушка, солдат. Держи людей подальше от борта!","General Gull, Soldier. He'll carry your men right off!":"Генерал Чайка, солдат. Он утащит твоих людей!","The Cannon Twins, Soldier. Port and starboard. Spread out!":"Пушки-близнецы, солдат. Левый борт и правый. Рассредоточиться!","The prince, Soldier. Mind the ink!":"Принц, солдат. Берегись чернил!","CARRIED OFF!":"УТАЩИЛ!","THE VOLLEY!":"ЗАЛП!"},
+  es:{"SERGEANT BARNACLE":"SARGENTO PERCEBE","GENERAL GULL":"GENERAL GAVIOTA","THE CANNON TWINS":"LOS CAÑONES GEMELOS","PRINCE INKLING":"PRÍNCIPE TINTITA","SERGEANT BARNACLE CRAWLS OUT":"EL SARGENTO PERCEBE SALE A RASTRAS","GENERAL GULL TAKES WING":"EL GENERAL GAVIOTA ALZA EL VUELO","THE CANNON TWINS ROLL IN":"LOS CAÑONES GEMELOS RUEDAN AL FRENTE","PRINCE INKLING SURFACES":"EL PRÍNCIPE TINTITA SALE A FLOTE","Sergeant Barnacle, Soldier. Keep your men off his rim!":"El sargento Percebe, soldado. ¡Aleja a tus hombres de la borda!","General Gull, Soldier. He'll carry your men right off!":"El general Gaviota, soldado. ¡Se llevará a tus hombres en vuelo!","The Cannon Twins, Soldier. Port and starboard. Spread out!":"Los cañones gemelos, soldado. Babor y estribor. ¡Dispersaos!","The prince, Soldier. Mind the ink!":"El príncipe, soldado. ¡Cuidado con la tinta!","CARRIED OFF!":"¡SE LO LLEVÓ!","THE VOLLEY!":"¡LA ANDANADA!"},
+  ar:{"SERGEANT BARNACLE":"الرقيب برنقيل","GENERAL GULL":"الجنرال نورس","THE CANNON TWINS":"المدفعان التوأم","PRINCE INKLING":"الأمير حبر","SERGEANT BARNACLE CRAWLS OUT":"الرقيب برنقيل يزحف خارجًا","GENERAL GULL TAKES WING":"الجنرال نورس يحلّق","THE CANNON TWINS ROLL IN":"المدفعان التوأم يتدحرجان","PRINCE INKLING SURFACES":"الأمير حبر يطفو","Sergeant Barnacle, Soldier. Keep your men off his rim!":"الرقيب برنقيل، أيها الجندي. أبعد رجالك عن حافة السفينة!","General Gull, Soldier. He'll carry your men right off!":"الجنرال نورس، أيها الجندي. سيخطف رجالك في الهواء!","The Cannon Twins, Soldier. Port and starboard. Spread out!":"المدفعان التوأم، أيها الجندي. يمينًا ويسارًا. تفرّقوا!","The prince, Soldier. Mind the ink!":"الأمير، أيها الجندي. احذر الحبر!","CARRIED OFF!":"خُطف!","THE VOLLEY!":"الوابل!"} };
+  for(const lg in W9){ const tb=TR[lg]||(TR[lg]={}); for(const k in W9[lg]) if(!(k in tb)) tb[k]=W9[lg][k]; } })();
+
+setTimeout(function(){ try{ if(window.GVT && !GVT.lbwd) GVT.lbwd=function(o){ o=o||{}; const rd=S.raid, L=rd && rd.lbwd, RV=lbwcRV();
+  if(L && o.force){ L.force[o.force]=1; if(o.force==='gull'){ const g=S.foes.find(f=>!f.dead && f.def && f.def.lbwd==='gull'); if(g && g.ld) g.ld.cd=0; } }
+  const four=S.foes.filter(f=>!f.dead && f.def && f.def.lbwd).map(f=>({ k:f.def.lbwd, x:Math.round(f.x), y:Math.round(f.y), hp:Math.round(f.hp), max:f.hpMax, st:f.ld? f.ld.st : null, alt:(f.ld && f.ld.alt!=null)? +f.ld.alt.toFixed(2) : null, seat:f.ld? (f.ld.seat==null? null : f.ld.seat) : null, port:f.ld? !!f.ld.port : null, man:(f.ld && f.ld.man)? f.ld.man.type : null, cd:f.ld? +(+f.ld.cd||0).toFixed(2) : null }));
+  return { cv:GVT_CV, v:LBWD.v, on:lbwcOn()?1:0, tier:lbwcOn()? rd.t : null, joined:LBWD.joined, cfgFour:(S.cfg && S.cfg.lbwdFour)? S.cfg.lbwdFour.slice() : null, waves:S.cfg? S.cfg.waves.map(w=>(w.boss||'')+'|'+w.name+'|'+(w.hpGate? w.hpGate.t+'@'+w.hpGate.k+(w.hpGate.clk? '/'+w.hpGate.clk : '') : '')) : null, wave:S.wave|0, queue:S.queue? S.queue.length : null, ann:S.ann? S.ann.txt : null,
+    four, bars:['barnacle','gull','pcannon','inkling'].map(k=>BOSSDEF[k].bar), L:L? { snaps:L.snaps, snapped:L.snapped, dives:L.dives, carries:L.carries, drops:L.drops, volleys:L.volleys, knocked:L.knocked, inks:L.inks, balls:L.balls.length, inkP:L.inkP.map(c=>({ x:Math.round(c.x), y:Math.round(c.y), r:c.r, t:+c.t.toFixed(2) })), turn:L.tw.turn, last:L.tw.last, stood:Object.assign({}, L.stood) } : null,
+    units:S.units.filter(u=>!u.dead).map(u=>({ t:u.type, x:Math.round(u.x), y:Math.round(u.y), fly:!!u.lbwcFly, carry:!!u.lbwdCarry, daze:+(u.lbwcDazeT||0).toFixed(2), ink:u.lbwdInk|0 })), dead:S.units.filter(u=>u.dead).length, bosses:S.foes.filter(f=>f.boss && !f.dead).map(f=>f.type),
+    sb:Object.keys(LBWD_SAY).map(k=>(typeof SB_LINE==='object' && SB_LINE[k])? 1 : 0), threats:(function(){ try{ const r=LG_CH.find(c=>c.id==='wreck'); return r? r.threats.map(x=>x[0]) : null; }catch(e){ return null; } })(), rd:rd? { k:rd.k, t:rd.t, won:rd.won?1:0, p3King:rd.p3King?1:0, kingDown:rd.kingDown?1:0 } : null, mode:S.mode }; }; }catch(e){} }, 0);
 
 
 
