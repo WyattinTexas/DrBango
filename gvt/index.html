@@ -90755,7 +90755,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='26.64';        
+let GVT_CV='26.65';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -197533,6 +197533,65 @@ function pcfRead(o){ const keys={}; for(const k in PCF_KEYS){ const im=IMG[k]; k
   return { on:pcfOn(), armed:PCF.armed, px:pcfPx(), layPx:+pcfLayPx().toFixed(4), bakes:PCF.bakes, layBakes:PCF.layBakes, swaps:PCF.swaps, err:PCF.err, log:PCF.log.slice(-6), keys:keys, gown:[gwnOf('d'), gwnOf('h')], port:PCF_PORT_VB, wall:PCF_WALL_VB, live:live, sha:PCF_ART? PCF_ART.sha : null }; }
 try{ pcfInstall(); }catch(e){ PCF.err++; }
 setTimeout(function(){ try{ if(window.GVT && !GVT.pcf) GVT.pcf=pcfRead; }catch(e){} }, 0);   
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+var RSQ={ on:(function(){ try{ const q=/[?&]rsq=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_rsq','0'); else localStorage.removeItem('gvt_rsq'); } return localStorage.getItem('gvt_rsq')==='0'? 0 : 1; }catch(e){ return 1; } })(),
+  d:{}, armed:0, warm:0, reads:0, stand:0, blanks:0, writes:0, bakes:0, outs:0, hid:0, err:0, log:[], blank0:null, layNo:0, layOk:0, layOut:0, palNow:0, palGone:0, tick:0 };
+const RSQ_IDLE=60000, RSQ_BEAT=5000, RSQ_EARLY=15000, RSQ_WAIT=1500, RSQ_TRIES=4;   
+function rsqOn(){ return RSQ.on===1 && typeof pcfOn==='function' && pcfOn(); }
+function rsqBlank(){ if(RSQ.blank0) return RSQ.blank0; const c=document.createElement('canvas'); c.width=12; c.height=14; c.complete=true; c.naturalWidth=12; c.naturalHeight=14; c.rsq='blank'; return (RSQ.blank0=c); }   
+function rsqBake(k, d){   
+  const src=SPRITES_SRC[k]; if(typeof pcfKeyOf!=='function' || !pcfKeyOf(src)) return Promise.resolve(null); const ck=pcfBakeKey(k); if(d.cv && d.ck===ck) return Promise.resolve(d.cv); if(d.busy && d.busy[0]===ck) return d.busy[1];
+  const px=pcfPx(), W=120*px, H=140*px;
+  const pr=new Promise(res=>{ const im=new Image(); const fin=v=>{ im.onload=im.onerror=null; try{ im.removeAttribute('src'); }catch(e){} if(d.busy && d.busy[0]===ck) d.busy=null; res(v); };   
+    im.onload=()=>{ let cv=null; try{ cv=document.createElement('canvas'); cv.width=W; cv.height=H; cv.getContext('2d').drawImage(im, 0, 0, W, H); cv.complete=true; cv.naturalWidth=W; cv.naturalHeight=H; cv.pcf=ck; cv.rsq=k; }catch(e){ cv=null; RSQ.err++; RSQ.log.push(['bake', k, String(e).slice(0, 80)]); }
+      if(cv && SPRITES_SRC[k]===src){ d.cv=cv; d.ck=ck; RSQ.bakes++; PCF.bakes++; PCF.swaps++; } fin(cv);
+      if(cv && !d.steady && performance.now()<RSQ_EARLY){ d.steady=1; rsqSteady(k, d, 1); } };   
+    im.onerror=()=>{ RSQ.err++; RSQ.log.push(['load', k]); fin(null); };
+    im.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 140" width="'+W+'" height="'+H+'">'+src+'</svg>'); });   
+  d.busy=[ck, pr]; return pr; }
+function rsqSame(a, b){ try{ if(a.width!==b.width || a.height!==b.height) return false; const x=a.getContext('2d').getImageData(0, 0, a.width, a.height).data, y=b.getContext('2d').getImageData(0, 0, b.width, b.height).data; for(let i=0;i<x.length;i++) if(x[i]!==y[i]) return false; return true; }catch(e){ return true; } }
+function rsqSteady(k, d, n){ setTimeout(function(){ const prev=d.cv; if(!prev) return; d.ck=''; rsqBake(k, d).then(cv=>{ RSQ.warm++; if(cv && cv!==prev && !rsqSame(prev, cv) && n<RSQ_TRIES) rsqSteady(k, d, n+1); }); }, RSQ_WAIT); }   
+function rsqDoor(k){ const pd=Object.getOwnPropertyDescriptor(IMG, k); if(pd && (pd.get || pd.set || !pd.configurable)) return false; const d=RSQ.d[k]={ cv:null, ck:'', busy:null, at:0, steady:0 };
+  Object.defineProperty(IMG, k, { configurable:true, enumerable:true,
+    get:function(){ d.at=Date.now(); RSQ.reads++; if(!(d.cv && d.ck===pcfBakeKey(k))) rsqBake(k, d); if(d.cv) return d.cv; const s0=RSQ.d.princess; if(s0 && s0.cv){ RSQ.stand++; return s0.cv; } RSQ.blanks++; return rsqBlank(); },   
+    set:function(n){ RSQ.writes++; } });   
+  return true; }
+function rsqPalShown(){ try{ const w=document.getElementById('palaceWrap'); return !!(w && w.isConnected && w.getClientRects().length); }catch(e){ return false; } }
+function rsqBeat(){ const now=Date.now(); for(const k in RSQ.d){ const d=RSQ.d[k]; if(d.cv && !d.busy && now-d.at>RSQ_IDLE){ d.cv=null; d.ck=''; RSQ.outs++; } }   
+  let lay=0; try{ lay=Object.keys(PCF.lay).length; }catch(e){}
+  if(lay){ if(rsqPalShown()) RSQ.palGone=0; else if(!RSQ.palGone) RSQ.palGone=now; else if(now-RSQ.palGone>RSQ_IDLE){ PCF.lay={}; try{ if(PARK_HERO.palace && PARK_HERO.palace.indexOf('data-pcf="')>=0) delete PARK_HERO.palace; }catch(e){} RSQ.layOut++; RSQ.palGone=0; } } }   
+function rsqArm(){ if(RSQ.armed || !rsqOn()) return; RSQ.armed=1;
+  try{ for(const k in PCF_KEYS) rsqDoor(k); }catch(e){ RSQ.err++; }
+  try{ const b0=buildSprites; buildSprites=function(){ if(!rsqOn()) return b0.apply(this, arguments); const hid=[];   
+      for(const k in PCF_KEYS){ const pd=Object.getOwnPropertyDescriptor(SPRITES_SRC, k); if(pd && pd.enumerable && pd.configurable && ('value' in pd)){ Object.defineProperty(SPRITES_SRC, k, { enumerable:false }); hid.push(k); } }
+      try{ return b0.apply(this, arguments); } finally { for(const k of hid) Object.defineProperty(SPRITES_SRC, k, { enumerable:true }); RSQ.hid+=hid.length; } }; }catch(e){ RSQ.err++; }
+  try{ const a0=pcfBakeAll; pcfBakeAll=function(){ if(rsqOn()) return; return a0.apply(this, arguments); }; }catch(e){ RSQ.err++; }   
+  try{ const p0=pcfBake; pcfBake=function(k){ const d=RSQ.d[k]; if(rsqOn() && d){ d.at=Date.now(); return rsqBake(k, d); } return p0.apply(this, arguments); }; }catch(e){ RSQ.err++; }   
+  try{ const q0=pcfBaked; pcfBaked=function(k){ const d=RSQ.d[k]; if(rsqOn() && d){ d.at=Date.now(); return (d.cv && d.ck===pcfBakeKey(k))? d.cv : null; } return q0.apply(this, arguments); }; }catch(e){ RSQ.err++; }
+  try{ const f0=pcfFigure; pcfFigure=function(){ RSQ.palNow++; try{ return f0.apply(this, arguments); } finally { RSQ.palNow--; } }; }catch(e){ RSQ.err++; }   
+  try{ const l0=pcfLayBake; pcfLayBake=function(){ if(rsqOn() && !RSQ.palNow && !rsqPalShown()){ RSQ.layNo++; return; } RSQ.layOk++; RSQ.palGone=0; return l0.apply(this, arguments); }; }catch(e){ RSQ.err++; }   
+  try{ RSQ.tick=setInterval(function(){ try{ rsqBeat(); }catch(e){ RSQ.err++; } }, RSQ_BEAT); }catch(e){ RSQ.err++; } }
+function rsqRead(){ const keys={}; for(const k in RSQ.d){ const d=RSQ.d[k]; keys[k]={ cv:d.cv? d.cv.width+'x'+d.cv.height : null, ck:d.ck, at:d.at? Date.now()-d.at : null, busy:!!d.busy }; }
+  let lay=0; try{ lay=Object.keys(PCF.lay).length; }catch(e){}
+  return { on:RSQ.on, live:rsqOn(), armed:RSQ.armed, reads:RSQ.reads, stand:RSQ.stand, blanks:RSQ.blanks, writes:RSQ.writes, bakes:RSQ.bakes, warm:RSQ.warm, outs:RSQ.outs, hid:RSQ.hid, layNo:RSQ.layNo, layOk:RSQ.layOk, layOut:RSQ.layOut, lay:lay, palShown:rsqPalShown(), rslPcf:(typeof RSL==='object' && RSL)? RSL.pcf : null, rslStf:(typeof RSL==='object' && RSL)? RSL.stf : null, err:RSQ.err, log:RSQ.log.slice(-6), keys:keys }; }
+try{ rsqArm(); }catch(e){ RSQ.err++; }
+setTimeout(function(){ try{ if(window.GVT && !GVT.rsq) GVT.rsq=rsqRead; }catch(e){} }, 0);   
 
 buildSprites(()=>{ ready=true;
   
