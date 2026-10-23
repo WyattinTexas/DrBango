@@ -90721,7 +90721,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='26.07';        
+let GVT_CV='26.08';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -196808,6 +196808,155 @@ function otsRoadIx(i){ i=i|0; if(!(typeof BTW==='object' && BTW.laid) && BBS_ROA
 
 
 
+
+
+
+const COL_LIVE=1;   
+const OTS_COL={ on:(function(){ try{ const q=/[?&]billcol=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_billcol','0'); else localStorage.removeItem('gvt_billcol'); } return localStorage.getItem('gvt_billcol')==='0'? 0 : COL_LIVE; }catch(e){ return COL_LIVE; } })(),
+  chain:['tan','green','red','blue','purple'], fight:null, id:'tan', hex:null, taken:[], roster:[], imgs:Object.create(null), force:null, stats:{ picks:0, draws:0 } };
+function otsColNorm(h){ return (typeof h==='string' && /^#[0-9A-Fa-f]{6}$/.test(h))? h.toUpperCase() : null; }
+function otsColRoster(){   
+  if(OTS_COL.force) return OTS_COL.force.slice();
+  const out=[], mem=(typeof COOP==='object' && COOP && Array.isArray(COOP.members))? COOP.members : null;
+  if(mem && mem.length){ for(const m of mem) out.push(otsColNorm(m && m.hex) || GREEN.toUpperCase()); }
+  else { let h=null; try{ h=dyeHex(); }catch(e){} out.push(otsColNorm(h) || GREEN.toUpperCase()); }
+  const bots=(S.sq && Array.isArray(S.sq.bots))? S.sq.bots : []; for(const b of bots){ const h=otsColNorm(b && b.hex); if(h) out.push(h); }
+  return out; }
+function otsColId(h){   
+  let id=null; try{ id=bfDyeOfHex(h) || bfDyeOfHex(h.toLowerCase()); }catch(e){}
+  if(!id){ const r=ARMIES.find(a=>a.hex.toUpperCase()===h) || ELITE_DYES.find(d=>d.hex.toUpperCase()===h); if(r) id=r.id; }
+  if(id==='camo') return 'green';
+  if(id) return id;
+  if(hexNear(h, GREEN)) return 'green';
+  for(const a of ARMIES){ if(hexNear(h, a.hex)) return a.id; }
+  return null; }
+function otsColPick(roster){   
+  const taken=new Set(); for(const h of roster){ const id=otsColId(h); if(id) taken.add(id); }
+  let id=null; for(const c of OTS_COL.chain){ if(!taken.has(c)){ id=c; break; } }
+  if(!id){ const free=ARMIES.filter(a=>!taken.has(a.id)).map(a=>a.id); if(free.length){ const r=roomRng('bbscol'); id=free[Math.min(free.length-1, (r()*free.length)|0)]; } else id='tan'; }
+  OTS_COL.taken=Array.from(taken); return id; }
+function otsColHex(id){ if(id==='tan') return TAN; const r=ARMIES.find(a=>a.id===id); return r? r.hex : TAN; }
+function otsColImg(hex){   
+  if(OTS_COL.imgs[hex]!==undefined) return OTS_COL.imgs[hex];
+  OTS_COL.imgs[hex]=null; try{ const body=amMold('bbshow').split('currentColor').join(hex), im=new Image();
+    im.onload=function(){ OTS_COL.imgs[hex]=im; }; im.onerror=function(){ OTS_COL.imgs[hex]=null; };
+    im.src='data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 140">'+body+'</svg>'); }catch(e){}
+  return null; }
+function otsColNow(){   
+  const rd=S.raid; if(!rd) return null;
+  if(OTS_COL.fight!==rd || OTS_COL.force){ if(!OTS_COL.force && !(S.sq && Array.isArray(S.sq.bots)) && (S.t||0)<2) return null;   
+    OTS_COL.fight=rd; OTS_COL.roster=otsColRoster(); OTS_COL.id=otsColPick(OTS_COL.roster); OTS_COL.hex=otsColHex(OTS_COL.id); OTS_COL.stats.picks++;
+    if(OTS_COL.force) OTS_COL.force=null;
+    if(OTS_COL.id!=='tan') otsColImg(OTS_COL.hex); }
+  return OTS_COL.hex; }
+{ const fi0=foeImg; foeImg=function(k){   
+    if(k==='bbshow' && OTS_COL.on){ try{ if(bbsOn()){ const hex=otsColNow(); if(hex && OTS_COL.id!=='tan'){ const im=OTS_COL.imgs[hex] || otsColImg(hex); if(im && im.width){ OTS_COL.stats.draws++; return im; } } } }catch(e){} }
+    return fi0.apply(this, arguments); }; }
+function otsColRead(o){ o=o||{};   
+  if(o.reset){ OTS_COL.fight=null; }
+  if(Array.isArray(o.roster)){ OTS_COL.force=o.roster.map(otsColNorm).filter(Boolean); OTS_COL.fight=null; otsColNow(); }
+  return { on:OTS_COL.on, live:COL_LIVE, id:OTS_COL.id, hex:OTS_COL.hex, taken:OTS_COL.taken.slice(), roster:OTS_COL.roster.slice(), loaded:!!(OTS_COL.hex && OTS_COL.imgs[OTS_COL.hex] && OTS_COL.imgs[OTS_COL.hex].width), stats:Object.assign({},OTS_COL.stats) }; }
+setTimeout(function(){ try{ if(window.GVT && !GVT.billCol) GVT.billCol=function(o){ return otsColRead(o); }; }catch(e){} }, 0);
+
+
+
+
+
+
+
+
+
+
+
+
+
+const RIDE_LIVE=1;
+const RIDE={ on:(function(){ try{ const q=/[?&]ride=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_ride','0'); else localStorage.removeItem('gvt_ride'); } return localStorage.getItem('gvt_ride')==='0'? 0 : RIDE_LIVE; }catch(e){ return RIDE_LIVE; } })(),
+  m:28, turnRate:1.9, turnEase:0.9, vTurn:46, decel:110, laneMin:2,
+  spray:{ every:1.0, aimR:228 },
+  big:{ first:5, cd:9, retry:1.0, t:2.2, gap:0.09, R:300, half:92, thru:6, sweep:0.55, minMen:3, pipCd:0.3 },
+  fa:{ first:8, cd:12, retry:1.0, tell:0.45, beat:0.28, n:3, R:340, half:38, thru:8, pips:3, minMen:2, slow:22 },
+  rally:{ first:11, cd:18, retry:1.5, t:6, r:560, fire:0.5, ring:0.7, minAllies:1 },
+  strafe:{ off:95, past:180, refresh:2.0, grid:40 },
+  orig:null, stats:{ sprays:0, big:0, fa:0, faBlasts:0, rally:0, uturns:0, maxDh:0, lastAtk:null, maxGap:0, rideT:0, ev:[] } };
+function rideAtk(kind,f){ const S9=RIDE.stats, t=+S.t.toFixed(2); if(S9.lastAtk!=null) S9.maxGap=Math.max(S9.maxGap, +(t-S9.lastAtk).toFixed(2)); S9.lastAtk=t; S9.ev.push([t,kind,Math.round(f.x),Math.round(f.y)]); if(S9.ev.length>600) S9.ev.shift(); }   
+function rideMen(f,R){ const out=[]; for(const u of bbsGreen()){ if(Math.hypot(u.x-f.x,u.y-f.y)>R) continue; if(bbsWalled(f,u)) continue; out.push(u); } return out; }   
+function rideBestLine(f,R,half,thru){ let best=null; for(let k=0;k<24;k++){ const a=k*Math.PI/12, n=bbsCorridor(f,a,R,half,thru).length; if(n>0 && (!best || n>best.n)) best={ aim:a, n:n }; } return best; }   
+function rideCrowd(lane){ const G=bbsGreen().filter(u=>u.x>=BBS3.xMin+30); if(!G.length) return null; const B=BBS_BANDS[lane], pad=BBS3.mind.bandPad; let M=B? G.filter(u=>u.y>=B[0]-pad && u.y<B[1]+pad) : G; if(!M.length) M=G;
+  let sx=0, sy=0, x0=1e9, x1=-1e9; for(const u of M){ sx+=u.x; sy+=u.y; x0=Math.min(x0,u.x); x1=Math.max(x1,u.x); } const g=RIDE.strafe.grid;
+  return { x:Math.round(sx/M.length/g)*g, y:Math.round(sy/M.length/g)*g, w:Math.max(80, x1-x0), n:M.length }; }   
+
+(function rideArm(){ if(!RIDE.on) return; RIDE.orig={ turnA:BBS3.turnA, turnRate:BBS3.turnRate, lane:BBS3.mind.lane }; BBS3.turnA=99; BBS3.turnRate=RIDE.turnRate; BBS3.mind.lane=RIDE.laneMin; })();   
+{ const sk0=bbsSkid; bbsSkid=function(f,b){ if(!RIDE.on || !b) return sk0.apply(this, arguments); b.skid=0; b.v=Math.max(RIDE.vTurn, (b.v||0)*0.6); b.uturns=(b.uturns|0)+1; RIDE.stats.uturns++;
+    if(!reducedMotion()) for(let i=0;i<2;i++) S.fx.push({ k:'puff', x:f.x-10+i*14, y:f.y+2, t:-i*0.05, dur:0.4, R:8 }); }; }   
+{ const ta0=bbsTurnAround; bbsTurnAround=function(f,b){ if(!RIDE.on || !b) return ta0.apply(this, arguments); const h0=b.h; const r=ta0.apply(this, arguments); b.h=h0; return r; }; }   
+{ const g0=bbsGoal; bbsGoal=function(f,b){ if(!RIDE.on || !b || b.mode!=='own') return g0.apply(this, arguments);
+    const C=rideCrowd(b.lane); if(!C) return g0.apply(this, arguments);
+    if(b.leg==='past' && b.goal) return b.goal;
+    if(b.goal && b.leg==='to' && b.sgT!=null && S.t-b.sgT<RIDE.strafe.refresh) return b.goal;
+    const side=(f.y<C.y)? -1 : 1, dirx=(Math.cos(b.h)>=0)? 1 : -1;
+    const g=bbsClampGoal({ x:C.x+dirx*Math.max(60, C.w*0.5), y:C.y+side*RIDE.strafe.off }); b.goal=g; b.leg='to'; b.sgT=S.t; b.strafes=(b.strafes|0)+1; return g; }; }   
+{ const ld0=bbsLegDone; bbsLegDone=function(f,b){ if(!RIDE.on || !b || b.mode!=='own' || !rideCrowd(b.lane)) return ld0.apply(this, arguments);
+    if(b.leg==='to'){ b.leg='past'; b.goal=bbsClampGoal({ x:f.x+Math.cos(b.h)*RIDE.strafe.past, y:f.y+Math.sin(b.h)*RIDE.strafe.past*0.5 }); } else { b.leg='to'; b.goal=null; } }; }   
+
+{ const sa0=bbsSprayAim; bbsSprayAim=function(f,b){ const a=sa0.apply(this, arguments); if(a!=null || !RIDE.on) return a; let bu=null, bd=1e9; for(const u of rideMen(f,RIDE.spray.aimR)){ const d=Math.hypot(u.x-f.x,u.y-f.y); if(d<bd){ bd=d; bu=u; } } return bu? Math.atan2(bu.y-f.y, bu.x-f.x) : null; }; }   
+{ const st0=bbsSprayTick; bbsSprayTick=function(f,dt,B,b){ if(!RIDE.on || !b) return st0.apply(this, arguments);
+    if((b.bigS || b.faS) && !b.spray){ b.sprayCd=Math.max(b.sprayCd||0, 0.3); return; }   
+    const n0=b.sprays|0, r=st0.apply(this, arguments); if((b.sprays|0)>n0){ RIDE.stats.sprays++; rideAtk('spray',f); } if(!b.spray && b.sprayCd>RIDE.spray.every) b.sprayCd=RIDE.spray.every; return r; }; }
+
+function rideBigStart(f,b){ const ln=rideBestLine(f,RIDE.big.R,RIDE.big.half,RIDE.big.thru); if(!ln || rideMen(f,RIDE.big.R).length<RIDE.big.minMen) return false;
+  b.bigS={ t:RIDE.big.t, rt:0, n:0, aim0:ln.aim, k:0 }; b.bigs=(b.bigs|0)+1; RIDE.stats.big++; rideAtk('big',f); b.sprayCd=Math.max(b.sprayCd||0, RIDE.big.t+0.4);
+  S.fx.push({ k:'ring', x:f.x, y:f.y-24, r:10, R:56, t:0, dur:0.35, col:'#FFD34D' }); bbsSay(f, BBS3_LINES[3], { pend:1 }); return true; }
+function rideBigTick(f,dt,b){ const G9=b.bigS, BG=RIDE.big; G9.t-=dt; G9.rt-=dt; G9.k+=dt; const aim=G9.aim0+Math.sin(G9.k*4.2)*BG.sweep, fz=(b.dir>0)? 1 : -1;
+  while(G9.rt<=0 && G9.t>0){ G9.rt+=BG.gap; G9.n++; b.rounds=(b.rounds|0)+1;
+    for(const mi of [0,1]){ const m=BBS_FAN_MZ[mi], mx=f.x+m.x*fz, my=f.y+m.y-22, ex=mx+Math.cos(aim)*BG.R, ey=my+Math.sin(aim)*BG.R*0.35+(f.y-my);
+      S.fx.push({ k:'slugtr', x1:mx, y1:my, x2:ex, y2:ey, t:0, dur:0.12 }); S.fx.push({ k:'flash', x:mx, y:my, ang:aim, R:16, lw:3, t:0, dur:0.1 }); if(G9.n%3===0) S.fx.push({ k:'shell', x:mx-3*fz, y:my-2, h:mi, t:0, dur:0.55 }); }
+    if(G9.n%2===0) bfSfx(SFX.colt, f.x, f.y);
+    for(const u of bbsCorridor(f, aim, BG.R, BG.half, BG.thru)){ if(u.rideBigT!=null && S.t-u.rideBigT<BG.pipCd) continue; u.rideBigT=S.t; f.pipN=1; tanHit(u, f.x, f.y, f); f.pipN=0; b.pips=(b.pips|0)+1; } }
+  if(G9.t<=0) b.bigS=null; }
+function rideFaStart(f,b){ const ln=rideBestLine(f,RIDE.fa.R,RIDE.fa.half,RIDE.fa.thru); if(!ln || ln.n<RIDE.fa.minMen) return false;
+  b.faS={ t:0, n:0, aim:ln.aim }; b.fas=(b.fas|0)+1; RIDE.stats.fa++; b.sprayCd=Math.max(b.sprayCd||0, RIDE.fa.tell+RIDE.fa.beat*RIDE.fa.n+0.4);
+  S.floats.push({ x:f.x, y:f.y-f.def.w*1.5, txt:'FIRE AWAY!', t:0, col:'#FFD24A' });   
+  const fz=(b.dir>0)? 1 : -1; for(let i=0;i<2;i++){ const m=BBS_FAN_MZ[i]; S.fx.push({ k:'ring', x:f.x+m.x*fz, y:f.y+m.y-22, r:2, R:15, t:0, dur:0.3, col:'#FFF3C0' }); }   
+  try{ bfSfx(SFX.snap, f.x, f.y); }catch(e){} return true; }
+function rideFaTick(f,dt,b){ const C=b.faS, FA=RIDE.fa; C.t+=dt; b.v=Math.min(b.v||0, FA.slow);   
+  const due=(C.t<FA.tell)? 0 : Math.min(FA.n, Math.floor((C.t-FA.tell)/FA.beat)+1), fz=(b.dir>0)? 1 : -1;
+  while(C.n<due){ C.n++; RIDE.stats.faBlasts++; rideAtk('fa',f); const m=BBS_FAN_MZ[C.n&1], mx=f.x+m.x*fz, my=f.y+m.y-22, ex=mx+Math.cos(C.aim)*FA.R, ey=my+Math.sin(C.aim)*FA.R*0.35+(f.y-my);
+    S.fx.push({ k:'slugtr', x1:mx, y1:my, x2:ex, y2:ey, t:0, dur:0.2 }); S.fx.push({ k:'slugtr', x1:mx, y1:my+2, x2:ex, y2:ey+2, t:0, dur:0.2 }); S.fx.push({ k:'flash', x:mx, y:my, ang:C.aim, R:26, lw:4, t:0, dur:0.14 }); S.fx.push({ k:'shell', x:mx-3*fz, y:my-2, h:C.n&1, t:0, dur:0.55 });
+    bfSfx(SFX.colt, f.x, f.y); if(bfVis(f.x,f.y) && !reducedMotion()) S.shake=Math.max(S.shake, 0.18);
+    for(const u of bbsCorridor(f, C.aim, FA.R, FA.half, FA.thru)){ for(let k=0;k<FA.pips && !u.dead;k++){ f.pipN=1; tanHit(u, f.x, f.y, f); f.pipN=0; b.pips=(b.pips|0)+1; } S.fx.push({ k:'ring', x:u.x, y:u.y-10, r:4, R:22, t:0, dur:0.25, col:'#FFD34D' }); } }
+  if(C.n>=FA.n && C.t>=FA.tell+FA.beat*FA.n) b.faS=null; }
+function rideAllies(f,R){ let n=0; for(const o of S.foes){ if(o===f || o.dead || !(o.hp>0) || o.type===f.type) continue; if(Math.hypot(o.x-f.x,o.y-f.y)<=R) n++; } return n; }
+function rideRallyStart(f,b){ if(rideAllies(f,RIDE.rally.r)<RIDE.rally.minAllies) return false;
+  b.rallyS={ t:RIDE.rally.t, rk:0 }; b.rallies=(b.rallies|0)+1; RIDE.stats.rally++; rideAtk('rally',f);
+  f.def=Object.assign({}, FDEF.bbride, { auraR:RIDE.rally.r, auraFire:RIDE.rally.fire });   
+  S.floats.push({ x:f.x, y:f.y-f.def.w*1.8, txt:'FIRE AWAY, BOYS! Make it rain!', t:0, col:'#FFD24A' });   
+  const fz=(b.dir>0)? 1 : -1; for(let i=0;i<2;i++){ const m=BBS_FAN_MZ[i]; S.fx.push({ k:'flash', x:f.x+m.x*fz, y:f.y+m.y-36, ang:-Math.PI/2, R:14, lw:3, t:0, dur:0.16 }); } bfSfx(SFX.colt, f.x, f.y);   
+  return true; }
+function rideRallyTick(f,dt,b){ const R9=b.rallyS; R9.t-=dt; R9.rk-=dt; if(R9.rk<=0){ R9.rk=RIDE.rally.ring; S.fx.push({ k:'ring', x:f.x, y:f.y, r:RIDE.rally.r*0.9, R:RIDE.rally.r, t:0, dur:0.6, col:'rgba(255,210,74,0.5)' }); }   
+  if(R9.t<=0){ b.rallyS=null; if(f.def && f.def.auraR) f.def=FDEF.bbride; } }
+function rideMovesTick(f,dt,b){ const R2=b.r2||(b.r2={ big:RIDE.big.first, fa:RIDE.fa.first, rally:RIDE.rally.first }); R2.big-=dt; R2.fa-=dt; R2.rally-=dt;
+  if(b.bigS) rideBigTick(f,dt,b); else if(b.faS) rideFaTick(f,dt,b);
+  else if(!b.spray){ if(R2.fa<=0){ R2.fa=rideFaStart(f,b)? RIDE.fa.cd : RIDE.fa.retry; } else if(R2.big<=0){ R2.big=rideBigStart(f,b)? RIDE.big.cd : RIDE.big.retry; } }
+  if(b.rallyS) rideRallyTick(f,dt,b); else if(R2.rally<=0){ R2.rally=rideRallyStart(f,b)? RIDE.rally.cd : RIDE.rally.retry; } }
+{ const rt0=bbsRideTick; bbsRideTick=function(f,dt,B,b){ if(!RIDE.on || !b) return rt0.apply(this, arguments);
+    if(b.st==='ride' && !(b.skid>0)){ try{ const g=bbsGoal(f,b); if(g){ let da=Math.atan2(g.y-f.y,g.x-f.x)-b.h; while(da>Math.PI) da-=Math.PI*2; while(da<-Math.PI) da+=Math.PI*2; if(Math.abs(da)>RIDE.turnEase) b.v=Math.max(RIDE.vTurn, (b.v||0)-RIDE.decel*dt); } }catch(e){} }   
+    const h0=b.h, r=rt0.apply(this, arguments);
+    if(b.st==='ride'){ if(h0!=null && b.h!=null){ let d=b.h-h0; while(d>Math.PI) d-=Math.PI*2; while(d<-Math.PI) d+=Math.PI*2; RIDE.stats.maxDh=Math.max(RIDE.stats.maxDh, +Math.abs(d).toFixed(4)); } RIDE.stats.rideT+=dt;
+      try{ rideMovesTick(f,dt,b); }catch(e){} }
+    else if(b.rallyS && f.def && f.def.auraR){ b.rallyS=null; f.def=FDEF.bbride; }
+    return r; }; }
+function rideRead(){ const s=RIDE.stats; return { on:RIDE.on, live:RIDE_LIVE, turnA:BBS3.turnA, turnRate:BBS3.turnRate, orig:RIDE.orig, stats:{ sprays:s.sprays, big:s.big, fa:s.fa, faBlasts:s.faBlasts, rally:s.rally, uturns:s.uturns, maxDh:s.maxDh, maxGap:s.maxGap, rideT:+s.rideT.toFixed(1), ev:s.ev.slice(-200) } }; }
+setTimeout(function(){ try{ if(window.GVT && !GVT.ride) GVT.ride=function(){ return rideRead(); }; }catch(e){} }, 0);
+
+
+
+
+
+
+
+
+
 const BACK_LIVE=1;   
 const BACK={ on:(function(){ try{ const q=/[?&]back=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_back','0'); else localStorage.removeItem('gvt_back'); } return localStorage.getItem('gvt_back')==='0'? 0 : BACK_LIVE; }catch(e){ return BACK_LIVE; } })(),
   hm:1.4, dy:120, laid:0, stats:{ paints:0 },
@@ -196850,6 +196999,56 @@ function backRead(){ return { on:BACK.on, live:BACK_LIVE, laid:BACK.laid, hm:RAI
   bands:BBS_BANDS.map(b=>[b[0],b[1]]), bbf:(function(){ try{ return [BBF.yMin,BBF.yMax,BACK.late|0]; }catch(e){ return null; } })(), bbs3:(typeof BBS3==='object')? [BBS3.yLo,BBS3.yHi] : null, feet:BTW_TOWN.feet, street:Object.assign({},BTW_TOWN.street), stats:Object.assign({},BACK.stats) }; }
 setTimeout(function(){ try{ if(window.GVT && !GVT.back) GVT.back=function(){ return backRead(); }; }catch(e){} }, 0);   
 if(BACK.on && BTW.on && typeof OTS==='object' && OTS.laid) backLay();   
+
+
+
+
+
+
+
+
+
+
+
+const SNAKE_LIVE=1;   
+const SNAKE={ on:(function(){ try{ const q=/[?&]bbsnake=([01])/.exec(location.search||''); if(q){ if(q[1]==='1') localStorage.setItem('gvt_bbsnake','1'); else localStorage.removeItem('gvt_bbsnake'); } return localStorage.getItem('gvt_bbsnake')==='1'? 1 : SNAKE_LIVE; }catch(e){ return SNAKE_LIVE; } })(),
+  x:900, y:165, hp:3000, wake:70,   
+  stats:{ spawns:0, wakes:0 } };
+function snakeArm(){   
+  if(!(SNAKE.on && typeof BACK==='object' && BACK.laid && bbsOn())) return null;
+  if(S.foes.some(f=>f.bbsSnake && !f.dead)) return null;
+  const f=spawnFoe('wsnake', SNAKE.x, SNAKE.y); if(!f) return null;
+  f.hp=f.hpMax=SNAKE.hp; f.burrow=true; f.snakeState='sleep'; f.bbsSnake={ st:'sleep', x:SNAKE.x, y:SNAKE.y, t0:S.t };
+  SNAKE.stats.spawns++; return f;
+}
+function snakeWake(f){   
+  const B=f.bbsSnake; B.st='up'; B.wakeT=S.t; SNAKE.stats.wakes++;
+  f.burrow=false; f.snakeState='rise'; f.snkT=(f.def.bur.rattle||0.5);
+  S.fx.push({ k:'puff', x:f.x, y:f.y, t:0, dur:0.6, R:64 });
+  S.fx.push({ k:'ring', x:f.x, y:f.y-8, r:8, R:96, t:0, dur:0.45, col:'rgba(217,201,160,0.95)' });
+  if(!reducedMotion()){ for(let i=0;i<6;i++) S.fx.push({ k:'puff', x:f.x+Math.cos(i*1.05)*34, y:f.y+Math.sin(i*1.05)*14, t:-i*0.03, dur:0.55, R:20 }); }
+  S.shake=Math.max(S.shake,0.8);
+  try{ bfSfx(SFX.cotboom, f.x, f.y); }catch(e){}
+  try{ bfSfx(SFX.rattle, f.x, f.y); }catch(e){}
+}
+function snakeTick(dt){   
+  if(!SNAKE.on) return; const f=S.foes.find(q=>q.bbsSnake && !q.dead); if(!f) return; const B=f.bbsSnake;
+  if(B.st!=='sleep') return;
+  f.x=B.x; f.y=B.y; f.vx=0; f.vy=0; f.burrow=true; f.snakeState='sleep';
+  for(const u of S.units){ if(u.dead || u.jetT>0 || u.dropT>0 || u.falling) continue; if(Math.hypot(u.x-f.x,u.y-f.y)<SNAKE.wake){ snakeWake(f); break; } }
+}
+function snakeMound(){   
+  if(!SNAKE.on || !S.foes) return; const f=S.foes.find(q=>q.bbsSnake && !q.dead && q.bbsSnake.st==='sleep'); if(!f) return;
+  const k=reducedMotion()? 0 : Math.sin(S.t*1.6)*0.5+0.5;
+  cx.save(); cx.fillStyle='rgba(120,84,44,'+(0.16+0.06*k).toFixed(3)+')'; cx.beginPath(); cx.ellipse(f.x,f.y+4,46+4*k,11+2*k,0,0,7); cx.fill();
+  cx.fillStyle='rgba(232,196,140,'+(0.20+0.08*k).toFixed(3)+')'; cx.beginPath(); cx.ellipse(f.x-6,f.y,30+3*k,6+1.5*k,0,0,7); cx.fill();
+  cx.strokeStyle='rgba(120,84,44,0.30)'; cx.lineWidth=1.5; cx.beginPath(); cx.moveTo(f.x-40,f.y+6); cx.quadraticCurveTo(f.x-14,f.y-4,f.x+10,f.y+5); cx.quadraticCurveTo(f.x+30,f.y+12,f.x+50,f.y+4); cx.stroke();
+  cx.restore();
+}
+{ const t0=bbsStreetTick; bbsStreetTick=function(dt,B){     const r=t0.apply(this, arguments); try{ if(SNAKE.on && typeof BACK==='object' && BACK.laid){ const TR=S.cfg && S.cfg.terrain; if(TR && !TR.snakeArmed){ TR.snakeArmed=1; snakeArm(); } snakeTick(dt); } }catch(e){} return r; }; }   
+{ const fp2=bbsFloorPaint; bbsFloorPaint=function(WD,HT){ const r=fp2.apply(this, arguments); try{ snakeMound(); }catch(e){} return r; }; }
+function snakeRead(){ const f=S.foes? S.foes.find(q=>q.bbsSnake) : null; return { on:SNAKE.on, live:SNAKE_LIVE, seat:[SNAKE.x,SNAKE.y], wakeR:SNAKE.wake, snake:f? { st:f.bbsSnake.st, state:f.snakeState, burrow:!!f.burrow, x:Math.round(f.x), y:Math.round(f.y), hp:Math.round(f.hp), max:f.hpMax, dead:!!f.dead } : null, stats:Object.assign({},SNAKE.stats) }; }
+setTimeout(function(){ try{ if(window.GVT && !GVT.snake) GVT.snake=function(){ return snakeRead(); }; }catch(e){} }, 0);
 
 
 
