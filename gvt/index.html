@@ -90744,7 +90744,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='26.46';        
+let GVT_CV='26.47';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -199799,6 +199799,32 @@ function oilRead(){ const f=bbsBill(), b=f && f.bbs, M=b && b.bbf, L=oilRings();
   return { on:OIL.on, feet:OIL.feet, rings:L.map(g=>[Math.round(g.x), Math.round(g.y), g.r, g.live]), bill:f? { x:Math.round(f.x), y:Math.round(f.y), ride:f.bbsRide|0, st:M? M.st : null, bst:b? b.st : null, seat:M? M.seat : null, inRing:oilAt(f.x,f.y,L)? 1 : 0, exit:(M && M.oilG)? [M.oilG.x, M.oilG.y] : null, bad:(M && M.bad)? Object.keys(M.bad).length : 0 } : null,
     stats:Object.assign({}, OIL.stats), wrapped:[String(bbfTick).indexOf('OIL')>=0, String(bbfStep).indexOf('OIL')>=0, String(bbsFanBarrel).indexOf('OIL')>=0] }; }
 setTimeout(function(){ try{ if(window.GVT && !GVT.oil) GVT.oil=function(){ return oilRead(); }; }catch(e){} }, 0);   
+
+
+
+
+
+const NCL_OFF=(function(){ try{ const q=/[?&]ncl=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_ncloff','1'); else localStorage.removeItem('gvt_ncloff'); } return localStorage.getItem('gvt_ncloff')==='1'; }catch(e){ return false; } })();
+function nclOn(){ return !NCL_OFF; }
+var NCL={ v:1, id:'wreck', strips:0, took:0, paints:0, err:0 };   
+function nclStrip(){ if(!nclOn()) return 0; const id=NCL.id; let n=0; try{
+  if(typeof LG_CH==='object' && LG_CH && LG_CH.length){ for(let i=LG_CH.length-1; i>=0; i--) if(LG_CH[i] && LG_CH[i].id===id){ LG_CH.splice(i, 1); n++; } }   
+  if(typeof LG_PAGES==='object' && LG_PAGES && LG_PAGES.length){ for(let i=LG_PAGES.length-1; i>=0; i--) if(LG_PAGES[i]===id){ LG_PAGES.splice(i, 1); n++; } }   
+  if(typeof SLB==='object' && SLB && SLB.ORDER && SLB.PG){ let k=SLB.ORDER.indexOf(id); if(k>=0){ while(k>=0){ SLB.ORDER.splice(k, 1); k=SLB.ORDER.indexOf(id); } SLB.ORDER.forEach((pid, i9)=>{ if(i9>0) SLB.PG[pid]=[i9*2, i9*2+1]; }); n++; } if(Object.prototype.hasOwnProperty.call(SLB.PG, id)){ delete SLB.PG[id]; n++; } }   
+  if(typeof LG3_TOK==='object' && LG3_TOK && Object.prototype.hasOwnProperty.call(LG3_TOK, id)){ delete LG3_TOK[id]; n++; }   
+  if(typeof LG_SEATS==='object' && LG_SEATS && Object.prototype.hasOwnProperty.call(LG_SEATS, id)){ delete LG_SEATS[id]; n++; }   
+  }catch(e){ NCL.err++; try{ console.error('CARD-NCL strip', e); }catch(e2){} }
+  if(n){ NCL.strips++; NCL.took+=n; } return n; }
+{ const b0=lbwbBook; lbwbBook=function(){ if(!nclOn()) return b0.apply(this, arguments); return 0; }; }   
+{ const p0=lgPageHTML; lgPageHTML=function(pg, beat){ try{ NCL.paints++; nclStrip(); }catch(e){ NCL.err++; } return p0.apply(this, arguments); }; }   
+if(nclOn()){ try{ nclStrip(); }catch(e){ NCL.err++; } }   
+function nclRig(o){ o=o||{}; try{ if(o.strip) nclStrip(); }catch(e){ NCL.err++; }
+  const has=(T,k)=>!!(typeof T==='object' && T && Object.prototype.hasOwnProperty.call(T, k)); const id=NCL.id, W=(typeof LBWB==='object' && LBWB)? LBWB : null, R=(typeof RAID_INFO==='object' && RAID_INFO && RAID_INFO.wreck)? RAID_INFO.wreck : null;
+  let shelf=null; try{ const bk=document.querySelector('#travelMap .lg-book'); if(bk){ const words=[t('THE PIRATE COVE'), 'THE PIRATE COVE', t('THE SUNKEN SHIP'), 'THE SUNKEN SHIP']; const tx=bk.textContent||''; shelf={ pg:bk.getAttribute('data-pg'), books:Array.prototype.map.call(bk.querySelectorAll('.sls-row [data-ch]'), e=>e.getAttribute('data-ch')), cove:words.some(w=>w && tx.indexOf(w)>=0), ch:!!bk.querySelector('[data-ch="'+id+'"]'), tok:!!bk.querySelector('[data-place="'+id+'"]') }; } }catch(e){ NCL.err++; }
+  return { cv:GVT_CV, v:NCL.v, on:nclOn(), strips:NCL.strips, took:NCL.took, paints:NCL.paints, err:NCL.err, pirate:META.pirate? 1 : 0, cove:META.cove? 1 : 0, joined:W? W.joined : null, book:W? W.book : null,
+    log:{ ch:(typeof LG_CH==='object' && LG_CH)? LG_CH.some(c=>c && c.id===id) : null, pages:(typeof LG_PAGES==='object' && LG_PAGES)? LG_PAGES.indexOf(id) : null, order:(typeof SLB==='object' && SLB && SLB.ORDER)? SLB.ORDER.indexOf(id) : null, pg:(typeof SLB==='object' && SLB && SLB.PG)? has(SLB.PG, id) : null, tok:has(typeof LG3_TOK==='object'? LG3_TOK : null, id), seat:has(typeof LG_SEATS==='object'? LG_SEATS : null, id), name:has(typeof LG3_NAME==='object'? LG3_NAME : null, id), nPages:(typeof LG_PAGES==='object' && LG_PAGES)? LG_PAGES.length : null, nCh:(typeof LG_CH==='object' && LG_CH)? LG_CH.length : null, nOrder:(typeof SLB==='object' && SLB && SLB.ORDER)? SLB.ORDER.length : null },
+    world:{ row:!!R, wm:R? R.wm : null, pond:(typeof lbwbPondOn==='function')? !!lbwbPondOn() : null, jungle:(typeof LBWC==='object' && LBWC)? !!LBWC.dino : null, door:(typeof lbwbCoveOn==='function')? !!lbwbCoveOn() : null, tables:{ decor:!!(typeof DECOR_INFO==='object' && DECOR_INFO.shipswheel), part:!!(typeof ENH_INFO==='object' && ENH_INFO.cutlass), outfit:!!(typeof OUTFIT_INFO==='object' && OUTFIT_INFO.captainshat), unit:!!(typeof UDEF==='object' && UDEF.kingkraken) } }, shelf }; }
+setTimeout(()=>{ try{ if(typeof GVT==='object' && GVT) GVT.ncl=nclRig; }catch(e){} }, 0);   
 
 window.GVT = {
   cks(o){ if(o && o.pct!=null) CKS.pct=+o.pct||0; const R=[0,1,10,20,25,50,75,99,100], t={}; for(const r of R) t[r]={ mul:+cksMul(r).toFixed(4), hit:+hitDmgNowAt('kingcroak',r).toFixed(4), whole:hitWhole(hitDmgNowAt('kingcroak',r)) }; return { cv:GVT_CV, pct:CKS.pct, at:CKS.at, ck:HHB.ck, slope:HERO_DMG_RANK, mine:(META.up.kingcroak||0)|0, table:t }; },   
