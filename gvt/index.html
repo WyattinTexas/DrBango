@@ -90728,7 +90728,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='26.23';        
+let GVT_CV='26.24';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -197774,6 +197774,106 @@ function snakeMound(){
 { const fp2=bbsFloorPaint; bbsFloorPaint=function(WD,HT){ const r=fp2.apply(this, arguments); try{ snakeMound(); }catch(e){} return r; }; }
 function snakeRead(){ const f=S.foes? S.foes.find(q=>q.bbsSnake) : null; return { on:SNAKE.on, live:SNAKE_LIVE, seat:[SNAKE.x,SNAKE.y], wakeR:SNAKE.wake, snake:f? { st:f.bbsSnake.st, state:f.snakeState, burrow:!!f.burrow, x:Math.round(f.x), y:Math.round(f.y), hp:Math.round(f.hp), max:f.hpMax, dead:!!f.dead } : null, stats:Object.assign({},SNAKE.stats) }; }
 setTimeout(function(){ try{ if(window.GVT && !GVT.snake) GVT.snake=function(){ return snakeRead(); }; }catch(e){} }, 0);
+
+
+
+
+
+
+
+
+
+
+
+
+
+const SNAKE2_LIVE=1;
+const SNAKE2={ on:(function(){ try{ const q=/[?&]bbsnake2=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_bbsnake2','0'); else localStorage.removeItem('gvt_bbsnake2'); } return localStorage.getItem('gvt_bbsnake2')==='0'? 0 : SNAKE2_LIVE; }catch(e){ return SNAKE2_LIVE; } })(),
+  riseAt:20,              
+  gapX:742,               
+  crawl:24,               
+  strike:{ min:5, max:8, ahead:90, aheadR:80 },   
+  boxX:230, boxLives:2,   
+  backPx:520, rest:{ min:24, max:36 },   
+  stats:{ takes:0, wakes:0, clockWakes:0, strikes:0, bites:0, words:0, runs:0, errs:0 }, err:null, log:[] };
+function snake2Key(n,tag){ return 'bbs2:'+rxDoorKey()+':'+(n|0)+(tag? ':'+tag : ''); }   
+function snake2Roll(Z,tag){ Z.n=(Z.n|0)+1; return rxRoll(snake2Key(Z.n,tag)); }
+function snake2StreetY(){ const st=BTW_TOWN.street; return Math.round((st.y0+st.y1)/2); }   
+function snake2GapY(){ return BTW_TOWN.feet-124; }   
+function snake2On(){ return !!(SNAKE2.on && typeof SNAKE==='object' && SNAKE.on && typeof BACK==='object' && BACK.laid && typeof BTW_TOWN==='object' && bbsOn()); }
+function snake2Log(Z,st,f){ Z.ord=(Z.ord|0)+1; if(SNAKE2.log.length<600) SNAKE2.log.push([Z.ord, st, Math.round(f.x), Math.round(f.y), +(((S.raid&&S.raid.bbs)? S.raid.bbs.t : S.t)||0).toFixed(1)]); }
+function snake2Set(Z,f,st,o){ Z.st=st; Z.t=0; Z.hold=0; Z.after=''; if(o){ for(const k in o) Z[k]=o[k]; } snake2Log(Z,st,f); }
+{ const w0=snakeWake; snakeWake=function(f){   
+  try{ if(snake2On() && f && f.bbsSnake && f.bbsSnake.st==='sleep'){ const B=f.bbsSnake;
+    if(S.coop && COOP && !sqRef() && !B.word) return;
+    if(S.coop && COOP && sqRef() && !B.word && typeof coopSend==='function'){ try{ coopSend({ k:'bbs2', e:'wake' }); SNAKE2.stats.words++; }catch(e){} }
+    B.word=1; } }catch(e){ SNAKE2.stats.errs++; SNAKE2.err=String(e).slice(0,200); }
+  return w0.apply(this, arguments); }; }
+{ const ca0=coopApply; coopApply=function(cm){ if(cm && cm.k==='bbs2'){ try{ if(cm.e==='wake' && snake2On()){ const f=S.foes.find(q=>q.bbsSnake && !q.dead && q.bbsSnake.st==='sleep'); if(f && !f.bbsSnake.word){ f.bbsSnake.word=1; snakeWake(f); } } }catch(e){ SNAKE2.stats.errs++; SNAKE2.err=String(e).slice(0,200); } return; } return ca0.apply(this,arguments); }; }   
+function snake2Lunge(f,Z){   
+  const bg=f.def.bur; let m=null, md=bg.seekR;
+  for(const u of S.units){ if(u.dead||u.jetT>0||u.cloakT>0) continue; if(S.drag&&S.drag.unit===u) continue; const d=Math.hypot(u.x-f.x,u.y-f.y); if(d<md){ md=d; m=u; } }
+  Z.strikes++; SNAKE2.stats.strikes++;
+  if(!m){ try{ bfSfx(SFX.snap, f.x, f.y); }catch(e){} return 0; }   
+  S.fx.push({k:'ring',x:m.x,y:m.y-6,r:8,R:bg.lungeR,t:0,dur:0.3,col:'rgba(192,71,58,0.9)'});
+  try{ bfSfx(SFX.thock, f.x, f.y); }catch(e){} S.shake=Math.max(S.shake,0.4);
+  let eat9=null;
+  if(m.type!=='sarge'){ f.eatN=(f.eatN||0)+1; let vk9=0; const vs9=String(m.cid||m.type); for(let c9=0;c9<vs9.length;c9++) vk9=(Math.imul(vk9,31)+vs9.charCodeAt(c9))|0;
+    if((Math.imul((f.foN||1)*2654435761+f.eatN*40503+vk9,1597334677)>>>0)<SNAKE_EAT_P*4294967296){ eat9=m;
+      S.fx.push({k:'tracer',x1:f.x,y1:f.y-24,x2:m.x,y2:m.y-10,t:0,dur:0.18,col:'rgba(122,74,58,0.95)',w:11}); S.fx.push({k:'tracer',x1:f.x,y1:f.y-24,x2:m.x,y2:m.y-10,t:0,dur:0.14,col:'rgba(217,201,160,0.9)',w:4});
+      S.fx.push({k:'puff',x:m.x,y:m.y-6,t:0,dur:0.45,R:40}); S.fx.push({k:'ring',x:m.x,y:m.y-10,r:6,R:44,t:0,dur:0.35,col:'rgba(154,90,74,0.95)'});
+      try{ bfSfx(SFX.snap, m.x, m.y); }catch(e){} S.shake=Math.max(S.shake,0.5);
+      if(m.type==='jane'){ m.jSnakeT=S.t; S.fx.push({k:'jhat',x:m.x,y:m.y-40,t:0,dur:0.9}); }
+      tanHit(m, f.x, f.y, {pipN:Math.max(1,gritCap(m)-(m.hits||0)+1), dmgX:1, type:'wsnake'}); Z.eats=(Z.eats|0)+1; } }
+  let n=0;
+  for(const g8 of S.units){ if(g8.dead||g8.jetT>0) continue; if(S.drag&&S.drag.unit===g8) continue; if(g8===eat9) continue;
+    if(Math.hypot(g8.x-m.x,g8.y-m.y)<bg.lungeR){ n++;
+      tanHit(g8,f.x,f.y,{pipN:SNAKE_LUNGE_PIPS,dmgX:1,type:'wsnake'}); if(g8.type==='jane') g8.jSnakeT=S.t;
+      const dx9=g8.x-f.x, dy9=g8.y-f.y, k9=Math.max(0.1,Math.hypot(dx9,dy9)); g8.x+=dx9/k9*26; g8.y+=dy9/k9*26; g8.y=Math.max(74,Math.min(WORLD_H-96,g8.y)); if(g8.home){ g8.home.x=g8.x; g8.home.y=g8.y; } } }
+  Z.hit=(Z.hit|0)+n+(eat9? 1 : 0); return n+(eat9? 1 : 0);
+}
+function snake2Bite(f,Z){   
+  const b=T; S.fx.push({k:'tracer',x1:f.x,y1:f.y-24,x2:b.x+10,y2:b.y-10,t:0,dur:0.2,col:'rgba(122,74,58,0.95)',w:12}); S.fx.push({k:'tracer',x1:f.x,y1:f.y-24,x2:b.x+10,y2:b.y-10,t:0,dur:0.16,col:'rgba(217,201,160,0.9)',w:4});
+  try{ bfSfx(SFX.snap, b.x, b.y); }catch(e){}
+  let n=0; try{ n=skyBoxHit(SNAKE2.boxLives); }catch(e){ SNAKE2.stats.errs++; SNAKE2.err=String(e).slice(0,200); }
+  Z.bites++; SNAKE2.stats.bites++; Z.bitLives=(Z.bitLives|0)+n; if(n>0) Z.paid=(Z.paid|0)+1; return n;   
+}
+function snake2Tick(dt,Bb){   
+  if(!snake2On()) return; const f=S.foes.find(q=>q.bbsSnake && !q.dead); if(!f) return; const B=f.bbsSnake;
+  if(B.st==='sleep'){ if(Bb && Bb.t>=SNAKE2.riseAt){ B.word=1; SNAKE2.stats.clockWakes++; snakeWake(f); } else return; }
+  if(B.st==='up' && !B.s2){ B.st='hunt'; SNAKE2.stats.takes++; SNAKE2.stats.wakes++; SNAKE2.log.length=0;   
+    const Z=B.s2={ n:0, ord:0, st:'', t:0, hold:0, after:'', x:f.x, y:f.y, tx:0, due:0, strikes:0, bites:0, runs:0 };
+    snake2Set(Z,f,'wake',{ hold:(f.def.bur.rattle||0.5) }); }
+  if(B.st!=='hunt' || !B.s2) return; const Z=B.s2, bg=f.def.bur, sp=bg.digSpd*(f.spdMul||1);
+  f.x=Z.x; f.y=Z.y; f.vx=0; f.vy=0;   
+  Z.t+=dt;
+  const SY=snake2StreetY(), GX=SNAKE2.gapX, GY=snake2GapY(), RT=(bg.rattle||0.5);
+  const dig=function(tx,ty){ const dx=tx-f.x, dy=ty-f.y, d=Math.hypot(dx,dy); const m=Math.min(d, sp*dt); if(d>0.01){ f.x+=dx/d*m; f.y+=dy/d*m; } if(Math.random()<dt*9) S.fx.push({k:'puff',x:f.x,y:f.y+4,t:0,dur:0.3,R:9}); return d-m<=0.5; };
+  const under=function(){ f.burrow=true; f.snakeState='bbs2dig'; };
+  const up=function(rise){ f.burrow=false; f.snakeState=rise? 'rise' : 'bbs2'; f.snkT=9e9; };   
+  const popUp=function(){ S.fx.push({k:'puff',x:f.x,y:f.y,t:0,dur:0.45,R:44}); S.fx.push({k:'ring',x:f.x,y:f.y-8,r:6,R:30,t:0,dur:0.3,col:'rgba(217,201,160,0.95)'}); S.shake=Math.max(S.shake,0.5); try{ bfSfx(SFX.rattle, f.x, f.y); }catch(e){} };
+  const diveFx=function(){ S.fx.push({k:'puff',x:f.x,y:f.y,t:0,dur:0.4,R:40}); };
+  if(Z.st==='wake'){ up(1); if(Z.t>=Z.hold){ snake2Lunge(f,Z); under(); diveFx(); snake2Set(Z,f,'down1'); } }   
+  else if(Z.st==='down1'){ under(); if(dig(GX,GY)) snake2Set(Z,f,'down2'); }   
+  else if(Z.st==='down2'){ under(); if(dig(GX,SY)){ up(1); popUp(); snake2Set(Z,f,'rise',{ hold:RT, after:'west' }); } }   
+  else if(Z.st==='rise'){ up(1); if(Z.t>=Z.hold){ snake2Lunge(f,Z);
+      if(Z.after==='bite'){ snake2Bite(f,Z); under(); diveFx(); snake2Set(Z,f,'back',{ tx:Math.min(GX, f.x+SNAKE2.backPx) }); }
+      else { up(0); snake2Set(Z,f,'west',{ due:SNAKE2.strike.min+snake2Roll(Z,'beat')*(SNAKE2.strike.max-SNAKE2.strike.min) }); } } }
+  else if(Z.st==='west'){ up(0); f.x-=SNAKE2.crawl*dt; f.y=SY;
+    if(f.x<=SNAKE2.boxX){ f.x=SNAKE2.boxX; up(1); popUp(); snake2Set(Z,f,'rise',{ hold:RT, after:'bite' }); }   
+    else if(Z.t>=Z.due){ under(); diveFx(); const ah=SNAKE2.strike.ahead+snake2Roll(Z,'dive')*SNAKE2.strike.aheadR; snake2Set(Z,f,'dive',{ tx:Math.max(SNAKE2.boxX, f.x-ah) }); } }   
+  else if(Z.st==='dive'){ under(); if(dig(Z.tx,SY)){ up(1); popUp(); snake2Set(Z,f,'rise',{ hold:RT, after:(f.x<=SNAKE2.boxX+0.5)? 'bite' : 'west' }); } }
+  else if(Z.st==='back'){ under(); const dx=Z.tx-f.x, m=Math.min(Math.abs(dx), sp*0.8*dt); f.x+=Math.sign(dx)*m; f.y=SY; if(Math.random()<dt*9) S.fx.push({k:'puff',x:f.x,y:f.y+4,t:0,dur:0.3,R:9});
+    if(Math.abs(Z.tx-f.x)<=0.5) snake2Set(Z,f,'rest',{ hold:SNAKE2.rest.min+snake2Roll(Z,'rest')*(SNAKE2.rest.max-SNAKE2.rest.min) }); }
+  else if(Z.st==='rest'){ under(); if(Z.t>=Z.hold){ Z.runs++; SNAKE2.stats.runs++; up(1); popUp(); snake2Set(Z,f,'rise',{ hold:RT, after:'west' }); } }
+  Z.x=f.x; Z.y=f.y;
+}
+{ const t0=bbsStreetTick; bbsStreetTick=function(dt,B){ const r=t0.apply(this, arguments); try{ snake2Tick(dt,B); }catch(e){ SNAKE2.stats.errs++; SNAKE2.err=String(e).slice(0,200); } return r; }; }   
+function snake2Read(){ const f=S.foes? S.foes.find(q=>q.bbsSnake) : null; const Z=f? f.bbsSnake.s2 : null; let sy=null, gy=null; try{ sy=snake2StreetY(); gy=snake2GapY(); }catch(e){}
+  return { on:SNAKE2.on, live:SNAKE2_LIVE, riseAt:SNAKE2.riseAt, streetY:sy, gap:[SNAKE2.gapX,gy], boxX:SNAKE2.boxX, boxLives:SNAKE2.boxLives, crawl:SNAKE2.crawl,
+    snake:f? { st:f.bbsSnake.st, s2:Z? Z.st : null, word:f.bbsSnake.word|0, state:f.snakeState, burrow:!!f.burrow, x:Math.round(f.x), y:Math.round(f.y), hp:Math.round(f.hp), max:f.hpMax, dead:!!f.dead, strikes:Z? Z.strikes : 0, hit:Z? (Z.hit|0) : 0, eats:Z? (Z.eats|0) : 0, bites:Z? Z.bites : 0, paid:Z? (Z.paid|0) : 0, bitLives:Z? (Z.bitLives|0) : 0, runs:Z? Z.runs : 0, n:Z? Z.n : 0, ord:Z? Z.ord : 0 } : null,
+    log:SNAKE2.log.slice(), stats:Object.assign({},SNAKE2.stats), err:SNAKE2.err, lives:S.lives }; }
+setTimeout(function(){ try{ if(window.GVT && !GVT.snake2) GVT.snake2=function(){ return snake2Read(); }; }catch(e){} }, 0);   
 
 
 
