@@ -90729,7 +90729,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='26.31';        
+let GVT_CV='26.32';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -198827,6 +198827,78 @@ if(stfOn()) try{
   if(stfIdOn('unclerex')){ STF.old.urxSVG=urxSVG; urxSVG=function(){ const v=STF.old.urxSVG.apply(this, arguments); if(typeof v!=='string' || v.split(URX_ART).length!==2){ if(STF.miss.indexOf('urx')<0) STF.miss.push('urx'); return v; } return v.replace(URX_ART, function(){ return stfUrx(); }); };   
     STF.old.decShopArt=decShopArt; decShopArt=function(id){ if(id==='unclerex') return '<svg viewBox="0 0 140 140">'+stfUrx()+'</svg>'; return STF.old.decShopArt.apply(this, arguments); }; }   
 }catch(e){ STF.err++; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const OIL={ on:(function(){ try{ const q=/[?&]oil=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_oil','0'); else localStorage.removeItem('gvt_oil'); } return localStorage.getItem('gvt_oil')==='0'? 0 : 1; }catch(e){ return 1; } })(),   
+  pad:8, out:26, east:12, turnW:14, turns:[0, 0.61, -0.61, 1.22, -1.22, 1.83, -1.83, Math.PI], feet:0, q:8, stuck:3.0,   
+  t:-1, list:[], stats:{ outs:0, oilT:0, inside:0, cutTells:0, held:0, round:0, skips:0, moved:0, fanLeft:0, fanBurst:0, words:0 } };
+OIL.feet=BBS_BLAZE.r+OIL.pad+OIL.out;   
+function oilRings(){ if(OIL.t===S.t) return OIL.list; OIL.t=S.t; const L=[]; if(!OIL.on || !bbsOn()) return (OIL.list=L);   
+  if(S.fires && S.fires.length){ for(const p of S.fires){ if(p.src==='barrel' && p.t<p.life) L.push({ x:p.x, y:p.y, r:p.r, R:p.r+OIL.pad, live:1 }); } }
+  const TR=S.cfg && S.cfg.terrain; if(TR && TR.bbs && TR.rocks){ for(const rk of TR.rocks){ if(rk.art==='bbsbarrel' && !rk.up && rk.igniteT!=null) L.push({ x:rk.x, y:rk.y, r:BBS_BLAZE.r, R:BBS_BLAZE.r+OIL.pad, live:0 }); } }   
+  return (OIL.list=L); }
+function oilAt(x,y,L){ L=L||oilRings(); for(const g of L){ if(Math.hypot(g.x-x,g.y-y)<g.R) return g; } return null; }   
+function oilCross(x0,y0,x1,y1,L){ let dx=x1-x0, dy=y1-y0; const d=Math.hypot(dx,dy); if(d<1) return null; dx/=d; dy/=d; let best=null, ba=1e9;   
+  for(const g of L){ const vx=g.x-x0, vy=g.y-y0; if(Math.hypot(vx,vy)<g.R) continue; const along=vx*dx+vy*dy; if(along<=0 || along-g.R>d) continue; if(Math.abs(vx*dy-vy*dx)>=g.R) continue; if(along<ba){ ba=along; best=g; } }
+  return best; }
+function oilBand(x,y){ return { x:Math.max(BBF.xMin, Math.min(W-60, x)), y:Math.max(BBF.yMin, Math.min(BBF.yMax, y)) }; }   
+function oilEdge(x,y,g){ let vx=x-g.x, vy=y-g.y; const vl=Math.hypot(vx,vy); if(vl<1){ vx=1; vy=0; } else { vx/=vl; vy/=vl; } return { x:g.x+vx*(g.R+OIL.out), y:g.y+vy*(g.R+OIL.out) }; }   
+function oilExit(f,g,L){ let bx=f.x-g.x, by=f.y-g.y; const bl=Math.hypot(bx,by); if(bl<1){ bx=1; by=0; } const a0=Math.atan2(by,bx), R=g.R+OIL.out; let best=null, bs=1e9;   
+  for(const da of OIL.turns){ const a=a0+da, p=oilBand(g.x+Math.cos(a)*R, g.y+Math.sin(a)*R); if(Math.hypot(p.x-g.x,p.y-g.y)<g.R+2) continue; if(oilAt(p.x,p.y,L)) continue; if(pbmBetween(f.x,f.y,p.x,p.y,f.x,f.y)) continue;
+    const sc=Math.hypot(p.x-f.x,p.y-f.y)+Math.abs(da)*OIL.turnW-((p.x>=f.x)? OIL.east : 0); if(sc<bs){ bs=sc; best={ x:Math.round(p.x), y:Math.round(p.y) }; } }
+  if(!best){ const p=oilBand(g.x+Math.cos(a0)*R, g.y+Math.sin(a0)*R); best={ x:Math.round(p.x), y:Math.round(p.y) }; }   
+  return best; }
+function oilRound(x0,y0,x1,y1,g){ let ux=x1-x0, uy=y1-y0; const d=Math.hypot(ux,uy)||1; ux/=d; uy/=d; const nx=-uy, ny=ux, s=(g.x-x0)*nx+(g.y-y0)*ny, R=g.R+OIL.out, Q=OIL.q;   
+  for(const sd of [(s>0)? -1 : 1, (s>0)? 1 : -1]){ const p=oilBand(g.x+nx*sd*R, g.y+ny*sd*R); if(Math.hypot(p.x-g.x,p.y-g.y)<g.R+2) continue; return { x:Math.round(p.x/Q)*Q, y:Math.round(p.y/Q)*Q }; }
+  return null; }
+function oilSeatHot(M,L){ const s=bbfSeats()[M.seat]; if(!s) return false; if(oilAt(s.x,s.y,L)) return true; const p=(M.st==='out' && M.peek>=0)? s.peeks[M.peek] : (M.pend? s.peeks[M.pend.p] : null); return !!(p && oilAt(p.x,p.y,L)); }   
+function oilAgain(f,M){ if(M.seat>=0){ (M.bad||(M.bad={}))[M.seat]=bbsClock()+10; OIL.stats.skips++; }   
+  M.seat=-1; M.peek=-1; M.pend=null; M.fansHere=0; if(!bbfGuest() && bbfDecide(f,f.bbs,M,'flame')){ OIL.stats.words++; return; } M.st=M.engaged? 'adv' : 'in'; M.goal=null; }
+{ const st0=bbfStep; bbfStep=function(f,M,gx,gy,spd,dt){ if(!OIL.on) return st0.apply(this,arguments); const L=oilRings(); if(!L.length) return st0.apply(this,arguments);
+  let tx=gx, ty=gy; const inG=oilAt(gx,gy,L); if(inG){ const e=oilEdge(f.x,f.y,inG); tx=e.x; ty=e.y; OIL.stats.held++; }   
+  const cr=oilCross(f.x,f.y,tx,ty,L); if(cr){ const w=oilRound(f.x,f.y,tx,ty,cr); if(w){ tx=w.x; ty=w.y; OIL.stats.round++; } }   
+  if(tx===gx && ty===gy) return st0.apply(this,arguments);
+  st0.call(this,f,M,tx,ty,spd,dt); return Math.hypot(gx-f.x,gy-f.y); }; }   
+{ const tk0=bbfTick; bbfTick=function(f,dt,B){ if(!OIL.on) return tk0.apply(this,arguments); const b=f.bbs, M=b && b.bbf; if(!M) return tk0.apply(this,arguments); const L=oilRings();
+  if(L.length && M.st!=='fan'){ const g=oilAt(f.x,f.y,L);
+    if(g){ OIL.stats.inside++; if(M.st!=='oil'){ if(M.st==='tell'){ b.st='idle'; OIL.stats.cutTells++; } M.st='oil'; M.oilG=oilExit(f,g,L); M.oilT=0; M.oilX=f.x; M.oilY=f.y; OIL.stats.outs++; } }   
+    else if(M.st!=='oil'){ if(M.seat>=0 && oilSeatHot(M,L)) oilAgain(f,M);   
+      else if((M.st==='off' || M.st==='side') && M.goal && oilAt(M.goal.x,M.goal.y,L)){ const e=oilEdge(f.x,f.y,oilAt(M.goal.x,M.goal.y,L)); M.goal={ x:Math.round(e.x), y:Math.round(e.y) }; OIL.stats.moved++; } } }   
+  const r=tk0.apply(this,arguments);
+  if(M.st==='oil'){ OIL.stats.oilT+=dt; M.oilT+=dt; const g=M.oilG; let left=1e9; if(g) left=bbfStep(f,M,g.x,g.y,BBF.run,dt);
+    const L2=oilRings(), out=!oilAt(f.x,f.y,L2), stuck=(M.oilT>=OIL.stuck && Math.hypot(f.x-M.oilX,f.y-M.oilY)<20); if(M.oilT>=OIL.stuck){ M.oilT=0; M.oilX=f.x; M.oilY=f.y; }
+    if(!g || (out && left<3) || stuck){ M.oilG=null; const s=(M.seat>=0)? bbfSeats()[M.seat] : null;
+      if(s && !oilSeatHot(M,L2)){ M.st='go'; M.goal={ x:s.x, y:s.y }; M.pend=null; } else oilAgain(f,M); } }   
+  return r; }; }
+{ const fb0=bbsFanBarrel; bbsFanBarrel=function(f,aim,R,half){ if(!OIL.on || !f || f.type!=='bbshow' || f.bbsRide) return fb0.apply(this,arguments);   
+  const TR=S.cfg && S.cfg.terrain; if(!TR || !TR.bbs) return null; const cs=Math.cos(aim), sn=Math.sin(aim); let best=null, ba=1e9, left=0;
+  for(const rk of TR.rocks){ if(rk.art!=='bbsbarrel' || !rk.up) continue; const dx=rk.x-f.x, dy=rk.y-f.y, along=dx*cs+dy*sn, perp=Math.abs(-dx*sn+dy*cs); if(along<=0 || along>R || perp>half+BBS_BARREL.r) continue; if(pbmBetween(f.x,f.y,rk.x,rk.y,f.x,f.y)) continue;
+    if(Math.hypot(dx,dy)<OIL.feet){ left++; continue; }   
+    if(along<ba){ ba=along; best=rk; } }
+  if(left) OIL.stats.fanLeft+=left; if(best && bbsBarrelBurst(best,'fan')) OIL.stats.fanBurst++; return best; }; }
+function oilRead(){ const f=bbsBill(), b=f && f.bbs, M=b && b.bbf, L=oilRings();   
+  return { on:OIL.on, feet:OIL.feet, rings:L.map(g=>[Math.round(g.x), Math.round(g.y), g.r, g.live]), bill:f? { x:Math.round(f.x), y:Math.round(f.y), ride:f.bbsRide|0, st:M? M.st : null, bst:b? b.st : null, seat:M? M.seat : null, inRing:oilAt(f.x,f.y,L)? 1 : 0, exit:(M && M.oilG)? [M.oilG.x, M.oilG.y] : null, bad:(M && M.bad)? Object.keys(M.bad).length : 0 } : null,
+    stats:Object.assign({}, OIL.stats), wrapped:[String(bbfTick).indexOf('OIL')>=0, String(bbfStep).indexOf('OIL')>=0, String(bbsFanBarrel).indexOf('OIL')>=0] }; }
+setTimeout(function(){ try{ if(window.GVT && !GVT.oil) GVT.oil=function(){ return oilRead(); }; }catch(e){} }, 0);   
 
 window.GVT = {
   cks(o){ if(o && o.pct!=null) CKS.pct=+o.pct||0; const R=[0,1,10,20,25,50,75,99,100], t={}; for(const r of R) t[r]={ mul:+cksMul(r).toFixed(4), hit:+hitDmgNowAt('kingcroak',r).toFixed(4), whole:hitWhole(hitDmgNowAt('kingcroak',r)) }; return { cv:GVT_CV, pct:CKS.pct, at:CKS.at, ck:HHB.ck, slope:HERO_DMG_RANK, mine:(META.up.kingcroak||0)|0, table:t }; },   
