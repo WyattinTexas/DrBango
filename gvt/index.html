@@ -90728,7 +90728,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='26.16';        
+let GVT_CV='26.17';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -197713,6 +197713,8 @@ const SHARP={ on:(function(){ try{ const q=/[?&]sharp=([01])/.exec(location.sear
   dotLock:0.7, dotStep:3, dotAdv:300, dotFloor:520,   
   dot:{ r:4.2, halo:10, ring:15, lineA:0.42, lineW:1.4, col:'#e0251a' },   
   charge:{ r0:5, r1:19, col:'#9FE8FF' } };   
+const SHARP_ART_LIVE=0;   
+SHARP.art=(function(){ try{ const q=/[?&]sharpart=([01])/.exec(location.search||''); if(q){ if(q[1]==='1') localStorage.setItem('gvt_sharpart','1'); else localStorage.removeItem('gvt_sharpart'); } return (localStorage.getItem('gvt_sharpart')==='1')? 1 : SHARP_ART_LIVE; }catch(e){ return SHARP_ART_LIVE; } })();   
 function sharpPour(cfg){ let k=0; for(const w of cfg.waves){ if(!w || !w.groups) continue; for(const g of w.groups){ if(g && g.bba && g.t==='wsniper'){ g.t=SHARP.trio[k%SHARP.trio.length]; g.sharp=1; k++; } } } cfg.sharp=k; return cfg; }   
 { const c0=bbsCfg; bbsCfg=function(tier){ const cfg=c0.apply(this, arguments); try{ if(SHARP.on && cfg && cfg.bba) sharpPour(cfg); }catch(e){} return cfg; }; }   
 function sharpBag(){ const B=S.raid && S.raid.bbs; if(!B) return null; return B.sharp||(B.sharp={ seen:{}, n:{ reddot:0, tancommando:0, wsniper:0 }, adv:0, beams:0, beamHits:0, locks:0, bolts:0, boltHits:0 }); }
@@ -197734,7 +197736,7 @@ function sharpBolt(f,dt,A,tier,j){ const Bo=SHARP.bolt;
 function sharpRay(f,u){ foeAim(f,u); const fz=foeFaceX(f), mx=f.x+20*fz, my=f.y-36, a=Math.atan2((u.y-18)-my, u.x-mx); f.lrBmX1=mx; f.lrBmY1=my; f.lrBmX2=mx+Math.cos(a)*4600; f.lrBmY2=my+Math.sin(a)*4600; }   
 { const b0=tanBeam; tanBeam=function(f){ const r=b0.apply(this, arguments); try{ if(r && f && f.type==='tancommando' && SHARP.on && bbsOn()){ const A=sharpBag(); if(A) A.beams++; } }catch(e){} return r; }; }   
 { const h0=tanBeamHit; tanBeamHit=function(sh,u){ try{ const f=sh && sh.src; if(f && SHARP.on && bbsOn() && u && !u.dead && S.units.indexOf(u)>=0){ const A=sharpBag(); if(A){ if(f.type==='tancommando') A.beamHits++; else if(f.type==='wsniper' && f.shpBolt) A.boltHits++; } } }catch(e){} return h0.apply(this, arguments); }; }   
-function sharpDraw(){ if(!SHARP.on || !bbsOn()) return; const RM=reducedMotion(), D=SHARP.dot, C=SHARP.charge; cx.save();
+function sharpDraw(){ if(!SHARP.on || !bbsOn()) return; if(!SHARP.art){ try{ olvDotOver(); }catch(e){} return; }     const RM=reducedMotion(), D=SHARP.dot, C=SHARP.charge; cx.save();
   for(const f of S.foes){
     if(rdLive(f) && f.rd && f.rd.st==='dot'){ const P=rdSpot(f), x=P.x, y=P.y-18, mx=f.x-16, my=f.y-30, t0=(f.rd.t0==null)? S.t : f.rd.t0, k=Math.max(0, Math.min(1, (S.t-t0)/Math.max(0.1, f.rd.t-t0))), pu=RM? 1 : 0.75+0.25*Math.sin(S.t*14);   
       cx.globalAlpha=D.lineA; cx.strokeStyle=D.col; cx.lineWidth=D.lineW; cx.beginPath(); cx.moveTo(mx,my); cx.lineTo(x,y); cx.stroke();   
