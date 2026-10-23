@@ -90728,7 +90728,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='26.14';        
+let GVT_CV='26.15';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -197539,6 +197539,70 @@ function bq6Rig(o){ o=o||{}; if(o.rally!=null) BQ6.rally=o.rally? 1 : 0; if(o.cl
   const f=bbsBill(), b=f && f.bbs, ride=!!(f && f.bbsRide && b && b.st==='ride');
   return { cv:GVT_CV, on:BQ6.on, rally:BQ6.rally, n:Object.assign({}, BQ6.n), log:BQ6.log.slice(-60), mz:BBS_FAN_MZ.map(m=>({ x:m.x, y:m.y })), bill:f? { x:+f.x.toFixed(2), y:+f.y.toFixed(2), ride:ride? 1 : 0, st:b? b.st : null, fz:ride? (b.dir>0? 1 : -1) : (bq6Fl(f)? 1 : -1) } : null, irons:f? [0,1].map(i=>ride? bq6Horse(f,b,i) : bq6Foot(f,i)) : null }; }
 setTimeout(function(){ try{ if(window.GVT && !GVT.bq6) GVT.bq6=function(o){ return bq6Rig(o); }; }catch(e){} }, 0);   
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const SHARP={ on:(function(){ try{ const q=/[?&]sharp=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_sharp','0'); else localStorage.removeItem('gvt_sharp'); } return localStorage.getItem('gvt_sharp')==='0'? 0 : 1; }catch(e){ return 1; } })(),   
+  trio:['reddot','tancommando','wsniper'],   
+  beamAim:1.2, beamRngX:2,   
+  bolt:{ first:{ e:5, m:4, h:3 }, cd:{ e:12, m:10, h:8 }, stagger:1.3, lock:1.2 },   
+  dotLock:0.7, dotStep:3, dotAdv:300, dotFloor:520,   
+  dot:{ r:4.2, halo:10, ring:15, lineA:0.42, lineW:1.4, col:'#e0251a' },   
+  charge:{ r0:5, r1:19, col:'#9FE8FF' } };   
+function sharpPour(cfg){ let k=0; for(const w of cfg.waves){ if(!w || !w.groups) continue; for(const g of w.groups){ if(g && g.bba && g.t==='wsniper'){ g.t=SHARP.trio[k%SHARP.trio.length]; g.sharp=1; k++; } } } cfg.sharp=k; return cfg; }   
+{ const c0=bbsCfg; bbsCfg=function(tier){ const cfg=c0.apply(this, arguments); try{ if(SHARP.on && cfg && cfg.bba) sharpPour(cfg); }catch(e){} return cfg; }; }   
+function sharpBag(){ const B=S.raid && S.raid.bbs; if(!B) return null; return B.sharp||(B.sharp={ seen:{}, n:{ reddot:0, tancommando:0, wsniper:0 }, adv:0, beams:0, beamHits:0, locks:0, bolts:0, boltHits:0 }); }
+function sharpTick(dt){ if(!SHARP.on || !bbsOn() || S.mode!=='play' || !(dt>0)) return; const A=sharpBag(); if(!A) return; const tier=bbsTier(); let dots=0;
+  for(const f of S.foes){ if(f.dead) continue; const ty=f.type; if(ty!=='reddot' && ty!=='tancommando' && ty!=='wsniper') continue;
+    if(!A.seen[f.id]){ A.seen[f.id]=1; A.n[ty]++; if(ty==='tancommando') f.rngX=SHARP.beamRngX; }
+    if(ty==='reddot'){ dots++; const d=f.rd, st=d? d.st : null; if(f.shpSt==='dot' && st==='cd'){ f.shpN=(f.shpN|0)+1; if(f.shpN%SHARP.dotStep===0 && f.olvSx!=null){ f.olvSx=Math.max(SHARP.dotFloor, f.olvSx-SHARP.dotAdv); A.adv++; } } f.shpSt=st; } else if(ty==='tancommando') sharpBeamer(f); else sharpBolt(f,dt,A,tier,f.id%3); }
+  if(dots){ for(const f of S.foes){ const d=f.rd; if(f.type!=='reddot' || f.dead || !d || d.st!=='dot' || !d.u || d.off || d.u.dead || S.t>=d.t-SHARP.dotLock) continue; d.lx=d.u.x; d.ly=d.u.y; } olvRedDot(olvB2L()); } }   
+{ const t0=bbsTick; bbsTick=function(dt){ t0.apply(this, arguments); try{ sharpTick(dt); }catch(e){} }; }   
+function sharpBeamer(f){ if(f.aimT>0){ if(!f.shpAim){ f.shpAim=1; f.aimT=Math.max(f.aimT, SHARP.beamAim); f.shpAim0=f.aimT; } } else if(f.shpAim) f.shpAim=0; }   
+function sharpBolt(f,dt,A,tier,j){ const Bo=SHARP.bolt;
+  if(f.x>=W-10 || f.flatT>0 || f.fzT>0 || f.kyHeldT>0 || f.retreat || f.falling){ if(f.lrBmT>0){ f.lrBmT=0; f.lrBmX1=null; } return; }   
+  if(f.lrBmT>0){ f.lrBmT=Math.max(0, f.lrBmT-dt); { const u=f.shpTgt; if(f.lrBmT>Bo.lock && u && !u.dead && S.units.indexOf(u)>=0) sharpRay(f,u); }   
+    if(f.lrBmT<=0){ A.bolts++; f.shpBolt=1; try{ larsonBeamFire(f); }finally{ f.shpBolt=0; } f.lrBmX1=null; f.shpCd=Bo.cd[tier]; } return; }   
+  if(f.shpCd==null) f.shpCd=Bo.first[tier]+Bo.stagger*j; f.shpCd=Math.max(0, f.shpCd-dt);
+  if(f.shpCd>0 || f.aimT>0 || f.burst>0) return;   
+  const u=((A.locks&1)? tanPick(f) : null) || larsonMark(f); if(!u) return;   
+  f.lrBmT=LR_BM_CH; f.shpTgt=u; sharpRay(f,u); A.locks++; try{ SFX.ready(); }catch(e){} }
+function sharpRay(f,u){ foeAim(f,u); const fz=foeFaceX(f), mx=f.x+20*fz, my=f.y-36, a=Math.atan2((u.y-18)-my, u.x-mx); f.lrBmX1=mx; f.lrBmY1=my; f.lrBmX2=mx+Math.cos(a)*4600; f.lrBmY2=my+Math.sin(a)*4600; }   
+{ const b0=tanBeam; tanBeam=function(f){ const r=b0.apply(this, arguments); try{ if(r && f && f.type==='tancommando' && SHARP.on && bbsOn()){ const A=sharpBag(); if(A) A.beams++; } }catch(e){} return r; }; }   
+{ const h0=tanBeamHit; tanBeamHit=function(sh,u){ try{ const f=sh && sh.src; if(f && SHARP.on && bbsOn() && u && !u.dead && S.units.indexOf(u)>=0){ const A=sharpBag(); if(A){ if(f.type==='tancommando') A.beamHits++; else if(f.type==='wsniper' && f.shpBolt) A.boltHits++; } } }catch(e){} return h0.apply(this, arguments); }; }   
+function sharpDraw(){ if(!SHARP.on || !bbsOn()) return; const RM=reducedMotion(), D=SHARP.dot, C=SHARP.charge; cx.save();
+  for(const f of S.foes){
+    if(rdLive(f) && f.rd && f.rd.st==='dot'){ const P=rdSpot(f), x=P.x, y=P.y-18, mx=f.x-16, my=f.y-30, t0=(f.rd.t0==null)? S.t : f.rd.t0, k=Math.max(0, Math.min(1, (S.t-t0)/Math.max(0.1, f.rd.t-t0))), pu=RM? 1 : 0.75+0.25*Math.sin(S.t*14);   
+      cx.globalAlpha=D.lineA; cx.strokeStyle=D.col; cx.lineWidth=D.lineW; cx.beginPath(); cx.moveTo(mx,my); cx.lineTo(x,y); cx.stroke();   
+      cx.globalAlpha=0.32*pu; cx.fillStyle=D.col; cx.beginPath(); cx.arc(x,y,D.halo,0,7); cx.fill(); cx.globalAlpha=1; cx.beginPath(); cx.arc(x,y,D.r,0,7); cx.fill();   
+      cx.globalAlpha=0.85; cx.lineWidth=1.8; cx.beginPath(); cx.arc(x,y,D.r+2+D.ring*(1-k),0,7); cx.stroke(); }   
+    else if(f.type==='tancommando' && f.shpAim && f.aimT>0 && !f.dead){ const k=Math.max(0, Math.min(1, 1-f.aimT/(f.shpAim0||SHARP.beamAim))), fz=foeFaceX(f), x=f.x+CMDO_MZX*fz, y=f.y-CMDO_MZY, pu=RM? 0 : Math.sin(S.t*22);   
+      cx.globalAlpha=0.22+0.4*k; cx.fillStyle=C.col; cx.beginPath(); cx.arc(x,y,C.r0+(C.r1-C.r0)*k+1.5*pu,0,7); cx.fill();
+      cx.globalAlpha=0.9; cx.fillStyle='#FFFFFF'; cx.beginPath(); cx.arc(x,y,2+3*k,0,7); cx.fill();
+      cx.globalAlpha=0.5+0.4*k; cx.strokeStyle=C.col; cx.lineWidth=1.6; cx.beginPath(); cx.arc(x,y,C.r1+4-(C.r1-4)*k,0,7); cx.stroke(); } }
+  cx.restore(); }
+{ const ds0=drawSoccer; drawSoccer=function(){ const r=ds0.apply(this,arguments); try{ sharpDraw(); }catch(e){} return r; }; }   
+function sharpRead(o){ o=o||{}; const A=(bbsOn() && sharpBag())||null, L=(S.olv && S.olv.b2)||null;   
+  if(A && o.sharpSpawn && SHARP.trio.indexOf(o.sharpSpawn)>=0){ const g=spawnFoe(o.sharpSpawn, (o.sharpX!=null)? +o.sharpX : W+40, foeBandY((o.sharpY!=null)? +o.sharpY : 300), null, false); if(g && o.sharpX!=null) g.x=+o.sharpX; }
+  return { on:SHARP.on, cfgSharp:(S.cfg && S.cfg.sharp)|0, n:A? Object.assign({}, A.n) : null, beams:A? A.beams : 0, beamHits:A? A.beamHits : 0, adv:A? A.adv : 0, locks:A? A.locks : 0, bolts:A? A.bolts : 0, boltHits:A? A.boltHits : 0,
+    dots:L? L.dots|0 : 0, flat:L? L.flat|0 : 0, miss:L? L.miss|0 : 0,
+    up:S.foes.filter(f=>!f.dead && SHARP.trio.indexOf(f.type)>=0).map(f=>({ id:f.id, t:f.type, x:Math.round(f.x), y:Math.round(f.y), hp:+(+f.hp).toFixed(1), sx:(f.olvSx==null)? null : Math.round(f.olvSx), dot:(f.rd && f.rd.st==='dot')? 1 : 0, aim:+(f.aimT||0).toFixed(2), lock:+(f.lrBmT||0).toFixed(2), cd:(f.shpCd==null)? null : +f.shpCd.toFixed(2) })) }; }
+{ const r0=bbsRig; bbsRig=function(o){ const r=r0.apply(this, arguments); try{ if(r && typeof r==='object') r.sharp=sharpRead(o); }catch(e){} return r; }; }   
 
 
 
