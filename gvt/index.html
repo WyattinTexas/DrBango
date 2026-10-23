@@ -73629,7 +73629,7 @@ function bsaHulls(u,wdir){ const H=bsaHd(), hx=u.x+(H.B[0]+1.5)*wdir, hy=u.y+H.B
   S.fx.push({k:'shell',x:hx,y:hy,h:h,dir:-wdir,t:-BSA.hull,dur:0.55}); S.fx.push({k:'shell',x:hx-1.6*wdir,y:hy+0.6,h:h? 0 : 1,dir:-wdir,t:-BSA.hull-0.035,dur:0.55}); }
 
 function bsaFig(u,kyl,w){ if(!bsaOn(u) || u.dead || u.toadT>0 || dsfDance(u) || !bsaReady(u)) return false; BSAX.drawn++;
-  const D=BSA, H=bsaHd(), s=w/120, h=w*140/120, fl=unitDrawFl(u), rot=cmdoRecoil(u), wob=(u.rxHopT>0? -0.2 : u.rxHopW>0? 0.12 : u.kySwing>0? -0.14 : unitWob(u)), RM=reducedMotion();
+  const D=BSA, H=bsaHd(), s=w/120, h=w*140/120, fl=unitDrawFl(u), rot=cmdoRecoil(u), wob=(sgwHeld(u)? 0 : u.rxHopT>0? -0.2 : u.rxHopW>0? 0.12 : u.kySwing>0? -0.14 : unitWob(u)), RM=reducedMotion();   
   const tt=(u.bstT0!=null)? S.t-u.bstT0 : 9, kick=tt<D.kickT? Math.pow(1-tt/D.kickT,1.6) : 0, ease=(a,b)=>{ const q=(tt-a)/(b-a); return q<=0? 0 : q>=1? 1 : q*q*(3-2*q); };
   const brk=D.breakRot*(tt<D.up0? ease(D.dn0,D.dn1) : 1-ease(D.up0,D.up1)), breath=RM? 0 : D.breath*Math.sin(2*Math.PI*S.t/D.breathT+(u.id||0));
   cx.save(); cx.translate(u.x,u.y-(kyl||0)-(u.rxHopZ||0)); if(fl) cx.scale(-1,1); cx.rotate(rot+wob-D.lean*kick);
@@ -90744,7 +90744,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='26.45';        
+let GVT_CV='26.46';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -132023,6 +132023,17 @@ function unitWob(u){
   }
   return Math.sin(u.wobPh)*(WOB_A0+WOB_A1*u.wobH)*fzWalk(u);   
 }
+
+
+
+
+
+
+var SGW={ on:(function(){ try{ const q=/[?&]sgw=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_sgw','0'); else localStorage.removeItem('gvt_sgw'); } return localStorage.getItem('gvt_sgw')==='0'? 0 : 1; }catch(e){ return 1; } })() };
+let SGW_U=null;   
+function sgwIn(u,lift,wob){ if(!SGW.on) return false; cx.save(); cx.translate(u.x,u.y-(lift||0)); cx.rotate(unitDrawFl(u)? -wob : wob); cx.translate(-u.x,-u.y); SGW_U=u; return true; }   
+function sgwOut(){ SGW_U=null; cx.restore(); }
+function sgwHeld(u){ return SGW_U!=null && SGW_U===u; }   
 function drawUnit(u){
   if(u.wxToadT>0 && wxToadDraw(u)) return;   
   if(u.chs){ chsDrawPiece(u); return; }   
@@ -132103,6 +132114,7 @@ function drawUnit(u){
   const ul=uaLeanIn(u);   
   const sg=sgaIn(u);
   const dsf=dsfIn(u);   
+  const gw=(u.type==='sarge') && sgwIn(u,kyl,(u.kySwing>0? -0.14 : unitWob(u)));   
   if(u.type==='jane') drawJane(u,kyl);   
   else if(u.type==='kingyeti') drawKing(u,u.x,u.y-kyl,w,unitWob(u),false,unitFl(u));   
   else if(isCroakU(u) && (crFire(u)||crFlinch(u))) drawSprite(u.type,u.x,u.y-kyl,w,cmdoRecoil(u)+croakRc(u),(u.kySwing>0? -0.14 : unitWob(u)),crFire(u)||crFlinch(u),crAimFl(u,unitFl(u)));       
@@ -132114,11 +132126,11 @@ function drawUnit(u){
   else if(u.type==='aagun') aaDraw(u,w,im);   
   else if(u.type==='kingbear' && KBH_ON) drawKbHero(u,w,im,kyl);   
   else { if(u.rxHopT>0 && !(u.type==='kingrex' && kraRig(im))){ cx.fillStyle='rgba(0,0,0,0.22)'; cx.beginPath(); cx.ellipse(u.x,u.y+3,w*0.16,w*0.045,0,0,7); cx.fill(); }   
-    if(u.type==='sarge' && bstU(u) && !(bsaOn(u) && bsaReady(u))) bstGunUnder(u,kyl);        
-    if(!bsaFig(u,kyl,w))   if(!(u.type==='kingrex' && kraPaint(u,u.x,u.y-kyl,w,unitDrawFl(u),(u.rxHopZ||0),(u.rxHopT>0? -0.2 : u.rxHopW>0? 0.12 : unitWob(u)),im,kraKindU(u),1))) drawSprite(u.type,u.x,u.y-kyl-(u.rxHopZ||0),w,cmdoRecoil(u),(u.rxHopT>0? -0.2 : u.rxHopW>0? 0.12 : u.kySwing>0? -0.14 : unitWob(u)),dsfPose(u,krgPose(u,im)),unitDrawFl(u));         }       
+    if(u.type==='sarge' && bstU(u) && !(bsaOn(u) && bsaReady(u))) bstGunUnder(u,gw? 0 : kyl);            
+    if(!bsaFig(u,gw? 0 : kyl,w))     if(!(u.type==='kingrex' && kraPaint(u,u.x,u.y-kyl,w,unitDrawFl(u),(u.rxHopZ||0),(u.rxHopT>0? -0.2 : u.rxHopW>0? 0.12 : unitWob(u)),im,kraKindU(u),1))) drawSprite(u.type,u.x,u.y-(gw? 0 : kyl)-(u.rxHopZ||0),w,cmdoRecoil(u),(gw? 0 : u.rxHopT>0? -0.2 : u.rxHopW>0? 0.12 : u.kySwing>0? -0.14 : unitWob(u)),dsfPose(u,krgPose(u,im)),unitDrawFl(u));             }       
   if(u.type==='radioman') drawRadioCall(u);
   if(S.capGone===1 && !u.kbMount && capActU(u) && !(u.type==='kingrex' && kraHelm(u))) capHelmDraw(u.type, u.x, u.y-kyl-(u.rxHopZ||0), w, unitDrawFl(u), 0);       
-  if(u.type==='sarge'){ drawSargeOutfit(u); drawSargeWeapon(u); dsfSpark(u); if(dsf) cx.restore();   if(sg) cx.restore();   if(ul) cx.restore(); if(cl) cx.restore(); if(sl) cx.restore(); if(hv9) cx.restore(); drawAbsorbPips(u); drawCmdBlkPips(u); }   
+  if(u.type==='sarge'){ drawSargeOutfit(u); drawSargeWeapon(u); dsfSpark(u); if(gw) sgwOut();   if(dsf) cx.restore();   if(sg) cx.restore();   if(ul) cx.restore(); if(cl) cx.restore(); if(sl) cx.restore(); if(hv9) cx.restore(); drawAbsorbPips(u); drawCmdBlkPips(u); }   
   if(sg && u.type!=='sarge') cx.restore();   
   drawFz(u,u.x,u.y,w,im,kyl+(u.rxHopZ||0));   
   if(u.type==='commando') drawCmdoPip(u);
@@ -132232,12 +132244,13 @@ function drawBFUnit(u,w,im){
   const cl=cmdLeanIn(u);   
   const dsf=dsfIn(u);   
   const ul=uaLeanIn(u);   
-  if(!hppRide(u,w)){ if(!bsaFig(u,0,w))   { const hb9=hauBfPose(u,dsfPose(u,krgPose(u,pchImg(u,im))),flip); kbSwingSprite(u,u.x,u.y-pchLift(u),w,cmdoRecoil(u)+hauBfRc(u), eas2Wob(u,wob,flip), hb9.im, hb9.fl); } }           
+  const gw=(u.type==='sarge') && sgwIn(u,pchLift(u),eas2Wob(u,wob,flip));   
+  if(!hppRide(u,w)){ if(!bsaFig(u,0,w))   { const hb9=hauBfPose(u,dsfPose(u,krgPose(u,pchImg(u,im))),flip); kbSwingSprite(u,u.x,u.y-(gw? 0 : pchLift(u)),w,cmdoRecoil(u)+hauBfRc(u), (gw? 0 : eas2Wob(u,wob,flip)), hb9.im, hb9.fl);     } }           
   drawFz(u,u.x,u.y,w,im,0);   
   if(u.fsq && u.fsq.length) fsqDraw(u,w);   
-  if(ck){ if(ul) cx.restore(); if(cl) cx.restore(); if(sl) cx.restore(); if(hv9) cx.restore(); cx.globalAlpha=1; return; }
+  if(ck){ if(gw) sgwOut();   if(ul) cx.restore(); if(cl) cx.restore(); if(sl) cx.restore(); if(hv9) cx.restore(); cx.globalAlpha=1; return; }
   if(u.type==='radioman') drawRadioCall(u);
-  if(u.type==='sarge'){ drawSargeOutfit(u); drawSargeWeapon(u); dsfSpark(u); if(dsf) cx.restore();   if(ul) cx.restore(); if(cl) cx.restore(); if(sl) cx.restore(); if(hv9) cx.restore(); }   
+  if(u.type==='sarge'){ drawSargeOutfit(u); drawSargeWeapon(u); dsfSpark(u); if(gw) sgwOut();   if(dsf) cx.restore();   if(ul) cx.restore(); if(cl) cx.restore(); if(sl) cx.restore(); if(hv9) cx.restore(); }   
   drawTkFx(u);   
   if(u.hp<u.hpMax){
     const k=Math.max(0,u.hp/u.hpMax);
