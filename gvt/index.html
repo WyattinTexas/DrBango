@@ -90744,7 +90744,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='26.40';        
+let GVT_CV='26.41';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -199084,7 +199084,7 @@ const SHARP={ on:(function(){ try{ const q=/[?&]sharp=([01])/.exec(location.sear
   dotLock:0.7, dotStep:3, dotAdv:300, dotFloor:520,   
   dot:{ r:4.2, halo:10, ring:15, lineA:0.42, lineW:1.4, col:'#e0251a' },   
   charge:{ r0:5, r1:19, col:'#9FE8FF' } };   
-const SHARP_ART_LIVE=0;   
+const SHARP_ART_LIVE=1;   
 SHARP.art=(function(){ try{ const q=/[?&]sharpart=([01])/.exec(location.search||''); if(q){ if(q[1]==='1') localStorage.setItem('gvt_sharpart','1'); else localStorage.removeItem('gvt_sharpart'); } return (localStorage.getItem('gvt_sharpart')==='1')? 1 : SHARP_ART_LIVE; }catch(e){ return SHARP_ART_LIVE; } })();   
 function sharpPour(cfg){ let k=0; for(const w of cfg.waves){ if(!w || !w.groups) continue; for(const g of w.groups){ if(g && g.bba && g.t==='wsniper'){ g.t=SHARP.trio[k%SHARP.trio.length]; g.sharp=1; k++; } } } cfg.sharp=k; return cfg; }   
 { const c0=bbsCfg; bbsCfg=function(tier){ const cfg=c0.apply(this, arguments); try{ if(SHARP.on && cfg && cfg.bba) sharpPour(cfg); }catch(e){} return cfg; }; }   
@@ -199125,6 +199125,93 @@ function sharpRead(o){ o=o||{}; const A=(bbsOn() && sharpBag())||null, L=(S.olv 
     dots:L? L.dots|0 : 0, flat:L? L.flat|0 : 0, miss:L? L.miss|0 : 0,
     up:S.foes.filter(f=>!f.dead && SHARP.trio.indexOf(f.type)>=0).map(f=>({ id:f.id, t:f.type, x:Math.round(f.x), y:Math.round(f.y), hp:+(+f.hp).toFixed(1), sx:(f.olvSx==null)? null : Math.round(f.olvSx), dot:(f.rd && f.rd.st==='dot')? 1 : 0, aim:+(f.aimT||0).toFixed(2), lock:+(f.lrBmT||0).toFixed(2), cd:(f.shpCd==null)? null : +f.shpCd.toFixed(2) })) }; }
 { const r0=bbsRig; bbsRig=function(o){ const r=r0.apply(this, arguments); try{ if(r && typeof r==='object') r.sharp=sharpRead(o); }catch(e){} return r; }; }   
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const PLAY_HORSE_LIVE=0;   
+const PLAY={ on:(function(){ try{ const q=/[?&]otsplay=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_otsplay','0'); else localStorage.removeItem('gvt_otsplay'); } return localStorage.getItem('gvt_otsplay')==='0'? 0 : 1; }catch(e){ return 1; } })(),   
+  horse:(function(){ try{ const q=/[?&]otsplayh=([01])/.exec(location.search||''); if(q){ if(q[1]==='1') localStorage.setItem('gvt_otsplayh','1'); else localStorage.removeItem('gvt_otsplayh'); } return (localStorage.getItem('gvt_otsplayh')==='1')? 1 : PLAY_HORSE_LIVE; }catch(e){ return PLAY_HORSE_LIVE; } })(),   
+  cheeseK:0.5,   
+  riderAdd:100,  
+  cone:[60,100], other:[80,200],   
+  p1K:0.7,       
+  es:{ first:1, every:2, deg:9 },   
+  stats:{ slices:0, cut:0, riders:0, cone:0, other:0, coneHp:0, otherHp:0, downs:0, ride:0, mount:0, p0:0, es:0, esBolts:0, beams:0 } };
+function playRoll(lo,hi,a,b,c){ let h=2166136261>>>0; const s9=String(a)+':'+String(b)+':'+String(c); for(let i=0;i<s9.length;i++){ h^=s9.charCodeAt(i); h=Math.imul(h,16777619)>>>0; } return lo+(h%((hi-lo)+1)); }   
+function playEsHex(){ try{ const r=rlzRow(); if(r && r.hex) return r.hex; }catch(e){} return '#FF3B2A'; }   
+function playEsTurn(k){ const E=PLAY.es; return k>=E.first && ((k-E.first)%E.every)===0; }   
+
+{ const s0=updateFoeSneak; updateFoeSneak=function(f,dt){ let n0=-1; try{ if(PLAY.on && f && f.type==='wmouse' && !f.mzLaid && bbsOn()) n0=S.mines.length; }catch(e){}
+    const r=s0.apply(this, arguments);
+    try{ if(n0>=0 && f.mzLaid && S.mines.length>n0){ const fresh=[]; for(let i=n0;i<S.mines.length;i++){ if(S.mines[i] && S.mines[i].chz) fresh.push(i); } const keep=Math.round(fresh.length*PLAY.cheeseK);
+        for(let j=fresh.length-1;j>=keep;j--) S.mines.splice(fresh[j],1); PLAY.stats.slices+=fresh.length; PLAY.stats.cut+=Math.max(0,fresh.length-keep); } }catch(e){}
+    return r; }; }   
+
+{ const g0=spawnGroup; spawnGroup=function(g){ let i0=-1; try{ if(PLAY.on && g && g.t==='wrider' && bbsOn()) i0=idc; }catch(e){}
+    const r=g0.apply(this, arguments);
+    try{ if(i0>=0){ for(const f of S.foes){ if(f && f.id>=i0 && f.type==='wrider' && !f.playHp){ f.playHp=1; f.hp+=PLAY.riderAdd; f.hpMax+=PLAY.riderAdd; PLAY.stats.riders++; } } } }catch(e){}
+    return r; }; }   
+
+{ const fs0=fireShot; fireShot=function(f){ if(f) f.playFire=1; try{ return fs0.apply(this, arguments); } finally{ if(f) f.playFire=0; } }; }   
+{ const th0=tanHit; tanHit=function(u,fx,fy,src,fire9){
+    if(!(src && src.type==='bbshow' && src.pipN>0 && PLAY.on && u && !u.dead)) return th0.apply(this, arguments);
+    const b=src.bbs, ride=!!(src.bbsRide || (b && (b.st==='mount' || b.st==='ride')));
+    if(!b || (ride && !PLAY.horse) || !bbsOn()) return th0.apply(this, arguments);
+    const cone=src.playFire? 0 : (ride? 1 : (b.st==='fan')? 1 : 0), R=cone? PLAY.cone : PLAY.other; src.playN=(src.playN|0)+1;
+    const d=playRoll(R[0], R[1], src.id|0, src.playN, (u.id|0)+(cone? ':c' : ':o')), x0=src.dmgX, up=S.units.indexOf(u)>=0 && !u.dead;
+    src.dmgX=d/src.pipN; let r;
+    try{ r=th0.apply(this, arguments); } finally{ src.dmgX=x0; }
+    try{ const P=PLAY.stats; if(cone){ P.cone++; P.coneHp+=d; } else { P.other++; P.otherHp+=d; } if(ride) P.ride++; if(up && (u.dead || u.falling || S.units.indexOf(u)<0)) P.downs++; }catch(e){}
+    return r; }; }   
+
+function playCfg(cfg,tier){ const w1=cfg.waves && cfg.waves[0], g=w1 && w1.groups && w1.groups.find(x=>x && x.f==='boss' && x.t==='bbshow');
+  if(g && !g.playP1){ g.hpX=+((g.hpX||1)*PLAY.p1K).toFixed(4); g.playP1=1; }   
+  try{ if(typeof SHARP==='object' && SHARP.on && cfg.bba && typeof BBA_POSSE==='object'){ const P=BBA_POSSE, w=cfg.waves.find(x=>x && x.bbsT===P.first && x.groups && x.groups.some(q=>q && q.bba && q.t==='wbandit'));
+      if(w && !w.groups.some(q=>q && q.playP0)){ const gb=w.groups.find(q=>q && q.bba && q.t==='wbandit'); w.groups.push(Object.assign({}, gb, { f:'solo', t:'wsniper', n:1, at:P.sniperAt, pin:1, bba:1, sharp:1, playP0:1 })); PLAY.stats.p0++; } } }catch(e){}   
+  cfg.play=1; return cfg; }
+{ const c0=bbsCfg; bbsCfg=function(tier){ const cfg=c0.apply(this, arguments); try{ if(PLAY.on && cfg && cfg.bbs) playCfg(cfg, cfg.bbsTier||tier); }catch(e){} return cfg; }; }   
+{ const m0=bbsMount; bbsMount=function(f,u){ try{ if(f && f.type==='bbshow' && !f.bbsRide && !f.playFull && S.cfg && S.cfg.play && f.hpMax>0){ f.playP1Max=f.hpMax; f.hpMax=Math.round(f.hpMax/PLAY.p1K); f.playFull=1; PLAY.stats.mount++; } }catch(e){}
+    return m0.apply(this, arguments); }; }   
+function playHpTxt(h,mark){ try{ if(!(S && PLAY.on) || typeof h!=='string' || h.indexOf(mark)<0) return h; const A={}, C={}; for(const k of ['e','m','h']){ A[k]=Number(BBS_HP[k]).toLocaleString(); C[k]=Number(Math.round(BBS_HP[k]*PLAY.p1K)).toLocaleString(); }
+    const parts=h.split(mark); for(let i=1;i<parts.length;i++){ const s=parts[i], end=s.indexOf('</div>'), head=(end>=0)? s.slice(0,end) : s; let best=null, at=1e9; for(const k of ['e','m','h']){ const j=head.indexOf(A[k]); if(j>=0 && j<at){ at=j; best=k; } }
+      if(best) parts[i]=s.slice(0,at)+C[best]+s.slice(at+A[best].length); } return parts.join(mark); }catch(e){ return h; } }   
+{ const v0=vtcSkeleton; vtcSkeleton=function(){ return playHpTxt(v0.apply(this, arguments), 'class="vtc-hp">'); }; }   
+{ const v1=bbsvHTML; bbsvHTML=function(){ return playHpTxt(v1.apply(this, arguments), 'class="bbsv-sub" data-notr>'); }; }   
+
+function playTrio(f){ const mx=f.lrBmX1, my=f.lrBmY1, th=Math.atan2(f.lrBmY2-my, f.lrBmX2-mx), col=playEsHex(), vol={ hits:0, down:0, t0:+S.t.toFixed(2), play:1 }, RM=reducedMotion();   
+  try{ SFX.crack(); }catch(e){} try{ bfSfx(SFX.harpRelease, f.x, f.y); }catch(e){} if(!RM) S.shake=Math.max(S.shake||0,0.3); laRelease(mx,my,-1,col);
+  for(let i=0;i<LA_N;i++){ const k=Math.ceil(i/2)*((i%2)? -1 : 1), a=th+k*PLAY.es.deg*Math.PI/180; S.shots.push({ k:'lightarrow', x0:mx, y0:my, ux:Math.cos(a), uy:Math.sin(a), s:0, x:mx, y:my, dir:-1, len:LA_LEN, spd:LA_SPD, hw:LA_HW, side:'foe', la:1, lg:1, bounce:0, hit:{}, src:f, t:-i*LA_GAP, back:0, vol:vol, col:col, playEs:1 }); }   
+  S.floats.push({ x:f.x, y:f.y-76, txt:'ENERGY SHOT!', t:0, col:col }); f.playVol=vol; PLAY.stats.es++; PLAY.stats.esBolts+=LA_N; }   
+{ const lb0=larsonBeamFire; larsonBeamFire=function(f){ try{ if(PLAY.on && f && f.shpBolt && f.type==='wsniper' && !f.dead && f.lrBmX1!=null && bbsOn()){ if(f.playEs){ f.playEs=0; playTrio(f); return; } PLAY.stats.beams++; } }catch(e){}
+    return lb0.apply(this, arguments); }; }   
+function playTick(dt){ if(!PLAY.on || !bbsOn() || S.mode!=='play') return;
+  for(const f of S.foes){ if(f.dead || f.type!=='wsniper') continue;
+    if(f.lrBmT>0){ if(!f.playLkOn){ f.playLkOn=1; f.playLk=(f.playLk|0)+1; f.playEs=playEsTurn(f.playLk)? 1 : 0; if(f.playEs) S.floats.push({ x:f.x, y:f.y-76, txt:'ENERGY SHOT!', t:0, col:playEsHex() }); } }   
+    else if(f.playLkOn){ f.playLkOn=0; if(f.lrBmX1==null) f.playEs=0; } } }   
+{ const t0=bbsTick; bbsTick=function(dt){ const r=t0.apply(this, arguments); try{ playTick(dt); }catch(e){} return r; }; }   
+function playRead(o){ o=o||{}; if(o.playHorse!=null) PLAY.horse=o.playHorse? 1 : 0; if(o.playReset){ for(const k in PLAY.stats) PLAY.stats[k]=0; }
+  const bill=bbsBill(); return { on:PLAY.on, horse:PLAY.horse, live:PLAY_HORSE_LIVE, cfg:(S.cfg && S.cfg.play)? 1 : 0, p1K:PLAY.p1K, bar:bill? { hp:Math.round(bill.hp), max:bill.hpMax, full:!!bill.playFull, p1:bill.playP1Max||null } : null,
+    stats:Object.assign({}, PLAY.stats), riders:S.foes.filter(f=>f.type==='wrider' && !f.dead).map(f=>({ id:f.id, hp:+(+f.hp).toFixed(1), max:f.hpMax, add:f.playHp|0 })), cheese:(S.mines||[]).filter(m=>m && m.chz).length,
+    snipers:S.foes.filter(f=>f.type==='wsniper' && !f.dead).map(f=>({ id:f.id, x:Math.round(f.x), y:Math.round(f.y), hp:+(+f.hp).toFixed(1), lk:f.playLk|0, es:f.playEs|0, lock:+(f.lrBmT||0).toFixed(2), cd:(f.shpCd==null)? null : +f.shpCd.toFixed(2) })),
+    bolts:(S.shots||[]).filter(s=>s && s.playEs).map(s=>({ x:Math.round(s.x), y:Math.round(s.y), t:+s.t.toFixed(2), hits:Object.keys(s.hit||{}).length, col:s.col })) }; }
+{ const r0=bbsRig; bbsRig=function(o){ const r=r0.apply(this, arguments); try{ if(r && typeof r==='object') r.play=playRead(o); }catch(e){} return r; }; }   
+setTimeout(function(){ try{ if(window.GVT && !GVT.otsPlay) GVT.otsPlay=function(o){ return playRead(o); }; }catch(e){} }, 0);
+
 
 
 
