@@ -90742,7 +90742,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='26.34';        
+let GVT_CV='26.35';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -197160,6 +197160,45 @@ setTimeout(function(){ try{ if(window.GVT) GVT.vtc=vtcState; }catch(e){} }, 0);
     "HARD?! Ha! Now THAT'S a Showdown!": ['ハード？！ ハッ！ これぞ決闘だ！', '하드?! 하! 이게 바로 결투지!', '困难？！哈！这才叫对决！', 'SCHWER?! Ha! DAS ist ein Showdown!', 'СЛОЖНЫЙ?! Ха! Вот ЭТО дуэль!', '¿¡DIFÍCIL?! ¡Ja! ¡ESO sí es un duelo!', 'صعب؟! ها! هذه هي المواجهة الحقيقية!'],
     'A tie! The sharper shooters call it: %1.': ['同数だ！ 腕の立つ連中が決めた: %1。', '동률이다! 솜씨 좋은 사수들이 정했다: %1.', '平局！神枪手们说了算：%1。', 'Gleichstand! Die besseren Schützen entscheiden: %1.', 'Ничья! Решают меткие стрелки: %1.', '¡Empate! Deciden los mejores tiradores: %1.', 'تعادل! الرماة الأمهر يقررون: %1.'],
     'Nobody picked? Then %1 it is, Sarge!': ['誰も選ばない？ なら %1 だ、サージ！', '아무도 안 골랐어? 그럼 %1이다, 사지!', '没人选？那就 %1 吧，军士！', 'Keiner hat gewählt? Dann eben %1, Sarge!', 'Никто не выбрал? Тогда %1, Сардж!', '¿Nadie eligió? ¡Entonces %1, Sarge!', 'لم يختر أحد؟ إذن %1 يا سارج!']
+  };
+  const L = ['ja', 'ko', 'zh-Hans', 'de', 'ru', 'es', 'ar'];
+  for (const k in W) for (let i = 0; i < L.length; i++) { if (!TR[L[i]]) TR[L[i]] = {}; if (!(k in TR[L[i]])) TR[L[i]][k] = W[k][i]; }
+})();
+
+
+
+
+
+
+const VTA={ on:VTC.on && !/[?&]vta=0(&|$)/.test(location.search||'') };
+const VTA_PRIZE={ e:'THE OUTLAW .44s', m:BBSV_PRIZE.m, h:BBSV_PRIZE.h };   
+const VTA_CSS="\n.vtc-page::before{ content:\"\"; position:absolute; left:0; right:0; top:0; bottom:0; z-index:-1; background:rgba(38,23,12,.9); pointer-events:none }\n.vtc-bell.vta-cd{ left:calc(338*var(--u)); right:calc(54*var(--u)); top:calc(19*var(--u)); transform:none }\n.vtc-wanted{ white-space:nowrap }\n.vtc-bell.vta-cd b{ font-size:calc(15*var(--u)); padding:calc(5*var(--u)) calc(14*var(--u)); letter-spacing:.08em; border-width:calc(2*var(--u)) }\n.vta-rw{ margin-top:calc(6*var(--u)) }\n.vta-rwd{ display:flex; align-items:center; justify-content:center; gap:calc(6*var(--u)); color:#8A1C14 }\n.vta-rwd::before, .vta-rwd::after{ content:\"\"; flex:1 1 0; min-width:0; max-width:calc(18*var(--u)); height:calc(2*var(--u)); background:currentColor; opacity:.55 }\n.vta-rwd b{ flex:0 0 auto; font:900 calc(20*var(--u))/1 Georgia,\"Times New Roman\",serif; letter-spacing:.1em; white-space:nowrap }\n.vta-rwrow{ display:flex; align-items:center; justify-content:center; gap:calc(7*var(--u)); margin-top:calc(5*var(--u)) }\n.vta-rwrow img{ flex:0 0 auto; width:calc(46*var(--u)); height:calc(46*var(--u)); border-radius:calc(7*var(--u)); background:#2A2622; box-shadow:0 0 0 calc(2*var(--u)) #C9A24A, 0 calc(2*var(--u)) calc(4*var(--u)) rgba(0,0,0,.35) }\n.vta-rwrow span{ min-width:0; text-align:left; font:900 calc(12.5*var(--u))/1.1 \"Helvetica Neue\",Helvetica,Arial,sans-serif }\n.vtc-slam .vta-rw{ margin-top:calc(8*var(--u)) }\n";
+function vtaCss(){ if(document.getElementById('vtaCss')) return; const st=document.createElement('style'); st.id='vtaCss'; st.textContent=VTA_CSS; document.head.appendChild(st); }
+function vtaRewardHTML(k){ return '<div class="vta-rw"><div class="vta-rwd"><b>'+escH(t('REWARD'))+'</b></div><div class="vta-rwrow"><img alt="" src="'+BBSV_ART[k]+'"><span>'+escH(t(VTA_PRIZE[k]))+'</span></div></div>'; }
+function vtaPare(root){   
+  for(const e of root.querySelectorAll('.vtc-sarge, .vtc-bell svg, .vtc-hp, .vtc-bite')) e.remove();
+  const bell=root.querySelector('.vtc-bell'); if(bell) bell.classList.add('vta-cd');
+  for(const rw of root.querySelectorAll('.vtc-rw')){ const band=rw.parentNode.querySelector('.vtc-band'), k=BBSV_TIERS.find(x=>band && band.classList.contains(x)); if(k) rw.outerHTML=vtaRewardHTML(k); }
+}
+function vtaShrink(e, w, room, u){ if(w>room) e.style.fontSize='calc('+(parseFloat(getComputedStyle(e).fontSize)*room/w*0.96/u).toFixed(2)+'*var(--u))'; }   
+function vtaFit(root){ const u=bbsvU();   
+  for(const e of root.querySelectorAll('.vtc-wanted')){ if(e.__fit || !e.clientWidth) continue; e.__fit=1; vtaShrink(e, e.scrollWidth, e.clientWidth, u); }
+  for(const b of root.querySelectorAll('.vta-rwd b')){ if(b.__fit) continue; const row=b.parentNode, room=row.clientWidth-2*(parseFloat(getComputedStyle(row).columnGap)||0), w=b.offsetWidth; if(room<=0 || !w) continue; b.__fit=1; vtaShrink(b, w, room, u); }
+}
+const vta0_skel=vtcSkeleton, vta0_render=bbsvRender, vta0_card=bbsvRulingCard, vta0_clock=bbsvClock;
+vtcSkeleton=function(){
+  const h=vta0_skel.apply(this, arguments); if(!VTA.on) return h;
+  vtaCss(); const tp=document.createElement('template'); tp.innerHTML=h; vtaPare(tp.content); return tp.innerHTML;   
+};
+bbsvRender=function(){ const r=vta0_render.apply(this, arguments); if(VTA.on && BBSV.el && !BBSV.folded) vtaFit(BBSV.el); return r; };
+bbsvRulingCard=function(){ const r=vta0_card.apply(this, arguments); const c=VTA.on && document.getElementById('vtcCard'); if(c){ vtaCss(); vtaPare(c); vtaFit(c); } return r; };   
+bbsvClock=function(){ return VTA.on? tf('COUNTDOWN %1', evMMSS(bbsvLeft())) : vta0_clock.apply(this, arguments); };   
+function vtaState(){ const n=s=>document.querySelectorAll(s).length, tx=id=>(document.getElementById(id)||{}).textContent||null; return { on:VTA.on?1:0, sarge:n('.vtc-sarge'), bell:n('.vtc-bell svg'), hp:n('.vtc-hp'), bite:n('.vtc-bite'), rewards:[...document.querySelectorAll('.vta-rw')].map(e=>e.textContent), clock:tx('bbsvClock'), clock2:tx('bbsvClock2') }; }
+setTimeout(function(){ try{ if(window.GVT) GVT.vta=vtaState; }catch(e){} }, 0);   
+
+(function(){
+  const W = {
+    'COUNTDOWN %1': ['カウントダウン %1', '카운트다운 %1', '倒计时 %1', 'COUNTDOWN %1', 'ОТСЧЁТ %1', 'CUENTA REGRESIVA %1', 'العد التنازلي %1']
   };
   const L = ['ja', 'ko', 'zh-Hans', 'de', 'ru', 'es', 'ar'];
   for (const k in W) for (let i = 0; i < L.length; i++) { if (!TR[L[i]]) TR[L[i]] = {}; if (!(k in TR[L[i]])) TR[L[i]][k] = W[k][i]; }
