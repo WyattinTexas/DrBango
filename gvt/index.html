@@ -81853,6 +81853,7 @@ function outfitDress(art, wk, wear){
   if(on('gnomebeard') && !pkh9) head+=OF_GBEARD;   
   if(on('helmet')) hat+=OF_HELM;
   if(on('cowboy')) hat+=OF_HAT;    
+  if(on('captainshat')) hat+=lbwaHatArt();   
   if(on('snowhat')) hat+=OF_SNOWHAT;   
   if(on('safarihat')) hat+=OF_SAFHAT;   
   if(on('kingcrown')) hat+=OF_CROWN;   
@@ -90721,7 +90722,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='26.08';        
+let GVT_CV='26.09';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -151940,7 +151941,7 @@ function read(pg){ const c=lgCh(pg); if(!c) return null; const S={ id:pg, name:c
     if(park){ const pid=LG3_PARK[park], won=parkLedger(pid).lv|0, Lv=parkLevels(pid), st=lg3St(park); S.road={ id:'park', name:LG3_NAME[park], place:park, from:1, to:Lv, won, live:Lv, open:!st.lock, lock:st.lock, lockLine:safe(()=>{ const k=amLock(amPin(park)); return k && k.line; }) };
       S.prizes=lg3ParkPrizes(pid).map(p=>mkPrize(p, 'road', won>=p.n, p.n)); S.ladder=ladder('park'+pid, 1, Lv, n=>parkCfg(pid, n)); }
     if(throne){ const led=META[throne]||{}, st=lg3St(throne), T=lg3TierTable()[throne]||[]; S.tiers=T.map(([tk, pz])=>({ k:tk, name:LG3_TIERNAME[tk], won:!!led[tk], night:tk==='u', prizes:pz.map(([kind, id])=>mkPrize({ kind, id, n:tk }, 'throne', held(kind, id, led[tk]), tk)) }));
-      S.thr={ id:throne, name:LG3_NAME[throne], lock:st.lock, king:({ bone:'kingrex', ice:'kingyeti', croak:'kingcroak', fields:'kingbear', palace:'princess', caves:'fyeti', sky:'skyfort', bbs:'bbshow' })[throne], lockLine:safe(()=>{ const k=amLock(amPin(throne)); return k && k.line; }) };
+      S.thr={ id:throne, name:LG3_NAME[throne], lock:st.lock, king:({ bone:'kingrex', ice:'kingyeti', croak:'kingcroak', fields:'kingbear', palace:'princess', caves:'fyeti', sky:'skyfort', bbs:'bbshow', wreck:'kingkraken' })[throne], lockLine:safe(()=>{ const k=amLock(amPin(throne)); return k && k.line; }) };
       for(const tr of S.tiers) for(const p of tr.prizes){ p.tier=tr.name; p.night=tr.night; S.prizes.push(p); } } }
   
   const ahead=S.prizes.filter(p=>!p.won); S.next=ahead.find(p=>p.where==='road' && p.kind!=='star') || ahead.find(p=>p.kind!=='star') || ahead[0] || null; if(S.next) S.next.isNext=true;
@@ -152117,8 +152118,8 @@ const SLI=(function(){
 const E=s=>escH(String(s)), safe=f=>{ try{ return f()||''; }catch(e){ return ''; } };
 const ORDER=['cover','theater','camp','camploot','dino','bone','yeti','ice','west','croak','teddy','fields','caves','sky','moon','palace','elite','eliteloot','over'];   
 const PG={}; ORDER.forEach((id,i)=>{ if(i>0) PG[id]=[i*2, i*2+1]; });   
-const PAIR={ dino:'dino', bone:'dino', yeti:'yeti', ice:'yeti', west:'west', croak:'west', teddy:'teddy', fields:'teddy', caves:'caves', sky:'sky', moon:'moon', palace:'moon', camp:'camp', camploot:'camp', elite:'elite', eliteloot:'elite', over:'over', bbs:'bbs' };   
-const PARK={ dino:'dino', yeti:'yeti', west:'western', teddy:'teddy', moon:'moon' }, THRONE={ bone:1, ice:1, croak:1, fields:1, palace:1, caves:1, sky:1, bbs:1 }, CHAP={ camp:1, elite:1, over:1 };   
+const PAIR={ dino:'dino', bone:'dino', yeti:'yeti', ice:'yeti', west:'west', croak:'west', teddy:'teddy', fields:'teddy', caves:'caves', sky:'sky', moon:'moon', palace:'moon', camp:'camp', camploot:'camp', elite:'elite', eliteloot:'elite', over:'over', bbs:'bbs', wreck:'wreck' };   
+const PARK={ dino:'dino', yeti:'yeti', west:'western', teddy:'teddy', moon:'moon' }, THRONE={ bone:1, ice:1, croak:1, fields:1, palace:1, caves:1, sky:1, bbs:1, wreck:1 }, CHAP={ camp:1, elite:1, over:1 };   
 const LOOT={ camploot:'camp', eliteloot:'elite' }, LOOT_L=5, CHAP_N=5;   
 const lvOf=g=>{ const nx=g.group? (g.items.find(p=>!p.won)||g.items[g.items.length-1]) : g; return typeof nx.n==='number'? nx.n : 0; };   
 
@@ -152218,7 +152219,7 @@ function meter(b){ const s=b.st; if(s.frac!==null) return '<div class="l3-mb"><i
 
 
 
-const CLOTH={ camp:'#3F4A24', elite:'#1E2B50', over:'#4E2E78', dino:'#9A3B12', yeti:'#235A80', west:'#6B4A22', teddy:'#8E1F2C', caves:'#0F3843', sky:'#37569A', moon:'#1A5F3D', bbs:'#4F1D2D' };   
+const CLOTH={ camp:'#3F4A24', elite:'#1E2B50', over:'#4E2E78', dino:'#9A3B12', yeti:'#235A80', west:'#6B4A22', teddy:'#8E1F2C', caves:'#0F3843', sky:'#37569A', moon:'#1A5F3D', bbs:'#4F1D2D', wreck:'#1F4E6E' };   
 function cloth(b){ if(OPT.cloth==='theme') return CLOTH[b.id]||'#3F4A24'; if(OPT.cloth==='land'){ if(b.kind!=='quest') return b.kind==='camp'? '#3F4A24' : b.id==='elite'? '#2F5FB8' : '#4A2C78'; const p=safe(()=>amPin(b.tok)); return (p && AM_LAND[p.room])||'#3F4A24'; } return '#3F4A24'; }
 function bookHTML(b, w){ const nm=nameOf(b), win=OPT.books==='sections'? lg3Win(b.id) : '', art=win||(LG3_MENU[b.tok]? LG3_MENU[b.tok]() : ''), king=!win && (b.tok==='bone' || b.tok==='ice'), face=!win && !!LG3_THRONE[b.tok];   
   return '<div class="lg-ch sls-slot k-'+b.kind+(pbkTok(b.tok)? ' pbk-gold' : '')+(tpoOn() && TPO_IDS[b.id]? ' tpo' : '')    +(b.st.lock? ' lock' : '')+(b.next && !b.st.lock? ' next' : '')+'" data-ch="'+b.ch+'" data-book="'+b.id+'" style="--bw:'+w+'px;--cloth:'+cloth(b)+'">'
@@ -195271,6 +195272,132 @@ setTimeout(function(){ try{ if(window.GVT && !GVT.lbwa) GVT.lbwa=function(){ con
   const L=function(f){ try{ const v=f(); return typeof v==='string'? v.length : -1; }catch(e){ return 'err '+String(e).slice(0,60); } };
   return { cv:GVT_CV, on:LBWA.on, v:LBWA.v, joined:LBWA.joined, keys:keys.length, inTable:inT.length, minted:minted.length, boxes:keys.filter(function(k){ return !!PET_BOX[k]; }).length, box140:Object.keys(LBWA_BOX).length, w:LBWA_W,
     molds:keys.map(function(k){ return [k, LBWA_ART.mold[k].length]; }), painters:{ hall:L(lbwaCoveHallSVG), token:L(lbwaTokenSVG), wheel:L(lbwaWheelSVG), cutlass:L(lbwaCutlassSVG), hand:L(lbwaCutlassHand), hat:L(lbwaHatArt), tile:L(lbwaHatTileSVG), wall:L(function(){ return lbwaWallPaint(0,0,840,256); }), bottle:L(lbwaBottleSVG), leap:L(lbwaBottleLeap), ship:L(function(){ return lbwaPondShipSVG(0,0,1); }), pill:L(function(){ return lbwaPillSVG(0,0,''); }), log:L(lbwaLogThrone) } }; } }catch(e){} }, 0);
+
+
+
+
+
+
+
+
+const LBWB={ v:1, joined:0, book:0, busy:0, seat:{ cx:500, cy:328, rx:90, ry:24 }, ship:{ x:450, y:321, s:0.84 }, bottle:{ x:556, y:332, s:0.9, r:-10 }, lift:1100 };   
+const LBWB_T={ e:{ w:3, n:1.0, hp:1.0 }, m:{ w:4, n:1.25, hp:1.5 }, h:{ w:5, n:1.5, hp:2.2 }, g:{ w:5, n:1.5, hp:2.64 } };   
+const LBWB_TOAST='SOMETHING WASHED UP IN THE BACKYARD POND…', LBWB_LINE='The Tan have gone to sea. Mind the kraken.', LBWB_SOLO='THE SUNKEN SHIP IS SOLO FOR NOW';
+function lbwbPondOn(){ return !!META.pirate; }   
+function lbwbCoveOn(){ return !!(META.pirate && META.cove); }   
+function wreckMegaOpen(){ return !!(META.wreck && META.wreck.h); }   
+
+RAID_INFO.wreck={ k:'wreck', plc:'', enc:9200, name:'THE SUNKEN SHIP', wm:'THE PIRATE COVE', king:'kingkraken', show:null, falls:'VICTORY', wing:'sw', bed:'dinopark', g:true, u:false, hmul:1.2, hmulU:0, retreat:null, posts:[],
+  flankVB:'0 0 140 140', crop:'0 0 140 140', bg:'linear-gradient(180deg,#1B3550,#2E7FC0 52%,#E6CB8E)', hall:()=>lbwaCoveHallSVG(), mega:()=>wreckMegaOpen(), key:()=>lbwbCoveOn(), cel:()=>'', lost:'The kraken sends his regards.', pg:0 };   
+
+function lbwbJoin(){ if(LBWB.joined || !META.pirate) return 0; LBWB.joined=1; let n=0;
+  try{ if(lbwaJoin()) n++; }catch(e){}
+  try{
+    if(!DECOR_INFO.shipswheel){ DECOR_INFO.shipswheel={ name:"THE SHIP'S WHEEL", sub:'WON AT THE SUNKEN SHIP · NEVER SOLD', tag:'TAP IT! IT SPINS!' }; n++; }   
+    if(!WPAP.kraken){ WPAP.kraken={ name:'KING KRAKEN', boss:'wreck' }; n++; } if(!WPAP_PAINT.kraken){ WPAP_PAINT.kraken=lbwaWallPaint; n++; }   
+    if(!ENH_INFO.cutlass){ ENH_INFO.cutlass={ unit:'sarge', name:'THE CUTLASS', sub:"A BLADE FOR SARGE · THE SEA DOG'S STEEL", tag:'THE CUTLASS · IN YOUR HAND!' }; n++; }   
+    if(!OUTFIT_INFO.captainshat){ OUTFIT_INFO.captainshat={ name:"THE CAPTAIN'S HAT" }; n++; }   
+    if(!UDEF.kingkraken){ UDEF.kingkraken={ rng:220, rate:0.5, dmg:2.4, grit:31, name:'KING KRAKEN', lbwb:1 }; n++; }   
+  }catch(e){ try{ console.error('CARD-LBW-B join', e); }catch(e2){} }
+  try{ lbwbBook(); }catch(e){}
+  return n; }
+
+function lbwbBook(){ if(LBWB.book) return 0; try{
+  if(typeof LG_CH==='undefined' || typeof LG_PAGES==='undefined' || typeof SLB==='undefined' || !SLB.ORDER || !SLB.PG) return 0; LBWB.book=1;
+  if(!LG_CH.some(c=>c.id==='wreck')){ const row={ id:'wreck', n:7, name:'THE PIRATE COVE', place:'KING KRAKEN', pg:[34,35], scene:'wreckhall', crop:'404 0 792 672', boss:'kingkraken', bossAt:[158,38,236], plat:[150,262,250,'wood'], ground:'sand', men:[['rifleman',22,300,52],['mgunner',62,290,62],['bazooka',114,296,66]],
+      cap:'KING KRAKEN. THE SUNKEN SHIP. HOLD THE DECK.', note:'The bottle in the backyard pond holds the deed.', places:['wreck'], threats:[['kingkraken','KING KRAKEN'],['tanrifle','THE TAN ARMY']] };
+    const after=LG_CH.some(c=>c.id==='bbs')? 'bbs' : 'moon', afterPg=after==='bbs'? 'bbs' : 'palace';   
+    const i=LG_CH.findIndex(c=>c.id===after); LG_CH.splice(i>=0? i+1 : LG_CH.length, 0, row);
+    const j=LG_PAGES.indexOf(afterPg); LG_PAGES.splice(j>=0? j+1 : LG_PAGES.length, 0, 'wreck');
+    const k=SLB.ORDER.indexOf(afterPg); SLB.ORDER.splice(k>=0? k+1 : SLB.ORDER.length, 0, 'wreck'); SLB.ORDER.forEach((id,i9)=>{ if(i9>0) SLB.PG[id]=[i9*2, i9*2+1]; }); row.pg=SLB.PG.wreck||row.pg; }   
+  LG3_NAME.wreck='THE PIRATE COVE'; LG3_THRONE.wreck=1; LG3_MENU.wreck=()=>lbwaTokenSVG();   
+  if(typeof LG_SEATS==='object' && !LG_SEATS.wreck) LG_SEATS.wreck=[1160,300];
+  return 1; }catch(e){ try{ console.error('CARD-LBW-B book', e); }catch(e2){} return 0; } }
+{ const s0=LGX.scene; LGX.scene=k=>(k==='wreckhall')? (function(){ try{ return lbwaCoveHallSVG(); }catch(e){ return ''; } })() : s0(k); }   
+{ const d0=lgDone; lgDone=function(id){ if(id==='wreck'){ try{ return !!(META.wreck && (META.wreck.e||META.wreck.m||META.wreck.h||META.wreck.g)); }catch(e){ return false; } } return d0.apply(this, arguments); }; }   
+{ const t0=lg3TierTable; lg3TierTable=function(){ const T=t0.apply(this, arguments); if(T && !T.wreck) T.wreck=[['e',[['decor','shipswheel'],['wall','kraken']]],['m',[['part','cutlass']]],['h',[['outfit','captainshat']]],['g',[['man','kingkraken']]]]; return T; }; }   
+{ const d0=decShopArt; decShopArt=function(id){ if(id==='shipswheel') return lbwaWheelSVG(); return d0.apply(this, arguments); }; }   
+{ const e0=enhPartSVG; enhPartSVG=function(id){ if(id==='cutlass') return lbwaCutlassSVG(); return e0.apply(this, arguments); }; }   
+{ const o0=outfitPartSVG; outfitPartSVG=function(id){ if(id==='captainshat') return lbwaHatTileSVG(); return o0.apply(this, arguments); }; }   
+
+{ const r0=raidTierOpenFor; raidTierOpenFor=function(rk,tier){ if(rk==='wreck'){ if(tier==='g') return !!raidInfo(rk).mega(); if((tier==='m' || tier==='h') && pnTierPast(raidLed(rk,false), tier)) return true; if(tier==='e') return raidDoorKey('wreck'); if(tier==='m') return !!(META.wreck&&META.wreck.e); return !!(META.wreck&&META.wreck.m); } return r0.apply(this, arguments); }; }   
+{ const c0=raidCfg; raidCfg=function(tier,rk){ if(rk && RAID_INFO[rk] && RAID_INFO[rk].k==='wreck') return lbwbCfg(tier); return c0.apply(this, arguments); }; }
+function lbwbCfg(tier){ tier=(tier==='m' || tier==='h' || tier==='g')? tier : 'e'; const T=LBWB_T[tier], ax=parkCampAxes(40);   
+  const cfg={ n:0, oneBoss:1, hpMul:ax.hpMul*T.hp, cntMul:1, bossF:ax.bossF, rateMul:ax.rateMul, waves:[], terrain:{ rocks:[], river:null, ground:'sand' }, lbwb:1, lbwbTier:tier };
+  const c=k=>Math.max(1,Math.round(k*T.n)), pool=['tanmg','tanshotgun','tanflame','tansniper','tanmortar'], E=['right','right-top','right-bottom'];
+  for(let w=0; w<T.w; w++) cfg.waves.push({ name:'THE SUNKEN SHIP', groups:[ { f:'column', t:'tanrifle', n:c(4+w), e:'right', at:0 }, { f:(w%2)? 'guerrilla' : 'line', t:pool[w%pool.length], n:c(2+Math.floor(w/2)), e:E[1+(w%2)], at:2.5 } ] });
+  return cfg; }
+{ const t0=raidTick; raidTick=function(dt){ t0.apply(this, arguments); try{ lbwbTick(dt); }catch(e){} }; }
+function lbwbTick(dt){ const rd=S.raid; if(!rd || rd.k!=='wreck' || rd.cfg!==S.cfg || S.mode!=='play' || S.cleared || rd.won) return;   
+  if(S.wave<S.cfg.waves.length || S.queue.length || S.foes.length) return;
+  rd.won=true; rd.void=1;   
+  if(!coopGuest() && !S.cleared){ S.cleared=true; S.forms.length=0; S.queue.length=0; S.waveActive=false; S.bossKilled=true; startVictoryFlag(120, 1, null, dyeHex()||GREEN, ()=>{ if(S.mode==='play') endBattle(true); }); } }
+{ const b0=crewRaidBoom; crewRaidBoom=function(tier){ if(RAID_CUR==='wreck' && typeof COOP!=='undefined' && COOP && COOP.code && (COOP.members||[]).length>=2){ try{ wtToast(t(LBWB_SOLO)); }catch(e){} return Promise.resolve(true); } return b0.apply(this, arguments); }; }   
+
+{ const r0=renderRaidScene; renderRaidScene=function(){ r0.apply(this, arguments); if(RAID_CUR==='wreck'){ try{ lbwbLobbyDress(); }catch(e){ try{ console.error('CARD-LBW-B lobby', e); }catch(e2){} } } }; }
+function lbwbLobbyDress(){ const sc=document.getElementById('raidscene'); if(!sc) return; sc.classList.add('lbwb');
+  const tiers=sc.querySelector('.rd-tiers'); if(tiers && !raidInfo('wreck').mega() && !tiers.querySelector('#rdtier-g9')) tiers.insertAdjacentHTML('beforeend', '<button type="button" class="rd-tier mega lk" id="rdtier-g9" onclick="lbwbMegaTap()" data-notr>'+gly('lock')+' '+escH(t('MEGA'))+'</button>');
+  if(tiers && !sc.querySelector('.rd-rec')) tiers.insertAdjacentHTML('afterend', '<div class="rd-rec" data-notr>'+escH(t(LBWB_LINE))+'</div>'); }
+function lbwbMegaTap(){ try{ audio(); SFX.clack(); shopDeny('rdtier-g9'); }catch(e){} }   
+
+{ const y0=yardFloorSVG; yardFloorSVG=function(nt){ const s=y0.apply(this, arguments); return lbwbPondOn()? s+lbwbPondSVG(nt) : s; }; }   
+function lbwbPondSVG(nt){ const P=LBWB.seat, A=LBWA_ART, deed=lbwbCoveOn(), rm=reducedMotion();
+  const w1=nt? '#2A5F8E' : '#58B2E8', w2=nt? '#1E4668' : '#3D93CC', lit=nt? '#346F9E' : '#8ED2F6', bank=nt? '#3A6E2C' : '#6CB84E', reed=nt? '#2F5A24' : '#3F7030', pad=nt? '#3F8A33' : '#5FAF45';
+  let s='<g id="lbwb-pond" data-lbwb="'+(deed? 'ship' : 'bottle')+'">';
+  s+='<ellipse cx="'+P.cx+'" cy="'+(P.cy+5)+'" rx="'+(P.rx+9)+'" ry="'+(P.ry+6)+'" fill="'+bank+'"/>';   
+  s+='<ellipse cx="'+P.cx+'" cy="'+P.cy+'" rx="'+P.rx+'" ry="'+P.ry+'" fill="'+w1+'" stroke="'+w2+'" stroke-width="2.4"/>';
+  s+='<ellipse cx="'+(P.cx-14)+'" cy="'+(P.cy-5)+'" rx="'+Math.round(P.rx*0.58)+'" ry="'+Math.round(P.ry*0.46)+'" fill="'+lit+'" opacity="0.5"/>';   
+  [[P.cx+22,P.cy+6],[P.cx-48,P.cy+9],[P.cx+58,P.cy-6]].forEach(function(w){ s+=A.LN('M'+(w[0]-14)+' '+w[1]+' Q'+(w[0]-5)+' '+(w[1]-4)+' '+(w[0]+4)+' '+w[1]+' Q'+(w[0]+10)+' '+(w[1]+3)+' '+(w[0]+15)+' '+w[1], '#E6F6FF', 1.6, { opacity:nt? 0.35 : 0.7 }); });   
+  s+=A.LN('M'+(P.cx+P.rx-18)+' '+(P.cy+10)+' l-3 -36 M'+(P.cx+P.rx-8)+' '+(P.cy+9)+' l2 -30 M'+(P.cx+P.rx-26)+' '+(P.cy+12)+' l-5 -26', reed, 2.4)+A.E(P.cx+P.rx-21, P.cy-30, 2.6, 7, '#6E4A2B', 0.8)+A.E(P.cx+P.rx-6, P.cy-25, 2.4, 6, '#6E4A2B', 0.8);   
+  s+=A.E(P.cx-62, P.cy+9, 11, 5, pad, 1.2)+A.P('M'+(P.cx-62)+' '+(P.cy+9)+' L'+(P.cx-51)+' '+(P.cy+7)+' L'+(P.cx-53)+' '+(P.cy+12)+' Z', w1, 0)+A.E(P.cx-42, P.cy+15, 8, 3.8, pad, 1.1);   
+  if(!deed){ const B=LBWB.bottle;
+    s+='<g id="lbwb-ring" transform="translate('+B.x+' '+(B.y+6)+') scale(0.4)" opacity="0">'+A.RING(0,0,30,8,0.9)+'</g>';   
+    s+='<g id="lbwb-bottle" transform="translate('+B.x+' '+B.y+') rotate('+B.r+') scale('+B.s+')"><g>'+(rm? '' : '<animateTransform attributeName="transform" type="translate" values="0 0;0 -2.5;0 0" dur="2.6s" repeatCount="indefinite"/>')+lbwaBottleLeap()+'</g></g>'; }   
+  else { const H=LBWB.ship;
+    s+='<g id="ro-lbwcove">'+A.E(H.x+4, H.y+9, 26, 4.5, '#000', 0, { opacity:0.18 })+'<g transform="translate('+H.x+' '+H.y+') scale('+H.s+')"><g>'+(rm? '' : '<animateTransform attributeName="transform" type="rotate" values="-2.2 0 0;2.2 0 0;-2.2 0 0" dur="3.6s" repeatCount="indefinite"/>')+A.ship()+'</g></g></g>'; }   
+  return s+'</g>'; }
+ROOM_SPOTS.push({ id:'lbwbottle', x:514, y:294, w:84, h:76, z:3, due:()=>roomCur()==='backyard' && lbwbPondOn() && !META.cove, act:()=>lbwbCatch() });   
+ROOM_SPOTS.push({ id:'lbwcove', x:404, y:272, w:92, h:84, mv:'lbwcove', z:3, due:()=>roomCur()==='backyard' && lbwbCoveOn(), label:()=>t('TO THE COVE'), notr:1, cap:220, lx:500, ly:355, act:()=>lbwbShipTap() });   
+function lbwbShipTap(){ if(!lbwbCoveOn()) return; audio(); SFX.blip(); openRaidScene('wreck'); }
+function lbwbCatch(){ if(!lbwbPondOn() || META.cove || LBWB.busy || S.mode!=='menu') return; LBWB.busy=1; audio(); try{ SFX.thock(); }catch(e){}
+  const g=document.getElementById('lbwb-bottle'), ring=document.getElementById('lbwb-ring'), B=LBWB.bottle;
+  const done=()=>{ LBWB.busy=0; META.cove=1; saveMeta(); try{ SFX.snap(); }catch(e){} if(S.mode==='menu') renderMenu(); lbwbCard(); };   
+  if(!g || reducedMotion()){ done(); return; }
+  const t0=performance.now();
+  const step=()=>{ const k=Math.min(1,(performance.now()-t0)/LBWB.lift), e=1-Math.pow(1-k,3);
+    g.setAttribute('transform', 'translate('+B.x+' '+(B.y-46*e)+') rotate('+(B.r+34*e)+') scale('+(B.s+0.3*e)+')');
+    if(ring){ ring.setAttribute('transform', 'translate('+B.x+' '+(B.y+6)+') scale('+(0.4+1.3*e)+')'); ring.setAttribute('opacity', String(0.9*(1-k))); }
+    if(k<1 && g.isConnected) requestAnimationFrame(step); else done(); };
+  requestAnimationFrame(step); }
+function lbwbCard(){ const p=document.getElementById('milePop'); if(!p) return;   
+  p.innerHTML='<div class="mb-card"><span class="mb-band" data-notr>'+escH(t('A MESSAGE IN A BOTTLE!'))+'</span>'+utBrow('treasure')+'<h2 class="mb-h" data-notr>'+escH(t('THE PIRATE COVE'))+'</h2>'
+    +'<span class="mb-win">'+MB_RAYS+lbwaBottleSVG()+'</span><span class="mb-line" data-notr>'+escH(t('X marks the spot. The cove is yours, Sarge. Mind the kraken.'))+'</span>'
+    +'<button type="button" class="mb-take gold" onclick="UI.mileTake()" data-notr>'+escH(t('OKAY'))+'</button></div>';
+  p.classList.remove('hidden'); try{ SFX.fanfare(); }catch(e){} }
+
+{ const c0=codeRedeem; codeRedeem=function(){ try{ const inp=document.getElementById('shCodeIn'); const word=inp? codeNorm(inp.value) : '';
+    if(word==='PIRATE' || word==='CODEPIRATE'){ inp.value=''; try{ inp.blur(); }catch(e){} codeSay(t(LBWB_TOAST),'yes'); SFX.fanfare(); codeShut(1); META.pirate=1; saveMeta(); lbwbJoin(); if(roomCur()!=='backyard') roomSwitch('backyard', true); if(S.mode==='menu') renderMenu(); evToast(t(LBWB_TOAST)); return; } }
+  catch(e){ try{ console.error('CARD-LBW-B code', e); }catch(e2){} }
+  return c0.apply(this, arguments); }; }
+if(META.pirate){ try{ lbwbJoin(); }catch(e){} }   
+
+Object.assign(TR.ja||(TR.ja={}), {"THE PIRATE COVE":"かいぞくの いりえ","THE SUNKEN SHIP":"しずんだ ふね","TO THE COVE":"いりえへ","A MESSAGE IN A BOTTLE!":"ボトルの てがみ！","X marks the spot. The cove is yours, Sarge. Mind the kraken.":"Xじるしが めじるし。いりえは きみのものだ、サージ。クラーケンに きをつけろ。","KING KRAKEN":"キング・クラーケン","THE SHIP'S WHEEL":"ふねの かじ","THE CUTLASS":"カトラス","THE CAPTAIN'S HAT":"せんちょうの ぼうし","SOMETHING WASHED UP IN THE BACKYARD POND…":"うらにわの いけに なにか ながれついた…","The Tan have gone to sea. Mind the kraken.":"タンぐんが うみに でた。クラーケンに きをつけろ。","The kraken sends his regards.":"クラーケンから よろしくだってさ。","KING KRAKEN. THE SUNKEN SHIP. HOLD THE DECK.":"キング・クラーケン。しずんだ ふね。デッキを まもれ。","The bottle in the backyard pond holds the deed.":"うらにわの いけの ボトルに けんりしょが はいっている。","TAP IT! IT SPINS!":"タップ！ くるくる まわる！","THE SUNKEN SHIP IS SOLO FOR NOW":"しずんだ ふねは いまは ひとりで"});
+Object.assign(TR.ko||(TR.ko={}), {"THE PIRATE COVE":"해적의 만","THE SUNKEN SHIP":"가라앉은 배","TO THE COVE":"만으로","A MESSAGE IN A BOTTLE!":"유리병 편지!","X marks the spot. The cove is yours, Sarge. Mind the kraken.":"X 표시가 그 자리야. 만은 네 거야, 병장. 크라켄을 조심해.","KING KRAKEN":"크라켄 왕","THE SHIP'S WHEEL":"배의 키","THE CUTLASS":"커틀러스","THE CAPTAIN'S HAT":"선장 모자","SOMETHING WASHED UP IN THE BACKYARD POND…":"뒷마당 연못에 뭔가 떠내려왔어…","The Tan have gone to sea. Mind the kraken.":"탄 군이 바다로 나갔어. 크라켄을 조심해.","The kraken sends his regards.":"크라켄이 안부를 전한대.","KING KRAKEN. THE SUNKEN SHIP. HOLD THE DECK.":"크라켄 왕. 가라앉은 배. 갑판을 지켜라.","The bottle in the backyard pond holds the deed.":"뒷마당 연못의 병 속에 권리증이 들어 있어.","TAP IT! IT SPINS!":"눌러 봐! 빙글빙글 돌아!","THE SUNKEN SHIP IS SOLO FOR NOW":"가라앉은 배는 지금은 혼자만"});
+Object.assign(TR["zh-Hans"]||(TR["zh-Hans"]={}), {"THE PIRATE COVE":"海盗湾","THE SUNKEN SHIP":"沉船","TO THE COVE":"去海盗湾","A MESSAGE IN A BOTTLE!":"漂流瓶里的信！","X marks the spot. The cove is yours, Sarge. Mind the kraken.":"X 标记的地方就是了。中士，海盗湾是你的了。小心海怪。","KING KRAKEN":"海怪国王","THE SHIP'S WHEEL":"船舵","THE CUTLASS":"弯刀","THE CAPTAIN'S HAT":"船长帽","SOMETHING WASHED UP IN THE BACKYARD POND…":"后院的池塘里漂来了什么东西……","The Tan have gone to sea. Mind the kraken.":"黄军出海了。小心海怪。","The kraken sends his regards.":"海怪向你问好。","KING KRAKEN. THE SUNKEN SHIP. HOLD THE DECK.":"海怪国王。沉船。守住甲板。","The bottle in the backyard pond holds the deed.":"后院池塘里的瓶子装着地契。","TAP IT! IT SPINS!":"点一下！它会转！","THE SUNKEN SHIP IS SOLO FOR NOW":"沉船目前只能单人挑战"});
+Object.assign(TR.de||(TR.de={}), {"THE PIRATE COVE":"DIE PIRATENBUCHT","THE SUNKEN SHIP":"DAS GESUNKENE SCHIFF","TO THE COVE":"ZUR BUCHT","A MESSAGE IN A BOTTLE!":"EINE FLASCHENPOST!","X marks the spot. The cove is yours, Sarge. Mind the kraken.":"Das X zeigt die Stelle. Die Bucht gehört dir, Sarge. Hüte dich vor dem Kraken.","KING KRAKEN":"KÖNIG KRAKE","THE SHIP'S WHEEL":"DAS STEUERRAD","THE CUTLASS":"DER ENTERSÄBEL","THE CAPTAIN'S HAT":"DER KAPITÄNSHUT","SOMETHING WASHED UP IN THE BACKYARD POND…":"ETWAS IST IM TEICH IM HINTERHOF ANGESPÜLT WORDEN…","The Tan have gone to sea. Mind the kraken.":"Die Beigen sind zur See gefahren. Hüte dich vor dem Kraken.","The kraken sends his regards.":"Der Krake lässt grüßen.","KING KRAKEN. THE SUNKEN SHIP. HOLD THE DECK.":"KÖNIG KRAKE. DAS GESUNKENE SCHIFF. HALTET DAS DECK.","The bottle in the backyard pond holds the deed.":"Die Flasche im Teich im Hinterhof enthält die Urkunde.","TAP IT! IT SPINS!":"TIPP DRAUF! ES DREHT SICH!","THE SUNKEN SHIP IS SOLO FOR NOW":"DAS GESUNKENE SCHIFF IST VORERST NUR SOLO"});
+Object.assign(TR.ru||(TR.ru={}), {"THE PIRATE COVE":"ПИРАТСКАЯ БУХТА","THE SUNKEN SHIP":"ЗАТОНУВШИЙ КОРАБЛЬ","TO THE COVE":"В БУХТУ","A MESSAGE IN A BOTTLE!":"ПОСЛАНИЕ В БУТЫЛКЕ!","X marks the spot. The cove is yours, Sarge. Mind the kraken.":"Крестик отмечает место. Бухта твоя, Сарж. Берегись кракена.","KING KRAKEN":"КОРОЛЬ КРАКЕН","THE SHIP'S WHEEL":"ШТУРВАЛ","THE CUTLASS":"АБОРДАЖНАЯ САБЛЯ","THE CAPTAIN'S HAT":"ШЛЯПА КАПИТАНА","SOMETHING WASHED UP IN THE BACKYARD POND…":"ЧТО-ТО ПРИБИЛО К ПРУДУ НА ЗАДНЕМ ДВОРЕ…","The Tan have gone to sea. Mind the kraken.":"Песочная армия ушла в море. Берегись кракена.","The kraken sends his regards.":"Кракен передаёт привет.","KING KRAKEN. THE SUNKEN SHIP. HOLD THE DECK.":"КОРОЛЬ КРАКЕН. ЗАТОНУВШИЙ КОРАБЛЬ. ДЕРЖИТЕ ПАЛУБУ.","The bottle in the backyard pond holds the deed.":"В бутылке в пруду на заднем дворе лежит купчая.","TAP IT! IT SPINS!":"НАЖМИ! ОНО КРУТИТСЯ!","THE SUNKEN SHIP IS SOLO FOR NOW":"ЗАТОНУВШИЙ КОРАБЛЬ ПОКА ТОЛЬКО В ОДИНОЧКУ"});
+Object.assign(TR.es||(TR.es={}), {"THE PIRATE COVE":"LA CALA PIRATA","THE SUNKEN SHIP":"EL BARCO HUNDIDO","TO THE COVE":"A LA CALA","A MESSAGE IN A BOTTLE!":"¡UN MENSAJE EN UNA BOTELLA!","X marks the spot. The cove is yours, Sarge. Mind the kraken.":"La X marca el lugar. La cala es tuya, Sargento. Cuidado con el kraken.","KING KRAKEN":"EL REY KRAKEN","THE SHIP'S WHEEL":"EL TIMÓN","THE CUTLASS":"EL SABLE","THE CAPTAIN'S HAT":"EL SOMBRERO DEL CAPITÁN","SOMETHING WASHED UP IN THE BACKYARD POND…":"ALGO LLEGÓ AL ESTANQUE DEL PATIO TRASERO…","The Tan have gone to sea. Mind the kraken.":"Los beige se hicieron a la mar. Cuidado con el kraken.","The kraken sends his regards.":"El kraken te manda saludos.","KING KRAKEN. THE SUNKEN SHIP. HOLD THE DECK.":"EL REY KRAKEN. EL BARCO HUNDIDO. DEFIENDE LA CUBIERTA.","The bottle in the backyard pond holds the deed.":"La botella del estanque del patio trasero guarda la escritura.","TAP IT! IT SPINS!":"¡TÓCALO! ¡GIRA!","THE SUNKEN SHIP IS SOLO FOR NOW":"EL BARCO HUNDIDO ES SOLO INDIVIDUAL POR AHORA"});
+Object.assign(TR.ar||(TR.ar={}), {"THE PIRATE COVE":"خليج القراصنة","THE SUNKEN SHIP":"السفينة الغارقة","TO THE COVE":"إلى الخليج","A MESSAGE IN A BOTTLE!":"رسالة في زجاجة!","X marks the spot. The cove is yours, Sarge. Mind the kraken.":"علامة X تحدد المكان. الخليج لك يا سارج. احذر الكراكن.","KING KRAKEN":"الملك كراكن","THE SHIP'S WHEEL":"دفة السفينة","THE CUTLASS":"سيف القراصنة","THE CAPTAIN'S HAT":"قبعة القبطان","SOMETHING WASHED UP IN THE BACKYARD POND…":"شيء ما جرفته المياه إلى بركة الفناء الخلفي…","The Tan have gone to sea. Mind the kraken.":"الجيش البيج خرج إلى البحر. احذر الكراكن.","The kraken sends his regards.":"الكراكن يرسل تحياته.","KING KRAKEN. THE SUNKEN SHIP. HOLD THE DECK.":"الملك كراكن. السفينة الغارقة. تمسكوا بسطح السفينة.","The bottle in the backyard pond holds the deed.":"الزجاجة في بركة الفناء الخلفي تحمل صك الملكية.","TAP IT! IT SPINS!":"اضغط عليه! إنه يدور!","THE SUNKEN SHIP IS SOLO FOR NOW":"السفينة الغارقة للعب الفردي فقط حاليًا"});
+
+setTimeout(function(){ try{ if(window.GVT && !GVT.lbwb) GVT.lbwb=function(o){ o=o||{};
+  if(o.code){ META.pirate=1; saveMeta(); lbwbJoin(); if(S.mode==='menu') renderMenu(); } if(o.deed){ META.cove=1; saveMeta(); if(S.mode==='menu') renderMenu(); } if(o.catch) lbwbCatch(); if(o.book) lbwbBook();
+  const sc=document.getElementById('raidscene'), pond=document.getElementById('lbwb-pond'), pill=document.getElementById('rtag-lbwcove'), T=(typeof lg3TierTable==='function')? (lg3TierTable().wreck||[]) : [];
+  return { cv:GVT_CV, v:LBWB.v, pirate:META.pirate?1:0, cove:META.cove?1:0, joined:LBWB.joined, book:LBWB.book, art:(typeof LBWA==='object')? LBWA.joined : null, kk:typeof SPRITES_SRC.kingkraken, row:!!RAID_INFO.wreck, key:raidDoorKey('wreck')?1:0, tiers:['e','m','h','g'].map(k=>raidTierOpenFor('wreck',k)?1:0),
+    pond:pond? pond.getAttribute('data-lbwb') : null, spots:ROOM_SPOTS.filter(sp=>(sp.id==='lbwbottle' || sp.id==='lbwcove') && (!sp.due || sp.due())).map(sp=>sp.id), pill:pill? pill.textContent.trim() : null, room:roomCur(),
+    lobby:!!(sc && !sc.classList.contains('hidden') && RAID_CUR==='wreck'), chips:sc? Array.prototype.map.call(sc.querySelectorAll('.rd-tier'), b=>b.id+':'+(b.classList.contains('lk')? 'lk' : 'open')+(b.classList.contains('on')? ':on' : '')) : [], line:sc? (function(){ const e=sc.querySelector('.rd-rec'); return e? e.textContent.trim() : null; })() : null, wordmark:sc? (function(){ const e=sc.querySelector('.wt-wordmark'); return e? e.textContent.trim() : null; })() : null,
+    tables:{ decor:!!DECOR_INFO.shipswheel, wall:!!(WPAP.kraken && WPAP_PAINT.kraken), part:!!ENH_INFO.cutlass, outfit:!!OUTFIT_INFO.captainshat, unit:!!UDEF.kingkraken }, shelf:{ ch:LG_CH.some(c=>c.id==='wreck'), pages:LG_PAGES.indexOf('wreck'), order:SLB.ORDER.indexOf('wreck'), pg:SLB.PG.wreck||null, name:LG3_NAME.wreck||null, throne:!!LG3_THRONE.wreck, tiers:T.map(r=>r[0]), done:lgDone('wreck') },
+    fight:S.raid? { k:S.raid.k, t:S.raid.t, won:S.raid.won?1:0, void:S.raid.void?1:0, wave:S.wave, waves:S.cfg? S.cfg.waves.length : 0, foes:S.foes.filter(f=>!f.dead).length, queue:S.queue.length, cleared:S.cleared?1:0, mode:S.mode, lbwb:!!(S.cfg && S.cfg.lbwb), ground:S.cfg && S.cfg.terrain? S.cfg.terrain.ground : null } : null,
+    wreck:META.wreck? JSON.parse(JSON.stringify(META.wreck)) : null, bank:META.starBank|0, raidDay:META.raidDay? JSON.parse(JSON.stringify(META.raidDay)) : null }; }; }catch(e){} }, 0);
 
 buildSprites(()=>{ ready=true;
   
