@@ -90729,7 +90729,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='26.30';        
+let GVT_CV='26.31';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -198189,6 +198189,44 @@ function snake2Read(){ const f=S.foes? S.foes.find(q=>q.bbsSnake) : null; const 
     snake:f? { st:f.bbsSnake.st, s2:Z? Z.st : null, word:f.bbsSnake.word|0, state:f.snakeState, burrow:!!f.burrow, x:Math.round(f.x), y:Math.round(f.y), hp:Math.round(f.hp), max:f.hpMax, dead:!!f.dead, strikes:Z? Z.strikes : 0, hit:Z? (Z.hit|0) : 0, eats:Z? (Z.eats|0) : 0, bites:Z? Z.bites : 0, paid:Z? (Z.paid|0) : 0, bitLives:Z? (Z.bitLives|0) : 0, runs:Z? Z.runs : 0, n:Z? Z.n : 0, ord:Z? Z.ord : 0 } : null,
     log:SNAKE2.log.slice(), stats:Object.assign({},SNAKE2.stats), err:SNAKE2.err, lives:S.lives }; }
 setTimeout(function(){ try{ if(window.GVT && !GVT.snake2) GVT.snake2=function(){ return snake2Read(); }; }catch(e){} }, 0);   
+
+
+
+
+
+
+
+
+
+
+
+
+const OTSP2_LIVE=1;
+const OTSP2={ on:(function(){ try{ const q=/[?&]otsp2=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_otsp2','0'); else localStorage.removeItem('gvt_otsp2'); } return localStorage.getItem('gvt_otsp2')==='0'? 0 : OTSP2_LIVE; }catch(e){ return OTSP2_LIVE; } })(),
+  lives:30,   
+  rider:1,    
+  stats:{ starts:0, rows:0, errs:0 }, err:null };
+function otsp2On(){ return !!(OTSP2.on && S.raid && S.raid.k==='bbs' && S.raid.cfg===S.cfg && !S.bf); }
+{ const s0=startRaidBattle; startRaidBattle=function(){ const r=s0.apply(this, arguments); try{ if(otsp2On()){ S.lives=OTSP2.lives; OTSP2.stats.starts++; } }catch(e){ OTSP2.stats.errs++; OTSP2.err=String(e).slice(0,200); } return r; }; }
+{ const d9=FDEF.wrider; let v9=d9.leak; Object.defineProperty(d9, 'leak', { configurable:true, enumerable:true, get:function(){ try{ return otsp2On()? OTSP2.rider : v9; }catch(e){ return v9; } }, set:function(v){ v9=v; } }); }
+{ const b0=drawBaseBar; drawBaseBar=function(bx,by,bw,k,label,col){ try{ if(otsp2On() && label===tf('YOUR TOY BOX %1', Math.max(0,S.lives|0))){ k=Math.max(0, Math.min(1, (S.lives|0)/OTSP2.lives)); col=k>0.35? '#5E7F44' : '#E8705A'; } }catch(e){} return b0.call(this, bx,by,bw,k,label,col); }; }
+{ const t0=bbsStreetTick; bbsStreetTick=function(dt,B){ const r=t0.apply(this, arguments); try{ if(otsp2On()){ const f=S.foes.find(q=>q.type==='bbshow' && !q.dead); if(f && f.hpMax>0) S.raid.otsp2={ pct:Math.max(0, f.hp)/f.hpMax, ride:!!(f.bbsRide || (f.bbs && (f.bbs.st==='ride' || f.bbs.st==='mount'))) }; } }catch(e){ OTSP2.stats.errs++; OTSP2.err=String(e).slice(0,200); } return r; }; }
+function otsp2Line(o){ const p=Math.max(1, Math.min(99, Math.round(o.pct*100))); return o.ride? tf('BUFFALO BILL WAS ON HIS HORSE AT %1%', p) : tf('BUFFALO BILL WAS AT %1%', p); }
+{ const e0=endBattle; endBattle=function(win){ const on=!win && otsp2On(), o=on? S.raid.otsp2 : null; const r=e0.apply(this, arguments);
+  try{ if(o && S.mode==='lose' && !S.raid.otsp2Row){ const el=document.getElementById('loseText'); if(el){ S.raid.otsp2Row=1; const txt=otsp2Line(o);
+    el.insertAdjacentHTML('afterbegin', '<span class="'+(VD_KIND.r||'vr')+'" data-otsp2="1">'+escH(txt)+'</span>'); el.dataset.v=txt+(el.dataset.v? ' · '+el.dataset.v : ''); OTSP2.stats.rows++; } } }catch(e){ OTSP2.stats.errs++; OTSP2.err=String(e).slice(0,200); }
+  return r; }; }
+
+(function(){ const W9={
+  ja:{"BUFFALO BILL WAS AT %1%":"バッファロー・ビルは のこり %1%だった","BUFFALO BILL WAS ON HIS HORSE AT %1%":"バッファロー・ビルは うまのうえで のこり %1%だった"},
+  ko:{"BUFFALO BILL WAS AT %1%":"버팔로 빌은 %1% 남아 있었다","BUFFALO BILL WAS ON HIS HORSE AT %1%":"버팔로 빌은 말 위에서 %1% 남아 있었다"},
+  "zh-Hans":{"BUFFALO BILL WAS AT %1%":"水牛比尔还剩 %1%","BUFFALO BILL WAS ON HIS HORSE AT %1%":"水牛比尔骑在马上，还剩 %1%"},
+  de:{"BUFFALO BILL WAS AT %1%":"BUFFALO BILL HATTE NOCH %1%","BUFFALO BILL WAS ON HIS HORSE AT %1%":"BUFFALO BILL HATTE AUF SEINEM PFERD NOCH %1%"},
+  ru:{"BUFFALO BILL WAS AT %1%":"У БАФФАЛО БИЛЛА ОСТАВАЛОСЬ %1%","BUFFALO BILL WAS ON HIS HORSE AT %1%":"У БАФФАЛО БИЛЛА НА КОНЕ ОСТАВАЛОСЬ %1%"},
+  es:{"BUFFALO BILL WAS AT %1%":"A BUFFALO BILL LE QUEDABA %1%","BUFFALO BILL WAS ON HIS HORSE AT %1%":"A BUFFALO BILL LE QUEDABA %1% SOBRE SU CABALLO"},
+  ar:{"BUFFALO BILL WAS AT %1%":"كان بافالو بيل عند %1%","BUFFALO BILL WAS ON HIS HORSE AT %1%":"كان بافالو بيل على حصانه عند %1%"} };
+  for(const lg in W9){ const tb=TR[lg]||(TR[lg]={}); for(const k in W9[lg]) if(!(k in tb)) tb[k]=W9[lg][k]; } })();
+setTimeout(function(){ try{ if(window.GVT && !GVT.otsp2) GVT.otsp2=function(){ return { on:OTSP2.on, live:OTSP2_LIVE, lives:OTSP2.lives, rider:OTSP2.rider, active:otsp2On(), riderLeak:FDEF.wrider.leak, boxNow:S.lives, snap:(S.raid && S.raid.otsp2)? Object.assign({}, S.raid.otsp2) : null, stats:Object.assign({}, OTSP2.stats), err:OTSP2.err }; }; }catch(e){} }, 0);   
 
 
 
