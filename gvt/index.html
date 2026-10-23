@@ -90742,7 +90742,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='26.35';        
+let GVT_CV='26.36';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -198969,6 +198969,43 @@ const RBX={ on:(function(){ try{ const q=/[?&]ridersbox=([01])/.exec(location.se
 function ridersBoxRead(){ const B=(bbsOn() && S.raid && S.raid.bbs)||null, A=(B && B.alert)||null;   
   return { on:RBX.on, draws:RBX.draws, boxed:RBX.boxed, alert:A? { t:+A.t.toFixed(2), n:A.n|0, left:+Math.max(0,BBS_RIDE.warn-A.t).toFixed(2) } : null, rides:B? B.rides|0 : null, hud:B? bbsHudLine() : null, E:Math.round(H*0.055), VW:VW, H:H, scale:scale, wrapped:String(bbsRaidHUD).indexOf('RBX')>=0 }; }
 setTimeout(function(){ try{ if(window.GVT && !GVT.ridersBox) GVT.ridersBox=function(){ return ridersBoxRead(); }; }catch(e){} }, 0);   
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const OTSC={ on:(function(){ try{ const q=/[?&]otscode=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_otscode','0'); else localStorage.removeItem('gvt_otscode'); } return localStorage.getItem('gvt_otscode')==='0'? 0 : 1; }catch(e){ return 1; } })(), rooms:0, skips:0, last:null, err:null };   
+function otscPc(){ return Math.max(1, Math.min(SQ_MAX, S.coop? (((COOP&&COOP.pc)|0) || ((COOP&&COOP.members)||[]).length || 1) : 1)); }   
+function otscRoom(){   
+  if(!OTSC.on) return null;
+  const rd=S.raid; if(!rd || rd.k!=='bbs' || rd.cfg!==S.cfg || S.mode!=='play' || !S.sq){ OTSC.skips++; return null; }   
+  if(COOP && COOP.ev){ OTSC.skips++; return null; }   
+  if(S.sq.ev || S.sq.bots){ OTSC.skips++; return null; }   
+  const pc=otscPc(), p0=S.plastic|0;
+  const extra=bbsTag(RAID_TAGS+EV_TAGS_ADD+eliteRaidTags())-bbsTag(RAID_TAGS+eliteRaidTags());   
+  S.cfg=raidCfg(rd.t,'bbs'); rd.cfg=S.cfg; sqScaleCfg(S.cfg, BBS_PIN_P, true, pc);   
+  S.sq.p=BBS_PIN_P; S.sq.bp=pc;   
+  S.sq.ev={ bell:0, ring:0, wk:'', rk:'bbs', code:1 };   
+  S.plastic=p0+extra;
+  const nb=evBotsArm(pc);   
+  OTSC.rooms++; OTSC.last={ solo:S.coop? 0 : 1, pc, bots:nb, purse:S.plastic|0, purse0:p0, extra, tier:rd.t, p:S.sq.p, bp:S.sq.bp, t:+(S.t||0).toFixed(2) };
+  return OTSC.last; }
+{ const r0=startRaid; startRaid=function(tier){ const r=r0.apply(this, arguments); try{ otscRoom(); }catch(e){ OTSC.err=String(e).slice(0,200); } return r; }; }   
+{ const c0=coopStartBattle; coopStartBattle=function(){ const r=c0.apply(this, arguments); try{ otscRoom(); }catch(e){ OTSC.err=String(e).slice(0,200); } return r; }; }   
+function otsCodeRead(){ const sq=S.sq||null, ev=sq && sq.ev; return { on:OTSC.on, rooms:OTSC.rooms, skips:OTSC.skips, last:OTSC.last, err:OTSC.err, wrapped:String(startRaid).indexOf('otscRoom')>=0 && String(coopStartBattle).indexOf('otscRoom')>=0,
+  bbs:bbsOn()? 1 : 0, tier:bbsOn()? S.raid.t : null, coop:S.coop? 1 : 0, evRoom:!!(COOP && COOP.ev), evBattle:(typeof evBattle==='function' && evBattle())? 1 : 0, night:bbsNightRoom()? 1 : 0,
+  sq:sq? { p:sq.p, bp:sq.bp|0, evPc:sq.evPc|0, evBots:sq.evBots? 1 : 0, ev:ev? { rk:ev.rk, code:ev.code|0, wk:ev.wk } : null, bots:(sq.bots||[]).map(b=>({ hex:b.hex, name:b.name||null, purse:+(+b.purse).toFixed(1), n:b.n|0, sg:b.sg|0 })) } : null,
+  purse:S.plastic|0, tagX:(typeof bbsTagX==='function')? bbsTagX() : null, fill:[1,2,3,4,5].map(evBotsNFor9), botMen:S.units.filter(u=>u.coopBy==='bot' && !u.dead).length }; }   
+setTimeout(function(){ try{ if(window.GVT && !GVT.otsCode) GVT.otsCode=function(){ return otsCodeRead(); }; }catch(e){} }, 0);   
 
 
 
