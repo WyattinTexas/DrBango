@@ -90744,7 +90744,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='26.52';        
+let GVT_CV='26.53';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -191089,6 +191089,121 @@ function afxRead(o){ if(o && o.sweep) afxSweep(); const live=[]; for(const im of
   return { on:afxOn(), armed:AFX.armed, bakes:AFX.bakes, swaps:AFX.swaps, drops:AFX.drops, sweeps:AFX.sweeps, err:AFX.err, pics:Object.keys(AFX.pic).map(k=>k+'='+AFX.pic[k].length), live:live, dims:document.querySelectorAll('[data-afx-dim]').length, filters:document.querySelectorAll('g[filter="url(#wb-night)"]').length, svgLeft:[...document.querySelectorAll('image')].filter(im=>{ const h=im.getAttribute('href')||''; return h.charCodeAt(11)===115 && afxKeys().has(h) && afxNeed(im)>0; }).length, log:AFX.log.slice(-8) }; }
 try{ afxArm(); }catch(e){ AFX.err++; }
 setTimeout(function(){ try{ if(window.GVT && !GVT.afx) GVT.afx=afxRead; }catch(e){} }, 0);   
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+var AFXN={ on:(function(){ try{ const q=/[?&]afxn=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_afxn','0'); else localStorage.removeItem('gvt_afxn'); } return localStorage.getItem('gvt_afxn')==='0'? 0 : 1; }catch(e){ return 1; } })(),
+  pic:new Map(), busy:new Map(), armed:0, iv:0, bakes:0, swaps:0, skips:0, sweeps:0, err:0, dirty:0, quiet:0, log:[], rave:{ a:null, b:null, beams:null, lens:null, hid:[], tile:null, svg:null, mo:null, raf:0, why:'', builds:0, syncs:0, k:0 } };
+const AFXN_ROOMS={ attic:1, bedroom:1 }, AFXN_SKIP=3;   
+const AFXN_WK=(function(){ try{ return /Apple/.test(navigator.vendor||''); }catch(e){ return false; } })();   
+function afxnOn(){ return AFXN.on===1 && AFXN_WK; }
+function afxnRoomOk(){ try{ return S.mode==='menu' && !!AFXN_ROOMS[roomCur()]; }catch(e){ return false; } }
+function afxnTheirs(im, h){ if(im.__afx || im.hasAttribute('data-afx')) return true; try{ return typeof afxKeys==='function' && afxKeys().has(h); }catch(e){ return false; } }   
+function afxnDoc(h){ const c=h.indexOf(','); if(c<0) return null; const head=h.slice(0, c), body=h.slice(c+1);   
+  if(/;base64/i.test(head)){ try{ const b=atob(body), u=new Uint8Array(b.length); for(let i=0;i<b.length;i++) u[i]=b.charCodeAt(i); return new TextDecoder().decode(u); }catch(e){ return null; } }
+  try{ return decodeURIComponent(body); }catch(e){ return body; } }
+function afxnSize(doc){ const m=/<svg\b[^>]*>/i.exec(doc); if(!m) return null; const tag=m[0], at=n=>{ const r=new RegExp('\\s'+n+'\\s*=\\s*("([^"]*)"|\'([^\']*)\')', 'i').exec(tag); return r? (r[2]!=null? r[2] : r[3]) : null; };
+  const vb=at('viewBox'), V=vb? vb.trim().split(/[\s,]+/).map(Number) : null, num=v=>(v!=null && /^\s*[\d.]+(px)?\s*$/.test(v))? parseFloat(v) : 0;
+  let w=num(at('width')), h=num(at('height')); if(!(w>0 && h>0) && V && V.length===4){ w=V[2]; h=V[3]; } if(!(w>0 && h>0)) return null;
+  return { w:w, h:h, vb:vb || ('0 0 '+w+' '+h), tag:tag, at:m.index }; }   
+function afxnBake(h, b){ const row=AFXN.pic.get(h); if(row && row[b]) return Promise.resolve(row[b]); let bz=AFXN.busy.get(h); if(bz && bz[b]) return bz[b];
+  const doc=afxnDoc(h), z=doc && afxnSize(doc); if(!z){ AFXN.err++; AFXN.log.push(['size', h.length]); return Promise.resolve(null); }
+  const W=Math.max(1, Math.round(z.w>=z.h? b : b*z.w/z.h)), H=Math.max(1, Math.round(z.w>=z.h? b*z.h/z.w : b));
+  const d2=doc.slice(0, z.at)+z.tag.replace(/\s(width|height|viewBox)\s*=\s*("[^"]*"|'[^']*')/gi, '').replace(/^<svg\b/i, '<svg width="'+W+'" height="'+H+'" viewBox="'+z.vb+'"')+doc.slice(z.at+z.tag.length);   
+  const pr=new Promise(res=>{ const im=new Image(); const done=u=>{ const q=AFXN.busy.get(h); if(q) delete q[b]; res(u); };
+    im.onload=()=>{ let u=null; try{ const cv=document.createElement('canvas'); cv.width=W; cv.height=H; cv.getContext('2d').drawImage(im, 0, 0, W, H); u=cv.toDataURL('image/png'); let r2=AFXN.pic.get(h); if(!r2){ r2={}; AFXN.pic.set(h, r2); } r2[b]=u; AFXN.bakes++; }catch(e){ AFXN.err++; AFXN.log.push(['bake', String(e).slice(0, 80)]); } done(u); };
+    im.onerror=()=>{ AFXN.err++; AFXN.log.push(['load', h.length]); done(null); }; im.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(d2); });   
+  if(!bz){ bz={}; AFXN.busy.set(h, bz); } bz[b]=pr; return pr; }
+function afxnBest(row, b){ if(!row) return null; if(row[b]) return [b, row[b]]; let best=0; for(const k in row){ const v=+k; if(v>=b && (!best || v<best)) best=v; } return best? [best, row[best]] : null; }   
+function afxnSet(im, h, b, u){ im.__afxn={ h:h, b:b, u:u, n:(im.__afxn && im.__afxn.n) || 0 }; im.setAttribute('href', u); AFXN.swaps++; AFXN.dirty=1; }
+function afxnQuiet(){ if(!AFXN.dirty) return; AFXN.dirty=0; let mo=null; try{ mo=DLGP.mo; }catch(e){ return; } if(!mo) return;   
+  const recs=mo.takeRecords(), rest=recs.filter(r=>!(r.type==='attributes' && r.attributeName==='href' && r.target.__afxn && r.target.getAttribute('href')===r.target.__afxn.u)); if(rest.length){ try{ dlgMut(rest); }catch(e){ AFXN.err++; } } AFXN.quiet+=recs.length-rest.length; }   
+function afxnTake(im, h, b){ const got=afxnBest(AFXN.pic.get(h), b); if(got){ afxnSet(im, h, got[0], got[1]); return; }
+  afxnBake(h, b).then(u=>{ if(u && im.isConnected && im.getAttribute('href')===h && !im.__afxnSkip){ afxnSet(im, h, b, u); afxnQuiet(); } }); }
+function afxnSweep(){ if(!afxnOn()) return; const st=document.getElementById('roomStage'); if(!st) return; AFXN.sweeps++;
+  if(afxnRoomOk()) for(const im of st.querySelectorAll('image')){ const h=im.getAttribute('href'); if(!h) continue; const me=im.__afxn;
+    if(me && h===me.u){ const need=afxNeed(im); if(need>0){ const b=afxBucket(need); if(b>me.b) afxnTake(im, me.h, b); } continue; }   
+    if(h.charCodeAt(11)!==115 || h.lastIndexOf('data:image/svg', 0)!==0) continue;   
+    if(im.__afxnSkip || afxnTheirs(im, h)) continue;
+    if(me && ++me.n>=AFXN_SKIP){ im.__afxnSkip=1; AFXN.skips++; continue; }   
+    const need=afxNeed(im); if(!(need>0)) continue; afxnTake(im, h, afxBucket(need)); }
+  afxnQuiet();
+  try{ afxnRave(); }catch(e){ AFXN.err++; AFXN.log.push(['rave', String(e).slice(0, 80)]); } }
+
+function afxnFirst(svg){ for(const e of svg.children){ const t=e.tagName; if(t==='defs' || t==='style' || t==='title' || t==='desc') continue; if(e.style && e.style.display==='none') continue; return e; } return null; }   
+function afxnPhase(from, to){ try{ const A0=from.getAnimations()[0], A1=to.getAnimations()[0]; if(A0 && A1 && A0.currentTime!=null) A1.currentTime=A0.currentTime; }catch(e){} }   
+function afxnRaveOff(R){ R=R||AFXN.rave; const B=R.beams||[];
+  for(const e of R.hid){ try{ e.style.removeProperty('display'); }catch(err){} } R.hid=[];
+  for(const b of B) afxnPhase(b.i, b.g); if(R.lens && R.lens.src) afxnPhase(R.lens.c, R.lens.src);   
+  if(R.a){ R.a.remove(); R.a=null; } if(R.b){ R.b.remove(); R.b=null; } if(R.mo){ R.mo.disconnect(); R.mo=null; } R.beams=null; R.lens=null; R.tile=null; R.svg=null; }
+function afxnRaveWhy(){ let why=''; const root=document.querySelector('#roomStage #ro-rave .rv-root.rva-at'), tile=root && root.closest('#ro-rave'), svg=tile && tile.parentNode;
+  if(!afxnOn()) why=AFXN_WK? 'switch' : 'engine'; else if(S.mode!=='menu' || roomCur()!=='attic') why='room'; else if(reducedMotion()) why='still'; else if(!root) why='none'; else if(root.classList.contains('rv-off')) why='dark';
+  else if(!svg || svg.id!=='dlgTop' || afxnFirst(svg)!==tile) why='order';   
+  return { why:why, root:root, tile:tile, svg:svg }; }
+function afxnGeo(root){ const lens=root.querySelector(':scope > .rv-lens'), ring=lens && lens.previousElementSibling; if(!ring || ring.tagName!=='circle') return null; const r=+ring.getAttribute('r'), q=ring.getBoundingClientRect(); if(!(r>0) || !(q.width>0) || Math.abs(q.width-q.height)>Math.max(0.6, q.width*0.01)) return null;
+  return { k:q.width/(2*r), sx:q.left+q.width/2, sy:q.top+q.height/2, cx:+ring.getAttribute('cx'), cy:+ring.getAttribute('cy') }; }   
+function afxnRave(){ const R=AFXN.rave; R.syncs++; const w=afxnRaveWhy(); let why=w.why, M=null;
+  if(!why){ M=afxnGeo(w.root); if(!M) why='skew'; }
+  if(why){ if(R.a || R.b || R.hid.length) afxnRaveOff(R); R.why=why; return false; }
+  if(R.tile!==w.tile || R.svg!==w.svg || !R.a || !R.a.isConnected || R.a.nextElementSibling!==w.svg || (R.b && R.b.previousElementSibling!==w.svg)){ afxnRaveOff(R); if(!afxnRaveBuild(R, w)) return false; }   
+  afxnRavePlace(R, w, M); R.why=''; return true; }
+function afxnRaveBuild(R, w){ const NS='http://www.w3.org/2000/svg', root=w.root, svg=w.svg, bg=root.querySelector(':scope > .rv-beams'), G=bg? [...bg.querySelectorAll(':scope > g > .rv-b')] : [];
+  const tr=bg && /translate\(\s*(-?[\d.]+)[\s,]+(-?[\d.]+)\s*\)/.exec(bg.getAttribute('transform')||''); if(G.length!==6 || !tr){ R.why='art'; return false; }
+  const beams=[]; for(const g of G){ const p=g.querySelector('path'), d=p && (p.getAttribute('d')||'').trim(), m=d && /^M0 0 L(-?[\d.]+) ([\d.]+) L(-?[\d.]+) ([\d.]+) Z$/.exec(d), rot=/rotate\(\s*(-?[\d.]+)/.exec((g.parentNode && g.parentNode.getAttribute('transform'))||''); if(!m || !rot){ R.why='art'; return false; }
+    beams.push({ g:g, p:p, d:d, hw:+m[3], L:+m[2], ang:+rot[1], dur:g.style.animationDuration||'4.8s', del:g.style.animationDelay||'0s' }); }
+  const a=document.createElement('div'); a.id='afxnRave'; dlgLike(svg, a, 0);   
+  for(const b of beams){ const o=document.createElement('div'), i=document.createElement('div'), s=document.createElementNS(NS, 'svg'), q=document.createElementNS(NS, 'path');
+    s.setAttribute('viewBox', (-b.hw)+' 0 '+(2*b.hw)+' '+b.L); s.setAttribute('preserveAspectRatio', 'none'); s.setAttribute('width', '100%'); s.setAttribute('height', '100%'); s.style.cssText='display:block;overflow:visible';
+    q.setAttribute('d', b.d); for(const k of ['fill', 'opacity']) if(b.p.hasAttribute(k)) q.setAttribute(k, b.p.getAttribute(k)); s.appendChild(q); i.appendChild(s);
+    o.style.cssText='position:absolute;transform-origin:50% 0;pointer-events:none;transform:rotate('+b.ang+'deg)';   
+    i.style.cssText='position:absolute;left:0;top:0;width:100%;height:100%;transform-origin:50% 0;will-change:transform;animation:rvsweep '+b.dur+' ease-in-out '+b.del+' infinite alternate';   
+    o.appendChild(i); a.appendChild(o); b.o=o; b.i=i; }
+  svg.parentNode.insertBefore(a, svg); R.a=a; R.beams=beams; R.tile=w.tile; R.svg=svg; R.tx=+tr[1]; R.ty=+tr[2]; R.builds++;
+  for(const b of beams){ afxnPhase(b.g, b.i); b.g.style.display='none'; R.hid.push(b.g); }   
+  const lens=root.querySelector(':scope > .rv-lens'), hi=lens && lens.nextElementSibling;   
+  if(lens && hi && hi.tagName==='circle' && !hi.getAttribute('class')){ const b=document.createElement('div'), l=document.createElement('div'), s=document.createElementNS(NS, 'svg'), c=lens.cloneNode(false), g2=hi.cloneNode(false);
+    const cx=+lens.getAttribute('cx'), cy=+lens.getAttribute('cy'), r=+lens.getAttribute('r')+1; c.removeAttribute('class'); c.style.animation='rvhue 2.6s linear infinite'; s.setAttribute('viewBox', (cx-r)+' '+(cy-r)+' '+(2*r)+' '+(2*r)); s.setAttribute('width', '100%'); s.setAttribute('height', '100%'); s.style.cssText='display:block;overflow:visible';
+    s.appendChild(c); s.appendChild(g2); l.appendChild(s); l.style.cssText='position:absolute;pointer-events:none;will-change:transform'; b.id='afxnRaveLens'; dlgLike(svg, b, 0); b.appendChild(l);
+    svg.parentNode.insertBefore(b, svg.nextSibling); R.b=b; R.lens={ l:l, c:c, src:lens, hi:hi, cx:cx, cy:cy, r:r, out:0 }; afxnPhase(lens, c); }
+  try{ R.mo=new MutationObserver(()=>{ if(!R.raf) R.raf=requestAnimationFrame(()=>{ R.raf=0; try{ afxnRave(); }catch(e){} }); }); R.mo.observe(svg, { subtree:true, childList:true, attributes:true, attributeFilter:['transform'] }); }catch(e){}   
+  return true; }
+function afxnRavePlace(R, w, M){ const a=R.a; if(!a) return; const ra=a.getBoundingClientRect(), cw=parseFloat(getComputedStyle(a).width)||a.offsetWidth||1, sA=ra.width/cw; if(!(sA>0)) return;
+  const X=x=>M.sx+(x-M.cx)*M.k, Y=y=>M.sy+(y-M.cy)*M.k, P=(x, y)=>[(X(x)-ra.left)/sA, (Y(y)-ra.top)/sA], k=M.k/sA, ap=P(R.tx, R.ty), set=(e, p, v)=>{ if(e.style[p]!==v) e.style[p]=v; };   
+  for(const b of R.beams){ const bw=2*b.hw*k, bh=b.L*k; set(b.o, 'left', (ap[0]-bw/2).toFixed(2)+'px'); set(b.o, 'top', ap[1].toFixed(2)+'px'); set(b.o, 'width', bw.toFixed(2)+'px'); set(b.o, 'height', bh.toFixed(2)+'px'); }
+  const L=R.lens; if(L){ const p0=P(L.cx-L.r, L.cy-L.r), s=2*L.r*k; set(L.l, 'left', p0[0].toFixed(2)+'px'); set(L.l, 'top', p0[1].toFixed(2)+'px'); set(L.l, 'width', s.toFixed(2)+'px'); set(L.l, 'height', s.toFixed(2)+'px');
+    let over=0; try{ const x0=X(L.cx-L.r), y0=Y(L.cy-L.r), sz=2*L.r*M.k, lr={ left:x0, top:y0, right:x0+sz, bottom:y0+sz };     for(let e=w.tile.nextElementSibling; e; e=e.nextElementSibling){ if(e.style && e.style.display==='none') continue; const q=e.getBoundingClientRect(); if(q.width && q.height && q.left<lr.right && q.right>lr.left && q.top<lr.bottom && q.bottom>lr.top){ over=1; break; } } }catch(e){ over=1; }   
+    if(over!==L.out){ L.out=over; if(over){ R.b.style.display='none'; for(const e of [L.src, L.hi]){ e.style.removeProperty('display'); const i=R.hid.indexOf(e); if(i>=0) R.hid.splice(i, 1); } afxnPhase(L.c, L.src); } else { R.b.style.removeProperty('display'); afxnPhase(L.src, L.c); for(const e of [L.src, L.hi]){ e.style.display='none'; if(R.hid.indexOf(e)<0) R.hid.push(e); } } }
+    else if(!over && L.src.style.display!=='none'){ afxnPhase(L.src, L.c); for(const e of [L.src, L.hi]){ e.style.display='none'; if(R.hid.indexOf(e)<0) R.hid.push(e); } } }
+  R.k=k; }
+function afxnRead(o){ if(o && o.sweep) afxnSweep(); const st=document.getElementById('roomStage'), I=st? [...st.querySelectorAll('image')] : [], live=[];
+  for(const im of I) if(im.__afxn && im.getAttribute('href')===im.__afxn.u) live.push(im.__afxn.b+':'+im.__afxn.h.length);
+  const left=I.filter(im=>{ const h=im.getAttribute('href')||''; return h.lastIndexOf('data:image/svg', 0)===0 && !afxnTheirs(im, h) && !im.__afxnSkip && afxNeed(im)>0; }).length, R=AFXN.rave;
+  return { on:afxnOn(), wk:AFXN_WK, room:afxnRoomOk(), bakes:AFXN.bakes, swaps:AFXN.swaps, quiet:AFXN.quiet, skips:AFXN.skips, sweeps:AFXN.sweeps, err:AFXN.err, pics:AFXN.pic.size, live:live.length, liveB:live, svgLeft:left,
+    rave:{ on:!!R.a, lens:!!(R.b && R.b.style.display!=='none'), why:R.why, builds:R.builds, syncs:R.syncs, beams:R.beams? R.beams.length : 0, hid:R.hid.length, k:+(R.k||0).toFixed(4) }, log:AFXN.log.slice(-8) }; }
+function afxnArm(){ if(AFXN.armed || !afxnOn()) return; AFXN.armed=1;
+  try{ const r0=renderMenu; renderMenu=function(){ const v=r0.apply(this, arguments); try{ requestAnimationFrame(afxnSweep); }catch(e){} return v; }; }catch(e){ AFXN.err++; }   
+  try{ const l0=dlgLayers; dlgLayers=function(){ const v=l0.apply(this, arguments); try{ afxnSweep(); }catch(e){ AFXN.err++; } return v; }; }catch(e){ AFXN.err++; }   
+  try{ const o0=dlgOff; dlgOff=function(){ const v=o0.apply(this, arguments); try{ afxnRave(); }catch(e){ AFXN.err++; } return v; }; }catch(e){ AFXN.err++; }   
+  try{ const t0=raveTap; raveTap=function(){ const v=t0.apply(this, arguments); try{ afxnRave(); }catch(e){ AFXN.err++; } return v; }; }catch(e){ AFXN.err++; }   
+  try{ AFXN.iv=setInterval(function(){ try{ if(typeof S==='object' && S.mode==='menu' && !document.hidden) afxnSweep(); }catch(e){ AFXN.err++; } }, 1000); }catch(e){ AFXN.err++; } }
+try{ afxnArm(); }catch(e){ AFXN.err++; }
+setTimeout(function(){ try{ if(window.GVT && !GVT.afxn) GVT.afxn=afxnRead; }catch(e){} }, 0);   
 
 
 
