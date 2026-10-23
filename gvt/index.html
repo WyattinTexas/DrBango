@@ -90728,7 +90728,7 @@ function bfQueueStart(size,opts){
 
 
 
-let GVT_CV='26.24';        
+let GVT_CV='26.25';        
 let NX_CAP_MUL=4;         
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -195141,6 +195141,146 @@ function bbgSeat(MZ,tilt){ const t=bbgTips(tilt); MZ[0].x=t[0].x; MZ[0].y=t[0].y
 if(BBG.on){ try{ const m=bbgMold(BBG.tilt); SPRITES_SRC.bbill=m; SPRITES_SRC.bbillx=m; if(BBG_ART) LSB_ART.bbill=BBG_ART; bbgSeat(FAN_MZ, BBG.tilt); }catch(e){} }   
 setTimeout(function(){ try{ if(window.GVT && !GVT.bbg) GVT.bbg=function(o){ o=o||{}; if(o.mold) return bbgMold(o.mold); const fnv=s=>{ s=String(s||''); let h=2166136261>>>0; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619)>>>0; } return h.toString(16)+':'+s.length; }, tan=encodeURIComponent('#C09E6C'), grn=encodeURIComponent('#7FA35C'), u=sprURI('bbshow',null), p=amArt(['spr','bbill',null,'0 0 120 140']);
   return { cv:GVT_CV, on:BBG.on, tilt:BBG.tilt, live:BBG_LIVE, liveTilt:BBG_TILT, art:(LSB_ART.bbill||'').length, artNew:!!BBG_ART && LSB_ART.bbill===BBG_ART, bbill:fnv(SPRITES_SRC.bbill), bbillx:SPRITES_SRC.bbillx===SPRITES_SRC.bbill, bbshow:SPRITES_SRC.bbshow===SPRITES_SRC.bbill, up:fnv(bbgMold('up')), down:fnv(bbgMold('down')), fan:FAN_MZ.map(m=>({ x:m.x, y:m.y })), bbsFan:(typeof BBS_FAN_MZ!=='undefined')? BBS_FAN_MZ.map(m=>({ x:m.x, y:m.y })) : null, tips:{ up:bbgTips('up'), down:bbgTips('down') }, img:(IMG.bbill && IMG.bbill.width)? IMG.bbill.src.length : 0, imgShow:!!(IMG.bbshow && IMG.bbshow===IMG.bbill), spr:fnv(u), sprTan:u.indexOf(tan)>=0, sprGreen:u.indexOf(grn)>=0, pinTan:p.indexOf(tan)>=0, pinGreen:p.indexOf(grn)>=0 }; }; }catch(e){} }, 0);   
+
+
+
+
+
+
+const LBWH={ v:1, joined:0, hooked:0 };
+const LBWH_INK='#22160F', LBWH_TAN='#C09E6C';   
+const LBWH_W={ pcaptain:56, pcrew:50, cabinboy:44, polly:40, figurehead:84, mermaid:64 };   
+const LBWH_ART=(function(){
+  const I=LBWH_INK, T=LBWH_TAN;
+  const A=function(o){ let s=''; for(const k in o){ if(o[k]!==undefined && o[k]!==null && o[k]!=='') s+=' '+k+'="'+o[k]+'"'; } return s; };
+  const P=function(d,f,sw,x){ return '<path d="'+d+'" fill="'+(f||'none')+'"'+(sw===0? '' : ' stroke="'+I+'" stroke-width="'+(sw||1.6)+'" stroke-linejoin="round" stroke-linecap="round"')+A(x||{})+'/>'; };   
+  const E=function(cx,cy,rx,ry,f,sw,x){ return '<ellipse cx="'+cx+'" cy="'+cy+'" rx="'+rx+'" ry="'+ry+'" fill="'+f+'"'+(sw===0? '' : ' stroke="'+I+'" stroke-width="'+(sw||1.6)+'"')+A(x||{})+'/>'; };
+  const C=function(cx,cy,r,f,sw,x){ return '<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="'+f+'"'+(sw===0? '' : ' stroke="'+I+'" stroke-width="'+(sw||1.6)+'"')+A(x||{})+'/>'; };
+  const LN=function(d,c,w,x){ return '<path d="'+d+'" fill="none" stroke="'+c+'" stroke-width="'+w+'" stroke-linecap="round" stroke-linejoin="round"'+A(x||{})+'/>'; };   
+  const SH=function(cx,rx,ry,cy){ return '<ellipse cx="'+cx+'" cy="'+(cy||131)+'" rx="'+rx+'" ry="'+(ry||5.5)+'" fill="#000" opacity="0.2"/>'; };   
+  const EYE=function(cx,cy,r,dx,dy,w,sw){ return C(cx,cy,r,w||'#FFFFFF',sw||1.4)+C(cx+(dx||0),cy+(dy||0),r*0.46,'#15110E',0)+C(cx+(dx||0)-r*0.2,cy+(dy||0)-r*0.22,r*0.16,'#FFFFFF',0); };   
+  const LIMB=function(d,w,f){ return LN(d, I, w+3.2)+LN(d, f, w); };   
+  const STAR=function(cx,cy,r,f){ let d=''; for(let i=0;i<10;i++){ const a=-Math.PI/2+i*Math.PI/5, rr=(i%2? r*0.45 : r); d+=(i? 'L' : 'M')+Math.round((cx+rr*Math.cos(a))*10)/10+' '+Math.round((cy+rr*Math.sin(a))*10)/10+' '; } return P(d+'Z', f||'#FFD24A', 0.8); };
+  
+  const STAND=function(rx,ry){ return '<ellipse cx="60" cy="129" rx="'+rx+'" ry="'+ry+'" fill="#000" opacity="0.28"/><ellipse cx="60" cy="126" rx="'+rx+'" ry="'+ry+'" fill="'+T+'"/>'; };
+  const ST=function(d,w){ return '<path d="'+d+'" fill="none" stroke="'+T+'" stroke-width="'+w+'" stroke-linecap="round" stroke-linejoin="round"/>'; };
+  
+  const BAND=function(dye){ let b=(typeof OF_BANDANA==='string')? OF_BANDANA : '<path d="M -12.6 -1.2 Q -12.2 -12.8 0 -13.4 Q 12.2 -12.8 12.6 -1.2 Z" fill="#C8312E" stroke="#7E1B19" stroke-width="0.9"/>'; if(dye){ b=b.split('#C8312E').join(dye[0]).split('#7E1B19').join(dye[1]); if(dye[2]) b=b.split('#E0574F').join(dye[2]); } return b; };
+  const HEADB=function(hx,hy,r,s,dye){ return C(hx,hy,r,T,0)+'<g transform="translate('+hx+' '+hy+') scale('+(-(s||1))+' '+(s||1)+')">'+BAND(dye)+'</g>'; };   
+  const CUTLASS=function(x,y,rot,s){ return '<g transform="translate('+x+' '+y+') rotate('+rot+') scale('+(s||1)+')">'+P('M0 0 Q-16 -6 -34 -16 Q-40 -19 -39 -13 Q-24 -3 -2 5 Z','#DDE3E8',1.3)+LN('M-4 0 Q-18 -6 -33 -13','#B9CCDA',1)+C(1,2,4.2,'#C9A24A',1.1)+P('M3 -1 L13 2 L12 6 L2 3 Z','#3A2C1C',1.1)+'</g>'; };   
+  const FLINT=function(x,y,rot){ return '<g transform="translate('+x+' '+y+') rotate('+rot+')">'+P('M0 -2.2 L-15 -3.2 L-15 0.8 L0 1.8 Z','#3F4247',1)+P('M-1 -3 L4 -3 L6 6 L1 7 Z','#6E4A2B',1)+C(-15,-1.2,1.5,'#15110E',0)+C(2,-3.4,1.3,'#C9A24A',0)+'</g>'; };   
+  const M={};   
+  
+  M.pcrew=(function(){ let s='<g>'+STAND(33,7.5);
+    s+=ST('M71 122 L61 97',11)+ST('M47 122 L57 97',11)+ST('M59 97 L58 72',15)+ST('M61 78 L73 92',8);   
+    s+=P('M50.5 72 L66 72 L66.6 92 L50 92 Z','#1F2A44',1.2)+LN('M50.6 77 L66.1 77 M50.4 82 L66.3 82 M50.2 87 L66.5 87','#F6EFE4',2.4);   
+    s+=P('M48.6 91 L67.4 90 L67.8 96.4 L48.2 97.4 Z','#C8312E',1.1)+LN('M49 97 Q46 102 48 108','#C8312E',3);   
+    s+=ST('M56 76 L40 64',8)+FLINT(39,62,8);   
+    s+=HEADB(54,57,8,1);
+    return s+'</g>'; })();
+  
+  const CAPT=function(slash){ let s='<g>'+STAND(35,8);
+    const hx=slash? 51 : 54, hy=55;
+    s+=ST(slash? 'M76 122 L64 96' : 'M72 122 L62 96',12)+ST(slash? 'M44 122 L57 96' : 'M46 122 L57 96',12);   
+    s+=LN(slash? 'M73 114 L77 124' : 'M69 114 L73 124','#2B2118',12)+LN(slash? 'M47 114 L43 124' : 'M49 114 L45 124','#2B2118',12);   
+    s+=ST(slash? 'M60 96 L55 68' : 'M60 96 L58 68',17);   
+    s+=P(slash? 'M45 70 L67 70 L71 104 L60 100 L53 101 L42 105 Z' : 'M48 70 L70 70 L73 104 L62 100 L56 101 L45 105 Z','#B3261E',1.6);   
+    s+=LN(slash? 'M49 72 L55 84 M63 72 L57 84' : 'M52 72 L58 84 M66 72 L60 84','#E2B84A',2)+C(slash? 56 : 59,88,1.5,'#E2B84A',0)+C(slash? 56 : 59,94,1.5,'#E2B84A',0);   
+    s+=P(slash? 'M44 96 L70 95 L70 100 L44 101 Z' : 'M47 96 L73 95 L73 100 L47 101 Z','#2B2118',1)+C(slash? 56.5 : 59.5,98,2.6,'#E2B84A',0.8);   
+    s+=ST('M62 78 L74 92',8)+LN('M74 92 L76 95','#E2B84A',8)+LN('M76 96 Q86 100 82 110','#DDE3E8',3.4);   
+    if(slash){ s+=ST('M56 74 L38 84',8)+LN('M40 83 L38 84','#E2B84A',8)+CUTLASS(38,84,-12,0.86)+LN('M30 56 Q12 66 14 84','#F6EFE4',2.2,{ opacity:0.7 })+LN('M36 50 Q6 60 10 88','#F6EFE4',1.3,{ opacity:0.5 }); }   
+    else s+=ST('M56 74 L40 60',8)+LN('M42 62 L40 60','#E2B84A',8)+CUTLASS(40,60,28,0.92);   
+    s+=C(hx,hy,8.5,T,0);   
+    s+=P('M'+(hx-8)+' '+(hy+2)+' Q'+(hx-6)+' '+(hy+16)+' '+hx+' '+(hy+16)+' Q'+(hx+6)+' '+(hy+16)+' '+(hx+8)+' '+(hy+2)+' Q'+(hx+4)+' '+(hy+6)+' '+hx+' '+(hy+6)+' Q'+(hx-4)+' '+(hy+6)+' '+(hx-8)+' '+(hy+2)+' Z','#3A2C1C',1.1);   
+    s+=LN('M'+(hx-8.5)+' '+(hy-2)+' Q'+hx+' '+(hy-8)+' '+(hx+8.5)+' '+(hy-3),'#15110E',1.4)+C(hx-4.6,hy-2,3.2,'#15110E',0);   
+    s+=C(hx+8.4,hy+5,1.9,'none',0,{ stroke:'#E2B84A', 'stroke-width':1.2 });   
+    s+='<g transform="translate('+hx+' '+hy+') scale(-1.06 1.06)">'+BAND()+'</g>';
+    return s+'</g>'; };
+  M.pcaptain=CAPT(0); M.pcaptainslash=CAPT(1);
+  
+  const PIP=function(lit){ let s='<g>'+STAND(24,5.5); const ky=lit? -4 : 0;
+    s+=ST('M70 124 L60 104',8)+ST('M46 122 L57 104',8)+ST('M59 104 L58 84',11);   
+    s+=P('M53.5 84 L63.5 84 L64 102 L53 102 Z','#C8312E',1.1)+LN('M53.5 89 L63.8 89 M53.3 94 L63.9 94 M53.2 99 L64 99','#F6EFE4',2)+P('M51.6 101 L65.4 101 L66.4 108.5 L50.6 108.5 Z','#2F5BB7',1);   
+    s+=ST('M55 86 L48 '+(68+ky),6)+ST('M61 86 L68 '+(68+ky),6);   
+    s+='<g transform="translate(0 '+ky+')">'+P('M45 46 Q58 41.5 71 46 L73 68 Q58 72.5 43 68 Z','#8B5A2B',1.4)+LN('M44.2 52 L72 52 M43.4 62 L72.6 62','#3F4247',2.6)+LN('M58 43.5 L58 70.5','#6E4A2B',1)+LN('M58 43.5 Q62 36 70 34','#F6E7C8',2)+(lit? STAR(71,33,6.5,'#FFD24A')+C(66,37,1.3,'#FFD24A',0)+C(75,30,1.1,'#FFD24A',0) : C(70.5,33.5,1.6,'#15110E',0))+'</g>';   
+    if(lit) s+=LN('M47 72 L45 77','#6EA0C8',1.6)+C(44.6,78.5,1.4,'#6EA0C8',0)+LN('M48 66 L50 60 M46 68 L41 64','#F6EFE4',1.4,{ opacity:0.8 });   
+    s+=HEADB(56,78,6.5,0.8,['#2F5BB7','#1F2A44','#5A86D8']);
+    return s+'</g>'; };
+  M.cabinboy=PIP(0); M.cabinboylit=PIP(1);
+  
+  const PARROT=function(pose){ const red='#D9342B', yel='#F2C230', blu='#2F5BB7', fly=pose==='fly', sq=pose==='squawk'; let s='<g>'+SH(60, fly? 14 : 17, fly? 3 : 3.8);
+    s+='<g transform="translate(0 '+(fly? -26 : 0)+')">';
+    if(!fly) s+=LN('M56 125 L52 131 M56 125 L58 131 M66 125 L62 131 M66 125 L68 131','#7F93A4',2.2);   
+    s+=P('M70 106 Q92 110 102 124 Q86 120 72 114 Z',red,1.3)+P('M72 112 Q90 120 95 130 Q82 125 72 118 Z',blu,1.1);   
+    s+=E(60,104,16,20,red,1.8);   
+    if(fly){ s+=P('M48 98 Q20 84 8 96 Q22 102 36 106 Q44 106 50 103 Z',yel,1.4)+P('M30 95 Q16 94 10 97 Q20 101 32 102 Z',blu,1)+P('M72 98 Q100 84 112 96 Q98 102 84 106 Q76 106 70 103 Z',yel,1.4)+P('M90 95 Q104 94 110 97 Q100 101 88 102 Z',blu,1); }   
+    else s+=P('M51 90 Q36 102 44 120 Q56 118 63 104 Z',yel,1.4)+P('M48 104 Q40 110 46 118 Q54 116 56 108 Z',blu,1.1);   
+    s+=C(52,84,11,red,1.8);   
+    if(sq) s+=LN('M50 73 L47 65 M54 72 L54 63 M58 73 L62 66',red,3);   
+    s+=E(47,86,5.5,6.2,'#F6EFE4',0.9);   
+    if(sq){ s+=LN('M44 84 Q47 81 50 84',I,1.6); s+=P('M42 83 Q32 78 34 86 Q38 88 42 88 Z','#15110E',1)+P('M42 89 Q34 96 38 97 Q42 95 43 91 Z','#3F4247',0.9)+LN('M30 82 Q26 84 28 90 M28 78 Q22 80 24 88','#F6EFE4',1.6,{ opacity:0.8 }); }   
+    else { s+=EYE(47,84,2.6,-0.3,0.3); s+=P('M42 84 Q34 84 36 92 Q40 94 42 90 Z','#15110E',1)+P('M42 90 L38 93.5 L42.5 93.5 Z','#3F4247',0.8); }   
+    s+='</g>';
+    return s+'</g>'; };
+  M.polly=PARROT(''); M.pollyfly=PARROT('fly'); M.pollysquawk=PARROT('squawk');
+  
+  const FIG=function(wake){ const wood='#D9A66A', oak='#6E4A2B', sea='#3FB8AF', gold='#E8C24A', glow='#7FF0E6'; let s='<g>'+SH(66,36,6);
+    s+=P('M46 128 L98 128 L94 92 L72 72 L58 74 Z',oak,1.8)+LN('M60 100 L92 97 M56 112 L94 110 M52 124 L96 122','#5C3D21',1.4)+LN('M72 72 L94 92','#8B5A2B',2.2);   
+    s+=P('M58 74 Q42 86 38 112 Q52 120 68 114 Q76 98 72 74 Z',sea,1.6)+LN('M52 90 Q47 100 48 110 M60 88 Q60 100 62 110','#2E8C84',1.2)+LN('M38 112 Q52 121 68 114',gold,2.4);   
+    s+=LIMB('M52 80 Q38 88 40 98',6,wood);   
+    s+=P('M48 52 Q58 43 70 51 Q78 62 80 80 Q72 72 66 62 Q62 56 57 58 Z',gold,1.4)+LN('M62 50 Q70 56 74 68',I,1,{ opacity:0.5 });   
+    s+=C(54,60,10,wood,1.6);   
+    if(wake){ s+=C(49,60,5,glow,0,{ opacity:0.35 })+C(59,60,5,glow,0,{ opacity:0.35 })+C(49,60,2.8,glow,0)+C(59,60,2.8,glow,0)+C(49,60,1.1,'#FFFFFF',0)+C(59,60,1.1,'#FFFFFF',0)+C(54,67.5,2.2,I,0)+C(54,60,15,'none',0,{ stroke:glow, 'stroke-width':2, opacity:0.5 })+C(54,60,20,'none',0,{ stroke:glow, 'stroke-width':1, opacity:0.25 }); }   
+    else s+=LN('M46 60 Q49 57 52 60 M56 60 Q59 57 62 60',I,1.6)+LN('M50 66 Q54 69 58 66',I,1.4);   
+    return s+'</g>'; };
+  M.figurehead=FIG(0); M.figureheadwake=FIG(1);
+  
+  const MER=function(ring){ const skin='#F2C4A0', tail='#2EAFA2', tail2='#1E8C82', hair='#E65C2E', shell='#F28BB4', tin='#9FB2C3', brass='#C9A24A'; let s='<g>'+SH(60,34,6);
+    s+=P('M34 118 L38 131 L82 131 L86 118 Z',tin,1.4)+LN('M44 122 L46 129 M76 122 L74 129','#7F93A4',1.1)+E(60,118,30,8,'#C3D1DB',1.6);   
+    s+=P('M62 100 Q48 104 36 112 Q26 118 22 126 Q28 124 34 124 Q30 130 26 134 Q38 132 42 124 Q50 116 64 112 Z',tail,1.6)+LN('M56 104 q3 -3 6 0 M50 108 q3 -3 6 0 M44 113 q3 -3 6 0 M38 119 q3 -3 6 0 M52 112 q3 -3 6 0 M46 117 q3 -3 6 0',tail2,1);   
+    s+=P('M56 76 Q52 90 62 100 L72 100 Q74 86 70 76 Z',skin,1.4);   
+    s+=P('M55 80 Q60 76 64 80 Q66 86 60 86 Q54 86 55 80 Z',shell,1)+P('M64 80 Q68 76 72 80 Q73 86 68 86 Q62 86 64 80 Z',shell,1);   
+    s+=LIMB('M72 84 Q80 96 78 112',5,skin);   
+    if(ring){ s+=LIMB('M58 82 Q50 70 52 58',5,skin)+'<g transform="translate(52 52) rotate(-28)">'+P('M-6 12 Q-6 0 0 -2 Q6 0 6 12 Z',brass,1.3)+LN('M-7 12 L7 12',brass,2.4)+C(0,14.5,2,'#8C6A24',0)+C(0,-3,1.6,'#8C6A24',0)+'</g>'+LN('M38 46 Q32 54 34 62 M42 40 Q36 44 34 50','#F6EFE4',1.8,{ opacity:0.75 })+LN('M30 56 Q26 62 28 70','#F6EFE4',1.2,{ opacity:0.5 }); }   
+    else s+=LIMB('M58 82 Q46 78 44 66',5,skin)+'<g transform="translate(44 62)">'+P('M-6 12 Q-6 0 0 -2 Q6 0 6 12 Z',brass,1.3)+LN('M-7 12 L7 12',brass,2.4)+C(0,14.5,2,'#8C6A24',0)+C(0,-3,1.6,'#8C6A24',0)+'</g>';   
+    s+=P('M54 60 Q60 50 72 54 Q82 60 84 82 Q82 96 78 104 Q76 90 74 78 Q70 70 60 70 Q56 66 54 60 Z',hair,1.4);   
+    s+=C(64,66,10,skin,1.6)+P('M55 62 Q60 54 70 56 Q66 60 64 60 Q58 60 55 62 Z',hair,1);   
+    s+=EYE(59,65,3,-0.4,0.4)+EYE(68,65,3,-0.4,0.4)+(ring? E(63.5,73,2.6,2.2,'#A33A3A',1.2) : LN('M60 72 Q64 75 68 72',I,1.4));   
+    s+=STAR(76,56,4,'#FFD24A');   
+    return s+'</g>'; };
+  M.mermaid=MER(0); M.mermaidring=MER(1);
+  return { mold:M, P:P, E:E, C:C, LN:LN };
+})();
+const LBWH_BOX={};   
+const LBWH_KEYS=Object.keys(LBWH_ART.mold);
+
+const LBWH_ROLES={
+  pcaptain:  { role:'leader', name:'CAPTAIN CUTLASS', bank:'far', tiers:{ e:1, m:1, h:2, g:2 }, fdef:{ hp:6, spd:36, bounty:20, leak:1, w:56, melee:34, slashCd:2.4, knock:1 }, poses:['pcaptain','pcaptainslash'], note:"leads the far bank's crews, the first off the planks; THE SLASH knocks one man back to the bank he came from, alive (nobody is destroyed)" },
+  pcrew:     { role:'wave',   name:'THE CREW',        bank:'far', tiers:{ e:4, m:6, h:8, g:10 }, fdef:{ hp:2, spd:40, bounty:5, leak:1, w:50, rng:170, fireCd:3.4 }, poses:['pcrew'], note:'the rank and file in bandanas: the rifleman\'s law at a flintlock\'s shorter reach' },
+  cabinboy:  { role:'runner', name:'PIP',             bank:'far', tiers:{ e:0, m:1, h:2, g:3 }, fdef:{ hp:1, spd:76, bounty:6, leak:0, w:44, keg:{ r:60, fuse:0.8, knock:1 } }, poses:['cabinboy','cabinboylit'], note:'runs the planks with a powder keg; on your sand the fuse burns 0.8 s, then the keg knocks every man within 60 px back to the water\'s edge and tosses him back to the far bank' },
+  polly:     { role:'pet',    name:'POLLY',           w:40, poses:['polly','pollyfly','pollysquawk'], note:'a pet from the cove (its PET rows, find and ladder are a pet card of its own); THE SQUAWK one beat before a pop-up rises at the bridge nearest Sarge' },
+  figurehead:{ role:'scene',  name:'THE FIGUREHEAD',  seat:"the wreck's prow", w:84, poses:['figurehead','figureheadwake'], note:'carved wood, eyes closed; on MEGA she wakes the frame the king rises (no banner: a caption by her, if any)' },
+  mermaid:   { role:'scene',  name:'MARINA',          seat:"the pail lighthouse's rim", w:64, poses:['mermaid','mermaidring'], note:'the lookout; THE RING 1.0 s before a pop-up, at the bridge where it will rise' }
+};
+function lbwhJoin(){   
+  if(LBWH.joined) return 0; LBWH.joined=1; let n=0; const late=(typeof ready!=='undefined' && ready);
+  for(const k of LBWH_KEYS){ SPRITES_SRC[k]=LBWH_ART.mold[k]; if(LBWH_BOX[k]) PET_BOX[k]=LBWH_BOX[k]; n++; if(late){ try{ spriteMint(k); }catch(e){} } }
+  return n; }
+function lbwhShoreFiguresSVG(){   
+  try{ if(!LBWH.joined || typeof sprURI!=='function' || !SPRITES_SRC.figurehead) return ''; const U=function(k){ return sprURI(k); };
+    return '<g transform="translate(860 420) rotate(-7)"><image href="'+U('figurehead')+'" x="-216" y="-62" width="58" height="68"/></g>'
+      +'<image href="'+U('mermaid')+'" x="1252" y="340" width="56" height="65"/>'
+      +'<image href="'+U('pcaptain')+'" x="226" y="386" width="56" height="65"/>'
+      +'<image href="'+U('polly')+'" x="288" y="420" width="26" height="30"/>'
+      +'<image href="'+U('cabinboy')+'" x="690" y="560" width="46" height="54"/>'; }catch(e){ return ''; } }
+function lbwhHook(){   
+  if(LBWH.hooked) return 1; if(typeof lbwaJoin!=='function' || typeof lbwaCoveHallSVG!=='function') return 0;
+  const j0=lbwaJoin; lbwaJoin=function(){ const n=j0.apply(this, arguments); try{ lbwhJoin(); }catch(e){} return n; };
+  const h0=lbwaCoveHallSVG; lbwaCoveHallSVG=function(){ let s=h0.apply(this, arguments); try{ s+=lbwhShoreFiguresSVG(); }catch(e){} return s; };
+  LBWH.hooked=1; try{ if(LBWA.joined && !LBWH.joined) lbwhJoin(); }catch(e){} return 1; }
+if(!lbwhHook()) setTimeout(function(){ lbwhHook(); }, 0);
+setTimeout(function(){ try{ if(window.GVT && !GVT.lbwh) GVT.lbwh=function(){ const keys=LBWH_KEYS.slice(), inT=keys.filter(function(k){ return typeof SPRITES_SRC[k]==='string'; }), minted=keys.filter(function(k){ return !!(IMG[k] && IMG[k].width>0); });
+  return { cv:GVT_CV, v:LBWH.v, joined:LBWH.joined, hooked:LBWH.hooked, keys:keys.length, inTable:inT.length, minted:minted.length, boxes:keys.filter(function(k){ return !!PET_BOX[k]; }).length, w:LBWH_W, roles:Object.keys(LBWH_ROLES), molds:keys.map(function(k){ return [k, LBWH_ART.mold[k].length]; }), shore:(function(){ try{ return lbwhShoreFiguresSVG().length; }catch(e){ return -1; } })() }; } }catch(e){} }, 0);
 
 
 
