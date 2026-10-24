@@ -72265,7 +72265,7 @@ function lensLines2(id){ const p=lensPct; { const dj9=djsLens(id); if(dj9) retur
   if(id==='furryhat')    return ['half damage from mortars & snipers'];
   if(id==='sheriffhat')  return ['+'+p(OF_SHF_DMG)+'% damage to riflemen within '+(OF_SHF_M/TK_M)+' m', '+'+p(OF_SHF_VS)+'% damage to their Sarge'];
   if(id==='fuzzyhat')    return ['every second Commando beam bounces back'];
-  if(id==='kingbearhat') return ['marches '+p(OF_KBH_SPD)+'% faster', '+'+p(OF_KBH_DMG)+'% damage', '+'+p(OF_KBH_DEF)+'% armor'];
+  if(id==='kingbearhat') return ['marches '+p(OF_KBH_SPD)+'% faster', '+'+p(OF_KBH_DMG)+'% damage', 'cannons within '+(OF_KBH_M/TK_M)+' m fire '+p(OF_KBH_AS)+'% faster', 'their first shot CRITS ×'+OF_KBH_CRITX];   
   if(id==='marshalcap')  return ['+'+p(OF_MCAP_AIR)+'% damage to planes', 'planes within '+OF_MCAP_NEAR_M+' m of him attack twice as fast'];   
   if(id==='tombstonehat') return [tf('THE QUICK DRAW: the first shot at a new man comes %1% faster', p(1-OF_TSH.qd)), t('THE JUMP BACK: a round lands on him, he hops clear and fires one shot back')];   
   if(id==='muskboots')   return ['+'+OF_MBOOT_HP+' HP', 'marches '+p(OF_MBOOT_SPD)+'% faster'];   
@@ -756352,6 +756352,54 @@ function cpnRig(o){ o=o||{}; if(o.on!=null){ CPN.on=o.on? 1 : 0; CPN.svg=''; }
 
 
 
+
+function ebhCannonU(u){ return !!u && (u.type==='kbcannon' || cannonU(u)); }
+function ebhNear(u){   
+  for(const s of S.units){
+    if(s.type!=='sarge' || s===u || s.dead) continue;
+    if(S.bf && (s.dropT>0 || s.side!==u.side)) continue;
+    if(!sargeOfU(s,'kingbearhat')) continue;
+    if(Math.hypot(s.x-u.x,s.y-u.y)<=OF_KBH_M) return true;
+  }
+  return false; }
+function ebhRateMul(u){ if(!(OF_KBH_AS>0) || !ebhCannonU(u) || !ebhNear(u)) return 1; EBH.stats.rate++; return 1+OF_KBH_AS; }
+function ebhCritNow(u,dmg){ if(!(OF_KBH_CRITX>1) || !(dmg>0) || !u || u.ebhK || !ebhCannonU(u) || !ebhNear(u)) return false; u.ebhK=1; EBH.stats.crit++; return true; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function ebhRig(){ let rows=null; try{ rows=lensLines2('kingbearhat'); }catch(e){ rows='ERR '+e; }
+  return { v:EBH.v, name:OUTFIT_INFO.kingbearhat && OUTFIT_INFO.kingbearhat.name, rows, dials:{ spd:OF_KBH_SPD, dmg:OF_KBH_DMG, def:OF_KBH_DEF, as:OF_KBH_AS, m:OF_KBH_M/TK_M, critX:OF_KBH_CRITX }, stats:JSON.parse(JSON.stringify(EBH.stats)) }; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 function clmOn(){ return CLM.on===1; }
 function cmdRank(){ return Math.min(RANK_MAX, ((META.sargeUp||{}).commander)|0); }
 function clmRankU(c,sw){ try{ sw=sw||unitSargeStats(c); return (sw && sw.w==='commander')? Math.max(0,Math.min(RANK_MAX,(sw.r|0))) : -1; }catch(e){ CLM.err++; return -1; } }
@@ -860717,7 +860765,7 @@ const OF_ADV_CRIT=0.10, OF_ADV_DODGE=0.05;
 const OF_FURHAT_X=0.5;
 const OF_SHF_DMG=0.10, OF_SHF_M=4*TK_M, OF_SHF_VS=0.20;
 const OF_FUZ_EVERY=2;
-const OF_KBH_SPD=0.10, OF_KBH_DMG=0.10, OF_KBH_DEF=0.05;
+const OF_KBH_SPD=0.10, OF_KBH_DMG=0.10, OF_KBH_DEF=0, OF_KBH_AS=0.60, OF_KBH_M=35*TK_M, OF_KBH_CRITX=3;
 const OF_MCAP_AIR=0.50;
 const OF_MCAP_NEAR_M=20, OF_MCAP_WING=2, OF_MCAP_WING_BMB=1;
 
@@ -965306,7 +965354,7 @@ let BFQ=null;
 
 
 
-let GVT_CV='27.00';
+let GVT_CV='27.01';
 let NX_CAP_MUL=4;
 
 
@@ -2461460,6 +2461508,54 @@ Object.assign(TR.es||(TR.es={}), {"FEATHERED HAT":"SOMBRERO DE PLUMA","cannons w
 
 
 setTimeout(()=>{ try{ if(typeof GVT==='object' && GVT) GVT.cpn=cpnRig; }catch(e){} }, 0);
+
+
+
+
+
+
+
+
+
+
+
+
+
+const EBH={ v:1, stats:{ rate:0, crit:0, fx:0, err:0 } };
+
+
+
+
+
+
+
+
+
+
+
+{ const c0=capRateMul; capRateMul=function(u){ return c0.apply(this, arguments)*ebhRateMul(u); }; }
+{ const l0=lobFire; lobFire=function(u, best, def9, acc, dmg, P){ let k=false; try{ k=ebhCritNow(u,dmg); }catch(e){ EBH.stats.err++; }   
+    if(!k) return l0.apply(this, arguments);
+    const n0=S.shots.length, r=l0.call(this, u, best, def9, acc, dmg*OF_KBH_CRITX, P), sh=S.shots[S.shots.length-1];
+    if(S.shots.length>n0 && sh && sh.src===u) sh.ebhK=1;   
+    return r; }; }
+{ const s0=splash; splash=function(x, y){ const r=s0.apply(this, arguments);   
+    try{ const sh=arguments[11]; if(sh && sh.ebhK===1 && !r){ sh.ebhK=2; critFx({ x:x, y:y }); EBH.stats.fx++; } }catch(e){ EBH.stats.err++; }
+    return r; }; }
+
+
+
+Object.assign(TR.ar||(TR.ar={}), {"their first shot CRITS ×{0}":"طلقتها الأولى ضربة حاسمة ×{0}"});
+Object.assign(TR.ja||(TR.ja={}), {"their first shot CRITS ×{0}":"さいしょの いっぱつは クリティカル ×{0}"});
+Object.assign(TR.ko||(TR.ko={}), {"their first shot CRITS ×{0}":"첫 발은 크리티컬 ×{0}"});
+Object.assign(TR['zh-Hans']||(TR['zh-Hans']={}), {"their first shot CRITS ×{0}":"第一炮暴击 ×{0}","cannons within {0} m fire {1}% faster":"{0} 米内的大炮射速提高 {1}%"});
+Object.assign(TR.de||(TR.de={}), {"their first shot CRITS ×{0}":"ihr erster Schuss: KRIT ×{0}"});
+Object.assign(TR.ru||(TR.ru={}), {"their first shot CRITS ×{0}":"их первый выстрел — КРИТ ×{0}"});
+Object.assign(TR.es||(TR.es={}), {"their first shot CRITS ×{0}":"su primer disparo es CRÍTICO ×{0}"});
+
+
+
+setTimeout(()=>{ try{ if(typeof GVT==='object' && GVT) GVT.ebh=ebhRig; }catch(e){} }, 0);
 
 
 
