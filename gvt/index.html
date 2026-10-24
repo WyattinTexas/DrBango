@@ -756093,6 +756093,90 @@ function fzwRead(){ const r=fzwRect(); return { on:FZW.on, live:FZW_LIVE, hold:f
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function ph2On(){ return !!(PH2.on && bbsOn()); }
+function ph2Ride(){ if(!ph2On()) return false; const f=bbsBill(); return !!(f && f.bbs && (f.bbs.st==='ride' || f.bbs.st==='mount')); }
+function ph2P(){ const rd=S.raid; if(!rd || rd.k!=='bbs') return 1; return Math.max(1, Math.min(SQ_MAX, (rd.n|0)||1)); }
+function ph2RideAdd(){ return PH2.on? PH2.ride.per*(ph2P()-1) : 0; }
+
+
+
+
+
+function ph2Lane(){ const n=bbsLaneCounts(); let best=-1, bn=0; for(let i=0;i<n.length;i++){ if(n[i]>bn){ bn=n[i]; best=i; } } return (best>=0)? best : bbsBandOf(T.y); }
+function ph2Front(lane){ const B=BBS_BANDS[lane]||BBS_BANDS[1], x0=BBS3.xLo, x1=Math.max(x0+PH2.front.w, campDeployX()+PH2.front.dx); return { x:Math.round((x0+x1)/2), y:Math.round((B[0]+B[1])/2), w:x1-x0, n:0, front:1 }; }
+
+
+
+
+
+
+
+
+function ph2HorseHp(k){ return Math.max(1, Math.round((BBS_HP[k]||BBS_HP.e)*PH2.horseK)); }
+
+function ph2VoteTxt(h){ if(!PH2.on || typeof h!=='string') return h; try{ for(const k of ['e','m','h']){ const A=Number(BBS_HP[k]).toLocaleString(), F=Number(Math.round(BBS_HP[k]*PLAY.p1K)).toLocaleString(), Hh=Number(ph2HorseHp(k)).toLocaleString(); if(Hh===A) continue;
+    const a1=escH(tf('ON THE HORSE %1', A)), b1=escH(tf('ON THE HORSE %1', Hh)), a2=escH(tf('BILL %1 · THEN %2 ON THE HORSE', F, A)), b2=escH(tf('BILL %1 · THEN %2 ON THE HORSE', F, Hh));
+    if(h.indexOf(a1)>=0){ h=h.split(a1).join(b1); PH2.stats.vote++; } if(h.indexOf(a2)>=0){ h=h.split(a2).join(b2); PH2.stats.vote++; } } }catch(e){ PH2.stats.errs++; } return h; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function ph2Cfg(cfg){ const add=ph2RideAdd(); let rides=0, snip=0;
+  for(const w of cfg.waves){ if(!w || !w.groups) continue;
+    if(add>0 && w.bbsRide!=null){ for(const g of w.groups){ if(g && g.t==='wrider') g.n=(g.n|0)+add; } w.bbsRide=(w.bbsRide|0)+add; rides++; }   
+    const gb=w.groups.find(g=>g && g.bba && g.t==='wbandit');
+    if(gb && PH2.snipe.n>0 && !w.groups.some(g=>g && (g.t==='wsniper' || g.t==='reddot' || g.t==='tancommando'))){ w.groups.push(Object.assign({}, gb, { f:'solo', t:'wsniper', n:PH2.snipe.n, at:(typeof BBA_POSSE==='object')? BBA_POSSE.sniperAt : 1.5, pin:1, bba:1, sharp:1, ph2:1 })); snip++; } }   
+  cfg.ph2={ add:add, rides:rides, snip:snip, p:ph2P() }; PH2.stats.cfgs++; PH2.stats.rides+=rides; PH2.stats.snipers+=snip; return cfg; }
+
+
+
+
+
+function ph2Read(){ const f=bbsBill(), b=f && f.bbs; return { on:PH2.on, live:PH2_LIVE, active:ph2On()?1:0, p:ph2P(), rideAdd:ph2RideAdd(), cfg:(S.cfg && S.cfg.ph2)? Object.assign({}, S.cfg.ph2) : null, p1K:PLAY.p1K, horse:PLAY.horse, horseHp:{ e:ph2HorseHp('e'), m:ph2HorseHp('m'), h:ph2HorseHp('h') }, fa:Object.assign({}, RIDE.fa),
+    bill:f? { hp:Math.round(f.hp), max:f.hpMax, st:b? b.st : null, mode:b? (b.mode||null) : null, lane:b? (b.lane==null? null : b.lane) : null, x:Math.round(f.x), y:Math.round(f.y), bar:f.ph2Bar|0 } : null, was:PH2.was, err:PH2.err, stats:Object.assign({}, PH2.stats) }; }
+
+
+
+
+
+
+
+
 function nclOn(){ return !NCL_OFF; }
 
 function nclStrip(){ if(!nclOn()) return 0; const id=NCL.id; let n=0; try{
@@ -965122,7 +965206,7 @@ let BFQ=null;
 
 
 
-let GVT_CV='26.98';
+let GVT_CV='26.99';
 let NX_CAP_MUL=4;
 
 
@@ -2460664,6 +2460748,90 @@ window.addEventListener('pointercancel', function(){ FZW.dn=null; }, { capture:t
 (function(){ try{ const st=document.createElement('style'); st.textContent='body.fzw-hold .bbsv, body.fzw-hold #bbsvToast, body.fzw-hold #bbsvCard { display:none !important; }'; document.head.appendChild(st); }catch(e){} })();
 
 setTimeout(function(){ try{ if(window.GVT && !GVT.fzw) GVT.fzw=function(){ return fzwRead(); }; }catch(e){} }, 0);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const PH2_LIVE=1;
+const PH2={ on:(function(){ try{ const q=/[?&]otsph2=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_otsph2','0'); else localStorage.removeItem('gvt_otsph2'); } return localStorage.getItem('gvt_otsph2')==='0'? 0 : PH2_LIVE; }catch(e){ return PH2_LIVE; } })(),
+  p1K:1,          
+  horseK:0.5,     
+  front:{ dx:160, w:240 },   
+  fa:{ cd:7, first:5, R:400, half:56, thru:14, dmg:[200,400], pierce:1 },   
+  ride:{ per:4 },   
+  snipe:{ n:1 },    
+  was:null, err:null, stats:{ cfgs:0, rides:0, rideAdd:0, calls:0, snipers:0, mounts:0, lanes:0, mudOwn:0, front:0, crowd:0, faHits:0, faHp:0, faDowns:0, faPierce:0, faKnock:0, domes:0, vote:0, errs:0 } };
+
+
+
+
+
+if(PH2.on){ try{ PH2.was={ p1K:PLAY.p1K, horse:PLAY.horse, fa:Object.assign({}, RIDE.fa) };
+  PLAY.p1K=PH2.p1K; PLAY.horse=1;   
+  Object.assign(RIDE.fa, { cd:PH2.fa.cd, first:PH2.fa.first, R:PH2.fa.R, half:PH2.fa.half, thru:PH2.fa.thru }); }catch(e){ PH2.err=String(e).slice(0,200); } }
+
+
+
+{ const lc0=bbsLaneCounts; bbsLaneCounts=function(){ if(!ph2Ride()) return lc0.apply(this, arguments); const n=[0,0,0], M=BBS3.mind.bandPad; for(const u of bbsGreen()){ const b=bbsBandOf(u.y); n[b]++; if(b>0 && u.y<BBS_BANDS[b][0]+M) n[b-1]++; if(b<2 && u.y>=BBS_BANDS[b][1]-M) n[b+1]++; } PH2.stats.lanes++; return n; }; }
+{ const sm0=bbsSetMode; bbsSetMode=function(f,b,mode,tgt,lane){ if(mode==='mud' && f && f.type==='bbshow' && ph2On()){ const ln=ph2Lane(); PH2.stats.mudOwn++; if(b && b.mode==='own' && b.lane===ln) return; return sm0.call(this, f, b, 'own', null, ln); } return sm0.apply(this, arguments); }; }
+{ const rc0=rideCrowd; rideCrowd=function(lane){ if(!ph2Ride()) return rc0.apply(this, arguments);
+    const G=bbsGreen(); if(!G.length){ PH2.stats.front++; return ph2Front(lane); }
+    const B=BBS_BANDS[lane], pad=BBS3.mind.bandPad; let M=B? G.filter(u=>u.y>=B[0]-pad && u.y<B[1]+pad) : G; if(!M.length) M=G;
+    let sx=0, sy=0, x0=1e9, x1=-1e9; for(const u of M){ sx+=u.x; sy+=u.y; x0=Math.min(x0,u.x); x1=Math.max(x1,u.x); } const g=RIDE.strafe.grid; PH2.stats.crowd++;
+    return { x:Math.round(sx/M.length/g)*g, y:Math.round(sy/M.length/g)*g, w:Math.max(80, x1-x0), n:M.length }; }; }
+
+
+{ const m0=bbsMount; bbsMount=function(f,u){ const r=m0.apply(this, arguments); try{ if(ph2On() && f && f.type==='bbshow' && f.bbs && f.bbs.st==='mount' && !f.ph2Bar){ const hp=ph2HorseHp(bbsTier()); f.ph2Bar=1; f.ph2Was=f.hpMax; f.hpMax=hp; f.hp=hp; PH2.stats.mounts++; } }catch(e){ PH2.stats.errs++; PH2.err=String(e).slice(0,200); } return r; }; }
+
+
+
+{ const v0=vtcSkeleton; vtcSkeleton=function(){ return ph2VoteTxt(v0.apply(this, arguments)); }; }
+{ const v1=bbsvHTML; bbsvHTML=function(){ return ph2VoteTxt(v1.apply(this, arguments)); }; }
+
+{ const fa0=rideFaTick; rideFaTick=function(f,dt,b){ if(!f || !ph2On()) return fa0.apply(this, arguments); f.ph2Fa=1; try{ return fa0.apply(this, arguments); } finally{ f.ph2Fa=0; } }; }
+{ const th0=tanHit; tanHit=function(u,fx,fy,src,fire9){
+    if(!(src && src.ph2Fa && src.type==='bbshow' && src.pipN>0 && u && !u.dead && ph2On())) return th0.apply(this, arguments);
+    src.ph2FaN=(src.ph2FaN|0)+1; const d=playRoll(PH2.fa.dmg[0], PH2.fa.dmg[1], src.id|0, src.ph2FaN, (u.id|0)+':fa'), c0=PLAY.cone, x0=src.dmgX, was=PND_CUT, up=S.units.indexOf(u)>=0;
+    PLAY.cone=[d,d]; src.dmgX=d/src.pipN; if(PH2.fa.pierce){ PND_CUT=src; PH2.stats.faPierce++; }   
+    let r; try{ r=th0.apply(this, arguments); } finally{ PLAY.cone=c0; src.dmgX=x0; PND_CUT=was; }
+    try{ const P=PH2.stats; P.faHits++; P.faHp+=d; if(up && (u.dead || u.falling || S.units.indexOf(u)<0)) P.faDowns++; }catch(e){}
+    return r; }; }
+{ const pt0=olvPocketTurn; olvPocketTurn=function(u,fx,fy,src,fire9){ if(src && src.ph2Fa && src.type==='bbshow' && PH2.fa.pierce && ph2On()){ PH2.stats.domes++; return false; } return pt0.apply(this, arguments); }; }
+{ const k0=knock; knock=function(u,sx,sy,rolled){ const src=PND_CUT; if(u && !u.dead && src && src.ph2Fa && src.type==='bbshow' && PH2.fa.pierce && ph2On() && !(u.jetT>0 || u.dropT>0 || u.falling || u.kbMount || u.trk)){ PH2.stats.faKnock++; return knockKill(u); } return k0.apply(this, arguments); }; }
+
+
+
+
+
+
+
+{ const c0=bbsCfg; bbsCfg=function(tier){ const cfg=c0.apply(this, arguments); try{ if(PH2.on && cfg && cfg.bbs && !cfg.ph2) ph2Cfg(cfg); }catch(e){ PH2.stats.errs++; PH2.err=String(e).slice(0,200); } return cfg; }; }
+{ const r0=bbsRideCall; bbsRideCall=function(B,n){ const add=ph2On()? ph2RideAdd() : 0; if(!(add>0)) return r0.apply(this, arguments);
+    let base=n|0; try{ if(typeof OTS_HARD==='object' && OTS_HARD.on) base=Math.max(base, otsRideN((B && B.rides)|0)); }catch(e){} base=Math.max(1, Math.min(BBS_RIDE.max, base));
+    const m0=BBS_RIDE.max; BBS_RIDE.max=m0+add; PH2.stats.calls++; PH2.stats.rideAdd+=add; try{ return r0.call(this, B, base+add); } finally{ BBS_RIDE.max=m0; } }; }
+
+
+
+{ const g0=bbsRig; bbsRig=function(o){ const r=g0.apply(this, arguments); try{ if(r && typeof r==='object') r.ph2=ph2Read(); }catch(e){} return r; }; }
+setTimeout(function(){ try{ if(window.GVT && !GVT.ph2) GVT.ph2=function(){ return ph2Read(); }; }catch(e){} }, 0);
 
 
 
