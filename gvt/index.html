@@ -760752,6 +760752,7 @@ function hld2Room(b){ return !!(hld2On() && b && b.seat!=null && S.bf && b.seat!
 
 
 
+
 function fgtOn(){ return !!FGT.on; }
 function fgtLog(s){ if(FGT.log.length<80) FGT.log.push(s); }
 function fgtMedal(){ try{ const A=META.ach||{}; return achCase().some(a=>!!A[a.id]); }catch(e){ FGT.err++; return false; } }
@@ -760768,6 +760769,9 @@ function fgtHolds(id){ try{ switch(id){
 function fgtByLevel(id){ return FGT_LVL[id]!=null && (META.lvl|0)>=FGT_LVL[id]; }
 function fgtOpen(id){ if(!fgtOn()) return true; if(id==='table') return fgtOpen('roster'); if(id==='train') return false; if(FGT_LVL[id]==null && !FGT_ROSTER_IDS[id]) return true; return fgtByLevel(id) || fgtHolds(id); }
 function fgtNo(){ FGT.no++; try{ SFX.clack(); }catch(e){} return false; }
+
+function fgtMurals(bg){ try{ bg=bg||document.getElementById('fortBg'); if(!bg) return null; const closed=[]; for(const id in FGT_MURALS){ const c=fgtOn() && !fgtOpen(id); bg.classList.toggle('fgt-c-'+id, c); if(c) closed.push(id); } return closed; }catch(e){ FGT.err++; return null; } }
+function fgtMuralRead(){ const o={ closed:[], shown:{} }; try{ const bg=document.getElementById('fortBg'), sv=bg && bg.querySelector('svg.fhero'); if(!sv) return o; o.closed=[...bg.classList].filter(c=>c.indexOf('fgt-c-')===0).map(c=>c.slice(6)); for(const id in FGT_MURALS){ const els=FGT_MURALS[id].map(q=>sv.querySelector(q)).filter(Boolean); o.shown[id]=els.length? els.some(e=>getComputedStyle(e).display!=='none') : null; } const up=e=>{ for(let a=e; a && a!==sv; a=a.parentNode){ if(a.nodeType===1 && getComputedStyle(a).display==='none') return true; } return false; }; o.men=[...sv.querySelectorAll('image[data-fh="man"]')].filter(e=>e.getBoundingClientRect().width>0 && !up(e)).length; o.flr=(()=>{ const e=sv.querySelector('[data-fh="flr"]'); return e? getComputedStyle(e).display!=='none' : null; })(); }catch(e){ FGT.err++; } return o; }
 function fgtDoors(){ const o={}; ['promotions','roster','outfitter','heroes','pets','medals','table','trc','flx','east','fbw','wall','train'].forEach(id=>{ o[id]=fgtOpen(id); }); return o; }
 
 function fgtLabGift(){ try{ if(!fgtOn() || (META.lvl|0)<FGT_LVL.flx || !META.enh || !Array.isArray(META.enh.own) || !Array.isArray(META.enh.on) || typeof labSold!=='function' || !labSold('longtube') || enhOwns('longtube')) return false;
@@ -760788,7 +760792,7 @@ function fgtDecorOwn(){ return ((META.decor && META.decor.own)||[]).filter(id=>!
 function fgtRig(o){ o=o||{}; try{ if(o.on!=null){ FGT.on=o.on? 1 : 0; document.documentElement.classList.toggle('fgt-on', fgtOn()); } if(o.lvl!=null) META.lvl=o.lvl|0; if(o.camp!=null) META.campaign=o.camp|0; if(o.fresh){ const F=fsiLedger(); delete F.east; delete F.hangar; } if(o.save) saveMeta(); }catch(e){ FGT.err++; }
   const F=fsiLedger(); return { cv:GVT_CV, on:FGT.on, v:FGT.v, err:FGT.err, lvl:META.lvl|0, camp:META.campaign|0, picks:META.pendingPicks|0, rungs:Object.assign({ roster:PAINT_GIFT_LVL }, FGT_LVL), board:(typeof FBW==='object' && FBW)? { B:FBW.B.slice(), D:FBW.D.slice() } : null, open:fgtDoors(),
     holds:{ promotions:fgtHolds('promotions'), roster:fgtHolds('roster'), pets:fgtHolds('pets'), heroes:fgtHolds('heroes'), medals:fgtHolds('medals'), east:fgtHolds('east'), flx:fgtHolds('flx') }, medal:fgtMedal(), decorOwn:fgtDecorOwn(), first:{ fgt:F.fgt|0, east:F.east|0, hangar:F.hangar|0, fort:F.fort|0 },
-    tube:{ own:enhOwns('longtube'), on:enhOn('longtube') }, gifts:FGT.gifts, no:FGT.no, paint:FGT.paint, stamp:FGT.stamp, surpTut:META.surpTut, paintOwed:paintRiteOwed(), fxr:{ x:FXR.x, e:FXR.e }, arrow:!!document.getElementById('fgtEast'), news:fortNews(), log:FGT.log.slice() }; }
+    tube:{ own:enhOwns('longtube'), on:enhOn('longtube') }, gifts:FGT.gifts, no:FGT.no, paint:FGT.paint, stamp:FGT.stamp, surpTut:META.surpTut, paintOwed:paintRiteOwed(), fxr:{ x:FXR.x, e:FXR.e }, arrow:!!document.getElementById('fgtEast'), news:fortNews(), murals:fgtMuralRead(), log:FGT.log.slice() }; }
 
 
 
@@ -969990,7 +969994,7 @@ let BFQ=null;
 
 
 
-let GVT_CV='27.32';
+let GVT_CV='27.33';
 let NX_CAP_MUL=4;
 
 
@@ -2472247,7 +2472251,8 @@ if(typeof GVT==='object' && GVT) GVT.sdr=function(){ return { on:SDR.on, gear:(S
 
 
 
-var FGT={ on:(function(){ try{ const q=/[?&]fgt=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_fgt','0'); else localStorage.removeItem('gvt_fgt'); } return localStorage.getItem('gvt_fgt')==='0'? 0 : 1; }catch(e){ return 1; } })(), v:1, err:0, log:[], old:{}, gifts:0, no:0, paint:0, stamp:0 };
+
+var FGT={ on:(function(){ try{ const q=/[?&]fgt=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_fgt','0'); else localStorage.removeItem('gvt_fgt'); } return localStorage.getItem('gvt_fgt')==='0'? 0 : 1; }catch(e){ return 1; } })(), v:2, err:0, log:[], old:{}, gifts:0, no:0, paint:0, stamp:0 };
 const FGT_LVL={ promotions:3, east:7, flx:11 }, FGT_BOARD_X=702, FGT_ISSUE={ warplane:1 }, FGT_ROSTER_IDS={ roster:1, pets:1, heroes:1, medals:1, trc:1 };
 
 
@@ -2472263,6 +2472268,9 @@ const FGT_LVL={ promotions:3, east:7, flx:11 }, FGT_BOARD_X=702, FGT_ISSUE={ war
 
 
 
+
+
+const FGT_MURALS={ promotions:['[data-fh="rankwall"]','[data-fh="badge"]','[data-fh="crest"]','[data-fh="coin"]','[data-fh="tierman"]'], trc:['[data-trc="cab"]'], medals:['[data-fh="wallcase"]'], flx:['[data-fh="flxblock"]'], heroes:['[data-fh="bench"]','[data-fh="bagseat"]'], roster:['[data-afq="range"]','[data-fa="sentries"]'], pets:['[data-fh="fence"]','[data-afq="pendummy"]','[data-fa="pen-dressing"]','[data-fa="bucket"]','[data-fa="barrel"]'] };
 
 
 
@@ -2472291,7 +2472299,7 @@ try{ FGT.old.renderFortScene=renderFortScene; renderFortScene=function(){ const 
     fgtLabGift(); const g=id=>document.getElementById(id), rm=el=>{ if(el) el.remove(); };
     FORT_TABS.forEach(t9=>{ if(!fgtOpen(t9[0])) rm(g('fhHot-'+t9[0])); });
     if(!fgtOpen('flx')) rm(g('flxHot')); if(!fgtOpen('trc')) rm(g('fhTrc')); rm(g('fhTrain'));
-    fgtEastCue(); }catch(e){ FGT.err++; } return r; }; }catch(e){ FGT.err++; }
+    fgtMurals(document.getElementById('fortBg')); fgtEastCue(); }catch(e){ FGT.err++; } return r; }; }catch(e){ FGT.err++; }
 try{ FGT.old.exrFortSync=exrFortSync; exrFortSync=function(bg, r, f){ if(fgtOn() && !fgtOpen('east')){ try{ FXR.e=0; FXR.x=0; const ex=bg && bg.querySelector(':scope > .exr-east'); if(ex) ex.style.display='none'; exrFortPan(bg); const b=document.getElementById('fgtEast'); if(b) b.remove(); }catch(e){ FGT.err++; } return 0; }   
     try{ const ex=bg && bg.querySelector(':scope > .exr-east'); if(ex && ex.style.display==='none') ex.style.display=''; }catch(e){} return FGT.old.exrFortSync.apply(this, arguments); }; }catch(e){ FGT.err++; }
 try{ FGT.old.exrFortPan=exrFortPan; exrFortPan=function(bg){ const r=FGT.old.exrFortPan.apply(this, arguments); try{ if(fgtOn() && FXR.e>0 && FXR.x>=FXR.e*0.5 && fortSceneOpen() && fgtEastFresh()) fgtEastSeen(); }catch(e){ FGT.err++; } return r; }; }catch(e){ FGT.err++; }
@@ -2472308,7 +2472316,7 @@ try{ FGT.old.checkAch=checkAch; checkAch=function(){ if(fgtOn()){ try{ if(tourDu
 try{ ['hm4','hm5'].forEach(id=>{ const r=ACH.find(a=>a.id===id); if(!r) return; const f0=r.f, s0=r.stat; r.stat=function(){ return fgtOn()? fgtDecorOwn() : s0(); }; r.f=function(){ return fgtOn()? fgtDecorOwn()>=r.goal : f0(); }; }); }catch(e){ FGT.err++; }
 try{ FGT.old.openPaintRite=openPaintRite; openPaintRite=function(){ if(fgtOn()){ fgtPaintDay(); return true; } return FGT.old.openPaintRite.apply(this, arguments); }; }catch(e){ FGT.err++; }
 try{ if(fgtOn() && typeof FBW==='object' && FBW && FBW.on && Array.isArray(FBW.B) && Array.isArray(FBW.D)){ FBW.B[0]=FGT_BOARD_X; FBW.D[0]=FGT_BOARD_X; } }catch(e){ FGT.err++; }
-try{ document.documentElement.classList.toggle('fgt-on', fgtOn()); const st=document.createElement('style'); st.id='fgtCss'; st.textContent='html.fgt-on #fortBg [data-fh="wartable"],html.fgt-on #fortBg [data-fh="trainpad"]{display:none}.us-train{text-align:center;margin:10px 0 2px}.us-train .mbtn{min-width:58%}'; document.head.appendChild(st); }catch(e){ FGT.err++; }
+try{ document.documentElement.classList.toggle('fgt-on', fgtOn()); const st=document.createElement('style'); st.id='fgtCss'; st.textContent='html.fgt-on #fortBg [data-fh="wartable"],html.fgt-on #fortBg [data-fh="trainpad"],html.fgt-on #fortBg [data-fh="flr"]{display:none}.us-train{text-align:center;margin:10px 0 2px}.us-train .mbtn{min-width:58%}'+Object.keys(FGT_MURALS).map(id=>FGT_MURALS[id].map(q=>'#fortBg.fgt-c-'+id+' '+q).join(',')+'{display:none}').join(''); document.head.appendChild(st); }catch(e){ FGT.err++; }
 try{ if(fgtOn()){ const F=fsiLedger(); if(!F.fgt){ F.fgt=1; if((META.lvl|0)>=FGT_LVL.east || fgtHolds('east')){ F.east=1; F.hangar=1; } FGT.stamp=1; fgtLog('stamp'); saveMeta(); } } }catch(e){ FGT.err++; }
 try{ Object.assign(TR.ar||(TR.ar={}), {"TRY TRAINING GROUNDS":"جرّب ميدان التدريب", "The hangar is open, soldier. Swipe east and take a look.":"الحظيرة مفتوحة يا جندي. اسحب شرقًا وألقِ نظرة."});
   Object.assign(TR.ja||(TR.ja={}), {"TRY TRAINING GROUNDS":"くんれんじょうで ためす", "The hangar is open, soldier. Swipe east and take a look.":"かくのうこが ひらいたぞ、へいし。ひがしへ スワイプして みてみろ。"});
