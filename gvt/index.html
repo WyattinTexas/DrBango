@@ -760753,6 +760753,61 @@ function hld2Room(b){ return !!(hld2On() && b && b.seat!=null && S.bf && b.seat!
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 function fgtOn(){ return !!FGT.on; }
 function fgtLog(s){ if(FGT.log.length<80) FGT.log.push(s); }
 function fgtMedal(){ try{ const A=META.ach||{}; return achCase().some(a=>!!A[a.id]); }catch(e){ FGT.err++; return false; } }
@@ -969994,7 +970049,7 @@ let BFQ=null;
 
 
 
-let GVT_CV='27.34';
+let GVT_CV='27.35';
 let NX_CAP_MUL=4;
 
 
@@ -2472238,6 +2472293,61 @@ const SDR=(function(){
 })();
 window.GVT_SDR=SDR;
 if(typeof GVT==='object' && GVT) GVT.sdr=function(){ return { on:SDR.on, gear:(SDR.on && SDR.gon)? SDR.gear().length : 0, pool:SDR.on? SDR.pool().length : 0, found:SDR.on? SDR.found() : null, n:(META.sdr&&META.sdr.n)|0, step:SDR.on? SDR.st.step : null }; };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const NFD=(function(){
+  const on=(function(){ try{ const q=/[?&]nfd=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_nfd','0'); else localStorage.removeItem('gvt_nfd'); } return localStorage.getItem('gvt_nfd')==='0'? 0 : 1; }catch(e){ return 1; } })();
+  const B={ v:2, on, pill:1, surplus:1, look:'sil', robo:2, robo0:null };
+  if(!on || typeof SDR!=='object' || !SDR || !SDR.on) return B;   
+  B.robo0=SDR.JUDGE.robot; SDR.JUDGE.robot=B.robo;   
+  const own=id=>{ try{ return decOwns(id); }catch(e){ return false; } };
+  const shut=id=>{ try{ return !!(decBoss(id) && !decBossOpen(id)); }catch(e){ return false; } };   
+  const due=(id, h)=>B.on && SDR.isDrop(id) && !own(id) && !shut(id) && !/class="sh-dec[^"]*\b(mys|sil)\b/.test(h);   
+  const css=document.createElement('style'); css.id='nfdCSS'; css.textContent=[
+    
+    '.sh-dec.nfd .sh-dwin{filter:grayscale(1) brightness(.8) contrast(.9);opacity:.92}',
+    '.sh-dec.nfd .sh-dwin svg{filter:drop-shadow(0 3px 2px rgba(0,0,0,.28)) saturate(0)}',
+    '.sdr-grid .sh-dec.nfd .sh-dwin,.sdr-row .sh-dec.nfd .sh-dwin{min-height:clamp(70px,13vh,110px)}',   
+    
+    '.nfd-mark{position:absolute;left:2%;right:2%;top:50%;z-index:4;transform:translateY(-50%);padding:3px 2px;text-align:center;font-family:var(--uih);font-weight:800;font-size:clamp(10px,1.95vh,14px);letter-spacing:.14em;line-height:1.1;color:#F6EFDC;background:rgba(36,28,18,.86);border:2px solid rgba(246,239,220,.55);border-radius:4px;box-shadow:0 3px 6px rgba(0,0,0,.45);pointer-events:none;white-space:normal;overflow:hidden}',
+    
+    '.sh-dec.nfd-stamp .nfd-mark{left:50%;right:auto;width:auto;max-width:112%;transform:translate(-50%,-50%) rotate(-12deg);padding:1px 7px;background:rgba(246,239,220,.78);color:#8B2432;border:3px double #8B2432;border-radius:6px;letter-spacing:.14em;box-shadow:none}',
+    
+    '.sh-dec.nfd-plate .nfd-mark{position:static;display:block;flex:0 0 auto;overflow:visible;transform:none;margin-top:clamp(1px,.5vh,4px);padding:2px 8px;background:rgba(36,28,18,.86);border-radius:5px;box-shadow:none;border:none;letter-spacing:.14em}',
+    '.sh-dec.nfd-plate .sh-dwin{flex:1 1 auto}',
+    '.sh-dec.nfd-plate .nfd-mark{white-space:nowrap}',
+    '.sdr-grid .nfd-mark,.sdr-row .nfd-mark{font-size:clamp(9px,1.6vh,12px);letter-spacing:.08em}',   
+    
+    '.sh-dec.nfd-sil .sh-dwin,.sh-dec.nfd-silband .sh-dwin{filter:none;opacity:1}',
+    '.sh-dec.nfd-sil .sh-dwin svg,.sh-dec.nfd-sil .sh-dwin img,.sh-dec.nfd-silband .sh-dwin svg,.sh-dec.nfd-silband .sh-dwin img{filter:brightness(0)}',
+    '.sh-dec.nfd-sil .nfd-mark{display:none}'   
+  ].join('\n'); document.head.appendChild(css);
+  const MARK='<span class="nfd-mark">NOT FOUND</span>';
+  const old={ shopDecHTML };
+  shopDecHTML=function(id, twin){ const h=old.shopDecHTML(id, twin); if(!due(id, h)) return h; if(twin!=='c' && !B.surplus) return h;   
+    let s=h.replace(/<span class="sh-dn">[\s\S]*?<\/span>/, '').replace(/<span class="sh-dsub">[\s\S]*?<\/span>/, '').replace(/<span class="sh-dlk">[\s\S]*?<\/span>/, '').replace(/<span class="sh-dtag">[\s\S]*?<\/span>/, '');   
+    if(!B.pill) s=s.replace(/<span class="sdr-pill[^"]*">[\s\S]*?<\/span>/, '');
+    return s.replace(/(<button type="button" class="sh-dec)/, '$1 nfd nfd-'+B.look).replace('</button>', MARK+'</button>'); };   
+  for(const L9 of [ ['es','NO ENCONTRADO'], ['de','NICHT GEFUNDEN'], ['ru','НЕ НАЙДЕНО'], ['ja','まだ みつけてない'], ['ko','아직 못 찾음'], ['zh-Hans','未找到'], ['ar','لم يُعثر عليها'] ]) Object.assign(TR[L9[0]]||(TR[L9[0]]={}), { 'NOT FOUND':L9[1] });
+  return Object.assign(B, { due:id=>due(id, old.shopDecHTML(id, 'c')), mark:MARK });
+})();
+if(typeof GVT==='object' && GVT) GVT.nfd=function(o){ o=o||{}; let re=0;
+  if(o.pill!=null){ NFD.pill=o.pill? 1 : 0; re=1; } if(o.surplus!=null){ NFD.surplus=o.surplus? 1 : 0; re=1; } if(o.look && /^(sil|silband|band|stamp|plate)$/.test(o.look)){ NFD.look=o.look; re=1; }
+  if(o.robo!=null && typeof SDR==='object' && SDR && SDR.on && SDR.JUDGE){ NFD.robo=o.robo|0; SDR.JUDGE.robot=NFD.robo; re=1; }
+  if(re){ try{ if(typeof chestStands==='function' && chestStands()){ const v=CHT_VIEW; CHT_VIEW=null; chtTab(v); } }catch(e){} }   
+  return { v:NFD.v, on:NFD.on, pill:NFD.pill, surplus:NFD.surplus, look:NFD.look, robo:NFD.robo, robo0:NFD.robo0, robot:(typeof SDR==='object' && SDR && SDR.on)? SDR.tierOf('robot') : null, css:!!document.getElementById('nfdCSS'), marks:document.querySelectorAll('.sh-dec.nfd .nfd-mark').length }; };
 
 
 
