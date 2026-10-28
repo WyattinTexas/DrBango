@@ -1,6 +1,6 @@
 /* JUMPR shell cache — cache-first so the pad opens in dead zones,
    background refresh so deploys still arrive. */
-const V = "jr-v9";   // 10/28 THE PARTS FOLD: the pad shows a set still waiting for its parts
+const V = "jr-v10";   // 10/28 THE PARTS FOLD: the pad shows a set still waiting for its parts
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon-180.png", "./icon-512.png"];
 
 self.addEventListener("install", e => {
