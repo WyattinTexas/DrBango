@@ -64,11 +64,16 @@ self.addEventListener('fetch', e => {
   if (!isPage(rq)) return;   // everything else: the browser's own road, untouched
   e.respondWith(pageFetch(e, rq));
 });
+// CARD-SCH THE SCHOOL DOOR (design/school-door-1028/00-DESIGN-SCH.md; Wyatt 10/28/2026 13:56 EDT by phone on Discord: "There must be something we can do to make playgvt.net not blockable for school filters. She has my approval here."):
+// a school filter's block page and a captive portal's notice (a hotel, an airport) answer a navigation with HTTP 200 exactly like the game, and the page road below kept whatever came back as the offline copy.
+// From here the copy takes only the game: its first bytes carry the house mark (the notice at the top of index.html). The page a filter sends still reaches the browser (network first, as before); it just never becomes the offline copy.
+const SW_MARK = /GVT \u2014 GREEN VS\. TAN/;
+async function swIsGame(r) { try { const rd = r.body.getReader(), td = new TextDecoder(); let got = '', n = 0; while (n < 8192) { const { value, done } = await rd.read(); if (done) break; got += td.decode(value, { stream: true }); n += value.length; if (SW_MARK.test(got)) { rd.cancel().catch(() => {}); return true; } } rd.cancel().catch(() => {}); return SW_MARK.test(got); } catch (e) { return false; } }   // the first 8 KB at most, then the stream is let go
 function pageFetch(e, rq) {   // 1097's page road, byte-what-it-was inside: NETWORK FIRST, the copy when the line fails or says nothing for SW_NET_MS
   return (async () => {
     const net = fetch(rq).then(r => {
       if (r && r.ok && (r.type === 'basic' || r.type === 'default')) {   // a whole, good reply refreshes the copy; a torn body fails the put and the last good copy stands
-        const c = r.clone(); e.waitUntil(caches.open(SW_K).then(k => k.put(SW_PAGE, c)).catch(() => {}));
+        const c = r.clone(), probe = r.clone(); e.waitUntil(swIsGame(probe).then(yes => yes ? caches.open(SW_K).then(k => k.put(SW_PAGE, c)) : (c.body ? c.body.cancel().catch(() => {}) : null)).catch(() => {}));   // CARD-SCH: only the game itself goes into the copy
       }
       return r;
     });

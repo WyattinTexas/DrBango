@@ -1,0 +1,26 @@
+<!doctype html><meta charset="utf-8"><title>Take a seat</title>
+<body style="background:#111;color:#eee;font:16px system-ui;display:grid;place-items:center;height:100vh;margin:0">
+<div id="o">Taking the seat…</div>
+<script>
+(function(){
+  var q=new URLSearchParams(location.search), dev=q.get('dev')||'', name=q.get('name')||'';
+  var o=document.getElementById('o');
+  if(!/^[a-f0-9]{16,64}$/.test(dev)){ o.textContent='No seat in this link.'; return; }
+  try{
+    var m={}; try{ m=JSON.parse(localStorage.getItem('gvt_meta')||'{}')||{}; }catch(e){ m={}; }
+    m.deviceId=dev; if(name) m.name=name;
+    var lv=parseInt(q.get('lvl')||'',10); if(lv>0){ m.lvl=lv; m.xp=0; m.pendingPicks=0; }
+    var cp=parseInt(q.get('camp')||'',10); if(cp>=0 && q.get('camp')!==null){ m.campaign=Math.max(cp, (m.campaign|0)); }
+    window.__SEAT_V=3;
+    function mergeIn(dst,src){ Object.keys(src).forEach(function(k){ var v=src[k], d=dst[k];
+      if(Array.isArray(v)){ var a=Array.isArray(d)?d.slice():[]; v.forEach(function(x){ if(a.indexOf(x)<0) a.push(x); }); dst[k]=a; }
+      else if(v && typeof v==='object'){ dst[k]=(d&&typeof d==='object'&&!Array.isArray(d))?d:{}; mergeIn(dst[k],v); }
+      else dst[k]=v; }); }
+    function maxIn(dst,src){ Object.keys(src).forEach(function(k){ var v=src[k]; if(v && typeof v==='object'){ dst[k]=(dst[k]&&typeof dst[k]==='object')?dst[k]:{}; maxIn(dst[k],v); } else dst[k]=Math.max(+dst[k]||0,+v||0); }); }
+    try{ if(q.get('set')) mergeIn(m, JSON.parse(q.get('set'))); if(q.get('max')) maxIn(m, JSON.parse(q.get('max'))); }catch(e){ o.textContent='Bad set/max JSON: '+e; return; }
+    localStorage.setItem('gvt_meta', JSON.stringify(m));
+    o.textContent='Seated as '+(name||dev)+' — loading the game…';
+  }catch(e){ o.textContent='Storage refused: '+e; return; }
+  setTimeout(function(){ location.replace('./'); }, 400);
+})();
+</script>
