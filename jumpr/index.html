@@ -214,6 +214,7 @@
     <p class="label" id="maclabel">Mac status</p>
     <div class="statrow" id="statrow"><span class="chip">waiting for first report…</span></div>
     <p class="queue-lines" id="queuelines"></p>
+    <p class="queue-lines" id="partsnote" hidden></p>
   </div>
 
   <div class="card">
@@ -677,6 +678,12 @@ async function pollStatus() {
     if (s.guest_cap) rows.push(`<span class="chip">your notes today <b>${s.guest_today || 0}</b>/${s.guest_cap}</span>`);
     $("statrow").innerHTML = rows.join("");
     $("queuelines").textContent = (s.queue_lines || []).slice(0,6).join("\n");
+    // 10/28 THE PARTS FOLD: a note that came in parts ("… part k/N") and is still short, damaged, or waiting for its
+    // card — the Mac's own words (textContent only), one line a set; gone from the pad once the set is whole.
+    const parts = (Array.isArray(s.parts) ? s.parts : []).slice(0, 4);
+    const pn = $("partsnote");
+    pn.textContent = parts.map(p => "🧩 jumpr: " + String(p.text || "").slice(0, 220)).join("\n");
+    pn.hidden = !parts.length;
     const hl = Array.isArray(s.held) ? s.held : [];
     for (const t of Object.keys(heldSent)) if (!hl.some(h => h.task === t) && !heldSent[t].pid) delete heldSent[t];
     renderHeld(hl);
