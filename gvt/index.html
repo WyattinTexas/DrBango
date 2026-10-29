@@ -762099,6 +762099,21 @@ function hld2Room(b){ return !!(hld2On() && b && b.seat!=null && S.bf && b.seat!
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 function fgtOn(){ return !!FGT.on; }
 function fgtLog(s){ if(FGT.log.length<80) FGT.log.push(s); }
 function fgtMedal(){ try{ const A=META.ach||{}; return achCase().some(a=>!!A[a.id]); }catch(e){ FGT.err++; return false; } }
@@ -972930,7 +972945,7 @@ let BFQ=null;
 
 
 
-let GVT_CV='28.25';
+let GVT_CV='28.26';
 let NX_CAP_MUL=4;
 
 
@@ -2637421,7 +2637436,7 @@ window.GVT = {
 
 
 const SQZ=(function(){
-  const S={ v:1, on:0, off:false, feel:'squish', presses:0, log:[], retired:null, swept:0, err:0 };
+  const S={ v:2, on:0, off:false, feel:'squish', presses:0, log:[], retired:null, swept:0, err:0 };   
   try{ const q=/[?&]sqz=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_sqzoff','1'); else localStorage.removeItem('gvt_sqzoff'); } S.off=localStorage.getItem('gvt_sqzoff')==='1'; }catch(e){ S.off=false; }
   const RM=(function(){ try{ return matchMedia('(prefers-reduced-motion: reduce)'); }catch(e){ return { matches:false }; } })();
   
@@ -2637436,6 +2637451,7 @@ const SQZ=(function(){
   const MIN_HOLD=90;                           
   const SCROLL_WAIT=60;                        
   const SLOP2=100;                             
+  const SINK=6, PIN_EDGE=2;                    
   const SLAB='.btn, .mbtn, .mb-take, .shc-yes, .shc-no, .wt-play, .agok';   
   const TAP=SLAB+', button, a[href], [role=button], [role=tab], [onclick], input[type=button], input[type=submit], input[type=checkbox], input[type=radio], label[for], summary, select';
   const SKIP='[data-sqz=off], input[type=range], input[type=text], input[type=number], input[type=email], input[type=password], input[type=search], input[type=tel], textarea, canvas, video';
@@ -2637465,7 +2637481,20 @@ const SQZ=(function(){
     const fx=bb.x+bb.width/2, fy=feet? bb.y+bb.height : bb.y+bb.height/2, px=m? m.a*fx+m.c*fy+m.e : fx, py=m? m.b*fx+m.d*fy+m.f : fy;
     const o=(cs.transformOrigin||'0px 0px').split(' ').map(parseFloat); let ox=o[0]||0, oy=o[1]||0; if(cs.transformBox==='fill-box'){ ox+=bb.x; oy+=bb.y; }
     return { px:px, py:py, ox:ox, oy:oy }; }catch(e){ return null; } }
-  function frameOf(p, sx, sy, off){ const f={ scale:sx.toFixed(4)+' '+sy.toFixed(4) }; if(p.anc) f.translate=((1-sx)*(p.anc.px-p.anc.ox)).toFixed(3)+'px '+((1-sy)*(p.anc.py-p.anc.oy)).toFixed(3)+'px'; if(off!=null) f.offset=off; return f; }
+  
+  
+  
+  
+  
+  
+  
+  function pin(p){ try{ const el=p.el, r=p.r; if(!r || !(r.width>0 && r.height>0)) return null; const cs=getComputedStyle(el), o=String(cs.transformOrigin||'').split(' ').map(parseFloat);
+    const kx=(el.offsetWidth>0)? r.width/el.offsetWidth : 1, ky=(el.offsetHeight>0)? r.height/el.offsetHeight : 1;   
+    const ox=r.left+(isFinite(o[0])? o[0]*kx : r.width/2), oy=r.top+(isFinite(o[1])? o[1]*ky : r.height/2);   
+    const fx=Math.min(r.right, Math.max(r.left, p.x0)), fy=Math.min(r.bottom, Math.max(r.top, p.y0));   
+    return { px:(fx-ox)/kx, py:(fy-oy)/ky, ox:0, oy:0, top:(fy-r.top)/ky }; }catch(e){ return null; } }
+  
+  function frameOf(p, sx, sy, off, dip){ const f={ scale:sx.toFixed(4)+' '+sy.toFixed(4) }; if(p.anc) f.translate=((1-sx)*(p.anc.px-p.anc.ox)).toFixed(3)+'px '+((1-sy)*(p.anc.py-p.anc.oy)+(p.sink||0)*(dip==null? 1 : dip)).toFixed(3)+'px'; if(off!=null) f.offset=off; return f; }   
   function press(p){
     if(p.down) return; p.down=true; p.t0=performance.now(); S.presses++;
     const F=FEELS[S.feel]||FEELS.squish, el=p.el;
@@ -2637477,10 +2637506,11 @@ const SQZ=(function(){
     if(art){ const d=1-sy; sy=+(1-d*1.35).toFixed(4); sx=+(1+d*0.45).toFixed(4); }   
     if(F.swell){ sx=+(2-sx).toFixed(4); sy=+(2-sy).toFixed(4); }   
     p.sx=sx; p.sy=sy; p.swell=!!F.swell;
-    p.anc=p.art.ownerSVGElement? anchor(p.art, !!art) : null; p.flat=!!(p.art.ownerSVGElement && !p.anc);   
+    p.anc=p.art.ownerSVGElement? anchor(p.art, !!art) : pin(p); p.flat=!!(p.art.ownerSVGElement && !p.anc);   
     p.slab=el.matches(SLAB) && !F.swell; if(p.slab){ el.classList.remove('sqz-up'); el.classList.add('sqz-on'); }
+    p.sink=(p.slab && p.anc && !RM.matches)? Math.max(0, Math.min(SINK, sy*p.anc.top-PIN_EDGE)) : 0;   
     try{
-      if(!RM.matches && !p.flat){ const c0=curScale(p.art); p.a=p.art.animate([frameOf(p, c0[0], c0[1]), frameOf(p, sx, sy)], { duration:F.inMs, easing:IN_EASE, fill:'forwards' }); }
+      if(!RM.matches && !p.flat){ const c0=curScale(p.art); p.a=p.art.animate([frameOf(p, c0[0], c0[1], null, 0), frameOf(p, sx, sy)], { duration:F.inMs, easing:IN_EASE, fill:'forwards' }); }   
       p.fEl=(art && !p.flat)? null : (p.flat? p.art : el);
       if(!p.slab && !F.swell && p.fEl && getComputedStyle(p.fEl).filter==='none') p.f=p.fEl.animate([{ filter:'brightness(1)' },{ filter:'brightness('+F.shade+')' }], { duration:F.inMs, easing:IN_EASE, fill:'forwards' });
     }catch(e){ S.err++; }
@@ -2637500,7 +2637530,7 @@ const SQZ=(function(){
         if(getComputedStyle(el).filter==='none' || el.matches(SLAB)){ const w=el.animate([{ filter:'brightness('+F.shade+')' },{ filter:'brightness('+F.shade+')', offset:0.3 },{ filter:'brightness(1)' }], { duration:190, easing:'ease-out' }); w.onfinish=function(){ w.cancel(); }; }
       } else if(p.a && !RM.matches){
         const n=40, z=cancelled? 0.95 : F.zeta, d=cancelled? 200 : F.settle, kk=cancelled? 0 : F.kick, yv=spring(z, d, n, 1, kk), xv=spring(z, d, n, F.wobble, kk), kf=[];
-        for(let i=0;i<=n;i++) kf.push(frameOf(p, p.sx+(1-p.sx)*xv[i], p.sy+(1-p.sy)*yv[i], i/n));
+        for(let i=0;i<=n;i++) kf.push(frameOf(p, p.sx+(1-p.sx)*xv[i], p.sy+(1-p.sy)*yv[i], i/n, 1-yv[i]));   
         const b=p.art.animate(kf, { duration:d, easing:'linear' }); p.b=b; p.a.cancel(); b.onfinish=function(){ b.cancel(); if(el.__sqz===p) el.__sqz=null; };
       }
       if(p.f){ const fb=p.fEl.animate([{ filter:'brightness('+F.shade+')' },{ filter:'brightness(1)' }], { duration:220, easing:IN_EASE }); p.fb=fb; p.f.cancel(); fb.onfinish=function(){ fb.cancel(); }; }
@@ -2637539,7 +2637569,7 @@ const SQZ=(function(){
   S.setFeel=function(f){ if(FEELS[f]) S.feel=f; try{ const F=FEELS[S.feel]; if(CSS.supports('transition-timing-function', 'linear(0, 1)')) document.documentElement.style.setProperty('--sqz-spring', 'linear('+spring(F.zeta, F.settle, 40, 1, F.kick).map(function(v){ return v.toFixed(4); }).join(', ')+')'); document.documentElement.style.setProperty('--sqz-out', F.settle+'ms'); }catch(e){} return S.feel; };
   S.setOn=function(v){ S.on=v? 1 : 0; try{ document.documentElement.classList.toggle('sqz', !!S.on); }catch(e){} if(S.on){ arm(); sweep(); } else dropAll(); return S.on; };
   S.sweep=sweep; S.probe=function(el){ const f=findTarget(el); return f? { el:f.el, locked:!!f.locked, toy:!!S.artOf(f.el), amount:amount(f.el, f.r) } : null; };
-  S.read=function(){ return { cv:(typeof GVT_CV!=='undefined')? GVT_CV : null, v:S.v, on:S.on, off:S.off, feel:S.feel, presses:S.presses, live:live.size, log:S.log.slice(), retired:S.retired, swept:S.swept, err:S.err, rm:!!RM.matches }; };
+  S.read=function(){ return { cv:(typeof GVT_CV!=='undefined')? GVT_CV : null, v:S.v, pin:1, on:S.on, off:S.off, feel:S.feel, presses:S.presses, live:live.size, log:S.log.slice(), retired:S.retired, swept:S.swept, err:S.err, rm:!!RM.matches }; };   
   S.setFeel(S.feel); S.setOn(!S.off);
   try{ window.GVT_SQZ=S; }catch(e){}
   return S;
