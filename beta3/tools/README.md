@@ -2,6 +2,69 @@
 
 Thirty-four scripts, all dev-only — nothing here ships to the browser.
 
+## settings-check.mjs — THE TUTORIAL DOOR: a replay-the-tutorial row in the gear's sheet (v0.124.0)
+
+Skylar (10/29): "Lets put a tutorial button in the settings page. That way if
+someone wants to replay the tutorial they can." The tutorial the live game
+teaches is THE FIRST OPEN (v0.75.0, ftue-check): the rise with no questions,
+the curated first board, the friendly finger. (The scripted First Night —
+first5's orange / scry / blue / green lessons — is still the unmerged
+`first-night` preview branch; its battle beats key on the same `ftue` flag,
+so this door replays the First Night the day that branch ships.)
+
+The game side: `settingsSheet()` grows a third row on its own 52-unit pitch —
+SOUND · LANGUAGE · TUTORIAL (`rowY(i) = top + 96 + 52·i`) — and the endpanel
+grows one row, 248 → 300 tall, still centred at y400, so the version line keeps
+its foot (26 off the bottom) and its old gap below the last row. The row is a
+whole-band zone (`c.tutZone`) with the language row's own `›` mark (no
+emoji); its tap closes the sheet the way the language row does and calls
+`Home.replayTutorial()` — `beginAscent({ mode: 'quick', resume: null,
+ascended: true, ftue: 1 })`, the very rise `ftueRise` makes. Nothing is
+written: `prof.ftue` stays 1 (a closed app never replays it uninvited) and
+`ssFtueDone` at the run's end is already a no-op. The way back is every quick
+run's own — the ‹ abandon and the end screen's HOME wake the meadow with its
+chrome; NEW RUN deals a plain quick game (the restart data carries no ftue).
+Quick keeps no checkpoint, so CONTINUE GAME, an endless climb and a kept daily
+hunt are never touched. `replayTutorial` stands behind the whole one-sheet
+guard family; `window.__ssftue.replay = 1` marks a replay for harnesses.
+Strings: `setTut` ×5 — TUTORIAL / TUTORIAL / TUTORIEL / TUTORIAL / TUTORIAL.
+
+`node tools/settings-check.mjs` — 118 checks, ~5 min, real DPR-3 taps on a
+VETERAN's meadow (stored profile + a campaign checkpoint + an endless climb).
+§1 on paper (the row, the pitch, the `›`, the rise, no flag write, the guard,
+the release ritual) · §2 the sheet by a real gear tap: five tongues' `setTut`,
+the served BUILD, the phone (390 × 844 css, a 1170 × 2532 canvas), three rows
+in order, 300 × 300 at y400, rows at 346 · 398 · 450, no overlap (bands AND
+their 44-pt padded hit rects), label clear of value, version at the foot
+and INERT (fps-check's v0.96.0 assert, carried here while fps-check is
+env-blocked), title above the rows, everything inside the window, the window inside the
+viewport · §3 the guard family both ways (daily / language / tutorial / a
+second settings refused over the sheet; settings and the tutorial refused
+over the daily sheet; a REAL gear tap under the daily sheet lands on its
+veil) · §4 the TUTORIAL tap: the container destroyed whole, the rise, an
+unsigned quick fight 1 with ftue, the authored board tile for tile, the
+finger on S and walking to T, `prof.ftue` still 1 · §5 ‹ → the full meadow,
+the checkpoints byte-identical, the gear and the row answering again · §6 a
+second replay played to its end screen and out by its own HOME (the full
+meadow comes down, everything byte-identical), a third to its end and NEW
+RUN → a plain quick game (no ftue, no finger, the bag's deal), ‹ home,
+everything still byte-identical ·
+§7 es/fr/pt/de sheet census + the Spanish tutorial (LUNA, the finger on L) ·
+§8 `?inset=59,34`: the window inside the safe band · zero page exceptions.
+`SHOTS=tools/shots-tutorial` writes the DPR-3 captures (untracked).
+`ORIGIN=https://drbango.com/beta3` runs it on the PUBLISHED bytes (no local
+serve; §2's BUILD check catches a stale edge).
+
+⚠ Rig notes: (1) the browser is Playwright's own Chromium when installed
+(newest `ms-playwright/chromium-*`; `CHROME=` overrides) — a headless GOOGLE
+Chrome hijacks AppleScript's session with the real one on this Mac; (2) the
+viewport is pinned ONCE by `Emulation.setDeviceMetricsOverride` (390 × 844,
+DPR 3, mobile) — Playwright's headless window alone leaves 390 × 652, where
+the scale drops to 2.45 px/unit and the 44-pt pads (54 units) overlap the
+52 pitch by 2: a short-viewport property of the sheet's shipped pitch (SOUND
+and LANGUAGE always had it), not a defect — on a 390 × 844 phone the pad is
+47.4 units.
+
 ## worldwide-check.mjs — WORLDWIDE FINDS A RIVAL (v0.121.0)
 
 Skylar (10/9, off his phone on live beta3): "when you click challenge worldwide

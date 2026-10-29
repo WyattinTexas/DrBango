@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.123.0';
+const BUILD = 'STARSPELL v0.124.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -7650,6 +7650,23 @@ class Home extends Phaser.Scene {
     window.__ssftue.state = 'rise';
     this.beginAscent({ mode: 'quick', resume: null, ascended: true, ftue: 1 });
   }
+  /* THE TUTORIAL DOOR (v0.124.0, Skylar 10/29) — the settings sheet's
+     TUTORIAL row. The first open's guided game again, from the rise: the
+     very ascent ftueRise makes (the chrome fades, the title comes apart),
+     into a quick run on the curated board with the friendly finger. Only the
+     rise carries it — `prof.ftue` stays down (nothing is re-owed, so a closed
+     app never replays it uninvited), and ssFtueDone at the end is already a
+     no-op. The way back is every quick run's own: the ‹ abandon and the end
+     screen's HOME wake this meadow with its chrome, and NEW RUN deals a
+     plain quick game. Quick keeps no checkpoint, so a standing campaign,
+     endless climb or kept daily hunt is never touched. */
+  replayTutorial() {
+    if (this.busy() || this.setC || this.langC || this.dailyC || this.mapC || this.confirmC || this.signC || this.streakC || this.riteC) return;
+    SFX.ui();
+    DIAG('ftue: replay (the settings door)');
+    window.__ssftue = Object.assign(window.__ssftue || {}, { state: 'rise', replay: 1 });
+    this.beginAscent({ mode: 'quick', resume: null, ascended: true, ftue: 1 });
+  }
 
   /* the DAILY door's herald, every second while the meadow stands and on
      every wake (the name is the corner chip's — the harnesses call it):
@@ -8002,7 +8019,13 @@ class Home extends Phaser.Scene {
      surfaces live now: the sound toggle (the same SFX singleton —
      setMuted writes beta3.mute itself), the language row (the parchment
      langSheet itself, unforked — this sheet steps aside and it opens),
-     and the version line at the foot, its ' · offline' suffix rule intact. */
+     and the version line at the foot, its ' · offline' suffix rule intact.
+     THE TUTORIAL DOOR (v0.124.0, Skylar 10/29): "Lets put a tutorial button
+     in the settings page. That way if someone wants to replay the tutorial
+     they can." A third row on the same pitch — it steps aside like the
+     language row and replays the first open's guided game
+     (replayTutorial); the window grows one row and the version line keeps
+     the foot. */
   settingsSheet() {
     if (this.busy() || this.setC || this.langC || this.dailyC || this.mapC || this.confirmC || this.signC || this.streakC || this.riteC) return;
     SFX.ensure(); SFX.ui();
@@ -8017,7 +8040,11 @@ class Home extends Phaser.Scene {
     this.tweens.add({ targets: veil, alpha: 0.66, duration: 200 });
     veil.on('pointerdown', () => { SFX.ui(); closeSheet(); });
     c.add(veil);
-    const PH = 248, top = 400 - PH / 2;
+    // three rows on one 52-unit pitch under the title (SOUND · LANGUAGE ·
+    // TUTORIAL); the window is sized to them, so the version line's gap
+    // below the last row is the one it always had
+    const PH = 300, top = 400 - PH / 2;
+    const rowY = (i) => top + 96 + 52 * i;
     const items = [];
     // the window swallows its own taps so a press inside never falls through
     items.push(this.add.image(l.x(0), l.y(400), 'endpanel').setDisplaySize(l.u(300), l.u(PH)).setInteractive());
@@ -8037,17 +8064,24 @@ class Home extends Phaser.Scene {
       return z;
     };
     // sound — the glyph IS the state, exactly as the old footer told it
-    const sndT = ssTxt(this, l.x(124), l.y(top + 96), SFX.muted ? '🔇' : '🔊', l.u(14)).setOrigin(1, 0.5);
+    const sndT = ssTxt(this, l.x(124), l.y(rowY(0)), SFX.muted ? '🔇' : '🔊', l.u(14)).setOrigin(1, 0.5);
     c.sndT = sndT;
-    c.sndZone = row(top + 96, SS_T('setSound'), sndT, () => {
+    c.sndZone = row(rowY(0), SS_T('setSound'), sndT, () => {
       SFX.ensure(); SFX.setMuted(!SFX.muted);
       sndT.setText(SFX.muted ? '🔇' : '🔊');
     });
     // language — the current tongue's own name points at the picker
-    const lnT = ssTxt(this, l.x(124), l.y(top + 148), (SS_LANGS[SS_LANG] || SS_LANG) + '  ›', l.u(12), '#c9b676').setOrigin(1, 0.5);
-    c.langZone = row(top + 148, SS_T('setLang'), lnT, () => {
+    const lnT = ssTxt(this, l.x(124), l.y(rowY(1)), (SS_LANGS[SS_LANG] || SS_LANG) + '  ›', l.u(12), '#c9b676').setOrigin(1, 0.5);
+    c.langZone = row(rowY(1), SS_T('setLang'), lnT, () => {
       closeSheet();
       this.langSheet();
+    });
+    // the tutorial — no state to show, only the way in (the language row's
+    // own mark); the sheet steps aside and the first open's game replays
+    const tuT = ssTxt(this, l.x(124), l.y(rowY(2)), '›', l.u(12), '#c9b676').setOrigin(1, 0.5);
+    c.tutZone = row(rowY(2), SS_T('setTut'), tuT, () => {
+      closeSheet();
+      this.replayTutorial();
     });
     // the version line, quiet at the sheet's foot
     c.verT = ssTxt(this, l.x(0), l.y(top + PH - 26), BUILD + ' · Corkscrew Games' + (SSNET.mode === 'local' ? ' · offline' : ''), l.u(9), '#5a6390').setOrigin(0.5);
