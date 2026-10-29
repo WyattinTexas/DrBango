@@ -761974,6 +761974,242 @@ function hld2Room(b){ return !!(hld2On() && b && b.seat!=null && S.bf && b.seat!
 
 
 
+function blbOn(){ return !!(META && META.bossLab); }
+function blbRow(k){ return BLB.ROWS.find(r=>r[0]===k)||null; }
+function blbTiers(k){ const r=raidInfo(k); return ['e','m','h'].concat(r.g? ['g'] : []).concat(r.u? ['u'] : []); }
+function blbLS(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+function blbSave(){ try{ localStorage.setItem('gvt_blb', JSON.stringify({ v:1, over:BLB.over, fight:BLB.fight, waves:BLB.waves, notes:BLB.notes, sel:BLB.sel, tier:BLB.tier, tab:BLB.tab })); localStorage.setItem('gvt_blb_log', JSON.stringify(BLB.log)); }catch(e){} }
+function blbLoad(){ try{ const o=JSON.parse(blbLS('gvt_blb')||'null'); if(o && o.v===1){ BLB.over=o.over||{}; Object.assign(BLB.fight, o.fight||{}); BLB.waves=o.waves||{}; BLB.notes=o.notes||{}; if(blbRow(o.sel)) BLB.sel=o.sel; if(BLB_TIERS.indexOf(o.tier)>=0) BLB.tier=o.tier; if(o.tab) BLB.tab=o.tab; } const L=JSON.parse(blbLS('gvt_blb_log')||'null'); if(Array.isArray(L)) BLB.log=L; }catch(e){} }
+function blbTable(id){ const r=BLB_RULES.find(x=>x[0]===id); if(!r) return null; try{ const T=r[1](); return (T && typeof T==='object')? T : null; }catch(e){ return null; } }
+function blbShip(){ for(const r of BLB_RULES){ const T=blbTable(r[0]); if(T && !BLB.ship[r[0]]) BLB.ship[r[0]]=JSON.parse(JSON.stringify(T)); } }
+function blbCells(id){ const T=blbTable(id), S0=BLB.ship[id]; if(!T || !S0) return []; const out=[]; for(const k of BLB_TIERS){ if(!(k in S0)) continue; const v=S0[k]; if(typeof v==='number') out.push({ key:k, tier:k, field:null, ship:v, now:T[k] }); else if(v && typeof v==='object' && !Array.isArray(v)){ for(const f in v) if(typeof v[f]==='number') out.push({ key:k+'.'+f, tier:k, field:f, ship:v[f], now:(T[k]||{})[f] }); } } return out; }
+function blbCellSet(id, key, val){ const T=blbTable(id), S0=BLB.ship[id]; if(!T || !S0) return false; const p=key.split('.'), k=p[0], f=p[1]||null; if(!(k in S0)) return false; const ship=f? (S0[k]||{})[f] : S0[k]; if(typeof ship!=='number') return false;
+  val=(val===null || val==='' || val===undefined)? ship : +val; if(!isFinite(val)) return false;
+  if(f){ if(!T[k] || typeof T[k]!=='object') T[k]={}; T[k][f]=val; } else T[k]=val;
+  if(val===ship){ if(BLB.over[id]){ delete BLB.over[id][key]; if(!Object.keys(BLB.over[id]).length) delete BLB.over[id]; } } else { (BLB.over[id]||(BLB.over[id]={}))[key]=val; }
+  return true; }
+function blbApplyOver(){ let n=0; for(const id in BLB.over){ const o=BLB.over[id]; for(const key in o){ if(blbCellSet(id, key, o[key])) n++; } } return n; }
+function blbResetTable(id){ const T=blbTable(id), S0=BLB.ship[id]; if(!T || !S0) return; for(const k in S0){ if(S0[k] && typeof S0[k]==='object' && !Array.isArray(S0[k])){ if(T[k] && typeof T[k]==='object') Object.assign(T[k], JSON.parse(JSON.stringify(S0[k]))); else T[k]=JSON.parse(JSON.stringify(S0[k])); } else T[k]=S0[k]; } delete BLB.over[id]; }
+function blbResetAll(){ for(const id in BLB.over) blbResetTable(id); BLB.over={}; }
+function blbOverList(){ const out=[]; for(const id in BLB.over){ const S0=BLB.ship[id]||{}; for(const key in BLB.over[id]){ const p=key.split('.'); const ship=p[1]? (S0[p[0]]||{})[p[1]] : S0[p[0]]; out.push({ id, key, ship, now:BLB.over[id][key] }); } } return out; }
+function blbOverN(){ return blbOverList().length; }
+
+function blbStamp(cfg, F, rk, tier){ const W9=((BLB.waves[rk]||{})[tier])||{}; let n=0;
+  cfg.waves.forEach((w,wi)=>{ (w.groups||[]).forEach((g,gi)=>{ const ed=W9[wi+':'+gi]; if(ed){ if(ed.n!=null){ if(g.pts && g.f==='spout') g.per=Math.max(1,ed.n|0); else g.n=Math.max(1,ed.n|0); n++; } if(ed.hpX!=null){ g.hpX=+ed.hpX; n++; } }
+    const boss=bhpIs(g);
+    if(boss){ if(F.bossHp!==1){ g.hpX=+(((g.hpX||1)*F.bossHp).toFixed(4)); if(g.hpAdd) g.hpAdd=Math.round(g.hpAdd*F.bossHp); } }
+    else { if(F.troops!==1){ if(g.pts && g.f==='spout') g.per=Math.max(1,Math.round((g.per||1)*F.troops)); else g.n=Math.max(1,Math.round((g.n||1)*F.troops)); if(g.escort) g.escort=Math.max(1,Math.round(g.escort*F.troops)); } if(F.troopHp!==1) g.hpX=+(((g.hpX||1)*F.troopHp).toFixed(4)); } }); });
+  return n; }
+function blbCfg(rk, tier, F, N){ F=F||BLB.fight; N=Math.max(1,Math.min(SQ_MAX,(N||F.party)|0)); const keep=S.raid, keepCfg=S.cfg; let cfg=null, err=null;
+  S.raid={ t:tier, k:rk, mine:true, n:N, seats:['0'], mates:[], won:false, p3:false, posts:[], sky:null, blbStub:1 }; BLB.pendN=N;
+  try{ cfg=raidCfg(tier, rk); blbStamp(cfg, F, rk, tier); sqScaleCfg(cfg, N, false, N); }catch(e){ err=String(e && e.message || e); } finally{ BLB.pendN=0; S.raid=keep; S.cfg=keepCfg; }
+  return { cfg, err, N }; }
+function blbSideX(rk, tier){ try{ return (rk==='croak' && tier==='g' && typeof MKC!=='undefined' && MKC.on)? (+MKC.hp||1) : 1; }catch(e){ return 1; } }
+function blbBar(g, cfg, N, rk, tier){ const d=FDEF[g.t]; if(!d) return null; const flat=!!cfg.flatBoss, bk=(d.boss && !flat)? bhpX(N) : 1, hpm=(d.boss? (1+((cfg.hpMul||1)-1)*(cfg.bossF!=null? cfg.bossF : 0.5)) : (cfg.hpMul||1))*(cfg.hpX||1)*bk;   
+  let hp=Math.round(d.hp*hpm); if(g.hpX) hp=Math.max(1,Math.round(hp*g.hpX)); if(g.hpAdd) hp=Math.max(1,hp+(g.hpAdd|0)); if(g.hpAddP && N>=(g.hpAddN||1)) hp=Math.max(1,hp+(g.hpAddP|0)); const sx=blbSideX(rk, tier); if(sx!==1) hp=Math.max(1,Math.round(hp*sx)); return hp; }
+function blbGate(w){ if(w.actGate) return 'WAITS FOR A SWEPT FIELD'; if(w.retreatGate) return 'WAITS FOR THE KING AT HIS RETREAT MARK'; if(w.bossGate) return 'WAITS FOR '+String(w.bossGate).toUpperCase()+' TO FALL'; if(w.hpGate){ const g=w.hpGate; return 'HOLDS WHILE '+String(g.t||'').toUpperCase()+' STANDS ABOVE '+Math.round((g.k||0)*100)+'%'+((g.clk!=null)? ' (OR '+(+g.clk).toFixed(0)+' s)' : ''); } return 'ON THE CLOCK'; }
+function blbTypeName(t){ const d=FDEF[t]||{}, b=(typeof BOSSDEF!=='undefined' && BOSSDEF[t])||null; return String((b && (b.bar||b.title)) || d.name || t).toUpperCase(); }
+function blbSheet(rk, tier, N){ const R=blbCfg(rk, tier, null, N); if(!R.cfg) return { err:R.err||'no cfg', waves:[], boss:[], troops:0, N:R.N }; const cfg=R.cfg, king=raidInfo(rk).king, boss=[], waves=[]; let troops=0;
+  cfg.waves.forEach((w,wi)=>{ const gs=(w.groups||[]).map((g,gi)=>{ const isB=bhpIs(g), n=(g.pts && g.f==='spout')? (g.pts.length*(g.per||1)) : (g.n||1); if(!isB) troops+=n; const bar=isB? blbBar(g,cfg,R.N,rk,tier) : null; if(isB) boss.push({ wi, name:w.name||('WAVE '+(wi+1)), t:g.t, bar, king:g.t===king }); return { gi, t:g.t, name:blbTypeName(g.t), f:g.f||'', e:g.e||'', at:+(g.at||0), n, hpX:g.hpX||1, hpAdd:g.hpAdd||0, boss:isB, bar, pin:!!g.pin, pts:!!g.pts }; });
+    waves.push({ wi, name:w.name||'', boss:w.boss||null, gate:blbGate(w), groups:gs }); });
+  return { err:null, waves, boss, troops, N:R.N, hpMul:cfg.hpMul, cntMul:cfg.cntMul, sideX:blbSideX(rk, tier) }; }
+
+function blbLaunch(rk, tier){ const row=raidInfo(rk); if(!row || !blbRow(rk)) return false; if(blbTiers(rk).indexOf(tier)<0) tier='e'; const F=BLB.fight, N=Math.max(1,Math.min(SQ_MAX,(F.party|0)||1));
+  blbClose(); try{ if(raidSceneOpen()) closeRaidScene(); }catch(e){}
+  RAID_CUR=rk; RAID_SEL=tier; BLB.pendN=N; FO_PASS=1;
+  try{ startRaidBattle(tier, rk); } finally{ FO_PASS=0; BLB.pendN=0; }
+  if(!S.raid || S.raid.k!==row.k) return false;
+  blbStamp(S.cfg, F, rk, S.raid.t);
+  raidArm(raidHmul(S.raid.k, S.raid.t));
+  sqScaleCfg(S.cfg, N, false, N); S.sq={ p:N, bp:N, t:0, nextT:sqGrace() };
+  spdInit();
+  if(F.tags!=null && isFinite(+F.tags)) S.plastic=Math.max(0, Math.round(+F.tags));
+  if(!F.bank) S.raid.void=1;   
+  BLB.ffK=[1,2,4].indexOf(+F.speed)>=0? +F.speed : 1; BLB.lives0=S.lives; BLB.last=null;
+  S.raid.blb={ rk, tier:S.raid.t, at:Date.now(), t0:S.t, party:N, dials:{ bossHp:F.bossHp, troops:F.troops, troopHp:F.troopHp, tags:S.plastic, speed:BLB.ffK, god:F.god?1:0, bank:F.bank?1:0 }, over:blbOverList().map(o=>o.id+'.'+o.key+' '+o.ship+' -> '+o.now), edits:Object.keys((BLB.waves[rk]||{})[S.raid.t]||{}).length, lives0:S.lives, logged:0 };
+  S.ann={ txt:t(row.name), t:2.8, sub:t(RAID_TIER_NAMES[S.raid.t]) };
+  olDeal();
+  blbHudOpen(); return true; }
+function blbFight(){ return !!(S.raid && S.raid.blb && S.raid.cfg===S.cfg); }
+function blbBossNow(){ const king=S.raid? raidInfo(S.raid.k).king : null; let b=null; for(const f of S.foes){ if(!f.boss || f.dead) continue; if(f.type===king) return f; if(!b) b=f; } return b; }
+function blbClock(){ return (S.raid && S.raid.blb)? Math.max(0, S.t-S.raid.blb.t0) : 0; }
+function blbMMSS(s){ s=Math.max(0,Math.round(s)); return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
+function blbNote(res){ const rd=S.raid; if(!rd || !rd.blb || rd.blb.logged) return null; rd.blb.logged=1; const b=blbBossNow(), bb=b? { hp:Math.round(b.hp), max:Math.round(b.hpMax), t:b.type } : (BLB.last||null);
+  const row={ at:Date.now(), rk:rd.blb.rk, tier:rd.blb.tier, res, sec:+blbClock().toFixed(1), wave:S.wave|0, waves:S.cfg? S.cfg.waves.length : 0, boss:bb, lives:S.lives|0, lives0:rd.blb.lives0|0, tags:S.plastic|0, party:rd.blb.party, dials:rd.blb.dials, over:rd.blb.over, edits:rd.blb.edits, cv:GVT_CV };
+  BLB.log.push(row); while(BLB.log.length>BLB.MAXLOG) BLB.log.shift(); blbSave(); BLB.ret=1; return row; }
+function blbAbort(){ if(!blbFight() || S.mode!=='play') return false; S.raid.void=1; blbNote('ABORT'); if(S.mode==='play') telLv(2); S.drag=null; hqClose(); showMenu(); return true; }
+function blbSkipWave(){ if(!blbFight() || S.mode!=='play') return 0; let n=0; for(let i=S.foes.length-1;i>=0;i--){ const f=S.foes[i]; if(f.boss) continue; S.fx.push({k:'smoke',x:f.x,y:f.y-14,t:0,dur:0.5}); S.foes.splice(i,1); n++; } S.forms.length=0; S.queue.length=0; S.waveActive=false; if(S.sq) S.sq.nextT=S.sq.t; return n; }
+function blbTags(n){ if(S.mode!=='play') return S.plastic; S.plastic=Math.max(0,(S.plastic|0)+(n|0)); return S.plastic; }
+function blbSpeed(k){ BLB.ffK=[1,2,4].indexOf(k|0)>=0? (k|0) : 1; BLB.fight.speed=BLB.ffK; blbSave(); blbHudPaint(); return BLB.ffK; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function blbCss(){ if(BLB.css) return; BLB.css=1; const st=document.createElement('style'); st.id='blbCss'; st.textContent=BLB_CSS; document.head.appendChild(st); }
+function blbEsc(s){ return escH(s==null? '' : s); }
+function blbNum(v, d){ return (v==null || !isFinite(+v))? '' : (+v).toLocaleString('en-US', { maximumFractionDigits:d==null? 3 : d }); }
+function blbPortrait(k){ const row=blbRow(k), r=raidInfo(k); try{ return sprURI(row[2], null, row[3]||r.crop); }catch(e){ return ''; } }
+function blbEnsure(){ blbCss(); if(BLB.el) return BLB.el; const d=document.createElement('div'); d.id='blbPage'; d.className='hidden'; document.body.appendChild(d); BLB.el=d; return d; }
+function blbOpen(tab){ if(!blbOn()) return false; blbEnsure(); if(tab) BLB.tab=tab; BLB.open=1; BLB.el.classList.remove('hidden'); if(BLB.pill) BLB.pill.classList.add('hidden'); blbRender(); return true; }
+function blbClose(){ if(BLB.el) BLB.el.classList.add('hidden'); BLB.open=0; blbSave(); blbPillSync(); }
+function blbRender(){ const d=BLB.el; if(!d || !BLB.open) return; const tabs=[['fights','FIGHTS'],['rules','RULES'],['log','RESULTS'],['help','HELP']];
+  let h='<div class="blb-top"><div class="blb-title">THE BOSS LAB</div><div class="blb-ver">v'+blbEsc(GVT_CV)+' · '+blbOverN()+' RULE'+(blbOverN()===1?'':'S')+' CHANGED · '+BLB.log.length+' FIGHT'+(BLB.log.length===1?'':'S')+' LOGGED</div>'
+    +'<div class="blb-tabs">'+tabs.map(x=>'<button type="button" class="blb-tab'+(BLB.tab===x[0]?' on':'')+'" onclick="BLB.ui.tab(\''+x[0]+'\')">'+x[1]+'</button>').join('')+'</div><button type="button" class="blb-x" onclick="BLB.ui.close()">✕</button></div>';
+  if(BLB.tab==='fights' || BLB.tab==='rules'){ h+='<div class="blb-bosses">'+BLB.ROWS.map(r=>'<button type="button" class="blb-boss'+(BLB.sel===r[0]?' on':'')+'" onclick="BLB.ui.sel(\''+r[0]+'\')"><img src="'+blbPortrait(r[0])+'" alt=""><span>'+blbEsc(r[1])+'<small>'+blbEsc(raidInfo(r[0]).name)+' · '+blbTiers(r[0]).length+' TIERS</small></span></button>').join('')+'</div>'; }
+  h+='<div class="blb-body">'+(BLB.tab==='fights'? blbFightsHTML() : BLB.tab==='rules'? blbRulesHTML() : BLB.tab==='log'? blbLogHTML() : blbHelpHTML())+'</div>';
+  d.innerHTML=h; }
+function blbFightsHTML(){ const rk=BLB.sel, tiers=blbTiers(rk); if(tiers.indexOf(BLB.tier)<0) BLB.tier=tiers[0]; const F=BLB.fight;
+  const facts=tiers.map(k=>{ const sh=blbSheet(rk, k, F.party); const kb=sh.boss.filter(b=>b.king); const bar=kb.length? kb.map(b=>blbNum(b.bar,0)).join(' / ') : (sh.boss.length? blbNum(sh.boss[0].bar,0) : '?'); return { k, sh, bar }; });
+  let h='<div class="blb-col blb-tiers"><h3>'+blbEsc(blbRow(rk)[1])+' · THE TIERS</h3>'+facts.map(o=>'<div class="blb-tier'+(BLB.tier===o.k?' on':'')+'" onclick="BLB.ui.tier(\''+o.k+'\')"><div class="nm" style="color:'+BLB.TIERC[o.k]+'">'+blbEsc(RAID_TIER_NAMES[o.k])+(o.k==='u'? ' <small style="color:#9a8a6a;font-size:9px">(THE NIGHT\'S FIGHT)</small>' : '')+'</div>'
+    +'<div class="fx">'+(o.sh.err? 'cfg: '+blbEsc(o.sh.err) : 'boss bar '+o.bar+' · '+o.sh.waves.length+' wave'+(o.sh.waves.length===1?'':'s')+' · '+blbNum(o.sh.troops,0)+' troops'+(o.sh.hpMul && o.sh.hpMul!==1? ' · hp x'+blbNum(o.sh.hpMul) : '')+(o.sh.cntMul && o.sh.cntMul!==1? ' · count x'+blbNum(o.sh.cntMul) : '')+(o.sh.sideX && o.sh.sideX!==1? ' · his whole side x'+blbNum(o.sh.sideX)+' at birth' : ''))+'</div>'
+    +(BLB.tier===o.k? '<button type="button" class="blb-go" onclick="BLB.ui.go()">⚔ DEPLOY · '+blbEsc(RAID_TIER_NAMES[o.k])+'</button>' : '')+'</div>').join('')+'</div>';
+  const seg=(id,vals,cur)=>'<div class="blb-seg">'+vals.map(v=>'<button type="button" class="'+(String(cur)===String(v)?'on':'')+'" onclick="BLB.ui.dial(\''+id+'\','+(typeof v==='number'? v : '\''+v+'\'')+')">'+(typeof v==='number'? (id==='party'? v : 'x'+v) : v)+'</button>').join('')+'</div>';
+  h+='<div class="blb-col blb-dials"><h3>THE DIALS · THE LAB\'S FIGHTS</h3>'
+    +'<div class="blb-dial"><label>BOSS HEALTH<small>his bar x (every boss row)</small></label><input type="number" step="0.05" min="0.05" value="'+F.bossHp+'" onchange="BLB.ui.dial(\'bossHp\',this.value)"></div>'
+    +'<div class="blb-dial"><label>TROOPS<small>every other row\'s count x</small></label><input type="number" step="0.05" min="0.05" value="'+F.troops+'" onchange="BLB.ui.dial(\'troops\',this.value)"></div>'
+    +'<div class="blb-dial"><label>TROOP HEALTH<small>their bars x</small></label><input type="number" step="0.05" min="0.05" value="'+F.troopHp+'" onchange="BLB.ui.dial(\'troopHp\',this.value)"></div>'
+    +'<div class="blb-dial"><label>COMMANDERS<small>the party\'s laws on the boss and the troops</small></label>'+seg('party',[1,2,3,4,6,10],F.party)+'</div>'
+    +'<div class="blb-dial"><label>DOG TAGS<small>at the whistle (blank = the fight\'s own)</small></label><input type="number" step="10" min="0" value="'+(F.tags==null?'':F.tags)+'" placeholder="own" onchange="BLB.ui.dial(\'tags\',this.value)"></div>'
+    +'<div class="blb-dial"><label>SPEED<small>extra sim steps a frame</small></label>'+seg('speed',[1,2,4],F.speed)+'</div>'
+    +'<div class="blb-dial"><label>GOD MODE<small>the toy box never falls</small></label>'+seg('god',['OFF','ON'],F.god?'ON':'OFF')+'</div>'
+    +'<div class="blb-dial"><label>BANK REWARDS<small>off = nothing banked, every tier stays a first clear</small></label>'+seg('bank',['OFF','ON'],F.bank?'ON':'OFF')+'</div>'
+    +'<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="blb-mini" onclick="BLB.ui.dialsReset()">RESET DIALS</button>'+(blbOverN()? '<button type="button" class="blb-mini warn" onclick="BLB.ui.resetAll()">RESET '+blbOverN()+' RULE'+(blbOverN()===1?'':'S')+'</button>' : '')+'</div></div>';
+  const sh=facts.find(o=>o.k===BLB.tier).sh, W9=((BLB.waves[rk]||{})[BLB.tier])||{}, nEd=Object.keys(W9).length;
+  h+='<div class="blb-col blb-sheet"><h3>THE WAVE SHEET · '+blbEsc(RAID_TIER_NAMES[BLB.tier])+' · '+sh.N+' COMMANDER'+(sh.N===1?'':'S')+(nEd? ' · <button type="button" class="blb-mini warn" onclick="BLB.ui.wavesReset()">RESET '+nEd+' EDIT'+(nEd===1?'':'S')+'</button>' : '')+'</h3>'
+    +(sh.err? '<div class="fx">'+blbEsc(sh.err)+'</div>' : sh.waves.map(w=>'<div class="blb-wave"><div class="wh"><span>W'+(w.wi+1)+' '+blbEsc(w.name||(w.boss? blbTypeName(w.boss) : ''))+'</span><small>'+blbEsc(w.gate)+'</small></div>'
+      +'<div class="blb-grp" style="color:#9a8a6a"><span>group · formation · edge · at</span><span>count</span><span>hp x</span></div>'
+      +w.groups.map(g=>{ const ed=W9[w.wi+':'+g.gi]||{}; return '<div class="blb-grp'+(g.boss?' boss':'')+'"><span>'+blbEsc(g.name)+(g.boss && g.bar!=null? ' · bar '+blbNum(g.bar,0) : '')+' <span style="color:#9a8a6a">· '+blbEsc(g.f)+(g.e? ' · '+blbEsc(g.e) : '')+(g.pts? ' · spout' : '')+' · +'+blbNum(g.at,1)+' s'+(g.hpAdd? ' · +'+g.hpAdd+' hp' : '')+'</span></span>'
+        +'<input type="number" step="1" min="1" class="'+(ed.n!=null?'ed':'')+'" value="'+g.n+'" onchange="BLB.ui.grp('+w.wi+','+g.gi+',\'n\',this.value)"><input type="number" step="0.05" min="0.05" class="'+(ed.hpX!=null?'ed':'')+'" value="'+(+g.hpX.toFixed(3))+'" onchange="BLB.ui.grp('+w.wi+','+g.gi+',\'hpX\',this.value)"></div>'; }).join('')+'</div>').join(''))+'</div>';
+  return h; }
+function blbRulesHTML(){ const rk=BLB.sel, mine=BLB_RULES.filter(r=>r[3].split(' ').indexOf(rk)>=0 && blbTable(r[0]));
+  let h='<div class="blb-col blb-rules"><h3>THE RULES · '+blbEsc(blbRow(rk)[1])+' · '+mine.length+' TABLES <small style="color:#9a8a6a;text-transform:none;font-weight:normal">(the game\'s own tier tables; a changed number plays on this device everywhere, until RESET)</small>'+(blbOverN()? ' <button type="button" class="blb-mini warn" onclick="BLB.ui.resetAll()">RESET ALL '+blbOverN()+'</button>' : '')+'</h3>';
+  if(!mine.length) h+='<div class="fx" style="color:#C9BFA8">no tier table for this row</div>';
+  for(const r of mine){ const cells=blbCells(r[0]), shared=r[3].split(' ').filter(x=>x!==rk && blbRow(x)); const ch=cells.filter(c=>c.now!==c.ship).length;
+    h+='<div class="blb-rule"><div class="rh"><span>'+blbEsc(r[2])+'<small>'+blbEsc(r[0])+(shared.length? ' · shared with '+shared.map(x=>blbRow(x)[1]).join(', ') : '')+'</small></span>'+(ch? '<button type="button" class="blb-mini warn" onclick="BLB.ui.resetTable(\''+r[0]+'\')">RESET '+ch+'</button>' : '')+'</div><div class="blb-cells">'
+      +cells.map(c=>'<div class="blb-cell"><b style="color:'+BLB.TIERC[c.tier]+'">'+blbEsc(RAID_TIER_NAMES[c.tier])+(c.field? ' · '+blbEsc(c.field) : '')+'</b><input type="number" step="any" class="'+(c.now!==c.ship?'ed':'')+'" value="'+c.now+'" onchange="BLB.ui.cell(\''+r[0]+'\',\''+c.key+'\',this.value)"><small>'+(c.now!==c.ship? 'was '+c.ship : 'shipped')+'</small></div>').join('')+'</div></div>'; }
+  return h+'</div>'; }
+function blbLogHTML(){ const rows=BLB.log.slice().reverse();
+  let h='<div class="blb-col blb-log"><h3>RESULTS · '+BLB.log.length+' FIGHT'+(BLB.log.length===1?'':'S')+' <button type="button" class="blb-mini" onclick="BLB.ui.exportIt()">EXPORT (COPY)</button> '+(BLB.log.length? '<button type="button" class="blb-mini warn" onclick="BLB.ui.clearLog()">CLEAR</button>' : '')+'</h3>';
+  if(!rows.length) h+='<div style="text-transform:none;font-weight:normal;color:#C9BFA8">No lab fight yet. DEPLOY one from FIGHTS; its row lands here with WIN / LOSS / ABORT, the clock, the boss\'s bar and the dials.</div>';
+  h+=rows.map(r=>{ const row=blbRow(r.rk), d=new Date(r.at), i=BLB.log.indexOf(r); return '<div class="blb-logrow"><span>'+blbEsc((d.getMonth()+1)+'/'+d.getDate()+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'))+'<br><span class="res-'+blbEsc(r.res)+'">'+blbEsc(r.res)+'</span> in '+blbMMSS(r.sec)+'</span>'
+    +'<span><b>'+blbEsc(row? row[1] : r.rk)+' · '+blbEsc(RAID_TIER_NAMES[r.tier]||r.tier)+'</b> · boss '+(r.boss? blbNum(r.boss.hp,0)+'/'+blbNum(r.boss.max,0) : 'not met')+' · wave '+r.wave+'/'+r.waves+' · lives '+r.lives0+'→'+r.lives+' · tags '+blbNum(r.tags,0)+' · '+r.party+' cmdr'+(r.party===1?'':'s')
+    +(r.dials? ' · boss x'+r.dials.bossHp+' troops x'+r.dials.troops+' hp x'+r.dials.troopHp+(r.dials.god?' · god':'')+(r.dials.bank?' · banked':'')+(r.dials.speed>1? ' · x'+r.dials.speed : '') : '')+(r.edits? ' · '+r.edits+' wave edit'+(r.edits===1?'':'s') : '')+(r.over && r.over.length? ' · rules: '+blbEsc(r.over.join('; ')) : '')
+    +'<input type="text" placeholder="your note on this fight" value="'+blbEsc(BLB.notes[r.at]||'')+'" onchange="BLB.ui.note('+r.at+',this.value)"></span></div>'; }).join('');
+  h+='<textarea class="blb-out" id="blbOut" readonly placeholder="EXPORT writes the ledger and the rule changes here (and copies them)"></textarea></div>'; return h; }
+function blbHelpHTML(){ return '<div class="blb-col blb-help"><h3>HOW TO USE THE BOSS LAB</h3>'
+  +'<p><b>FIGHTS.</b> Pick a boss on the strip, a tier on the left, then <b>DEPLOY</b>. The fight starts at once: no key, no ladder, no films. Under the tiers the <b>WAVE SHEET</b> lists the fight as the engine will build it: every wave, what it waits for, every group with its count and its health factor, and each boss row\'s bar in numbers. Type a new count or factor on a group to change the lab\'s next fight of that tier (gold = edited; RESET puts the sheet back).</p>'
+  +'<p><b>THE DIALS</b> apply to the lab\'s fights only: BOSS HEALTH x, TROOPS x, TROOP HEALTH x, COMMANDERS (the game\'s own party laws: ten percent more troops a commander and the boss\'s bar x (1 + 0.9 (n - 1)); Buffalo Bill\'s bar is flat), DOG TAGS at the whistle, SPEED (x2 and x4 run extra simulation steps a frame, the physics unchanged), GOD MODE (the toy box never falls), BANK REWARDS (OFF by default: the fight pays nothing and marks nothing, so every tier stays a first clear on your account; ON = a normal fight).</p>'
+  +'<p><b>RULES</b> are the game\'s own difficulty tables, one grid per table, the shipped number under each cell. A changed cell is live on this device at once and stays through reloads while the lab is open on this account, in the lab\'s fights and at the real doors alike. Nothing leaves your device: use <b>EXPORT</b> on RESULTS to copy the changes as text for Wyatt.</p>'
+  +'<p><b>IN THE FIGHT</b> the strip at the bottom right shows the boss\'s bar in numbers, the wave, the clock and the lives, with x1 x2 x4, +100 TAGS, SKIP WAVE (melts the standing troops, the next wave comes now) and END (back here, logged as ABORT). After any verdict the lab reopens on RESULTS.</p>'
+  +'<p><b>RESULTS</b> keeps every lab fight (WIN / LOSS / ABORT, the clock, the boss\'s bar left, the waves reached, the lives, the dials and the rules in force). Add a note to a row. EXPORT copies the whole ledger and the rules as plain text (and shows it below the list).</p>'
+  +'<p><b>THE DOORS.</b> The code <code>BOSSLAB</code> at Sarge\'s Surplus opens the lab and marks this account; the LAB tab on the bedroom\'s right edge reopens it. <code>BOSSLABOFF</code> takes the mark off (the rules you changed are reset first). On the web, <code>?bosslab=1</code> and <code>?bosslab=0</code> do the same.</p>'
+  +'<p><b>THE EIGHT.</b> King Rex (the lair: EASY MEDIUM HARD MEGA ULTRA MEGA), King Yeti (the castle: the same five), King Croak (the hideout), Emperor Bear (the pillow fields), Princess Croak (the palace), the Ice Caves (the ferocious yeti), the Sky Fortress (the big bomber), Buffalo Bill (the showdown: EASY MEDIUM HARD). ULTRA MEGA is the kings\' night fight, built for a room of ten; MEGA and the rest are the doors as players reach them.</p></div>'; }
+function blbExportText(){ const L=[ 'THE BOSS LAB · GREEN VS TAN v'+GVT_CV+' · '+new Date().toISOString() ]; const ov=blbOverList(); L.push('RULES CHANGED ON THIS DEVICE: '+ov.length); for(const o of ov) L.push('  '+o.id+'.'+o.key+'  '+o.ship+' -> '+o.now);
+  let ed=0; for(const rk in BLB.waves) for(const tier in BLB.waves[rk]) for(const k in BLB.waves[rk][tier]){ ed++; L.push('  WAVE EDIT '+rk+' '+tier+' group '+k+' '+JSON.stringify(BLB.waves[rk][tier][k])); } if(!ed) L.push('  (no wave edits)');
+  L.push('FIGHTS: '+BLB.log.length); for(const r of BLB.log){ const row=blbRow(r.rk), d=new Date(r.at); L.push('  '+d.toISOString().slice(0,16).replace('T',' ')+' · '+(row? row[1] : r.rk)+' · '+(RAID_TIER_NAMES[r.tier]||r.tier)+' · '+r.res+' in '+blbMMSS(r.sec)+' · boss '+(r.boss? r.boss.hp+'/'+r.boss.max : 'not met')+' · wave '+r.wave+'/'+r.waves+' · lives '+r.lives0+'->'+r.lives+' · tags '+r.tags+' · '+r.party+' cmdr'+(r.dials? ' · boss x'+r.dials.bossHp+' troops x'+r.dials.troops+' hp x'+r.dials.troopHp+(r.dials.god?' god':'')+(r.dials.bank?' banked':'')+(r.dials.speed>1? ' x'+r.dials.speed : '') : '')+(r.edits? ' · '+r.edits+' wave edits' : '')+(r.over && r.over.length? ' · rules '+r.over.join('; ') : '')+(BLB.notes[r.at]? ' · NOTE: '+BLB.notes[r.at] : '')); }
+  return L.join('\n'); }
+function blbExport(){ const txt=blbExportText(); const ta=document.getElementById('blbOut'); if(ta){ ta.value=txt; try{ ta.focus(); ta.select(); }catch(e){} } try{ if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt); }catch(e){} return txt; }
+
+function blbPillSync(){ const on=blbOn() && S.mode==='menu'; if(!on){ if(BLB.pill) BLB.pill.classList.add('hidden'); return; } blbCss(); if(!BLB.pill){ const p=document.createElement('div'); p.id='blbPill'; p.textContent='BOSS LAB'; p.onclick=()=>blbOpen(); document.body.appendChild(p); BLB.pill=p; } BLB.pill.classList.remove('hidden'); }
+
+function blbHudOpen(){ blbCss(); if(!BLB.hud){ const d=document.createElement('div'); d.id='blbHud'; document.body.appendChild(d); BLB.hud=d; } BLB.hud.classList.remove('hidden'); BLB.hud.classList.remove('fold'); blbHudPaint(); clearInterval(BLB.hudI); BLB.hudI=setInterval(blbHudPaint, 250); }
+function blbHudClose(){ clearInterval(BLB.hudI); BLB.hudI=0; if(BLB.hud) BLB.hud.classList.add('hidden'); }
+function blbHudPaint(){ const d=BLB.hud; if(!d || d.classList.contains('hidden')) return; if(!blbFight() || S.mode!=='play'){ if(S.mode!=='play') blbHudClose(); return; } const b=blbBossNow(); if(b) BLB.last={ hp:Math.round(b.hp), max:Math.round(b.hpMax), t:b.type };
+  const rd=S.raid, row=blbRow(rd.blb.rk); const line=(row? row[1] : rd.k)+' · '+RAID_TIER_NAMES[rd.t]+' · '+(b? blbTypeName(b.type)+' '+blbNum(Math.round(b.hp),0)+'/'+blbNum(Math.round(b.hpMax),0) : 'BOSS NOT OUT YET')+' · W'+(S.wave|0)+'/'+(S.cfg? S.cfg.waves.length : 0)+(rd.p3? ' P3' : '')+' · '+blbMMSS(blbClock())+' · L'+(S.lives|0)+' T'+blbNum(S.plastic|0,0)+' M'+S.units.filter(u=>!u.dead).length;
+  const bt='<div class="bt">'+[1,2,4].map(k=>'<button type="button" class="'+(BLB.ffK===k?'on':'')+'" onclick="BLB.ui.speed('+k+')">x'+k+'</button>').join('')+'<button type="button" onclick="BLB.ui.tags(100)">+100 TAGS</button><button type="button" onclick="BLB.ui.skip()">SKIP WAVE</button><button type="button" class="'+(BLB.fight.god?'on':'')+'" onclick="BLB.ui.god()">GOD</button><button type="button" class="end" onclick="BLB.ui.abort()">END</button></div>';
+  d.innerHTML='<div class="fd" onclick="BLB.ui.fold()">'+(d.classList.contains('fold')? '▲ LAB' : '▼ LAB')+'</div><div class="rd">'+blbEsc(line)+'</div>'+bt; }
+
+
+
+
+
+
+
+
+
+function blbBoot(){ if(BLB.booted) return; blbShip(); BLB.q=(function(){ try{ const q=/[?&]bosslab=([01])/.exec(location.search||''); return q? q[1] : null; }catch(e){ return null; } })();
+  if(BLB.q==='1' && !META.bossLab){ META.bossLab=1; saveMeta(); } else if(BLB.q==='0' && META.bossLab){ META.bossLab=0; saveMeta(); }
+  if(!blbOn()) return; BLB.booted=1; blbLoad(); blbApplyOver(); blbPillSync(); }
+function blbRig(o){ o=o||{}; const g=f=>{ try{ return f(); }catch(e){ return 'ERR:'+String(e && e.message || e).slice(0,120); } }; let did=null;
+  if(o.flag!=null){ META.bossLab=o.flag?1:0; saveMeta(); if(META.bossLab){ BLB.booted=0; blbBoot(); } else { blbResetAll(); blbSave(); blbClose(); blbPillSync(); } }
+  if(o.open) did=g(()=>blbOpen(typeof o.open==='string'? o.open : null)); if(o.close) blbClose(); if(o.tab) BLB.ui.tab(o.tab); if(o.sel) BLB.ui.sel(o.sel); if(o.tier) BLB.ui.tier(o.tier);
+  if(o.fight) for(const k in o.fight) BLB.ui.dial(k, o.fight[k]); if(o.dialsReset) BLB.ui.dialsReset();
+  if(o.set){ const a=Array.isArray(o.set[0])? o.set : [o.set]; did=a.map(s=>blbCellSet(s[0], s[1], s[2])); blbSave(); if(BLB.open) blbRender(); } if(o.resetTable) blbResetTable(o.resetTable); if(o.reset){ blbResetAll(); blbSave(); }
+  if(o.grp) BLB.ui.grp(o.grp[0], o.grp[1], o.grp[2], o.grp[3]); if(o.wavesReset) BLB.ui.wavesReset();
+  if(o.launch) did=g(()=>blbLaunch(o.launch[0], o.launch[1])); if(o.abort) did=g(()=>blbAbort()); if(o.skip) did=g(()=>blbSkipWave()); if(o.tags!=null) did=blbTags(o.tags); if(o.speed) did=blbSpeed(o.speed); if(o.clearLog) BLB.ui.clearLog();
+  const b=S.mode==='play'? blbBossNow() : null;
+  return { cv:GVT_CV, on:blbOn(), booted:BLB.booted, q:BLB.q, open:!!(BLB.el && !BLB.el.classList.contains('hidden')), tab:BLB.tab, sel:BLB.sel, tier:BLB.tier, pill:!!(BLB.pill && !BLB.pill.classList.contains('hidden')), hud:!!(BLB.hud && !BLB.hud.classList.contains('hidden')), did,
+    rows:BLB.ROWS.map(r=>({ k:r[0], name:r[1], king:r[2], place:raidInfo(r[0]).name, tiers:blbTiers(r[0]) })), rules:BLB_RULES.map(r=>({ id:r[0], ok:!!blbTable(r[0]), rows:r[3], cells:blbCells(r[0]).length })), over:blbOverList(), overN:blbOverN(), fight:Object.assign({},BLB.fight), waves:JSON.parse(JSON.stringify(BLB.waves)), ffK:BLB.ffK,
+    sheet:o.sheet? g(()=>blbSheet(o.sheet[0], o.sheet[1], o.sheet[2])) : null, log:BLB.log.slice(-5), logN:BLB.log.length, export:o.export? blbExportText() : null,
+    fightNow:(S.raid && S.raid.blb)? { rk:S.raid.k, t:S.raid.t, party:S.raid.blb.party, void:S.raid.void?1:0, mode:S.mode, wave:S.wave, waves:S.cfg? S.cfg.waves.length : 0, sec:+blbClock().toFixed(2), lives:S.lives, tags:S.plastic, sq:S.sq? { p:S.sq.p, bp:S.sq.bp } : null, boss:b? { t:b.type, hp:Math.round(b.hp), max:Math.round(b.hpMax) } : null, foes:S.foes.filter(f=>!f.dead).length, hpMul:S.cfg? S.cfg.hpMul : null } : null,
+    meta:{ bossLab:META.bossLab|0, ice:Object.assign({},META.ice||{}), bbs:Object.assign({},META.bbs||{}), sky:Object.assign({},META.sky||{}), starBank:META.starBank|0 }, dev:{ blb:blbLS('gvt_blb'), log:blbLS('gvt_blb_log') } }; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -973511,7 +973747,7 @@ let BFQ=null;
 
 
 
-let GVT_CV='28.40';
+let GVT_CV='28.41';
 let NX_CAP_MUL=4;
 
 
@@ -2638705,6 +2638941,242 @@ window.GVT = {
       units:S.units.filter(u=>!u.dead).map(u=>({s:u.side,st:u.seat,t:u.type,x:u.x|0,y:u.y|0,hp:u.hp,
         drop:+(u.dropT||0).toFixed(1), marching:!!u.marching})) }; }
 };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const BLB={ v:1, open:0, tab:'fights', sel:'bone', tier:'e', ship:{}, over:{}, fight:{ bossHp:1, troops:1, troopHp:1, party:1, tags:null, speed:1, god:0, bank:0 }, waves:{}, notes:{}, log:[], ret:0, ffK:1, inFF:0, lives0:10, last:null, pendN:0, el:null, hud:null, pill:null, hudI:0, css:0, booted:0, q:null,
+  ROWS:[ ['bone','KING REX','kingrex','8 34 96 96'], ['ice','KING YETI','kingyeti','14 -30 104 104'], ['croak','KING CROAK','kingcroak',null], ['fields','EMPEROR BEAR','bearnaparte',null], ['palace','PRINCESS CROAK','princess',null], ['caves','THE ICE CAVES','fyeti',null], ['sky','THE SKY FORTRESS','skyfort',null], ['bbs','BUFFALO BILL','bbshow',null] ],   
+  TIERC:{ e:'#BFE39A', m:'#9FC5DE', h:'#E8A070', g:'#B77DE8', u:'#FFD24A' }, MAXLOG:200 };
+
+const BLB_RULES=[
+  ['RAID_HP_MUL', ()=>RAID_HP_MUL, 'ENEMY HEALTH x (the raid curve)', 'ice bone caves'], ['RAID_CNT_MUL', ()=>RAID_CNT_MUL, 'ENEMY COUNT x (the raid curve)', 'ice bone'], ['RAID_P1_WAVES', ()=>RAID_P1_WAVES, 'SWARM WAVES BEFORE THE KING', 'bone'],
+  ['RAID_PURSE', ()=>RAID_PURSE, 'STARS A REPEAT CLEAR PAYS', 'ice bone croak fields palace caves sky'], ['RAID_KING_FCX', ()=>RAID_KING_FCX, "THE KING'S BREATH / BIG SNOWBALL CLOCK x", 'bone ice'], ['RAID_CRUSH_CD', ()=>RAID_CRUSH_CD, 'THE KING CRUSHES A HELD OUTPOST EVERY (s)', 'ice'],
+  ['ICE_KING_FCX', ()=>ICE_KING_FCX, 'KING YETI FIRE CLOCK x', 'ice'], ['ICE_KING_SPDX', ()=>ICE_KING_SPDX, 'KING YETI SPEED x', 'ice'], ['ICE_KING_KYX', ()=>ICE_KING_KYX, 'KING YETI TK WHEEL x', 'ice'], ['ICE_KING_SWX', ()=>ICE_KING_SWX, 'KING YETI MELEE CLOCK x', 'ice'], ['ICE_KING_HPADD', ()=>ICE_KING_HPADD, 'KING YETI HEALTH ADDED (flat)', 'ice'],
+  ['RAID_SB_N', ()=>RAID_SB_N, 'SGT SNOWMAN BOULDERS A VOLLEY', 'ice'], ['RAID_TRK_N', ()=>RAID_TRK_N, 'YETIS A FLANK LANDING', 'ice'], ['RAID_P2_N', ()=>RAID_P2_N, 'ESCORT MUNCHKINS A DETAIL', 'ice'], ['RAID_P2_T', ()=>RAID_P2_T, 'SECONDS BETWEEN ESCORT DETAILS', 'ice'], ['RAID_TUR_CD', ()=>RAID_TUR_CD, 'OUR TURRET: SECONDS A BOLT', 'ice'], ['RAID_TUR_CDG', ()=>RAID_TUR_CDG, 'THEIR TURRET: SECONDS A BOLT', 'ice'],
+  ['CROAK_HPX', ()=>CROAK_HPX, 'KING CROAK HEALTH x', 'croak'], ['CROAK_DMGX', ()=>CROAK_DMGX, 'KING CROAK DAMAGE x', 'croak'], ['CROAK_FAN_CD', ()=>CROAK_FAN_CD, 'KING CROAK FAN COOLDOWN (s)', 'croak'], ['CROAK_FAN_R', ()=>CROAK_FAN_R, 'KING CROAK FAN REACH (px)', 'croak'], ['CK_POUR', ()=>CK_POUR, 'THE HIDEOUT POUR: t = every (s) · nb bandits · ns snipers', 'croak'],
+  ['FIELDS_HPX', ()=>FIELDS_HPX, 'EMPEROR BEAR HEALTH x', 'fields'],
+  ['PC_HPX', ()=>PC_HPX, 'PRINCESS CROAK HEALTH x', 'palace'], ['PC_LIVES', ()=>PC_LIVES, 'PRINCESS CROAK BARS', 'palace'], ['PC_SHOT', ()=>PC_SHOT, 'HER HARP SHOT: cd (s) · pips', 'palace'], ['PC_RETURN_CLK', ()=>PC_RETURN_CLK, 'THE COURT RETURNS EVERY (s)', 'palace'], ['PC_GATE_CLK', ()=>PC_GATE_CLK, 'A PHASE RELEASES AFTER (s)', 'palace'], ['PC_COURT_HPX', ()=>PC_COURT_HPX, 'HER COURT HEALTH x', 'palace'], ['PC_BAR_CLK', ()=>PC_BAR_CLK, 'THE COURT CALLED ON A LATER BAR AFTER (s)', 'palace'], ['PC_ARROW_TIER', ()=>PC_ARROW_TIER, 'THE LIGHT ARROW (1 = fires)', 'palace'],
+  ['CAVES_HPX', ()=>CAVES_HPX, 'FEROCIOUS YETI HEALTH x', 'caves'], ['CAVES_STRIKE', ()=>CAVES_STRIKE, 'HIS STRIKE (s)', 'caves'], ['FY_PIPS', ()=>FY_PIPS, 'HIS CHOMP (pips)', 'caves'], ['FY_RUN', ()=>FY_RUN, 'THE CHASE PACE (px/s)', 'caves'], ['CAVES_HIDE', ()=>CAVES_HIDE, 'TIME IN THE DARK x', 'caves'], ['CAVES_HOLD', ()=>CAVES_HOLD, 'THE ROAR HOLD (s)', 'caves'], ['CAVES_EYES', ()=>CAVES_EYES, 'THE EYES WARN (s)', 'caves'],
+  ['CAVES_CALL', ()=>CAVES_CALL, 'CAVE YETIS A WAKE', 'caves'], ['CAVES_BURST', ()=>CAVES_BURST, 'CAVE YETIS AN OPENING BURST', 'caves'], ['CY_PIPS', ()=>CY_PIPS, 'A CAVE YETI LANDING (pips)', 'caves'], ['FY_STORM_EVERY', ()=>FY_STORM_EVERY, 'THE STORM EVERY (s)', 'caves'], ['FY_STORM_AREAS', ()=>FY_STORM_AREAS, 'STORM AREAS', 'caves'], ['FY_RAMP_N', ()=>FY_RAMP_N, 'THE BOUNCE CHAIN', 'caves'],
+  ['RV_SWARM', ()=>RV_SWARM, 'THE RIVER SWARM', 'caves'], ['CAVE_SWARM_EVERY', ()=>CAVE_SWARM_EVERY, 'THE CAVE SWARM EVERY (s)', 'caves'], ['CAVE_RUSH_EVERY', ()=>CAVE_RUSH_EVERY, 'THE RUSH EVERY (s)', 'caves'], ['HRT_CAVE_TT', ()=>HRT_CAVE_TT, 'THE CAVE-IN (s)', 'caves'], ['HRT_MARCH_X', ()=>HRT_MARCH_X, 'THE MARCH x', 'caves'], ['DY_LIVE', ()=>DY_LIVE, 'SWORDSMEN LIVE', 'caves'], ['DY_PREMIERE', ()=>DY_PREMIERE, 'SWORDSMEN AT THE PREMIERE', 'caves'], ['DY_CUT_PIPS', ()=>DY_CUT_PIPS, 'A SWORD CUT (pips)', 'caves'],
+  ['SKY_T', ()=>SKY_T, 'THE SKY FORTRESS: hp · spd · stick · every · drop · dropEvery · open · warn · aax · rarm · aceOpen · fhp · ahp · fcd ...', 'sky'], ['SKY_RANSOM', ()=>SKY_RANSOM, 'FIRST-CLEAR STARS', 'sky'],
+  ['BBS_HP', ()=>BBS_HP, "BILL'S HEALTH (flat)", 'bbs'], ['BBS_PIP', ()=>BBS_PIP, 'HIS FAN: SECONDS A PIP', 'bbs'], ['BBS_X', ()=>BBS_X, 'THE STANDING RAID COUNT x', 'bbs'], ['BBS_RIDER', ()=>BBS_RIDER, 'THE RIDERS: hpX · spdx', 'bbs'], ['BBS_GUNS', ()=>BBS_GUNS, 'BIG GUNS DUG IN', 'bbs'], ['BBS_PLANES', ()=>BBS_PLANES, 'PLANES: fighter every (s) · v2 every (s) · first (s)', 'bbs'] ];
+const BLB_TIERS=['e','m','h','g','u'];
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+if(typeof codeRedeem==='function'){ const cr0=codeRedeem; codeRedeem=function(){ const inp=document.getElementById('shCodeIn'); const w=inp? codeNorm(inp.value) : '';
+  if(w==='BOSSLAB' || w==='BOSSLABOFF'){ inp.value=''; try{ inp.blur(); }catch(e){}
+    if(w==='BOSSLABOFF'){ META.bossLab=0; saveMeta(); blbPillSync(); codeSay('THE BOSS LAB IS CLOSED','yes'); try{ SFX.clack(); }catch(e){} return; }
+    META.bossLab=1; saveMeta(); blbBoot(); codeSay('THE BOSS LAB IS OPEN…','yes'); try{ SFX.fanfare(); }catch(e){} codeShut(1); blbOpen('fights'); return; }
+  return cr0.apply(this, arguments); }; }
+if(typeof endBattle==='function'){ const eb0=endBattle; endBattle=function(win){ try{ if(blbFight() && S.mode==='play') blbNote(win? 'WIN' : 'LOSS'); blbHudClose(); }catch(e){} return eb0.apply(this, arguments); }; }
+if(typeof showMenu==='function'){ const sm0=showMenu; showMenu=function(){ const r=sm0.apply(this, arguments); try{ blbHudClose(); blbPillSync(); if(BLB.ret){ BLB.ret=0; setTimeout(()=>{ try{ if(raidSceneOpen()) closeRaidScene(); }catch(e){} blbOpen('log'); }, 0); } }catch(e){} return r; }; }
+if(typeof update==='function'){ const up0=update; update=function(dt){ const r=up0.apply(this, arguments); try{ if(BLB.pill && S.mode!=='menu' && !BLB.pill.classList.contains('hidden')) BLB.pill.classList.add('hidden'); if(blbFight() && !S.coop && S.mode==='play'){ const b9=blbBossNow(); if(b9) BLB.last={ hp:Math.round(b9.hp), max:Math.round(b9.hpMax), t:b9.type }; if(BLB.fight.god && S.lives<BLB.lives0) S.lives=BLB.lives0; if(BLB.ffK>1 && !BLB.inFF){ BLB.inFF=1; try{ for(let i=1;i<BLB.ffK && S.mode==='play';i++) up0.call(this, dt); } finally{ BLB.inFF=0; } } } }catch(e){} return r; }; }
+if(typeof raidCount9==='function'){ const rc0=raidCount9; raidCount9=function(){ return BLB.pendN>0? BLB.pendN : rc0.apply(this, arguments); }; }
+
+const BLB_CSS='#blbPage{position:fixed;inset:0;z-index:99980;background:#141810;color:#EDEADF;font-family:var(--uih);font-weight:bold;text-transform:uppercase;user-select:none;-webkit-user-select:none;display:flex;flex-direction:column;overflow:hidden;--bg:#1b1f17;--bd:rgba(127,163,92,0.45);--gold:#FFE07A;font-size:12px;line-height:1.25}'
+ +'#blbPage.hidden{display:none}#blbPage *{box-sizing:border-box}#blbPage input,#blbPage textarea{text-transform:none;font-family:ui-monospace,Menlo,monospace;font-weight:normal}'
+ +'.blb-top{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:2px solid var(--bd);flex-shrink:0}.blb-title{font-size:18px;letter-spacing:.08em;color:var(--gold);white-space:nowrap}.blb-ver{color:#9a8a6a;font-size:10px}'
+ +'.blb-tabs{display:flex;gap:6px;margin-left:auto}.blb-tab{background:rgba(38,40,31,.92);border:2px solid var(--bd);color:#EDEADF;border-radius:9px;padding:5px 10px;font:inherit;font-size:12px;cursor:pointer}.blb-tab.on{border-color:#BFE39A;background:linear-gradient(180deg,#4c6f86,#2e4a66)}'
+ +'.blb-x{width:34px;height:34px;border-radius:10px;background:rgba(18,15,11,.9);border:2px solid var(--bd);color:#EDEADF;font:inherit;font-size:16px;cursor:pointer;flex-shrink:0}'
+ +'.blb-bosses{display:flex;gap:6px;padding:6px 10px;overflow-x:auto;flex-shrink:0;border-bottom:2px solid var(--bd)}.blb-boss{display:flex;align-items:center;gap:6px;background:rgba(38,40,31,.92);border:2px solid var(--bd);border-radius:10px;padding:3px 8px 3px 4px;cursor:pointer;white-space:nowrap;color:#EDEADF;font:inherit;font-size:11px}'
+ +'.blb-boss img{width:34px;height:34px;object-fit:contain;display:block}.blb-boss.on{border-color:var(--gold);background:linear-gradient(180deg,#5a4b1f,#3a2f12)}.blb-boss small{display:block;color:#9a8a6a;font-size:9px}'
+ +'.blb-body{flex:1;min-height:0;display:flex;gap:8px;padding:8px 10px}.blb-col{background:var(--bg);border:2px solid var(--bd);border-radius:12px;padding:8px;overflow:auto;min-height:0}.blb-col h3{margin:0 0 6px;font-size:12px;letter-spacing:.1em;color:var(--gold)}'
+ +'.blb-tiers{width:230px;flex-shrink:0;display:flex;flex-direction:column;gap:6px}.blb-tier{border:2px solid var(--bd);border-radius:10px;padding:6px 8px;cursor:pointer;background:rgba(38,40,31,.92)}.blb-tier.on{background:rgba(60,70,50,.95)}.blb-tier .nm{font-size:14px;letter-spacing:.08em}.blb-tier .fx{color:#C9BFA8;font-size:10px;margin-top:2px;text-transform:none;font-weight:normal;line-height:1.3}'
+ +'.blb-go{display:block;width:100%;margin-top:6px;background:linear-gradient(180deg,#7FA35C,#4f6f3a);border:2px solid #BFE39A;color:#10140D;border-radius:9px;padding:7px 8px;font:inherit;font-size:13px;letter-spacing:.08em;cursor:pointer}'
+ +'.blb-dials{width:260px;flex-shrink:0}.blb-dial{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:4px 0;border-bottom:1px solid rgba(127,163,92,.2)}.blb-dial label{font-size:11px;color:#EDEADF}.blb-dial small{display:block;color:#9a8a6a;font-size:9px;text-transform:none;font-weight:normal}'
+ +'.blb-dial input[type=number]{width:72px;background:#0f120c;color:#FFE07A;border:1px solid var(--bd);border-radius:6px;padding:3px 5px;font-size:12px}.blb-seg{display:flex;gap:3px}.blb-seg button{background:rgba(38,40,31,.92);border:1px solid var(--bd);color:#EDEADF;border-radius:6px;padding:3px 7px;font:inherit;font-size:11px;cursor:pointer}.blb-seg button.on{border-color:#BFE39A;background:#2e4a66}'
+ +'.blb-sheet{flex:1;min-width:0}.blb-wave{border:1px solid rgba(127,163,92,.3);border-radius:8px;padding:5px 7px;margin-bottom:6px;background:rgba(38,40,31,.6)}.blb-wave .wh{display:flex;justify-content:space-between;gap:6px;font-size:11px}.blb-wave .wh small{color:#9a8a6a;font-size:9px;text-transform:none;font-weight:normal}'
+ +'.blb-grp{display:grid;grid-template-columns:1fr 54px 54px;gap:4px;align-items:center;font-size:10px;padding:2px 0;text-transform:none;font-weight:normal;color:#C9BFA8}.blb-grp.boss{color:#FFD24A;font-weight:bold}.blb-grp input{width:100%;background:#0f120c;color:#FFE07A;border:1px solid var(--bd);border-radius:5px;padding:2px 4px;font-size:10px}.blb-grp input.ed{border-color:var(--gold)}'
+ +'.blb-rules{flex:1;min-width:0}.blb-rule{margin-bottom:8px;border:1px solid rgba(127,163,92,.3);border-radius:8px;padding:5px 7px;background:rgba(38,40,31,.6)}.blb-rule .rh{display:flex;justify-content:space-between;align-items:center;gap:6px;font-size:11px}.blb-rule .rh small{color:#9a8a6a;font-size:9px;text-transform:none;font-weight:normal;display:block}'
+ +'.blb-cells{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}.blb-cell{display:flex;flex-direction:column;align-items:center;min-width:64px}.blb-cell b{font-size:9px;letter-spacing:.06em}.blb-cell input{width:64px;background:#0f120c;color:#EDEADF;border:1px solid var(--bd);border-radius:6px;padding:3px 4px;font-size:11px;text-align:center}.blb-cell input.ed{border-color:var(--gold);color:var(--gold)}.blb-cell small{color:#9a8a6a;font-size:9px;text-transform:none;font-weight:normal}'
+ +'.blb-mini{background:rgba(38,40,31,.92);border:1px solid var(--bd);color:#EDEADF;border-radius:6px;padding:2px 7px;font:inherit;font-size:10px;cursor:pointer}.blb-mini.warn{border-color:#E07A7A;color:#E07A7A}'
+ +'.blb-log{flex:1;min-width:0}.blb-logrow{display:grid;grid-template-columns:92px 1fr;gap:6px;border-bottom:1px solid rgba(127,163,92,.2);padding:4px 0;font-size:10px;text-transform:none;font-weight:normal;color:#C9BFA8}.blb-logrow b{color:#EDEADF}.blb-logrow .res-WIN{color:#BFE39A}.blb-logrow .res-LOSS{color:#E07A7A}.blb-logrow .res-ABORT{color:#9a8a6a}.blb-logrow input{width:100%;background:#0f120c;color:#EDEADF;border:1px solid var(--bd);border-radius:5px;padding:2px 4px;font-size:10px;margin-top:2px}'
+ +'.blb-help{flex:1;min-width:0;text-transform:none;font-weight:normal;font-size:12px;line-height:1.45;color:#C9BFA8}.blb-help b{color:#EDEADF}.blb-help h3{text-transform:uppercase}.blb-help code{color:var(--gold);font-family:ui-monospace,Menlo,monospace}'
+ +'#blbPage textarea.blb-out{width:100%;height:120px;background:#0f120c;color:#EDEADF;border:1px solid var(--bd);border-radius:6px;padding:4px 6px;font-size:10px;margin-top:6px}'
+ +'#blbPill{position:fixed;right:0;top:46%;z-index:9000;background:rgba(18,15,11,.92);border:2px solid #BFE39A;border-right:0;color:#FFE07A;border-radius:10px 0 0 10px;padding:8px 6px 8px 8px;font-family:var(--uih);font-weight:bold;font-size:12px;letter-spacing:.08em;cursor:pointer;writing-mode:vertical-rl;text-orientation:mixed;user-select:none;-webkit-user-select:none}#blbPill.hidden{display:none}'
+ +'#blbHud{position:fixed;right:6px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:9100;box-sizing:border-box;background:rgba(18,15,11,.88);border:2px solid var(--bd,rgba(127,163,92,.45));border-radius:10px;padding:4px 6px;font-family:var(--uih);font-weight:bold;text-transform:uppercase;color:#EDEADF;font-size:11px;display:flex;flex-direction:column;gap:3px;max-width:46vw;user-select:none;-webkit-user-select:none}#blbHud.hidden{display:none}'
+ +'#blbHud .rd{color:#FFE07A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#blbHud .bt{display:flex;gap:3px;flex-wrap:wrap}#blbHud button{background:rgba(38,40,31,.92);border:1px solid rgba(127,163,92,.45);color:#EDEADF;border-radius:6px;padding:2px 6px;font:inherit;font-size:10px;cursor:pointer}#blbHud button.on{border-color:#BFE39A;background:#2e4a66}#blbHud button.end{border-color:#E07A7A;color:#E07A7A}#blbHud.fold .rd,#blbHud.fold .bt{display:none}#blbHud .fd{align-self:flex-end;color:#9a8a6a;font-size:9px;cursor:pointer}'
+ +'@media (max-width:700px){.blb-tiers{width:170px}.blb-dials{width:200px}}';
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+BLB.ui={ tab(x){ BLB.tab=x; blbSave(); blbRender(); }, close(){ blbClose(); try{ SFX.blip(); }catch(e){} }, sel(k){ if(blbRow(k)) BLB.sel=k; blbSave(); blbRender(); }, tier(k){ BLB.tier=k; blbSave(); blbRender(); },
+  go(){ try{ SFX.blip(); }catch(e){} blbLaunch(BLB.sel, BLB.tier); },
+  dial(id,v){ const F=BLB.fight; if(id==='party') F.party=Math.max(1,Math.min(SQ_MAX,v|0)); else if(id==='speed') F.speed=[1,2,4].indexOf(+v)>=0? +v : 1; else if(id==='god') F.god=(v==='ON'||v===1||v===true)?1:0; else if(id==='bank') F.bank=(v==='ON'||v===1||v===true)?1:0; else if(id==='tags') F.tags=(v==='' || v==null)? null : Math.max(0,Math.round(+v)||0); else { const n=+v; F[id]=(isFinite(n) && n>0)? +n.toFixed(3) : 1; } blbSave(); blbRender(); },
+  dialsReset(){ BLB.fight={ bossHp:1, troops:1, troopHp:1, party:1, tags:null, speed:1, god:0, bank:0 }; blbSave(); blbRender(); },
+  grp(wi,gi,f,v){ const rk=BLB.sel, tier=BLB.tier, W=(BLB.waves[rk]||(BLB.waves[rk]={})), T9=(W[tier]||(W[tier]={})), k=wi+':'+gi, e=(T9[k]||(T9[k]={})); const n=+v; if(v==='' || !isFinite(n) || n<=0) delete e[f]; else e[f]=(f==='n')? Math.max(1,Math.round(n)) : +n.toFixed(3); if(!Object.keys(e).length) delete T9[k]; if(!Object.keys(T9).length) delete W[tier]; if(!Object.keys(W).length) delete BLB.waves[rk]; blbSave(); blbRender(); },
+  wavesReset(){ if(BLB.waves[BLB.sel]){ delete BLB.waves[BLB.sel][BLB.tier]; if(!Object.keys(BLB.waves[BLB.sel]).length) delete BLB.waves[BLB.sel]; } blbSave(); blbRender(); },
+  cell(id,key,v){ blbCellSet(id,key,v); blbSave(); blbRender(); }, resetTable(id){ blbResetTable(id); blbSave(); blbRender(); }, resetAll(){ blbResetAll(); blbSave(); blbRender(); },
+  note(at,v){ if(v) BLB.notes[at]=String(v).slice(0,400); else delete BLB.notes[at]; blbSave(); }, exportIt(){ blbExport(); }, clearLog(){ BLB.log=[]; BLB.notes={}; blbSave(); blbRender(); },
+  speed(k){ blbSpeed(k); }, tags(n){ blbTags(n); blbHudPaint(); }, skip(){ blbSkipWave(); blbHudPaint(); }, god(){ BLB.fight.god=BLB.fight.god?0:1; if(S.raid && S.raid.blb) S.raid.blb.dials.god=BLB.fight.god; blbSave(); blbHudPaint(); }, abort(){ blbAbort(); }, fold(){ if(BLB.hud){ BLB.hud.classList.toggle('fold'); blbHudPaint(); } } };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+GVT.blb=function(o){ return blbRig(o); };
+try{ blbBoot(); }catch(e){ try{ console.warn('BLB boot: '+(e && e.message)); }catch(e2){} }
+
 
 
 
