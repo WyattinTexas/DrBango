@@ -762446,6 +762446,44 @@ function bmtRig(o){ o=o||{}; if(o.on!=null) BMT.on=o.on? 1 : 0; if(o.mode){ META
 
 
 
+
+
+
+
+
+
+
+
+
+
+function bpuCss(){ if(document.getElementById('bpuCss')) return; const st=document.createElement('style'); st.id='bpuCss'; st.textContent=BPU_CSS; document.head.appendChild(st); }
+
+function bpuRows(wt){   
+  const mid=wt.querySelector('.wt-mid'), pw=mid && mid.querySelector('.wt-playwrap'), out=[]; if(!pw) return out; let past=false;
+  for(const el of mid.children){ if(el===pw){ past=true; continue; } if(!past || el.classList.contains('bmt-hide') || (el.classList.contains('wt-m2') && !el.hasAttribute('data-notr'))) continue;
+    const cs=getComputedStyle(el); if(cs.display==='none' || cs.visibility==='hidden' || cs.position==='absolute' || cs.position==='fixed') continue; out.push(el); }
+  return out; }
+function bpuBand(){ const wt=document.getElementById('wartable'); if(!wt) return; if(!BMT.on || !BPU.on || !wt.classList.contains('bpu')){ wt.style.removeProperty('--bpu-band'); return; }   
+  const play=wt.querySelector('.wt-play'); if(!play) return; const w=wt.getBoundingClientRect(), p=play.getBoundingClientRect(); if(!(p.height>0) || !(w.height>0)) return;   
+  let foot=p.bottom; for(const el of bpuRows(wt)){ const r=el.getBoundingClientRect(); if(r.height>0 && r.bottom>foot) foot=r.bottom; }
+  const pair=wt.querySelector('.bmt-pair'), sab=pair? (parseFloat(getComputedStyle(pair).bottom)||0) : 0, top=Math.max(0, Math.round(foot-w.top));
+  wt.style.setProperty('--bmt-pairtop', top+'px'); wt.style.setProperty('--bpu-band', Math.max(0, Math.round(w.height-sab-top))+'px'); BPU.n++; }
+
+
+
+
+
+
+function bpuRig(o){ o=o||{}; if(o.on!=null) BPU.on=o.on? 1 : 0; const wt=document.getElementById('wartable'); return { on:BPU.on, err:BPU.err, n:BPU.n, pty:(function(){ try{ return bmtPty(); }catch(e){ return null; } })(), cls:!!(wt && wt.classList.contains('bpu')) }; }
+
+
+
+
+
+
+
+
+
 function tfbOn(){ return TFB.on===1; }
 function tfbDue(){ try{ return tfbOn() && roomCur()==='bedroom' && !MAPPIN && bcrDue(); }catch(e){ return false; } }
 function tfbMove(id){ try{ const p=DECOR_SPOTS[id]; if(!p || !chestFloorToy(id) || rugIs(id) || ROOFTOP_ONLY[id] || BCR_WALK.indexOf(id)>=0 || DECOR_GLOBAL.indexOf(id)>=0 || TFB_STAY.indexOf(id)>=0) return false; return (+p.y+ +p.h)>=RN_SEAM; }catch(e){ return false; } }
@@ -972611,7 +972649,7 @@ let BFQ=null;
 
 
 
-let GVT_CV='27.93';
+let GVT_CV='27.94';
 let NX_CAP_MUL=4;
 
 
@@ -2631656,6 +2631694,44 @@ const bmtRWT0=renderWarTable;renderWarTable=function(){ const r=bmtRWT0.apply(th
 const bmtGLS0=glSquare;glSquare=function(){ const r=bmtGLS0.apply(this, arguments); try{ bmtPairSeat(); }catch(e){ BMT.err++; } return r; };
 
 setTimeout(()=>{ try{ if(typeof GVT==='object' && GVT) GVT.bmt=bmtRig; }catch(e){} }, 0);
+
+
+
+
+
+
+
+
+
+
+const BPU={ on:1, err:0, n:0 };
+try{ const m=location.search.match(/[?&]bpu=([01])/); if(m) localStorage.setItem('gvt_bpu', m[1]); BPU.on=(localStorage.getItem('gvt_bpu')==='0')? 0 : 1; }catch(e){ BPU.on=1; }
+const BPU_CSS=[
+  '#wartable.bmt.bpu { --bmt-n3:0px; --bpu-sab:env(safe-area-inset-bottom, 0px); }',    
+  '#wartable.bmt.bpu .wt-mid.wt-mid { gap:5px; padding-top:4px; }',    
+  '#wartable.bmt.bpu .bmt-pair { bottom:var(--bpu-sab); }',    
+  '#wartable.bmt.bpu .wt-gasq, #wartable.bmt.bpu .wt-glsq { --gasq:min(calc(var(--gasq0)*1.5), max(84px, calc(var(--bpu-band, 9999px) - 16px))); }'    
+].join('\n');
+
+const bpuPty0=bmtPty;bmtPty=function(){ if(bpuPty0()) return true; if(!BPU.on) return false; try{ return !!(ptyLobby() && ptyN()>=2); }catch(e){ return false; } };
+
+
+
+
+
+
+
+
+
+
+const bpuBand0=bmtBand;bmtBand=function(){ const r=bpuBand0.apply(this, arguments); try{ bpuBand(); }catch(e){ BPU.err++; } return r; };
+const bpuLay0=bmtLay;bmtLay=function(){ const wt=document.getElementById('wartable');
+  try{ if(wt){ const on=!!(BMT.on && BPU.on && bmtPty()); if(on) bpuCss(); wt.classList.toggle('bpu', on); if(!on) wt.style.removeProperty('--bpu-band'); } }catch(e){ BPU.err++; }   
+  const r=bpuLay0.apply(this, arguments);
+  try{ if(wt && wt.classList.contains('bpu')){ bmtBand(); if(BMT.ro) for(const el of bpuRows(wt)){ try{ BMT.ro.observe(el, { box:'border-box' }); }catch(e){ BMT.ro.observe(el); } } } }catch(e){ BPU.err++; }   
+  return r; };
+
+setTimeout(()=>{ try{ if(typeof GVT==='object' && GVT) GVT.bpu=bpuRig; }catch(e){} }, 0);
 
 
 
