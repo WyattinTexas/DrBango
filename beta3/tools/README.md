@@ -1,6 +1,107 @@
 # beta3 dev tools
 
-Thirty-four scripts, all dev-only — nothing here ships to the browser.
+Sixty-two scripts, all dev-only — nothing here ships to the browser.
+
+## THE FIRST NIGHT, LIVE (v0.125.0): firstnight-stage.sh · firstnight-live-check.mjs · veteran-twin-check.mjs · settings-check §5b–§5c
+
+Skylar (10/29): "We want the tutorial for STARSPELL to be more scripted. Right
+now, it only guides you to pick the first word." The scripted night was
+already built and verified in the first5 sandbox (v0.15.0: the guided first
+word → the ORANGE guided + explained → the SCRY gate → the BLUE shown, guided,
+explained → the beast's strike held on its damage → the GREEN guided +
+explained, earned by the blow) and wired into the live game on the
+`first-night` preview branch (8d9bf72d1, 10/20). v0.125.0 carries that branch
+onto main (cherry-picked over v0.123.0 + v0.124.0; the two game.js conflicts —
+`replayTutorial` beside `f5StandTitle`/`f5LeanTitle`, `busy()`'s `|| this.leaving`
+beside `quickCheckpoint()` — keep every side). Every beat rides
+`Battle.f5Night = quick && (ftue || resume.ftue || ?f5night=1)`: a stranger's
+first open, its pocketed resume, and now the settings door's replay (it rises
+with `ftue: 1`) — nothing else.
+
+Three ship fixes on top of the branch (all in game.js):
+1. **The replay keeps no pocket.** `replayTutorial` rises with `replay: 1` →
+   `Battle.f5Replay`, and `saveCheckpoint`'s quick branch returns first for a
+   replay — a killed replay never comes back on the next boot (the tutorial
+   door's law). A first-timer's night keeps graft 4's `beta3.quickck` pocket.
+2. **The lit sky is its owner's.** `ssF5DrawLitSky` (the meadow's one draw)
+   returns unless `ssF5LitOwner` (a device whose first open WAS the night) — a
+   veteran's replay lights VULPES (the rite plays in the replay) but never
+   marks their meadow.
+3. **No stale hand.** `Battle.create` nulls `ftueHand`/`ftueTimer` (the
+   stale-ref law). The ‹ abandon never retires the glove, so a replay left
+   mid-lesson kept a DESTROYED one on the reused scene and the NEXT replay's
+   `ftueShow` stood down: no finger, while the guide's lock refused every tile
+   off its road. Latent since v0.124.0's door; the night's lock made it a trap.
+   (settings-check run 1 caught it: §5b's walk never started.)
+
+**`tools/firstnight-stage.sh`** (from the branch) — rebuilds `beta3/f5stage/`
+(scratch, NEVER commit) = the first5 sandbox's shim + index + suite with every
+game file swapped for the live copy, then `cd f5stage && node
+tools/first5-check.mjs` runs the sandbox's whole battery (280) against the
+integrated game.js on Playwright's Chromium, its demo run marked `?f5night=1`.
+Expected reds (static, inherited): the dropped `__f5survive` sites and their
+seam tag, the F5-PAINTED tag count, the boot's soft list (live loads more art
+files than the sandbox did).
+
+**`tools/firstnight-live-check.mjs`** (from the branch) — 21 checks on the
+LIVE index.html (no shim): A a stranger's first open (the gate, the lure at
+the standing title, `prof.f5night` minted, VULPES + the en script) · B a
+returning player's quick run is the shipped one (f5Night off, no rig/rungs/
+script, the shipped refusal, nothing at a 12 s stall, no pocket, no night
+flag) · C every tongue's script stands and every lesson line is authored
+in-tongue and fits the frame. `PW_DIR=<dir with node_modules/playwright-core>
+FNBASE=http://localhost:<port>/ node tools/firstnight-live-check.mjs`.
+
+**`tools/veteran-twin-check.mjs`** (NEW) — the veterans-untouched proof, move
+for move: the TWIN (a shipped commit's beta3, `git archive`d to a scratch
+folder; default the last `STARSPELL v…` build before HEAD) and THIS tree
+served side by side, the SAME veteran run played on both — quick, daily,
+endless (a level-1 climb on a fixed eseed) and campaign (one stored roster
+roll) — with the run's one `setSeed` pinned (`Math.random` is left to the
+cosmetics, the house law — a CONSTANT Math.random inside Battle.create hangs
+its callees at state 'boot' with no page error), every move the same
+deterministic choice (two casts of the board's WEAKEST word — the solver's own
+walk, least damage — then its best; SCRY by its button when there is no word;
+the first card at a pick; the gate and the chart by their zones), each made
+only after a settled fight (nothing selected, no blow in flight, no bar held)
+so a timer-born draw (the dew) can never land on different sides of a move.
+Every move logs the board (letters · tiers · blacked), the fight and beast
+(hp, fuse), the player's hp, the score, the sigils, the move and the seeded
+stream's draw count (`rn` — every `rng()` call is counted through a wrapper
+and booked to its caller; the book is printed for the moves around a
+mismatch); the two logs must agree entry for entry, and THIS tree's run must
+stay dark (f5Night false, no script, rig, rungs, pocket, night flag or lit
+list). ⚠ ONE shipped cosmetic draws the SEEDED stream on a timer: each flying
+letter's landing sparks (`onComplete: () => { this.starBurst.emitParticleAt(
+this.beastC.x + (rng() - 0.5)…`, the cast flight since v0.104.0) — 310+ ms
+before the refill, but a stalled frame (a loaded box) can land them after it:
+the SAME draws reordered, a diverged deal on IDENTICAL bytes (the ledger
+caught it 10/29: twin and tree drew 30 each, by the same callers, different
+order). The harness finds that line in each served game.js and serves its
+draws from Math.random on both trees; if the line ever moves, the run says so.
+A killed run can orphan its two servers — the next run refuses a busy :8936 /
+:8937 rather than test a stale tree (and sweep orphaned headless Chromiums:
+`pkill -f ms-playwright/chromium-1140`).
+`cd beta3 && PW_DIR=… node tools/veteran-twin-check.mjs` (`TWIN_REF=`,
+`MODES=`, `MOVES=`; ~12 min). Cards 02/03 of the scripted-tutorial batch
+re-run it with the default twin (= v0.125.0 once they ship).
+
+**settings-check.mjs** (extended — §1 + §4 + NEW §5b/§5c; 118 → 161 checks,
+~8 min, `perl -e 'alarm 900; …'`) — the door now
+replays THE WHOLE NIGHT: §4 asserts the replay carries it (f5Night, f5Replay,
+VULPES pinned, the six-word script, the rig); §5b walks it start to farewell
+by REAL DPR-3 taps on the finger's road — STAR · MOONS → the orange on cell 0
+→ SKY (16, not 10) → the scry gate (SCRY tapped, the fuse stepping 3 → 2) →
+TONIGHT → the blue on cell 1 under the ember alarm → HALO (12, not 8) → the
+strike held (50 → 42, the bar draining in the light) → the dew pinned on
+DAWN's D → DAWN → the mend (42 → 48, the bar rising) → the hand's farewell —
+each showcase let go by a real tap past its floor, and asserts the finger
+rises on a SECOND replay in one visit (fix 3); §5c proves the replay keeps no
+pocket (none through the night, the fell or the curated pick) and that a COLD
+reboot wakes on the meadow with nothing owed, the campaign and climb
+byte-identical, and no lit-sky mark on the veteran's meadow (fix 2). `SHOTS=`
+adds night-orange-arrives · night-orange · night-scry-gate · night-blue ·
+night-strike · night-strike-drain · night-heal · home-after-night.
 
 ## settings-check.mjs — THE TUTORIAL DOOR: a replay-the-tutorial row in the gear's sheet (v0.124.0)
 

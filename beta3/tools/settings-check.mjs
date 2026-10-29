@@ -23,6 +23,18 @@
 // standing campaign checkpoint and endless climb byte-identical through all
 // of it (CONTINUE GAME still lit); prof.ftue never re-owed; the Spanish
 // tutorial too; zero page exceptions.
+// v0.125.0 (THE FIRST NIGHT, LIVE): the door now replays the whole scripted
+// night — the replay carries Battle.f5Night (it keys on ftue) and is marked
+// a replay (f5Replay). §5b walks it start to farewell by REAL taps on the
+// finger's road: STAR · MOONS → the orange (+6: 16, not 10) → SKY → the scry
+// gate (SCRY tapped, the fuse stepping 3 → 2) → TONIGHT → the blue (×1.5: 12,
+// not 8) → HALO → the beast's strike (50 → 42) → the green dew → DAWN → the
+// mend (42 → 48) → the hand's farewell, each showcase released by a real
+// tap past its floor (SHOTS: night-orange · night-scry-gate · night-blue ·
+// night-strike · night-strike-drain · night-heal). §5c proves the replay
+// keeps no pocket: no beta3.quickck through the night, the fell or the pick,
+// and a COLD reboot wakes on the meadow (no resume, nothing owed) — and the
+// veteran's meadow wears no lit-sky mark though the replay lit VULPES.
 // Self-launching: serves beta3 on :8899 if nothing does; headless Chromium on
 // :9501 (/tmp/cdp-settings wiped first) — Playwright's own Chromium when it
 // is installed (a headless GOOGLE Chrome hijacks AppleScript's session with
@@ -30,7 +42,7 @@
 // 390 × 844 at DPR 3 by one device-metrics override; Firebase blocked
 // throughout.
 //
-//   perl -e 'alarm 580; exec @ARGV' node tools/settings-check.mjs   # ~5 min
+//   perl -e 'alarm 900; exec @ARGV' node tools/settings-check.mjs   # ~8 min
 //   SHOTS=tools/shots-tutorial node tools/settings-check.mjs        # + DPR-3 captures
 //   ORIGIN=https://drbango.com/beta3 node tools/settings-check.mjs  # the PUBLISHED bytes
 //                                     (no local serve; §2 proves the served BUILD is this tree's)
@@ -68,8 +80,17 @@ ok('…on a window sized to three rows (PH 300, one 52-unit pitch)',
   /const PH = 300, top = 400 - PH \/ 2;/.test(sheetSrc) && /const rowY = \(i\) => top \+ 96 \+ 52 \* i;/.test(sheetSrc));
 ok('…and its mark is a plain › (no emoji — the no-emoji-as-game-art law)', /const tuT = ssTxt\(this, l\.x\(124\), l\.y\(rowY\(2\)\), '›'/.test(sheetSrc));
 const replaySrc = (gameSrc.match(/\n  replayTutorial\(\) \{[\s\S]*?\n  \}\n/) || [''])[0];
-ok("replayTutorial rides ftueRise's own rise (quick, no resume, ftue 1)",
-  replaySrc.includes("this.beginAscent({ mode: 'quick', resume: null, ascended: true, ftue: 1 });"));
+ok("replayTutorial rides ftueRise's own rise (quick, no resume, ftue 1), marked a replay",
+  replaySrc.includes("this.beginAscent({ mode: 'quick', resume: null, ascended: true, ftue: 1, replay: 1 });"));
+// v0.125.0: the night rides ftue, the replay rides `replay` — and keeps no pocket
+ok('the First Night keys on ftue (so the door replays the scripted night), the replay on its own flag',
+  /this\.f5Night = this\.mode === 'quick' && \(this\.ftue \|\|/.test(gameSrc) && gameSrc.includes('this.f5Replay = this.f5Night && !!data.replay;'));
+const ckSrc = (gameSrc.match(/\n  saveCheckpoint\(\) \{[\s\S]*?\n  \}\n/) || [''])[0];
+ok("…a replay writes no pocket (saveCheckpoint's quick branch steps aside first)", /if \(this\.mode === 'quick'\) \{\s*if \(this\.f5Replay\) return;/.test(ckSrc));
+ok("…the meadow's lit sky is its owner's alone (a veteran's replay never marks it)",
+  /function ssF5DrawLitSky\(scene\) \{[^]*?if \(!ssF5LitOwner\(scene\)\) return;\s*for \(const id of ssF5LitList\(\)\)/.test(gameSrc));
+ok('…and the hand dies with the scene (a ‹-abandoned replay leaves no stale glove for the next)',
+  /this\.ftueHand = null; this\.ftueTimer = null;\s*this\.f5G = null;[^\n]*\n\s*if \(this\.ftue\) this\.ftueStart\(\);/.test(gameSrc));
 ok('…writes nothing to the first-open flag', !!replaySrc && !/prof\.ftue|ssFtueDone|SS\.save/.test(replaySrc));
 ok('…and stands behind the whole one-sheet guard family', ['this.busy()', 'this.setC', 'this.langC', 'this.dailyC', 'this.mapC',
   'this.confirmC', 'this.signC', 'this.streakC', 'this.riteC'].every((t) => replaySrc.includes(t)));
@@ -290,6 +311,10 @@ ok('an unsigned QUICK run carrying the tutorial (ftue), fight 1', await ev(`(() 
   return b.mode === 'quick' && b.ftue === true && b.sign === null && b.run.fightIdx === 0 && !b.resume })()`) === true);
 ok('the opening deal is the authored English board, tile for tile', await ev(`${B}.board.map((s) => s.ch).join(' ')`) === FTUE.en.board.join(' '));
 ok('the beacon marks it a replay of STAR', await ev(`window.__ssftue.replay === 1 && window.__ssftue.word === 'star'`) === true);
+const night = await evj(`JSON.stringify((() => { const b = ${B}; return { on: b.f5Night, replay: b.f5Replay, beast: b.fights[0].id,
+  words: b.f5G ? b.f5G.words.map((w) => w.join('')).join(',') : null, rig: b.f5Queue ? b.f5Queue.length : 0 } })())`);
+ok('…and it is THE FIRST NIGHT (v0.125.0): f5Night on, marked a replay, VULPES pinned, the whole script standing, the rig loaded',
+  night.on === true && night.replay === true && night.beast === 'vulpes' && night.words === 'star,moons,sky,tonight,halo,dawn' && night.rig > 0, JSON.stringify(night));
 ok('the friendly finger rises on the first letter (S)', await until(`window.__ssftue.point === 'slot:9'`, 15000)
   && await until(`(() => { const h = ${B}.ftueHand; return !!h && h.alpha > 0.5 })()`, 6000));
 await sleep(900);   // let the hand finish its rise for the capture
@@ -312,6 +337,161 @@ ok('the first-open flag still down', back1.ftue === 1 && back1.ftueLS === 1);
 await shot('home-after');
 ok('the gear answers again, the TUTORIAL row in its place', await openSheet() && await ev(`!!${H}.setC.tutZone`) === true);
 ok('…and its ✕ closes it', await tapUntil(`${H}.setC.list.find((o) => o.text === '✕')`, SHEETS_SHUT, 4));
+
+/* ================= §5b THE NIGHT, REPLAYED (v0.125.0) ================= */
+console.log('— §5b the TUTORIAL door replays the whole scripted night (real taps, start to farewell) —');
+// the headless clock idles when input goes quiet — a harmless move keeps it ticking (first5-check's poke)
+const poke = (i) => send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 30 + (i % 5), y: 30 + (i % 7) });
+const NIGHT = `JSON.stringify((() => { const b = ${B}, g = window.__f5guide || {}, f = window.__ssftue || {};
+  return { state: b.state, sel: b.sel.join(','), beat: g.beat, idx: g.idx, word: f.word, ft: f.state, pt: f.point,
+    oc: g.orangeCell, bc: g.blueCell, gc: g.greenCell, shown: g.shown | 0, released: g.released | 0, ended: g.ended | 0, show: g.show || null,
+    hp: b.beast ? b.beast.hpNow : null, cnt: b.beast ? b.beast.count : null, php: b.run.hp, words: b.run.words,
+    gone: !!b.ftueGone, hand: !!(b.ftueHand && b.ftueHand.active), f5G: !!b.f5G, pill: b.strikeT.text, alarm: !!b.strikeAlarm,
+    board: b.board.map((s) => (s ? s.ch + (s.tier ? '*' : '') : '_')).join(' '),
+    strike: window.__f5strike || {}, mend: window.__f5mend || {}, scry: window.__f5scry || {},
+    hpShown: Math.round(b.hpShown.v), hpHold: b.hpHold | 0, quickck: localStorage.getItem('beta3.quickck') } })())`;
+const gs = () => evj(NIGHT);
+const waitFor = async (pred, cap = 30000) => {
+  const t = Date.now(); let i = 0;
+  while (Date.now() - t < cap) { await poke(i++); try { const s = await gs(); if (pred(s)) return s; } catch (e) { } await sleep(250); }
+  return null;
+};
+// follow the finger with REAL taps: the tile it points at, then CAST when it moves there
+const walk = async (max = 40) => {
+  for (let i = 0; i < max; i++) {
+    await poke(i);
+    const pt = await ev(`window.__ssftue ? window.__ssftue.point : null`);
+    if (pt === 'cast') { await tap(`${B}.castB`); await sleep(300); return 'cast'; }
+    if (pt && pt.startsWith('slot:')) { await tap(`${B}.board[${+pt.slice(5)}].c`); await sleep(420); continue; }
+    await sleep(300);
+  }
+  return 'stuck';
+};
+const letGo = async () => { await sleep(400); await tapAt(195, 500); };   // a real tap on the lesson's veil, past its floor
+await ev(`(window.__f5guide = null, window.__f5strike = null, window.__f5mend = null, window.__f5scry = null, 1)`);
+ok('a fresh replay by real taps: the gear, TUTORIAL, the rise, the night\'s fight', await openSheet()
+  && await tapUntil(`(${H}.setC && ${H}.setC.tutZone) || ${H}.setB`, `!${H}.setC && (${H}.ascending || game.scene.isActive('battle'))`, 3)
+  && await until(PICK, 40000));
+const n0 = await evj(`JSON.stringify((() => { const b = ${B}; return { on: b.f5Night, replay: b.f5Replay, ftue: b.ftue, beast: b.fights[0].id,
+  hp: b.beast.hp, cnt: b.beast.count } })())`);
+ok('…VULPES of the first night (84 hp, a six-cast fuse), the replay flagged', n0.on && n0.replay && n0.ftue && n0.beast === 'vulpes'
+  && n0.hp === 84 && n0.cnt === 6, JSON.stringify(n0));
+ok('…the finger rises on S again: a second replay in one visit, after §5\'s ‹ left the first mid-lesson (no stale hand — the v0.125.0 fix)',
+  !!(await waitFor((s) => s.pt === 'slot:9' && s.hand, 15000)));
+await sleep(2500);   // the deal's bounce settles before probe taps (house law)
+ok('STAR, by real taps on the finger\'s road', await walk() === 'cast' && !!(await waitFor((s) => s.words === 1, 8000)));
+const n1 = await waitFor((s) => s.beat === 'word' && s.idx === 1 && s.state === 'pick' && s.pt === 'slot:0', 20000);
+ok('…the hand STAYS (no free-typing gap): word two is MOONS, the finger on its M', !!n1 && n1.word === 'moons' && n1.hand && !n1.gone,
+  n1 ? n1.word + ' ' + n1.pt : 'never');
+ok('MOONS, by real taps', await walk() === 'cast');
+let n2 = await waitFor((s) => s.beat === 'point' && s.idx === 2, 25000);
+await sleep(700); n2 = await gs();
+ok('THE ORANGE: MOONS forged it onto cell 0, the hand resting on it, its +6 said — the word SKY, VULPES 70',
+  n2.oc === 0 && n2.pt === 'slot:0' && n2.ft === 'orange' && n2.word === 'sky' && n2.hp === 70, JSON.stringify({ oc: n2.oc, pt: n2.pt, ft: n2.ft, word: n2.word, hp: n2.hp }));
+await shot('night-orange-arrives');
+await tap(`${B}.board[0].c`);
+ok('…the pointed orange IS SKY\'s first tap', !!(await waitFor((s) => s.beat === 'word' && s.sel === '0', 5000)));
+ok('SKY, by real taps', await walk() === 'cast');
+let n3 = await waitFor((s) => s.shown >= 1, 20000);
+await sleep(700); n3 = await gs();
+ok('THE ORANGE SHOWCASE holds the fight: SKY hit 16, the same word plain 10 — the orange +6 — the hand on the number',
+  !!n3.show && n3.show.dmg === 16 && n3.show.plain === 10 && n3.show.extra === 6 && n3.show.tier === 1 && n3.state === 'anim' && /^pose:/.test(n3.pt), JSON.stringify(n3.show));
+await shot('night-orange');
+await letGo();
+ok('…a real tap past its floor lets it go', !!(await waitFor((s) => s.released >= 1, 6000)));
+let n4 = await waitFor((s) => s.beat === 'scry' && (s.scry.armed | 0) >= 1, 25000);
+await sleep(800); n4 = await gs();
+ok('THE SCRY GATE on the script\'s own beat: the screen grayed, SCRY alone lit, the finger ON it, the fuse at 3',
+  n4.pt === 'scry' && (n4.scry.scripted | 0) === 1 && n4.cnt === 3 && / 3 /.test(n4.pill), JSON.stringify({ pt: n4.pt, scripted: n4.scry.scripted, cnt: n4.cnt, pill: n4.pill }));
+await shot('night-scry-gate');
+await tap(`${B}.scryB`);
+const n5 = await waitFor((s) => !!s.scry.down, 8000);
+ok('…a real tap on SCRY: a fresh board, and the fuse STEPS 3 → 2 in the light (its cost, shown)', !!n5 && n5.scry.down[0] === 3 && n5.scry.down[1] === 2,
+  n5 ? JSON.stringify(n5.scry.down) : 'never');
+await sleep(1500); await tapAt(195, 500);   // past the reveal's 1.4 s floor
+ok('…the gate lifts and the hand stays: word four is TONIGHT', !!(await waitFor((s) => (s.scry.lifted | 0) >= 1, 8000))
+  && !!(await waitFor((s) => s.beat === 'word' && s.idx === 3 && s.state === 'pick' && s.word === 'tonight', 15000)));
+ok('TONIGHT, by real taps (seven letters — the forge of a BLUE)', await walk() === 'cast');
+let n6 = await waitFor((s) => s.beat === 'point' && s.idx === 4, 25000);
+await sleep(700); n6 = await gs();
+ok('THE BLUE: TONIGHT forged it onto cell 1 as the fuse burned 2 → 1 (the ember alarm), the hand on it — the word HALO, VULPES 33',
+  n6.bc === 1 && n6.pt === 'slot:1' && n6.word === 'halo' && n6.hp === 33 && n6.cnt === 1 && n6.alarm, JSON.stringify({ bc: n6.bc, pt: n6.pt, word: n6.word, hp: n6.hp, cnt: n6.cnt, alarm: n6.alarm }));
+await tap(`${B}.board[1].c`);
+ok('…the pointed blue IS HALO\'s first tap', !!(await waitFor((s) => s.beat === 'word' && s.sel === '1', 5000)));
+ok('HALO, by real taps', await walk() === 'cast');
+let n7 = await waitFor((s) => s.shown >= 2, 20000);
+await sleep(1100); n7 = await gs();
+ok('THE BLUE SHOWCASE: HALO hit 12, the same word plain 8 — the WHOLE word ×1.5 — the hand on the number',
+  !!n7.show && n7.show.dmg === 12 && n7.show.plain === 8 && n7.show.tier === 2 && n7.state === 'anim' && /^pose:/.test(n7.pt), JSON.stringify(n7.show));
+await shot('night-blue');
+await letGo();
+ok('…a real tap past its floor lets it go — and the blue word\'s own tick IS the strike', !!(await waitFor((s) => s.released >= 2, 6000)));
+let n8 = await waitFor((s) => (s.strike.shown | 0) >= 1, 20000);
+await sleep(900); n8 = await gs();
+ok('THE BEAST STRIKES, held: VULPES\'s 8 lands in truth (50 → 42) while the bar HOLDS at 50, the crimson −8 lit above the veil, the hand on it',
+  !!n8 && n8.strike.hit === 8 && n8.strike.before === 50 && n8.strike.after === 42 && n8.php === 42 && n8.hpShown === 50 && n8.hpHold === 1 && /^pose:/.test(n8.pt),
+  JSON.stringify({ strike: n8.strike, php: n8.php, hpShown: n8.hpShown, pt: n8.pt }));
+await shot('night-strike');
+let n9 = await waitFor((s) => (s.strike.landed | 0) >= 1, 12000);
+await sleep(600); n9 = await gs();
+ok('…the number lands and the bar DRAINS 50 → 42 in the light, the hand onto it', !!n9 && n9.hpShown === 42 && n9.hpHold === 0 && /^pose:/.test(n9.pt),
+  JSON.stringify({ hpShown: n9.hpShown, hpHold: n9.hpHold, pt: n9.pt }));
+await shot('night-strike-drain');
+await letGo();
+ok('…a real tap past its floor lifts it (the fuse re-armed at 6)', !!(await waitFor((s) => (s.strike.lifted | 0) >= 1 && s.cnt === 6, 8000)));
+let n10 = await waitFor((s) => s.beat === 'point' && s.idx === 5, 20000);
+await sleep(700); n10 = await gs();
+ok('THE GREEN: the dew the blow earned, pinned on DAWN\'s D at cell 1, the hand on it — the player at 42',
+  n10.gc === 1 && n10.pt === 'slot:1' && n10.word === 'dawn' && n10.php === 42, JSON.stringify({ gc: n10.gc, pt: n10.pt, word: n10.word, php: n10.php }));
+await tap(`${B}.board[1].c`);
+ok('…the pointed green IS DAWN\'s first tap', !!(await waitFor((s) => s.beat === 'word' && s.sel === '1', 5000)));
+ok('DAWN, by real taps', await walk() === 'cast');
+const n11 = await waitFor((s) => s.shown >= 3, 20000);
+ok('THE MEND holds the fight: DAWN healed ♥6 in truth (42 → 48) while the bar HOLDS at 42',
+  !!n11 && !!n11.show && n11.show.tier === 3 && n11.show.heal === 6 && n11.show.before === 42 && n11.show.after === 48 && n11.php === 48 && n11.hpShown === 42,
+  n11 ? JSON.stringify({ show: n11.show, php: n11.php, hpShown: n11.hpShown }) : 'never');
+let n12 = await waitFor((s) => (s.mend.risen | 0) >= 1, 12000);
+await sleep(500); n12 = await gs();
+ok('…the bar RISES 42 → 48 in the light, the hand onto it', !!n12 && n12.hpShown === 48 && /^pose:/.test(n12.pt), JSON.stringify({ hpShown: n12.hpShown, pt: n12.pt }));
+await shot('night-heal');
+await letGo();
+const n13 = await waitFor((s) => s.ended >= 1 && s.gone && s.state === 'pick', 20000);
+ok('THE FAREWELL: the hand retires for good (the script done) — VULPES 12, the player 48, the first fight the player\'s',
+  !!n13 && !n13.f5G && n13.ft === 'done' && n13.hp === 12 && n13.php === 48 && n13.words === 6, n13 ? JSON.stringify({ f5G: n13.f5G, ft: n13.ft, hp: n13.hp, php: n13.php, words: n13.words }) : 'never');
+ok('…and the whole night wrote no pocket (beta3.quickck absent)', !!n13 && n13.quickck === null);
+
+/* ================= §5c THE REPLAY KEEPS NO POCKET ================= */
+console.log('— §5c the replay keeps no pocket: the fell, the pick, a cold reboot —');
+const fellNight = async () => {
+  await until(`!!${B} && !${B}.dying && ${B}.state === 'pick'`, 25000, 250);
+  await ev(`(() => { const b = ${B}; b.beast.hpNow = -1; b.dying = true; b.beastDeath(); return 1 })()`);
+  return until(`${B}.state === 'sigil' && ${B}.overlayC.list.some((o) => o.getData && o.getData('sigilCard') && o.alpha === 1)`, 40000, 250);
+};
+ok('VULPES falls by the real death path — the lighting rite, then the pick', await fellNight());
+ok('…no pocket at the fell (a first night\'s own run would hold fight two here)', await ev(`localStorage.getItem('beta3.quickck') === null && ${B}.run.fightIdx === 1`) === true);
+const trio = await ev(`(() => { const ids = []; const scan = (ls) => ls.forEach((o) => { if (o.getData && o.getData('sigilDesc')) ids.push(o.getData('sigilDesc'));
+  if (o.list) scan(o.list); }); scan(${B}.overlayC.list); return ids.slice().sort().join(',') })()`);
+ok('…the first pick is the night\'s curated trio (QUILL / SALVE / FIRST LIGHT)', trio === 'first,quill,salve', trio);
+await tap(`(() => { let r = null; const scan = (ls) => ls.forEach((o) => { if (!r && o.getData && o.getData('sigilCard')) r = o; if (o.list) scan(o.list); }); scan(${B}.overlayC.list); return r })()`);
+ok('…the card taken (a curated one), fight two dealt — and still no pocket', await until(`${B}.state === 'pick' && ${B}.run.fightIdx === 1`, 30000)
+  && await ev(`['quill', 'salve', 'first'].includes(${B}.run.sigils[0]) && localStorage.getItem('beta3.quickck') === null`) === true,
+  await ev(`${B}.run.sigils.join(',')`));
+const lit = await ev(`JSON.stringify((SS.prof && SS.prof.f5lit) || [])`);
+// an app killed mid-replay: a COLD boot (no skip flag — the pocket door is read on a cold open)
+await send('Page.navigate', { url: ORIGIN + '/ascent.html' }); await sleep(450);
+await ev(`sessionStorage.removeItem('beta3.skipIntro'); 'ok'`);
+await send('Page.navigate', { url: BASE + '?fps=0' });
+await until(`window.__ssftue !== undefined`, 20000, 150);
+ok('a cold reboot after the killed replay wakes on the full meadow — no first open, no pocket resume', await until(RESTING, 60000)
+  && await ev(`window.__ssftue.on === false && !game.scene.isActive('battle') && localStorage.getItem('beta3.quickck') === null`) === true);
+await sleep(3000);
+ok('…and stays there (nothing knocks a held night back in)', await ev(`!game.scene.isActive('battle') && !${H}.ascending`) === true);
+const back4 = await saved();
+ok('…the campaign and the climb byte-identical, CONTINUE GAME lit, nothing owed', back4.camp === CAMP && back4.endl === ENDL
+  && back4.cont === true && back4.ftue === 1 && back4.ftueLS === 1);
+ok('the veteran\'s meadow wears no lit-sky mark, though the replay lit ' + lit + ' (the lit sky is its first night\'s owner\'s)',
+  /vulpes/.test(lit) && await ev(`!SS.prof.f5night && ${H}.children.list.filter((o) => o.getData && o.getData('f5mark')).length === 0`) === true);
+await shot('home-after-night');
 
 /* ================= §6 A REPLAY PLAYED OUT, THEN NORMAL PLAY ================= */
 console.log('— §6 a replay played to its end, then normal play —');
@@ -362,7 +542,7 @@ await replayToEnd(3);
 const newRun = await ev(`SS_T('newRun')`);
 ok('NEW RUN deals a PLAIN quick game: no tutorial, no finger, the bag\'s own deal', await tapUntil(endText(newRun),
   `${B}.state !== 'end' && ${B}.run && ${B}.run.fightIdx === 0`, 8) && await until(PICK, 40000)
-  && await ev(`${B}.mode === 'quick' && ${B}.ftue === false`) === true);
+  && await ev(`${B}.mode === 'quick' && ${B}.ftue === false && ${B}.f5Night === false && !${B}.f5Replay && !${B}.f5G`) === true);
 await sleep(2600);   // the finger would have risen by 1.5 s
 ok('…and the finger never comes', await ev(`!${B}.ftueHand && ${B}.board.map((s) => s.ch).join(' ') !== ${JSON.stringify(FTUE.en.board.join(' '))}`) === true);
 ok('‹ home from the plain game: the full meadow', await tapUntil(`${B}.homeB`, CHROME_FULL, 6) && await until(RESTING, 15000));

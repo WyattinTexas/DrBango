@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.124.0';
+const BUILD = 'STARSPELL v0.125.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -1966,6 +1966,9 @@ function ssF5DrawMini(scene, id, alpha, depth) {
 }
 /* every boot wears the kept sky — the morning-after proof */
 function ssF5DrawLitSky(scene) {
+  /* the meadow's kept sky is its OWNER's alone (v0.125.0): a veteran's
+     settings-door replay plays the night's lighting, never marks this */
+  if (!ssF5LitOwner(scene)) return;
   for (const id of ssF5LitList()) {
     const items = ssF5DrawMini(scene, id, 0, 5);
     items.forEach((o, k) => {
@@ -8166,13 +8169,17 @@ class Home extends Phaser.Scene {
      no-op. The way back is every quick run's own: the ‹ abandon and the end
      screen's HOME wake this meadow with its chrome, and NEW RUN deals a
      plain quick game. Quick keeps no checkpoint, so a standing campaign,
-     endless climb or kept daily hunt is never touched. */
+     endless climb or kept daily hunt is never touched.
+     THE FIRST NIGHT, LIVE (v0.125.0): ftue carries Battle.f5Night, so the
+     door replays the whole scripted night; `replay` tells the Battle it is
+     a replay, which keeps no pocket (see saveCheckpoint) — a closed app
+     still never brings the night back uninvited. */
   replayTutorial() {
     if (this.busy() || this.setC || this.langC || this.dailyC || this.mapC || this.confirmC || this.signC || this.streakC || this.riteC) return;
     SFX.ui();
     DIAG('ftue: replay (the settings door)');
     window.__ssftue = Object.assign(window.__ssftue || {}, { state: 'rise', replay: 1 });
-    this.beginAscent({ mode: 'quick', resume: null, ascended: true, ftue: 1 });
+    this.beginAscent({ mode: 'quick', resume: null, ascended: true, ftue: 1, replay: 1 });
   }
   /* F5-STRAIGHT: the title standing at the zenith with no cinematic — the
      reduce-motion open and a mid-open restart (rotation) stand here instead
@@ -9669,6 +9676,7 @@ class Battle extends Phaser.Scene {
        FTUE run, or its pocketed resume past fight 1). A returning player's
        quick run is the shipped quick run, beat for beat. */
     this.f5Night = this.mode === 'quick' && (this.ftue || !!(this.resume && this.resume.ftue) || QS.get('f5night') === '1' /* dev seam: any quick run plays the night's grafts (?ftue=1's pattern) */);
+    this.f5Replay = this.f5Night && !!data.replay;   // the settings door's replay (Home.replayTutorial): the night, never its pocket
     // THE KEPT HUNT (v0.114.0): the daily's own resume — the whole position a
     // closed hunt left standing. Null on a fresh run (and on every other
     // mode). startFight consumes it ONCE, for the fight the hunt was left on;
@@ -9923,6 +9931,11 @@ class Battle extends Phaser.Scene {
     DIAG('battle create ' + Math.round(tEnd - tCr) + 'ms (sky ' + Math.round(tSky - tCr) +
       ' · state ' + Math.round(tState - tSky) + ' · ui ' + Math.round(tUi - tState) + ' · fight ' + Math.round(tEnd - tUi) + ')');
 
+    /* the hand dies with the scene too (v0.125.0): the ‹ abandon never
+       retires it, so a replay left mid-lesson kept a DESTROYED glove here and
+       the next replay's ftueShow stood down — no finger, while the guide's
+       lock still refused every tile off its road */
+    this.ftueHand = null; this.ftueTimer = null;
     this.f5G = null;   /* F5-GUIDED: the script's state dies with the scene (stale-ref law) — reset BEFORE the hand builds it */
     if (this.ftue) this.ftueStart();   // the first open: curated deal landed above; the finger follows
 
@@ -12654,8 +12667,12 @@ class Battle extends Phaser.Scene {
     /* F5-GRAFT-4: the run must survive a pocket — the quick run checkpoints
        under its own key with fight-start semantics, exactly the campaign's
        law. The ftue flag rides along so a killed FIRST night relaunches
-       with the finger's lessons intact (fight 1 only). */
+       with the finger's lessons intact (fight 1 only).
+       A REPLAY from the settings door keeps no pocket (v0.125.0): the
+       replayed night is the tutorial again, not a run the next boot owes,
+       so a closed app wakes on the meadow (the tutorial door's law). */
     if (this.mode === 'quick') {
+      if (this.f5Replay) return;
       if (this.run.fightIdx >= this.fights.length) { localStorage.removeItem('beta3.quickck'); return; }
       localStorage.setItem('beta3.quickck', JSON.stringify({
         fightIdx: this.run.fightIdx, hp: this.run.hp, hpMax: this.run.hpMax,
