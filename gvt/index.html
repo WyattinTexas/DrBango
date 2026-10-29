@@ -761720,6 +761720,32 @@ function hld2Room(b){ return !!(hld2On() && b && b.seat!=null && S.bf && b.seat!
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 function fgtOn(){ return !!FGT.on; }
 function fgtLog(s){ if(FGT.log.length<80) FGT.log.push(s); }
 function fgtMedal(){ try{ const A=META.ach||{}; return achCase().some(a=>!!A[a.id]); }catch(e){ FGT.err++; return false; } }
@@ -972474,7 +972500,7 @@ let BFQ=null;
 
 
 
-let GVT_CV='28.17';
+let GVT_CV='28.18';
 let NX_CAP_MUL=4;
 
 
@@ -2636316,11 +2636342,19 @@ if(typeof GVT==='object' && GVT) GVT.sqz=function(o){ o=o||{}; if(o.feel) SQZ.se
 
 
 
+
+
+
+
 const SDR=(function(){
   const on=(function(){ try{ const q=/[?&]sdr=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_sdr','0'); else localStorage.removeItem('gvt_sdr'); } return localStorage.getItem('gvt_sdr')==='0'? 0 : 1; }catch(e){ return 1; } })();
   const B={ on };
   if(!on) return B;
   const gon=(function(){ try{ const q=/[?&]sdg=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_sdg','0'); else localStorage.removeItem('gvt_sdg'); } return localStorage.getItem('gvt_sdg')==='0'? 0 : 1; }catch(e){ return 1; } })();   
+  const eon=(function(){ try{ const q=/[?&]edr=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_edr','0'); else localStorage.removeItem('gvt_edr'); } return localStorage.getItem('gvt_edr')==='0'? 0 : 1; }catch(e){ return 1; } })();   
+  const EMG_ID='emg', EMG_TIER=2;   
+  const isEmg=id=>!!eon && id===EMG_ID;
+  const emgIn=()=>(eon && typeof emgOwned==='function' && typeof emgURI==='function')? [EMG_ID] : [];   
   const TIERS=[ { w:'COMMON', hex:'#D9D2B8' }, { w:'UNCOMMON', hex:'#7FA35C' }, { w:'RARE', hex:'#4C7FA8' }, { w:'EPIC', hex:'#8C5BC7' }, { w:'LEGENDARY', hex:'#FFD24A' } ];
   const CRATES=[
     { i:0, k:'common',   tier:0, w:'COMMON SUPPLY DROP',   line:'ANY TOY',            cost:300 },
@@ -2636340,7 +2636374,7 @@ const SDR=(function(){
     { k:'yeti',   w:'YETI PARK',    ids:()=>DECOR_BOSS.slice(7,12), lock:'BEAT KING YETI AT THE ICE CASTLE ON MEDIUM: 5 MORE TOYS JOIN THE DROPS' },
     { k:'outlaw', w:'WESTERN LAND', ids:()=>DECOR_BOSS.slice(12),   lock:'BEAT KING CROAK AT HIS HIDEOUT ON MEDIUM: 9 MORE TOYS JOIN THE DROPS' } ];
   const parkOpen=P=>{ try{ return decBossOpen(P.ids()[0]); }catch(e){ return false; } };   
-  const own=id=>{ try{ return isGear(id)? outfitOwns(id) : decOwns(id); }catch(e){ return false; } };   
+  const own=id=>{ try{ return isEmg(id)? emgOwned() : isGear(id)? outfitOwns(id) : decOwns(id); }catch(e){ return false; } };   
   const RM=()=>{ try{ return reducedMotion(); }catch(e){ return false; } };
   const sfx=k=>{ try{ if(typeof SFX[k]==='function') SFX[k](); }catch(e){} };
   const GBANDS=[350,500,650,1000], GJUDGE={ eyepatch:2 };   
@@ -2636349,10 +2636383,10 @@ const SDR=(function(){
   let GCACHE=null, GN=-1, GSET=new Set();
   function gear(){ if(!gon) return []; if(!GCACHE || GN!==OUTFIT_ORDER.length){ GN=OUTFIT_ORDER.length; GCACHE=OUTFIT_ORDER.filter(id=>OUTFIT_COST[id]!==undefined && !earned(id)); GSET=new Set(GCACHE); } return GCACHE; }   
   function isGear(id){ if(!gon) return false; if(!GCACHE) gear(); return GSET.has(id); }
-  function tierOf(id){ if(isGear(id)){ if(GJUDGE[id]!=null) return GJUDGE[id]; const c=OUTFIT_COST[id]||0; let t=0; while(t<4 && c>GBANDS[t]) t++; return t; }   
+  function tierOf(id){ if(isEmg(id)) return EMG_TIER;   if(isGear(id)){ if(GJUDGE[id]!=null) return GJUDGE[id]; const c=OUTFIT_COST[id]||0; let t=0; while(t<4 && c>GBANDS[t]) t++; return t; }   
     if(JUDGE[id]!=null) return JUDGE[id]; const c=DECOR_COST[id]||0; let t=0; while(t<4 && c>BANDS[t]) t++; return t; }
   function gen(){ return DECOR_ORDER.concat(['ducky']).filter(id=>DECOR_COST[id]!==undefined && !rugIs(id) && !(typeof tboMoved==='function' && tboMoved(id))); }   
-  function pool(){ let p=gen(); for(const P of PARKS) if(parkOpen(P)) p=p.concat(P.ids()); return p.concat(gear()); }   
+  function pool(){ let p=gen(); for(const P of PARKS) if(parkOpen(P)) p=p.concat(P.ids()); return p.concat(gear()).concat(emgIn()); }   
   function isDrop(id){ return gen().indexOf(id)>=0 || PARKS.some(P=>P.ids().indexOf(id)>=0); }   
   function avail(t){ return pool().filter(id=>tierOf(id)===t && !own(id)); }
   function found(){ const p=pool(); return { n:p.filter(own).length, of:p.length }; }
@@ -2636421,6 +2636455,7 @@ const SDR=(function(){
     '.sdr-aisle .sdr-row{display:flex;gap:clamp(6px,1.2vw,14px);justify-content:center;align-items:stretch;flex-wrap:wrap;padding:4px 2% 2px}.sdr-aisle .sdr-row .sh-dbox{flex:0 1 30%;min-width:150px;max-width:230px}',
     '.sdr-aisle .sdr-h,.sdr-park{display:block;text-align:center;margin:clamp(6px,1.4vh,12px) 0 2px;font-size:clamp(10px,2vh,14px);letter-spacing:.2em;color:#D2B489}',
     '.sdr-aisle .sdr-grid{display:flex;flex-wrap:wrap;justify-content:center;gap:clamp(4px,.9vw,10px);padding:0 2% 12px}.sdr-aisle .sdr-grid .sh-dbox{flex:0 1 15%;min-width:92px;max-width:130px}',
+    '.sdr-aisle .sh-dwin img{width:94%;height:94%;object-fit:contain;filter:drop-shadow(0 3px 2px rgba(0,0,0,.28))}#sdrStage .sdr-toy img{max-width:100%;max-height:100%;object-fit:contain}',   
     '.sdr-aisle .sdr-note{display:block;text-align:center;font-size:clamp(9px,1.6vh,12px);letter-spacing:.08em;color:#9a8a6a;margin:2px 0 6px}',
     '.sdr-park i{font-style:normal;display:inline-block;margin-left:8px;padding:1px 8px;border-radius:9px;background:#3A2E1C;color:#E8DCC0;letter-spacing:.1em}',
     '.sdr-locked .sh-dbox{filter:grayscale(.85) brightness(.62);opacity:.8}.sdr-lockc{display:block;margin:14px auto;max-width:520px;text-align:center}',
@@ -2636473,8 +2636508,10 @@ const SDR=(function(){
   function gearCard(id){ let h=old.shopOutfitHTML(id); if(!h) return ''; h=h.replace(/<span class="sh-oprice">[^<]*<\/span>/, '').replace('id="shof-'+id+'"', 'id="sdgc-'+id+'"').replace(/ data-lens="[^"]*"/, '').replace(/onclick="UI\.outfit\('[^']*'\)"/, 'onclick="UI.sdgNudge(\''+id+'\')"'); return h.replace(/(<button type="button" class="sh-ofit[^>]*>)/, '$1'+pill(id)); }   
   UI.sdgNudge=function(id){ try{ shopDeny('sdgc-'+id); }catch(e){} float('WIN IT IN A SUPPLY DROP!'); };   
   function gearHTML(){ const g=gear(); if(!g.length) return ''; return '<b class="sdr-h">GEAR FROM SARGE\'S QUARTERS · '+g.filter(own).length+' / '+g.length+' FOUND</b><span class="sdr-note">EVERY PIECE HERE IS ALSO SOLD AT SARGE\'S QUARTERS · A PIECE YOU WIN GOES STRAIGHT ON THE RACK</span><div class="sdr-grid sdg-grid">'+byTier(g).map(gearCard).join('')+'</div>'; }
-  const nameOf=id=>isGear(id)? OUTFIT_INFO[id].name : DECOR_INFO[id].name;
-  const artOf=id=>{ if(!isGear(id)) return old.decShopArt(id); const a=outfitPartSVG(id); return /^\s*<svg/.test(a)? a : '<svg viewBox="-34 -24 68 58">'+a+'</svg>'; };   
+  function emgCard(){ const o=emgOwned(); return '<div class="sh-dbox"><button type="button" class="sh-dec'+(o? ' own' : '')+'" id="sdgc-emg" onclick="'+(o? 'SFX.blip()' : 'UI.sdgNudge(\'emg\')')+'">'+pill(EMG_ID)+'<span class="sh-dwin"><img src="'+emgURI()+'" alt=""></span><span class="sh-dn">THE EMERGENCY PACKAGE</span><span class="sh-dsub">ONE RESCUE PER BATTLE</span>'+(o? '<span class="sh-dstamp">IN THE KIT \u2713</span>' : '')+'</button></div>'; }   
+  function emgHTML(){ if(!emgIn().length) return ''; const o=emgOwned()? 1 : 0; return '<b class="sdr-h">SPECIAL ISSUE \u00b7 '+o+' / 1 FOUND</b><span class="sdr-note">THE EMERGENCY PACKAGE IS A RARE \u00b7 ONE RESCUE PER BATTLE, FIVE SURPRISES INSIDE \u00b7 THE MYSTERY BOX CAN HAND IT OVER TOO</span><div class="sdr-grid sdg-grid">'+emgCard()+'</div>'; }   
+  const nameOf=id=>isEmg(id)? 'THE EMERGENCY PACKAGE' : isGear(id)? OUTFIT_INFO[id].name : DECOR_INFO[id].name;   
+  const artOf=id=>{ if(isEmg(id)) return '<img src="'+emgURI()+'" alt="">';   if(!isGear(id)) return old.decShopArt(id); const a=outfitPartSVG(id); return /^\s*<svg/.test(a)? a : '<svg viewBox="-34 -24 68 58">'+a+'</svg>'; };   
   shopDecHTML=function(id, twin){ const h=old.shopDecHTML(id, twin); if(!isDrop(id)) return h;
     const P=PARKS.find(p=>p.ids().indexOf(id)>=0); if(P && !parkOpen(P) && twin==='c') return h;   
     return dress(h, id); };
@@ -2636504,7 +2636541,7 @@ const SDR=(function(){
       +'<div class="sdr-row">'+CRATES.map(crateCard).join('')+'</div>'
       +'<b class="sdr-h">WHAT A DROP CAN GIVE · '+f.n+' / '+f.of+' FOUND</b><span class="sdr-note">'+(gon? 'A TOY YOU WIN WAITS IN THE TREASURE CHEST · A PIECE OF GEAR GOES ON THE RACK AT SARGE\'S QUARTERS' : 'EVERY TOY YOU WIN WAITS IN THE TREASURE CHEST')+'</span>'
       +'<span class="sdr-note">'+(inn.length? '<span>NOW IN THE DROPS</span>: '+inn.map(P=>'<span>'+P.w+'</span>').join(' · ') : 'BEAT A PARK\'S KING ON MEDIUM AND HIS ARMY JOINS THE DROPS')+'</span>'
-      +'<div class="sdr-grid">'+byTier(pool().filter(id=>!isGear(id))).map(id=>shopDecHTML(id)).join('')+'</div>'+gearHTML()
+      +'<div class="sdr-grid">'+byTier(pool().filter(id=>!isGear(id) && !isEmg(id))).map(id=>shopDecHTML(id)).join('')+'</div>'+gearHTML()+emgHTML()    
       +out.map(P=>'<b class="sdr-park">'+P.w+'<i>LOCKED</i></b><span class="sdr-note">'+P.lock+'</span><div class="sdr-grid sdr-locked">'+byTier(P.ids()).map(id=>shopDecHTML(id)).join('')+'</div>').join('')
       +'<div class="sh-rail"></div></section>'; }
   if(Array.isArray(SHOP_TABS) && !SHOP_TABS.some(t=>t.id==='drops')) SHOP_TABS.unshift({ id:'drops', lab:'SUPPLY DROPS' });
@@ -2636535,7 +2636572,8 @@ const SDR=(function(){
     if(!shopAsk('sdrBuy', [i], c.cost, c.w)) return;   
     const id=roll(c); if(!id) return;
     META.starBank-=till(c.cost);
-    if(isGear(id)){ if(!META.outfit) META.outfit={ own:[], wear:[] }; if(!Array.isArray(META.outfit.own)) META.outfit.own=[]; if(!outfitOwns(id)) META.outfit.own.push(id); if(Array.isArray(META.outfitSeen) && META.outfitSeen.indexOf(id)<0) META.outfitSeen.push(id); if(Array.isArray(META.rackSeen)){ const k9=META.rackSeen.indexOf(id); if(k9>=0) META.rackSeen.splice(k9,1); } }   
+    if(isEmg(id)){ META.emg=true; }   
+    else if(isGear(id)){ if(!META.outfit) META.outfit={ own:[], wear:[] }; if(!Array.isArray(META.outfit.own)) META.outfit.own=[]; if(!outfitOwns(id)) META.outfit.own.push(id); if(Array.isArray(META.outfitSeen) && META.outfitSeen.indexOf(id)<0) META.outfitSeen.push(id); if(Array.isArray(META.rackSeen)){ const k9=META.rackSeen.indexOf(id); if(k9>=0) META.rackSeen.splice(k9,1); } }   
     else { if(!META.decor) META.decor={ own:[], off:[] }; if(!Array.isArray(META.decor.own)) META.decor.own=[]; META.decor.own.push(id);
     if(id==='elephant' && !META.decor.eleph) META.decor.eleph=dyeHex()||'#7FA35C';
     if(decSold(id) && Array.isArray(META.decorSeen) && META.decorSeen.indexOf(id)<0) META.decorSeen.push(id);   
@@ -2636566,11 +2636604,11 @@ const SDR=(function(){
       +'<div class="sdr-dust">'+dust+'</div><div class="sdr-orb">'+raysSVG(T.hex)+'<div class="sdr-core"></div></div></div>'
       +'<div class="sdr-flash"></div><div class="sdr-toy">'+artOf(id)+'</div>'
       +'<div class="sdr-words"><span class="sdr-brow">SUPPLY DROP</span><span class="sdr-name">'+nameOf(id)+'</span><br><span class="sdr-rib t'+t+'">'+T.w+'</span></div>'
-      +'<div class="sdr-doors"><span class="sdr-line">'+(isGear(id)? 'IT\'S YOURS! IT\'S ON THE RACK AT SARGE\'S QUARTERS.' : 'IT\'S YOURS! IT\'S WAITING IN THE CHEST.')+'</span>'
+      +'<div class="sdr-doors"><span class="sdr-line">'+(isEmg(id)? 'IT\'S YOURS! IT\'S IN YOUR KIT: ONE RESCUE PER BATTLE.'   : isGear(id)? 'IT\'S YOURS! IT\'S ON THE RACK AT SARGE\'S QUARTERS.' : 'IT\'S YOURS! IT\'S WAITING IN THE CHEST.')+'</span>'
       +'<button type="button" class="mb-take" onclick="UI.sdrAnother()">OPEN ANOTHER · '+c.cost+'★</button><button type="button" class="mb-take quiet" onclick="UI.sdrClose()">OKAY</button></div>'
       +'<span class="sdr-skip">TAP TO SKIP</span><button type="button" class="rmx" aria-label="close" onclick="UI.sdrClose()">✕</button>';
     el.addEventListener('pointerdown', ev=>{ if(ev.target.closest('button')) return; if(st.step==='fall') land(); });
-    bare(true); document.body.appendChild(el); return el; }
+    bare(true); document.body.appendChild(el); try{ localizeTree(el); }catch(e){} return el; }   
   function start(){ st.step='fall'; $('.sdr-fall').classList.add('go'); $('.sdr-shadow').classList.add('go'); sfx('swish'); later(FALL_MS, land); }
   function land(){ if(st.step!=='fall') return; st.step='land'; const f=$('.sdr-fall'), s=$('.sdr-shadow'); f.classList.remove('go'); f.classList.add('down'); s.classList.remove('go'); s.classList.add('down');
     $('.sdr-skip').style.display='none'; $('.sdr-dust').classList.add('go'); sfx('thump'); $('.sdr-canopy').classList.add('fold'); $('.sdr-lines').classList.add('fold'); later(900, lid); }
@@ -2636620,15 +2636658,29 @@ const SDR=(function(){
     ['zh-Hans',{"ANY TOY OR GEAR":"任意玩具或装备","A CRATE FALLS · A TOY OR A PIECE OF GEAR IS INSIDE · THE ODDS ARE PRINTED":"箱子落下 · 里面有一个玩具或一件装备 · 概率都写在上面","GEAR FROM SARGE'S QUARTERS · {0} / {1} FOUND":"萨吉营房的装备 · 已找到 {0} / {1}","EVERY PIECE HERE IS ALSO SOLD AT SARGE'S QUARTERS · A PIECE YOU WIN GOES STRAIGHT ON THE RACK":"这里的每件装备在萨吉的营房也有售 · 赢得的装备直接挂上衣架","A TOY YOU WIN WAITS IN THE TREASURE CHEST · A PIECE OF GEAR GOES ON THE RACK AT SARGE'S QUARTERS":"你赢得的玩具在宝箱里等你 · 装备挂在萨吉营房的衣架上","IN THE DROPS":"补给箱有","IT'S YOURS! IT'S ON THE RACK AT SARGE'S QUARTERS.":"它是你的了！它挂在萨吉营房的衣架上。","WIN TOYS AND GEAR AT SARGE'S SURPLUS":"在中士商店赢取玩具和装备","EVERYTHING FOUND":"全部找到","SUPPLY DROPS":"补给箱","SUPPLY DROP":"补给箱","A CRATE FALLS · A TOY IS INSIDE · THE ODDS ARE PRINTED":"箱子落下 · 里面有一个玩具 · 概率都写在上面","COMMON SUPPLY DROP":"普通补给箱","UNCOMMON SUPPLY DROP":"优秀补给箱","RARE SUPPLY DROP":"稀有补给箱","ANY TOY":"任意玩具","UNCOMMON OR BETTER":"优秀或更好","RARE OR BETTER":"稀有或更好","COMMON":"普通","UNCOMMON":"优秀","RARE":"稀有","EPIC":"史诗","LEGENDARY":"传说","EVERY TOY FOUND":"所有玩具都找到了","THE DROPS OPEN AT COMMANDER LEVEL {0}":"指挥官等级 {0} 开放补给箱","WHAT A DROP CAN GIVE · {0} / {1} FOUND":"补给箱能开出什么 · 已找到 {0} / {1}","EVERY TOY YOU WIN WAITS IN THE TREASURE CHEST":"你赢得的每个玩具都在宝箱里等你","NOW IN THE DROPS":"现已加入补给箱","BEAT A PARK'S KING ON MEDIUM AND HIS ARMY JOINS THE DROPS":"在普通难度打败一个乐园的国王，他的军队就会加入补给箱","BEAT KING REX IN HIS LAIR ON MEDIUM: {0} MORE TOYS JOIN THE DROPS":"在普通难度打败巢穴里的雷克斯国王：再有 {0} 个玩具加入补给箱","BEAT KING YETI AT THE ICE CASTLE ON MEDIUM: {0} MORE TOYS JOIN THE DROPS":"在普通难度打败冰雪城堡的雪人国王：再有 {0} 个玩具加入补给箱","BEAT KING CROAK AT HIS HIDEOUT ON MEDIUM: {0} MORE TOYS JOIN THE DROPS":"在普通难度打败藏身处的呱呱国王：再有 {0} 个玩具加入补给箱","DINO PARK TOYS":"恐龙乐园的玩具","YETI PARK TOYS":"雪人乐园的玩具","WESTERN LAND TOYS":"西部乐园的玩具","NOT YET IN THE SUPPLY DROPS":"还没有加入补给箱","IN THE SUPPLY DROPS · {0} / {1} FOUND":"已在补给箱中 · 已找到 {0} / {1}","THE KING FELL: HIS ARMY IS IN THE SUPPLY DROPS AT SARGE'S SURPLUS":"国王倒下了：他的军队就在中士商店的补给箱里","TAKE ME TO THE SUPPLY DROPS":"带我去补给箱","WIN IT IN A SUPPLY DROP!":"在补给箱里赢取它！","IT'S YOURS! IT'S WAITING IN THE CHEST.":"它是你的了！它在宝箱里等你。","OPEN ANOTHER · {0}★":"再开一个 · {0}★","TAP TO SKIP":"点击跳过","WIN TOYS AT SARGE'S SURPLUS":"在中士商店赢取玩具","FIRE SALE!":"清仓大甩卖！","FIRE SALE · BONUS STARS · UP TO {0}% OFF":"清仓大甩卖 · 奖励星星 · 最高优惠 {0}%","Fire sale, Commander! Every pack comes with bonus stars, same price. Up to {0}% off every star. Grab one before the fire burns out.":"清仓大甩卖，指挥官！每个礼包都送奖励星星，价格不变。每颗星星最高优惠 {0}%。趁火还没灭，赶紧拿一个！","Delivered, Commander! The stars landed in your piggy. {0} stars, right on the spot.":"送到了，指挥官！星星已落进你的存钱罐。{0} 颗星星，当场到账。","Waiting on a grown-up's say-so, Commander. The moment they approve, the whole pack lands, bonus and all.":"在等大人点头，指挥官。他们一同意，整个礼包就到账，奖励星星一个不少。"}],
     ['ar',{"ANY TOY OR GEAR":"أي لعبة أو عتاد","A CRATE FALLS · A TOY OR A PIECE OF GEAR IS INSIDE · THE ODDS ARE PRINTED":"يسقط صندوق · في داخله لعبة أو قطعة عتاد · الاحتمالات مكتوبة","GEAR FROM SARGE'S QUARTERS · {0} / {1} FOUND":"عتاد من مقرّ سارج · وجدت {0} / {1}","EVERY PIECE HERE IS ALSO SOLD AT SARGE'S QUARTERS · A PIECE YOU WIN GOES STRAIGHT ON THE RACK":"كل قطعة هنا تُباع أيضًا في مقرّ سارج · القطعة التي تربحها تذهب مباشرة إلى الرفّ","A TOY YOU WIN WAITS IN THE TREASURE CHEST · A PIECE OF GEAR GOES ON THE RACK AT SARGE'S QUARTERS":"اللعبة التي تربحها تنتظرك في صندوق الكنز · قطعة العتاد تذهب إلى الرفّ في مقرّ سارج","IN THE DROPS":"في الصناديق","IT'S YOURS! IT'S ON THE RACK AT SARGE'S QUARTERS.":"إنها لك! إنها على الرفّ في مقرّ سارج.","WIN TOYS AND GEAR AT SARGE'S SURPLUS":"اربح ألعابًا وعتادًا في متجر سارج","EVERYTHING FOUND":"وجدت كل شيء","SUPPLY DROPS":"صناديق الإمداد","SUPPLY DROP":"صندوق إمداد","A CRATE FALLS · A TOY IS INSIDE · THE ODDS ARE PRINTED":"يسقط صندوق · في داخله لعبة · الاحتمالات مكتوبة","COMMON SUPPLY DROP":"صندوق إمداد عادي","UNCOMMON SUPPLY DROP":"صندوق إمداد غير شائع","RARE SUPPLY DROP":"صندوق إمداد نادر","ANY TOY":"أي لعبة","UNCOMMON OR BETTER":"غير شائع أو أفضل","RARE OR BETTER":"نادر أو أفضل","COMMON":"عادي","UNCOMMON":"غير شائع","RARE":"نادر","EPIC":"ملحمي","LEGENDARY":"أسطوري","EVERY TOY FOUND":"وجدت كل الألعاب","THE DROPS OPEN AT COMMANDER LEVEL {0}":"تُفتح الصناديق عند مستوى القائد {0}","WHAT A DROP CAN GIVE · {0} / {1} FOUND":"ما قد يعطيه الصندوق · وجدت {0} / {1}","EVERY TOY YOU WIN WAITS IN THE TREASURE CHEST":"كل لعبة تربحها تنتظرك في صندوق الكنز","NOW IN THE DROPS":"الآن في الصناديق","BEAT A PARK'S KING ON MEDIUM AND HIS ARMY JOINS THE DROPS":"اهزم ملك حديقة على المستوى المتوسط فينضم جيشه إلى الصناديق","BEAT KING REX IN HIS LAIR ON MEDIUM: {0} MORE TOYS JOIN THE DROPS":"اهزم الملك ركس في عرينه على المستوى المتوسط: تنضم {0} ألعاب أخرى إلى الصناديق","BEAT KING YETI AT THE ICE CASTLE ON MEDIUM: {0} MORE TOYS JOIN THE DROPS":"اهزم الملك يتي في قلعة الجليد على المستوى المتوسط: تنضم {0} ألعاب أخرى إلى الصناديق","BEAT KING CROAK AT HIS HIDEOUT ON MEDIUM: {0} MORE TOYS JOIN THE DROPS":"اهزم الملك كروك في مخبئه على المستوى المتوسط: تنضم {0} ألعاب أخرى إلى الصناديق","DINO PARK TOYS":"ألعاب حديقة الديناصورات","YETI PARK TOYS":"ألعاب حديقة اليتي","WESTERN LAND TOYS":"ألعاب أرض الغرب","NOT YET IN THE SUPPLY DROPS":"ليست في صناديق الإمداد بعد","IN THE SUPPLY DROPS · {0} / {1} FOUND":"في صناديق الإمداد · وجدت {0} / {1}","THE KING FELL: HIS ARMY IS IN THE SUPPLY DROPS AT SARGE'S SURPLUS":"سقط الملك: جيشه في صناديق الإمداد في متجر سارج","TAKE ME TO THE SUPPLY DROPS":"خذني إلى صناديق الإمداد","WIN IT IN A SUPPLY DROP!":"اربحها في صندوق إمداد!","IT'S YOURS! IT'S WAITING IN THE CHEST.":"إنها لك! تنتظرك في الصندوق.","OPEN ANOTHER · {0}★":"افتح واحدًا آخر · {0}★","TAP TO SKIP":"انقر للتخطي","WIN TOYS AT SARGE'S SURPLUS":"اربح ألعابًا في متجر سارج","FIRE SALE!":"تخفيضات نارية!","FIRE SALE · BONUS STARS · UP TO {0}% OFF":"تخفيضات نارية · نجوم إضافية · خصم حتى {0}%","Fire sale, Commander! Every pack comes with bonus stars, same price. Up to {0}% off every star. Grab one before the fire burns out.":"تخفيضات نارية أيها القائد! كل حزمة فيها نجوم إضافية بالسعر نفسه. خصم يصل إلى {0}% على كل نجمة. خذ واحدة قبل أن تنطفئ النار.","Delivered, Commander! The stars landed in your piggy. {0} stars, right on the spot.":"تم التوصيل أيها القائد! هبطت النجوم في حصّالتك. {0} نجمة، في الحال.","Waiting on a grown-up's say-so, Commander. The moment they approve, the whole pack lands, bonus and all.":"ننتظر موافقة شخص بالغ أيها القائد. لحظة موافقته تصل الحزمة كلها، بالنجوم الإضافية وكل شيء."}]
   ]) Object.assign(TR[L9[0]]||(TR[L9[0]]={}), L9[1]);
+  for(const L9 of [   
+    ['es',{"IT'S YOURS! IT'S IN YOUR KIT: ONE RESCUE PER BATTLE.":"¡ES TUYO! YA ESTÁ EN TU EQUIPO: UN RESCATE POR BATALLA.","SPECIAL ISSUE · {0} / {1} FOUND":"EDICIÓN ESPECIAL · {0} / {1} ENCONTRADOS","THE EMERGENCY PACKAGE IS A RARE · ONE RESCUE PER BATTLE, FIVE SURPRISES INSIDE · THE MYSTERY BOX CAN HAND IT OVER TOO":"EL PAQUETE DE EMERGENCIA ES RARO · UN RESCATE POR BATALLA, CINCO SORPRESAS DENTRO · LA CAJA MISTERIOSA TAMBIÉN PUEDE DARLO","ONE RESCUE PER BATTLE":"UN RESCATE POR BATALLA"}],
+    ['de',{"IT'S YOURS! IT'S IN YOUR KIT: ONE RESCUE PER BATTLE.":"ES GEHÖRT DIR! ES IST IN DEINEM GEPÄCK: EINE RETTUNG PRO SCHLACHT.","SPECIAL ISSUE · {0} / {1} FOUND":"SONDERAUSGABE · {0} / {1} GEFUNDEN","THE EMERGENCY PACKAGE IS A RARE · ONE RESCUE PER BATTLE, FIVE SURPRISES INSIDE · THE MYSTERY BOX CAN HAND IT OVER TOO":"DAS NOTFALL-PAKET IST SELTEN · EINE RETTUNG PRO SCHLACHT, FÜNF ÜBERRASCHUNGEN DRIN · DIE WUNDERTÜTE KANN ES AUCH BRINGEN","ONE RESCUE PER BATTLE":"EINE RETTUNG PRO SCHLACHT"}],
+    ['ru',{"IT'S YOURS! IT'S IN YOUR KIT: ONE RESCUE PER BATTLE.":"ОН ТВОЙ! ОН В ТВОЁМ НАБОРЕ: ОДНО СПАСЕНИЕ ЗА БОЙ.","SPECIAL ISSUE · {0} / {1} FOUND":"ОСОБЫЙ ВЫПУСК · НАЙДЕНО {0} / {1}","THE EMERGENCY PACKAGE IS A RARE · ONE RESCUE PER BATTLE, FIVE SURPRISES INSIDE · THE MYSTERY BOX CAN HAND IT OVER TOO":"АВАРИЙНЫЙ НАБОР: РЕДКАЯ НАХОДКА · ОДНО СПАСЕНИЕ ЗА БОЙ, ПЯТЬ СЮРПРИЗОВ ВНУТРИ · ТАИНСТВЕННАЯ КОРОБКА ТОЖЕ МОЖЕТ ЕГО ДАТЬ","ONE RESCUE PER BATTLE":"ОДНО СПАСЕНИЕ ЗА БОЙ"}],
+    ['ja',{"IT'S YOURS! IT'S IN YOUR KIT: ONE RESCUE PER BATTLE.":"きみのものだ！ キットに はいったよ：バトルごとに 1かい きゅうえんできる。","SPECIAL ISSUE · {0} / {1} FOUND":"とくべつしきゅう · {0} / {1} みつけた","THE EMERGENCY PACKAGE IS A RARE · ONE RESCUE PER BATTLE, FIVE SURPRISES INSIDE · THE MYSTERY BOX CAN HAND IT OVER TOO":"きんきゅうパックは レア · バトルごとに 1かい きゅうえん、なかに 5つの サプライズ · ミステリーボックスからも でるよ","ONE RESCUE PER BATTLE":"バトルごとに 1かい きゅうえん"}],
+    ['ko',{"IT'S YOURS! IT'S IN YOUR KIT: ONE RESCUE PER BATTLE.":"네 거야! 장비 가방에 들어갔어: 전투마다 한 번 구조할 수 있어.","SPECIAL ISSUE · {0} / {1} FOUND":"특별 보급 · {0} / {1} 찾음","THE EMERGENCY PACKAGE IS A RARE · ONE RESCUE PER BATTLE, FIVE SURPRISES INSIDE · THE MYSTERY BOX CAN HAND IT OVER TOO":"긴급 패키지는 희귀 · 전투마다 한 번 구조, 안에 다섯 가지 깜짝 선물 · 미스터리 박스에서도 나올 수 있어","ONE RESCUE PER BATTLE":"전투마다 한 번 구조"}],
+    ['zh-Hans',{"IT'S YOURS! IT'S IN YOUR KIT: ONE RESCUE PER BATTLE.":"它是你的了！已放进你的装备：每场战斗一次救援。","SPECIAL ISSUE · {0} / {1} FOUND":"特别配给 · 已找到 {0} / {1}","THE EMERGENCY PACKAGE IS A RARE · ONE RESCUE PER BATTLE, FIVE SURPRISES INSIDE · THE MYSTERY BOX CAN HAND IT OVER TOO":"紧急包裹是稀有品 · 每场战斗一次救援，内有五种惊喜 · 神秘宝箱也可能开出它","ONE RESCUE PER BATTLE":"每场战斗一次救援"}],
+    ['ar',{"IT'S YOURS! IT'S IN YOUR KIT: ONE RESCUE PER BATTLE.":"إنه لك! صار في عدّتك: إنقاذ واحد في كل معركة.","SPECIAL ISSUE · {0} / {1} FOUND":"إصدار خاص · وجدت {0} / {1}","THE EMERGENCY PACKAGE IS A RARE · ONE RESCUE PER BATTLE, FIVE SURPRISES INSIDE · THE MYSTERY BOX CAN HAND IT OVER TOO":"طرد الطوارئ نادر · إنقاذ واحد في كل معركة، وخمس مفاجآت في داخله · الصندوق الغامض قد يمنحه أيضًا","ONE RESCUE PER BATTLE":"إنقاذ واحد في كل معركة"}],
+  ]) Object.assign(TR[L9[0]]||(TR[L9[0]]={}), L9[1]);
 
   
   function sim(n, i){ const c=CRATES[i|0], out={ tiers:[0,0,0,0,0], park:0, nulls:0 }; let s=7; const rnd=()=>{ s=(s*16807)%2147483647; return s/2147483647; }, g=gen();
-    for(let k=0; k<n; k++){ const id=roll(c, rnd); if(!id){ out.nulls++; continue; } out.tiers[tierOf(id)]++; if(g.indexOf(id)<0) out.park++; }
+    for(let k=0; k<n; k++){ const id=roll(c, rnd); if(!id){ out.nulls++; continue; } out.tiers[tierOf(id)]++; if(isEmg(id)) out.emg=(out.emg|0)+1; else if(g.indexOf(id)<0) out.park++; }
+    out.emg=+(100*(out.emg|0)/n).toFixed(2);   
     out.tiers=out.tiers.map(x=>+(100*x/n).toFixed(2)); out.park=+(100*out.park/n).toFixed(2); out.printed=odds(c).map(p=>+(100*p).toFixed(2)); return out; }
-  return Object.assign(B, { TIERS, CRATES, JUDGE, PARKS, LADDER_C, LADDER_UP, OPEN_LVL, tierOf, gen, pool, isDrop, found, odds, roll, sim, crateArt, lidPath, st, to, bare, gear, isGear, GBANDS, GJUDGE, gon,
+  return Object.assign(B, { TIERS, CRATES, JUDGE, PARKS, LADDER_C, LADDER_UP, OPEN_LVL, tierOf, gen, pool, isDrop, found, odds, roll, sim, crateArt, lidPath, st, to, bare, gear, isGear, GBANDS, GJUDGE, gon, eon, isEmg, EMG_TIER, emgIn,  
     open:(i, o)=>{ o=o||{}; const c=CRATES[i|0]; open(c, o.id||roll(c), o); }, close });
 })();
 window.GVT_SDR=SDR;
+if(typeof GVT==='object' && GVT) GVT.edr=function(){ const on=!!(SDR.on && SDR.eon); const g=f=>{ try{ return f(); }catch(e){ return null; } };   
+  return { on, own:g(()=>emgOwned()), tier:on? SDR.tierOf('emg') : null, inPool:on? SDR.pool().indexOf('emg')>=0 : false, found:on? SDR.found() : null, card:!!document.getElementById('sdgc-emg'), block:!!document.querySelector('#shDrops .sdg-grid #sdgc-emg'),
+    chance:on? SDR.CRATES.map(c=>{ const o=SDR.odds(c), a=SDR.pool().filter(id=>SDR.tierOf(id)===2 && !(SDR.isEmg(id)? emgOwned() : (SDR.isGear(id)? outfitOwns(id) : decOwns(id)))); return a.indexOf('emg')>=0? +(100*o[2]/a.length).toFixed(2) : 0; }) : null,
+    sim:on? [0,1,2].map(i=>SDR.sim(4000, i).emg) : null, mbox:g(()=>typeof mboxPool==='function'? mboxPool().some(e=>e.k==='emg') : null), stage:g(()=>{ const n=document.querySelector('#sdrStage .sdr-name'); return n? n.textContent : null; }), stageImg:!!document.querySelector('#sdrStage .sdr-toy img') }; };
 if(typeof GVT==='object' && GVT) GVT.sdr=function(){ return { on:SDR.on, gear:(SDR.on && SDR.gon)? SDR.gear().length : 0, pool:SDR.on? SDR.pool().length : 0, found:SDR.on? SDR.found() : null, n:(META.sdr&&META.sdr.n)|0, step:SDR.on? SDR.st.step : null }; };
 
 
