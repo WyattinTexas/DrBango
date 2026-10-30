@@ -758933,6 +758933,142 @@ function ph2Read(){ const f=bbsBill(), b=f && f.bbs; return { on:PH2.on, live:PH
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function bnfErr(e){ BNF.stats.errs++; BNF.err=String(e && e.message || e).slice(0,200); }
+
+function bnfNightRaid(){ try{ return !!(BNF.on && evBattle()); }catch(e){ return false; } }
+
+
+
+
+
+
+
+function bnfBoxGuest(){ return !!(BNF.on && S.coop && COOP && !COOP.host && !COOP.ended && !S.bf && S.mode==='play' && S.cfg && S.bnfRefBox===S.cfg); }
+
+
+
+
+
+function bnfStreet(u){ return !!(BNF.on && u && !S.bf && S.raid && S.raid.k==='bbs' && S.raid.cfg===S.cfg && S.mode==='play'); }
+function bnfEdgeX(){ return Math.round(W-BNF.edge); }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function bnfBarrels(){ const TR=S.cfg && S.cfg.terrain; if(!TR || !TR.bbs || !Array.isArray(TR.rocks)) return []; return TR.rocks.filter(rk=>rk.art==='bbsbarrel'); }
+function bnfFeet(){ return (typeof OIL==='object' && OIL && OIL.feet)? OIL.feet : 144; }
+function bnfOilPick(f, fuse){   
+  const B=bnfBarrels(), men=S.units.filter(u=>!u.dead && !(u.jetT>0) && !u.falling); if(!men.length) return null; let best=null;
+  for(let pass=0;pass<2 && !best;pass++){ for(let i=0;i<B.length;i++){ const rk=B[i]; if(!rk.up) continue; if(Math.hypot(rk.x-f.x, rk.y-f.y)<bnfFeet()) continue;
+    if(pass===0){ let wall=null; try{ wall=pbmBetween(f.x,f.y,rk.x,rk.y,f.x,f.y); }catch(e){} if(wall) continue; }
+    let n=0, dm=1e9; for(const u of men){ const d=Math.hypot(u.x-rk.x,u.y-rk.y); if(d<=BNF.oil.near) n++; if(d<dm) dm=d; }
+    if(!n && !fuse) continue;
+    if(!best || n>best.n || (n===best.n && dm<best.dm)) best={ i:i, n:n, dm:dm, clear:pass===0 }; } }
+  return best; }
+function bnfOilShot(f, i, why){ const B=bnfBarrels(), rk=B[i|0]; if(!rk || !rk.up) return false;
+  if(f && !f.dead){ const dx=rk.x-f.x, mx=f.x+(dx>=0? 18 : -18), my=f.y-34, ang=Math.atan2(rk.y-10-my, rk.x-mx);
+    S.fx.push({ k:'tracer', x1:mx, y1:my, x2:rk.x, y2:rk.y-10, t:0, dur:0.11 }); S.fx.push({ k:'flash', x:mx, y:my, ang:ang, R:12, lw:2.6, t:0, dur:0.1 });
+    try{ bfSfx(SFX.colt, f.x, f.y); }catch(e){} }
+  if(!bbsBarrelBurst(rk,'bnf')) return false; BNF.stats.oil++; BNF.last={ i:i|0, why:why||null, t:+S.t.toFixed(2), x:rk.x, y:rk.y, dBill:(f && !f.dead)? Math.round(Math.hypot(rk.x-f.x, rk.y-f.y)) : null, men:S.units.filter(u=>!u.dead && Math.hypot(u.x-rk.x,u.y-rk.y)<=BNF.oil.near).length };
+  if(f && !f.dead){ try{ bbsSay(f,"Ooh, that's gonna leave a mark!",{ pend:1 }); }catch(e){} }   
+  return true; }
+function bnfOilTick(dt){ if(!BNF.on || S.mode!=='play' || S.bf || !S.raid || S.raid.k!=='bbs' || S.raid.cfg!==S.cfg || S.raid.kingDown) return; const B=S.raid.bbs; if(!B) return;
+  const O=B.bnfOil||(B.bnfOil={ t:BNF.oil.first, quiet:0 }); const live=(S.fires||[]).some(p=>p && p.src==='barrel' && p.t<p.life) || bnfBarrels().some(rk=>!rk.up && rk.igniteT!=null);
+  O.quiet=live? 0 : O.quiet+dt;
+  if(S.coop && COOP && !COOP.ended && !sqRef()) return;   
+  O.t-=dt; if(O.t>0) return;
+  const f=bbsBill(); if(!f || f.dead || (f.bbs && f.bbs.st==='mount')){ O.t=BNF.oil.retry; return; }
+  const fuse=O.quiet>=BNF.oil.fuse, p=bnfOilPick(f, fuse); if(!p){ O.t=BNF.oil.retry; return; }
+  if(S.coop && COOP && !COOP.ended){ try{ const rk=bnfBarrels()[p.i]; coopSend({ k:'bnfo', n:p.i+1, x:Math.round(rk.x), y:Math.round(rk.y) }); BNF.stats.oilWord++; }catch(e){} }
+  if(bnfOilShot(f, p.i, fuse? 'fuse' : 'pick')){ if(fuse && !p.n) BNF.stats.oilFuse++; O.quiet=0; } O.t=BNF.oil.every; }
+
+
+
+function bnfBillDows(){ try{ return evSchedSet()? EV.sched.filter(x=>x && x.rk==='bbs').map(x=>x.dow|0).sort() : []; }catch(e){ return []; } }
+function bnfTwo(){ const d=bnfBillDows(); return !!(BNF.on && d.length===2 && d[0]===4 && d[1]===5); }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function bnfRead(o){ o=o||{}; if(o.on!=null) BNF.on=o.on? 1 : 0; if(o.reset){ for(const k in BNF.stats) BNF.stats[k]=0; BNF.err=null; }
+  if(o.oil!=null){ const f=bbsBill(); bnfOilShot(f, o.oil|0, 'rig'); }
+  const lo=document.getElementById('lose'), rb=document.getElementById('retryBtn'), B=S.raid && S.raid.bbs, O=B && B.bnfOil;
+  return { cv:GVT_CV, on:BNF.on, live:BNF_LIVE, edge:BNF.edge, edgeX:bnfEdgeX(), oilDials:Object.assign({}, BNF.oil), night:bnfNightRaid(), guestBox:bnfBoxGuest(), refBox:!!(S.cfg && S.bnfRefBox===S.cfg),
+    lose:{ nr:!!(lo && lo.classList.contains('bnfnr')), retryShown:!!(rb && lo && !lo.classList.contains('hidden') && getComputedStyle(rb).display!=='none') },
+    oil:O? { t:+O.t.toFixed(2), quiet:+O.quiet.toFixed(2) } : null, barrels:bnfBarrels().map(rk=>({ x:rk.x, y:rk.y, up:rk.up|0, bursts:rk.bursts|0 })),
+    two:bnfTwo(), billDows:bnfBillDows(), kingDay:(function(){ try{ return evKingDayLong(0,'bbs'); }catch(e){ return null; } })(), tag:(function(){ try{ return bbwTag(); }catch(e){ return null; } })(),
+    edgeMen:S.units.filter(u=>!u.dead && u.bnfEdge).length, last:BNF.last? Object.assign({}, BNF.last) : null, stats:Object.assign({}, BNF.stats), err:BNF.err,
+    wraps:Object.assign({}, BNF.wraps) }; }
+
+
+
+
+
+
+
 function nclOn(){ return !NCL_OFF; }
 
 function nclStrip(){ if(!nclOn()) return 0; const id=NCL.id; let n=0; try{
@@ -973747,7 +973883,7 @@ let BFQ=null;
 
 
 
-let GVT_CV='28.41';
+let GVT_CV='28.42';
 let NX_CAP_MUL=4;
 
 
@@ -2635927,6 +2636063,142 @@ if(PH2.on){ try{ PH2.was={ p1K:PLAY.p1K, horse:PLAY.horse, fa:Object.assign({}, 
 
 { const g0=bbsRig; bbsRig=function(o){ const r=g0.apply(this, arguments); try{ if(r && typeof r==='object') r.ph2=ph2Read(); }catch(e){} return r; }; }
 setTimeout(function(){ try{ if(window.GVT && !GVT.ph2) GVT.ph2=function(){ return ph2Read(); }; }catch(e){} }, 0);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const BNF_LIVE=1;
+const BNF={ on:(function(){ try{ const q=/[?&]bnf=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_bnf','0'); else localStorage.removeItem('gvt_bnf'); } return localStorage.getItem('gvt_bnf')==='0'? 0 : BNF_LIVE; }catch(e){ return BNF_LIVE; } })(),
+  edge:80,   
+  oil:{ first:20, every:24, near:260, fuse:45, retry:2 },   
+  step:null, last:null, wraps:{}, stats:{ noRetry:0, tapHeld:0, refBox:0, held:0, edges:0, hunts:0, esPast:0, esCaught:0, oil:0, oilFuse:0, oilWord:0, oilGot:0, days:0, errs:0 }, err:null };
+
+
+
+(function(){ try{ const st=document.createElement('style'); st.id='bnfCss'; st.textContent='#lose.bnfnr #retryBtn{display:none!important}'; document.head.appendChild(st); }catch(e){} })();
+{ const lf0=loseFace; loseFace=function(kind){ const r=lf0.apply(this, arguments); try{ const lo=document.getElementById('lose'); if(lo) lo.classList.remove('bnfnr'); }catch(e){} return r; }; BNF.wraps.loseFace=1; }
+{ const e0=endBattle; endBattle=function(win){ let nr=false; try{ nr=!win && bnfNightRaid(); }catch(e){} const r=e0.apply(this, arguments);   
+  try{ if(nr && S.mode==='lose'){ const lo=document.getElementById('lose'); if(lo){ lo.classList.add('bnfnr'); BNF.stats.noRetry++; try{ vdSoon(); }catch(e){} } } }catch(e){ bnfErr(e); }
+  return r; }; BNF.wraps.endBattle=1; }
+document.addEventListener('click', function(e){ try{ const b=e.target && e.target.closest && e.target.closest('#retryBtn'), lo=document.getElementById('lose'); if(b && lo && lo.classList.contains('bnfnr')){ e.stopImmediatePropagation(); e.preventDefault(); BNF.stats.tapHeld++; } }catch(err){} }, true);
+
+
+{ const p0=coopOnPoll; coopOnPoll=function(r){ const r9=p0.apply(this, arguments); try{ if(BNF.on && r && r.beacon && typeof r.beacon.lives==='number' && S.coop && COOP && !COOP.host && !S.bf && S.cfg && S.bnfRefBox!==S.cfg){ S.bnfRefBox=S.cfg; BNF.stats.refBox++; } }catch(e){ bnfErr(e); } return r9; }; BNF.wraps.coopOnPoll=1; }
+{ const u0=update; update=function(dt){ const g=bnfBoxGuest(), L0=g? S.lives : 0; const r=u0.apply(this, arguments);
+  try{ if(g && S.mode==='play' && typeof L0==='number' && S.lives<L0 && bnfBoxGuest()){ BNF.stats.held+=L0-S.lives; S.lives=L0; } }catch(e){ bnfErr(e); }   
+  return r; }; BNF.wraps.update=1; }
+
+
+
+{ const cf0=campFrontX; campFrontX=function(){ if(BNF.step) return bnfEdgeX(); return cf0.apply(this, arguments); }; BNF.wraps.campFrontX=1; }
+{ const nf0=campNearestFoe; campNearestFoe=function(u){ const f=nf0.apply(this, arguments);
+  try{ if(f && BNF.step===u && u.bnfEdge){ const b=bbsBill(); if(b && b!==f && !b.burrow && !b.pendDie && !(b.dropT>0) && b.x<=W-10 && b.x>=-40){ BNF.stats.hunts++; return b; } } }catch(e){ bnfErr(e); }
+  return f; }; BNF.wraps.campNearestFoe=1; }
+{ const s0=campUnitStep; campUnitStep=function(u,dt){ if(!bnfStreet(u)) return s0.apply(this, arguments);
+  const was=BNF.step; BNF.step=u; let r; try{ r=s0.apply(this, arguments); } finally{ BNF.step=was; }
+  try{ if(!u.bnfEdge && !u.dead && u.x>=bnfEdgeX()-8){ u.bnfEdge=1; BNF.stats.edges++; } }catch(e){ bnfErr(e); }   
+  return r; }; BNF.wraps.campUnitStep=1; }
+
+{ const g0=ovfLaneGreen18; ovfLaneGreen18=function(sh,s0,src){ if(!(BNF.on && sh && sh.playEs && !sh.bx19 && !S.bf && S.raid && S.raid.k==='bbs')) return g0.apply(this, arguments);
+  const n0=S.shots.length, gone0=!!sh.gone; const r=g0.apply(this, arguments);
+  try{ if(!gone0 && sh.gone && S.shots.length===n0 && sh.x>-40){ sh.gone=0; if(!sh.bnfPast){ sh.bnfPast=1; BNF.stats.esPast++; } } }catch(e){ bnfErr(e); }   
+  return r; }; BNF.wraps.ovfLaneGreen18=1; }
+{ const mr0=mblRay; mblRay=function(u,sh){ if(mr0.apply(this, arguments)) return true;
+  try{ if(BNF.on && sh && sh.playEs && !S.bf && (sh.bounce|0)<2 && u && !u.dead && S.raid && S.raid.k==='bbs' && (u.tkDeflT>0 || tkTealRefl(u) || rfDomeIn(u,sh.src,'ray'))){ tkDeflPop(u,sh.src); BNF.stats.esCaught++; return true; } }catch(e){ bnfErr(e); }
+  return false; }; BNF.wraps.mblRay=1; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+{ const t0=bbsTick; bbsTick=function(dt){ const r=t0.apply(this, arguments); try{ bnfOilTick(dt); }catch(e){ bnfErr(e); } return r; }; BNF.wraps.bbsTick=1; }
+{ const ca0=coopApply; coopApply=function(cm){ if(cm && cm.k==='bnfo'){ try{ if(BNF.on && S.raid && S.raid.k==='bbs' && S.raid.cfg===S.cfg && S.mode==='play'){ const i=(cm.n|0)-1; if(i>=0 && bnfOilShot(bbsBill(), i, 'word')) BNF.stats.oilGot++; } }catch(e){ bnfErr(e); } return; } return ca0.apply(this, arguments); }; BNF.wraps.coopApply=1; }
+
+
+
+{ const kd0=evKingDayLong; evKingDayLong=function(raw,k){ try{ if(bnfTwo() && (k||evKing())==='bbs' && EV.bell>0){ const wd=evBellWD(EV.bell); if(wd>=0){ const nm=[4,5].map(dw=>{ const s=evFmt(EV.bell+((dw-wd+7)%7)*86400, {weekday:'long'}); return raw? s : s.toUpperCase(); }); BNF.stats.days++; return tf(raw? '%1 and %2' : '%1 AND %2', nm[0], nm[1]); } } }catch(e){ bnfErr(e); } return kd0.apply(this, arguments); }; BNF.wraps.evKingDayLong=1; }
+{ const P=(typeof AM_PINS!=='undefined' && Array.isArray(AM_PINS))? AM_PINS.find(x=>x && x.id==='bbs') : null;
+  if(P){ const l0=P.line, k0=P.lock;
+    if(typeof l0==='function') P.line=function(){ const s=l0.apply(this, arguments); try{ if(bnfTwo() && s===t('BUFFALO BILL CALLED US OUT. TEN COMMANDERS, ONE OUTLAW, THURSDAY NIGHT.')) return t('BUFFALO BILL CALLED US OUT. TEN COMMANDERS, ONE OUTLAW, THURSDAY AND FRIDAY NIGHTS.'); }catch(e){} return s; };
+    if(typeof k0==='function') P.lock=function(){ const o=k0.apply(this, arguments); try{ if(o && bnfTwo() && o.line===t('THE SHOWDOWN OPENS THURSDAY NIGHT AT THE BELL')) return Object.assign({}, o, { line:t('THE SHOWDOWN OPENS THURSDAY AND FRIDAY NIGHTS AT THE BELL') }); }catch(e){} return o; }; BNF.wraps.pin=1; } }
+{ const bb0=bbwBell; bbwBell=function(){ if(!bnfTwo()) return bb0.apply(this, arguments); try{ const now=evNow(); if(EV.rk==='bbs' && EV.bell>now-BBW.grace) return EV.bell; const D=bnfBillDows();
+    for(let k=0;k<9;k++){ const e=bbwAt(Math.floor(now)+k*86400, BBW.hm[0], BBW.hm[1]); if(D.indexOf(evBellWD(e))>=0 && e>now-BBW.grace) return e; } return 0; }catch(e){ bnfErr(e); return bb0.apply(this, arguments); } }; BNF.wraps.bbwBell=1; }
+{ const bt0=bbwTag; bbwTag=function(){ if(!bnfTwo()) return bt0.apply(this, arguments); try{ const e=bbwBell(); if(!e) return t('THURSDAY AND FRIDAY NIGHTS');
+    const d=new Date(e*1000), at=evFmt(e, {hour:'numeric', minute:'2-digit', timeZoneName:'short'}).toUpperCase(), wd=evBellWD(e);
+    if(wd===4 && d.getDay()===4 && d.getHours()>=BBW.eve) return tf('THURSDAY NIGHT · %1', at);
+    if(wd===5 && d.getDay()===5 && d.getHours()>=BBW.eve) return tf('FRIDAY NIGHT · %1', at);
+    return evFmt(e, {weekday:'long'}).toUpperCase()+' · '+at; }catch(e){ bnfErr(e); return bt0.apply(this, arguments); } }; BNF.wraps.bbwTag=1; }
+
+(function(){ const W9={
+  ja:{"%1 and %2":"%1と%2","%1 AND %2":"%1と%2","BUFFALO BILL CALLED US OUT. TEN COMMANDERS, ONE OUTLAW, THURSDAY AND FRIDAY NIGHTS.":"バッファロー・ビルに よびだされた。しれいかん10にん、あくとう1にん、もくようと きんようの よる。","THE SHOWDOWN OPENS THURSDAY AND FRIDAY NIGHTS AT THE BELL":"けっとうは もくようと きんようの よる、かねと ともに ひらく","THURSDAY AND FRIDAY NIGHTS":"もくようと きんようの よる","FRIDAY NIGHT · %1":"きんようの よる · %1"},
+  ko:{"%1 and %2":"%1과 %2","%1 AND %2":"%1과 %2","BUFFALO BILL CALLED US OUT. TEN COMMANDERS, ONE OUTLAW, THURSDAY AND FRIDAY NIGHTS.":"버팔로 빌이 우리를 불러냈다. 지휘관 열 명, 무법자 한 명, 목요일과 금요일 밤.","THE SHOWDOWN OPENS THURSDAY AND FRIDAY NIGHTS AT THE BELL":"결투는 목요일과 금요일 밤 종소리와 함께 열린다","THURSDAY AND FRIDAY NIGHTS":"목요일과 금요일 밤","FRIDAY NIGHT · %1":"금요일 밤 · %1"},
+  "zh-Hans":{"%1 and %2":"%1和%2","%1 AND %2":"%1和%2","BUFFALO BILL CALLED US OUT. TEN COMMANDERS, ONE OUTLAW, THURSDAY AND FRIDAY NIGHTS.":"水牛比尔向我们挑战了。十名指挥官，一名亡命徒，周四和周五晚上。","THE SHOWDOWN OPENS THURSDAY AND FRIDAY NIGHTS AT THE BELL":"决斗周四和周五晚钟响时开启","THURSDAY AND FRIDAY NIGHTS":"周四和周五晚上","FRIDAY NIGHT · %1":"周五晚上 · %1"},
+  de:{"%1 and %2":"%1 und %2","%1 AND %2":"%1 UND %2","BUFFALO BILL CALLED US OUT. TEN COMMANDERS, ONE OUTLAW, THURSDAY AND FRIDAY NIGHTS.":"BUFFALO BILL HAT UNS HERAUSGEFORDERT. ZEHN KOMMANDANTEN, EIN GESETZLOSER, DONNERSTAGNACHT UND FREITAGNACHT.","THE SHOWDOWN OPENS THURSDAY AND FRIDAY NIGHTS AT THE BELL":"DAS DUELL ÖFFNET DONNERSTAGNACHT UND FREITAGNACHT ZUR GLOCKE","THURSDAY AND FRIDAY NIGHTS":"DONNERSTAGABEND UND FREITAGABEND","FRIDAY NIGHT · %1":"FREITAGABEND · %1"},
+  ru:{"%1 and %2":"%1 и %2","%1 AND %2":"%1 И %2","BUFFALO BILL CALLED US OUT. TEN COMMANDERS, ONE OUTLAW, THURSDAY AND FRIDAY NIGHTS.":"БАФФАЛО БИЛЛ ВЫЗВАЛ НАС. ДЕСЯТЬ КОМАНДИРОВ, ОДИН РАЗБОЙНИК, В ЧЕТВЕРГ И ПЯТНИЦУ ВЕЧЕРОМ.","THE SHOWDOWN OPENS THURSDAY AND FRIDAY NIGHTS AT THE BELL":"ДУЭЛЬ ОТКРЫВАЕТСЯ В ЧЕТВЕРГ И ПЯТНИЦУ ВЕЧЕРОМ ПО КОЛОКОЛУ","THURSDAY AND FRIDAY NIGHTS":"В ЧЕТВЕРГ И ПЯТНИЦУ ВЕЧЕРОМ","FRIDAY NIGHT · %1":"В ПЯТНИЦУ ВЕЧЕРОМ · %1"},
+  es:{"%1 and %2":"%1 y %2","%1 AND %2":"%1 Y %2","BUFFALO BILL CALLED US OUT. TEN COMMANDERS, ONE OUTLAW, THURSDAY AND FRIDAY NIGHTS.":"BUFFALO BILL NOS RETÓ. DIEZ COMANDANTES, UN FORAJIDO, LOS JUEVES Y VIERNES POR LA NOCHE.","THE SHOWDOWN OPENS THURSDAY AND FRIDAY NIGHTS AT THE BELL":"EL DUELO ABRE LOS JUEVES Y VIERNES POR LA NOCHE CON LA CAMPANA","THURSDAY AND FRIDAY NIGHTS":"JUEVES Y VIERNES POR LA NOCHE","FRIDAY NIGHT · %1":"VIERNES POR LA NOCHE · %1"},
+  ar:{"%1 and %2":"%1 و%2","%1 AND %2":"%1 و%2","BUFFALO BILL CALLED US OUT. TEN COMMANDERS, ONE OUTLAW, THURSDAY AND FRIDAY NIGHTS.":"بافالو بيل تحدانا. عشرة قادة، خارج واحد عن القانون، ليلتي الخميس والجمعة.","THE SHOWDOWN OPENS THURSDAY AND FRIDAY NIGHTS AT THE BELL":"تفتح المواجهة ليلتي الخميس والجمعة عند الجرس","THURSDAY AND FRIDAY NIGHTS":"ليلتي الخميس والجمعة","FRIDAY NIGHT · %1":"ليلة الجمعة · %1"} };
+  for(const lg in W9){ const tb=TR[lg]||(TR[lg]={}); for(const k in W9[lg]) if(!(k in tb)) tb[k]=W9[lg][k]; } })();
+
+
+
+
+
+
+
+
+
+
+setTimeout(function(){ try{ if(window.GVT && !GVT.bnf) GVT.bnf=function(o){ return bnfRead(o); }; }catch(e){} }, 0);
 
 
 
