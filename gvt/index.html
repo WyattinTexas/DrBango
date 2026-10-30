@@ -762090,6 +762090,9 @@ function hld2Room(b){ return !!(hld2On() && b && b.seat!=null && S.bf && b.seat!
 
 
 
+
+
+
 function blbStockOn(){ return !!(BLB.blp && BLB.stock && BLB.stock.on); }
 function blbStockDef(rk, tier){ const r=BLB_STOCK_LV[rk]||[20,20], T=blbTiers(rk), i=Math.max(0,T.indexOf(tier)), n=T.length; return Math.max(1,Math.min(RANK_MAX,Math.round(r[0]+(r[1]-r[0])*(n>1? i/(n-1) : 0)))); }
 function blbStockLv(rk, tier){ const v=(BLB.stock.lv||{})[rk+':'+tier]; return (v!=null && isFinite(+v) && +v>=1)? Math.min(RANK_MAX,Math.round(+v)) : blbStockDef(rk, tier); }
@@ -762127,8 +762130,8 @@ function blbOn(){ return !!(META && META.bossLab); }
 function blbRow(k){ return BLB.ROWS.find(r=>r[0]===k)||null; }
 function blbTiers(k){ const r=raidInfo(k); return ['e','m','h'].concat(r.g? ['g'] : []).concat(r.u? ['u'] : []); }
 function blbLS(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
-function blbSave(){ try{ localStorage.setItem('gvt_blb', JSON.stringify({ v:1, over:BLB.over, fight:BLB.fight, waves:BLB.waves, notes:BLB.notes, sel:BLB.sel, tier:BLB.tier, tab:BLB.tab, stock:BLB.stock, keep:BLB.keep })); localStorage.setItem('gvt_blb_log', JSON.stringify(BLB.log)); }catch(e){} }
-function blbLoad(){ try{ const o=JSON.parse(blbLS('gvt_blb')||'null'); if(o && o.v===1){ BLB.over=o.over||{}; Object.assign(BLB.fight, o.fight||{}); BLB.waves=o.waves||{}; BLB.notes=o.notes||{}; if(blbRow(o.sel)) BLB.sel=o.sel; if(BLB_TIERS.indexOf(o.tier)>=0) BLB.tier=o.tier; if(o.tab) BLB.tab=o.tab; if(o.stock && typeof o.stock==='object'){ BLB.stock.on=(o.stock.on==null)? 1 : (o.stock.on? 1 : 0); BLB.stock.lv=(o.stock.lv && typeof o.stock.lv==='object')? o.stock.lv : {}; BLB.stock.w=(o.stock.w && typeof o.stock.w==='object')? o.stock.w : {}; BLB.stock.rk=(o.stock.rk && typeof o.stock.rk==='object')? o.stock.rk : {}; } BLB.keep=(o.keep && typeof o.keep==='object' && o.keep.m && typeof o.keep.m==='object')? o.keep : null; } const L=JSON.parse(blbLS('gvt_blb_log')||'null'); if(Array.isArray(L)) BLB.log=L; }catch(e){} }
+function blbSave(){ try{ localStorage.setItem('gvt_blb', JSON.stringify({ v:1, over:BLB.over, fight:BLB.fight, waves:BLB.waves, notes:BLB.notes, sel:BLB.sel, tier:BLB.tier, tab:BLB.tab, stock:BLB.stock, keep:BLB.keep, memo:BLB.memo })); localStorage.setItem('gvt_blb_log', JSON.stringify(BLB.log)); }catch(e){} }
+function blbLoad(){ try{ const o=JSON.parse(blbLS('gvt_blb')||'null'); if(o && o.v===1){ BLB.over=o.over||{}; Object.assign(BLB.fight, o.fight||{}); BLB.waves=o.waves||{}; BLB.notes=o.notes||{}; if(blbRow(o.sel)) BLB.sel=o.sel; if(BLB_TIERS.indexOf(o.tier)>=0) BLB.tier=o.tier; if(o.tab) BLB.tab=o.tab; if(o.stock && typeof o.stock==='object'){ BLB.stock.on=(o.stock.on==null)? 1 : (o.stock.on? 1 : 0); BLB.stock.lv=(o.stock.lv && typeof o.stock.lv==='object')? o.stock.lv : {}; BLB.stock.w=(o.stock.w && typeof o.stock.w==='object')? o.stock.w : {}; BLB.stock.rk=(o.stock.rk && typeof o.stock.rk==='object')? o.stock.rk : {}; } BLB.keep=(o.keep && typeof o.keep==='object' && o.keep.m && typeof o.keep.m==='object')? o.keep : null; BLB.memo=(typeof o.memo==='string')? o.memo.slice(0,2000) : ''; } const L=JSON.parse(blbLS('gvt_blb_log')||'null'); if(Array.isArray(L)) BLB.log=L; }catch(e){} }
 function blbTable(id){ const r=BLB_RULES.find(x=>x[0]===id); if(!r) return null; try{ const T=r[1](); return (T && typeof T==='object')? T : null; }catch(e){ return null; } }
 function blbShip(){ for(const r of BLB_RULES){ const T=blbTable(r[0]); if(T && !BLB.ship[r[0]]) BLB.ship[r[0]]=JSON.parse(JSON.stringify(T)); } }
 function blbCells(id){ const T=blbTable(id), S0=BLB.ship[id]; if(!T || !S0) return []; const out=[]; for(const k of BLB_TIERS){ if(!(k in S0)) continue; const v=S0[k]; if(typeof v==='number') out.push({ key:k, tier:k, field:null, ship:v, now:T[k] }); else if(v && typeof v==='object' && !Array.isArray(v)){ for(const f in v) if(typeof v[f]==='number') out.push({ key:k+'.'+f, tier:k, field:f, ship:v[f], now:(T[k]||{})[f] }); } } return out; }
@@ -762270,12 +762273,13 @@ function blbRulesHTML(){ const rk=BLB.sel, mine=BLB_RULES.filter(r=>r[3].split('
       +cells.map(c=>'<div class="blb-cell"><b style="color:'+BLB.TIERC[c.tier]+'">'+blbEsc(RAID_TIER_NAMES[c.tier])+(c.field? ' · '+blbEsc(c.field) : '')+'</b><input type="number" step="any" class="'+(c.now!==c.ship?'ed':'')+'" value="'+c.now+'" onchange="BLB.ui.cell(\''+r[0]+'\',\''+c.key+'\',this.value)"><small>'+(c.now!==c.ship? 'was '+c.ship : 'shipped')+'</small></div>').join('')+'</div></div>'; }
   return h+'</div>'; }
 function blbLogHTML(){ const rows=BLB.log.slice().reverse();
-  let h='<div class="blb-col blb-log"><h3>RESULTS · '+BLB.log.length+' FIGHT'+(BLB.log.length===1?'':'S')+' <button type="button" class="blb-mini" onclick="BLB.ui.exportIt()">EXPORT (COPY)</button> '+(BLB.log.length? '<button type="button" class="blb-mini warn" onclick="BLB.ui.clearLog()">CLEAR</button>' : '')+'</h3>';
+  let h='<div class="blb-col blb-log"><h3>RESULTS · '+BLB.log.length+' FIGHT'+(BLB.log.length===1?'':'S')+' <button type="button" class="blb-mini" onclick="BLB.ui.exportIt()">EXPORT (COPY + SEND)</button> <span id="blbSent" class="blb-sent">'+blbEsc(blbSentLine())+'</span> '+(BLB.log.length? '<button type="button" class="blb-mini warn" onclick="BLB.ui.clearLog()">CLEAR</button>' : '')+'</h3>'
+    +'<textarea class="blb-memo" maxlength="2000" placeholder="your notes (sent with EXPORT to the Raziya channel; up to 2,000 characters)" onchange="BLB.ui.memo(this.value)">'+blbEsc(BLB.memo||'')+'</textarea>';   
   if(!rows.length) h+='<div style="text-transform:none;font-weight:normal;color:#C9BFA8">No lab fight yet. DEPLOY one from FIGHTS; its row lands here with WIN / LOSS / ABORT, the clock, the boss\'s bar and the dials.</div>';
   h+=rows.map(r=>{ const row=blbRow(r.rk), d=new Date(r.at), i=BLB.log.indexOf(r); return '<div class="blb-logrow"><span>'+blbEsc((d.getMonth()+1)+'/'+d.getDate()+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'))+'<br><span class="res-'+blbEsc(r.res)+'">'+blbEsc(r.res)+'</span> in '+blbMMSS(r.sec)+'</span>'
     +'<span><b>'+blbEsc(row? row[1] : r.rk)+' · '+blbEsc(RAID_TIER_NAMES[r.tier]||r.tier)+'</b> · boss '+(r.boss? blbNum(r.boss.hp,0)+'/'+blbNum(r.boss.max,0) : 'not met')+' · wave '+r.wave+'/'+r.waves+' · lives '+r.lives0+'→'+r.lives+' · tags '+blbNum(r.tags,0)+' · '+r.party+' cmdr'+(r.party===1?'':'s')
     +(r.dials? ' · boss x'+r.dials.bossHp+' troops x'+r.dials.troops+' hp x'+r.dials.troopHp+(r.dials.god?' · god':'')+(r.dials.bank?' · banked':'')+(r.dials.speed>1? ' · x'+r.dials.speed : '') : '')+(r.stock? ' · stock army LV '+r.stock.L+' ('+blbEsc(blbWName(r.stock.w))+')'+(r.stock.over? ' · promotions '+blbEsc(blbRanksText(r.stock.over)) : '') : '')+(r.edits? ' · '+r.edits+' wave edit'+(r.edits===1?'':'s') : '')+(r.over && r.over.length? ' · rules: '+blbEsc(r.over.join('; ')) : '')
-    +'<input type="text" placeholder="your note on this fight" value="'+blbEsc(BLB.notes[r.at]||'')+'" onchange="BLB.ui.note('+r.at+',this.value)"></span></div>'; }).join('');
+    +'<textarea rows="2" maxlength="2000" placeholder="your note on this fight (up to 2,000 characters)" onchange="BLB.ui.note('+r.at+',this.value)">'+blbEsc(BLB.notes[r.at]||'')+'</textarea></span></div>'; }).join('');
   h+='<textarea class="blb-out" id="blbOut" readonly placeholder="EXPORT writes the ledger and the rule changes here (and copies them)"></textarea></div>'; return h; }
 function blbHelpHTML(){ return '<div class="blb-col blb-help"><h3>HOW TO USE THE BOSS LAB</h3>'
   +'<p><b>FIGHTS.</b> Pick a boss on the strip, a tier on the left, then <b>DEPLOY</b>. The fight starts at once: no key, no ladder, no films. Under the tiers the <b>WAVE SHEET</b> lists the fight as the engine will build it: every wave, what it waits for, every group with its count and its health factor, and each boss row\'s bar in numbers. Type a new count or factor on a group to change the lab\'s next fight of that tier (gold = edited; RESET puts the sheet back).</p>'
@@ -762283,14 +762287,26 @@ function blbHelpHTML(){ return '<div class="blb-col blb-help"><h3>HOW TO USE THE
   +'<p><b>THE PLAYER (10/30).</b> Every lab fight is fought by a <b>stock army</b> at a LEVEL: Wyatt\'s call per fight is filled in (King Rex 20, King Yeti 25, the Sky Fortress 30, King Croak 30 to 40, the Ice Caves 45 to 50, Emperor Bear 50 to 70, Princess Croak\'s palace behind Gnome Park 70 to 90, Buffalo Bill 80 and up; a range runs from EASY to the top tier). Retype it for any fight (gold = yours; RESET LEVELS puts the calls back). That one number is the commander level, the campaign rung, every man\'s rank and every iron\'s rank; the men are the ones a player has by that rung (the rescue road, the commando past 50, the spy past 30), the jeep from 20 and the tank from 40, and Sarge holds the irons a commander of that level has (the saber by default; pick another). Your own account is kept aside for the fight and put back at the verdict or at END; a stock fight never banks anything. PROMOTIONS under SARGE sets each man\'s rank and each iron\'s rank for the fight (blank = the level, gold = typed); a fight with typed promotions wears a star on the strip, and RESULTS lists them. Switch THE ARMY to OWN to fight with this account\'s own men and ranks.</p>'
   +'<p><b>RULES</b> are the game\'s own difficulty tables, one grid per table, the shipped number under each cell. A changed cell is live on this device at once and stays through reloads while the lab is open on this account, in the lab\'s fights and at the real doors alike. Nothing leaves your device: use <b>EXPORT</b> on RESULTS to copy the changes as text for Wyatt.</p>'
   +'<p><b>IN THE FIGHT</b> the strip at the bottom right shows the boss\'s bar in numbers, the wave, the clock and the lives, with x1 x2 x4, +100 TAGS, SKIP WAVE (melts the standing troops, the next wave comes now) and END (back here, logged as ABORT). After any verdict the lab reopens on RESULTS.</p>'
-  +'<p><b>RESULTS</b> keeps every lab fight (WIN / LOSS / ABORT, the clock, the boss\'s bar left, the waves reached, the lives, the dials and the rules in force). Add a note to a row. EXPORT copies the whole ledger and the rules as plain text (and shows it below the list).</p>'
+  +'<p><b>RESULTS</b> keeps every lab fight (WIN / LOSS / ABORT, the clock, the boss\'s bar left, the waves reached, the lives, the dials and the rules in force). Add a note to a row (up to 2,000 characters), and your notes in the box at the top. <b>EXPORT (COPY + SEND)</b> copies the whole ledger, the rules and the notes as plain text (and shows it below the list) and sends the same to HQ, which posts it to the Raziya channel on Discord within a minute, where Wyatt and Isaac read it; the line beside the button says SENT or why not (the copy is made either way).</p>'
   +'<p><b>THE DOORS.</b> The code <code>BOSSLAB</code> at Sarge\'s Surplus opens the lab and marks this account; the LAB tab on the bedroom\'s right edge reopens it. <code>BOSSLABOFF</code> takes the mark off (the rules you changed are reset first). On the web, <code>?bosslab=1</code> and <code>?bosslab=0</code> do the same. Opened by that link, a new account skips the opening mission and the tours and lands in the lab; ✕ shows the bedroom behind it, and every boot lands here again while the lab is on.</p>'
   +'<p><b>THE EIGHT.</b> King Rex (the lair: EASY MEDIUM HARD MEGA ULTRA MEGA), King Yeti (the castle: the same five), King Croak (the hideout), Emperor Bear (the pillow fields), Princess Croak (the palace), the Ice Caves (the ferocious yeti), the Sky Fortress (the big bomber), Buffalo Bill (the showdown: EASY MEDIUM HARD). ULTRA MEGA is the kings\' night fight, built for a room of ten; MEGA and the rest are the doors as players reach them.</p></div>'; }
-function blbExportText(){ const L=[ 'THE BOSS LAB · GREEN VS TAN v'+GVT_CV+' · '+new Date().toISOString() ]; const ov=blbOverList(); L.push('RULES CHANGED ON THIS DEVICE: '+ov.length); for(const o of ov) L.push('  '+o.id+'.'+o.key+'  '+o.ship+' -> '+o.now);
+function blbExportText(){ const L=[ 'THE BOSS LAB · GREEN VS TAN v'+GVT_CV+' · '+new Date().toISOString() ]; if(BLB.memo) L.push('NOTES: '+BLB.memo); const ov=blbOverList(); L.push('RULES CHANGED ON THIS DEVICE: '+ov.length); for(const o of ov) L.push('  '+o.id+'.'+o.key+'  '+o.ship+' -> '+o.now);
   let ed=0; for(const rk in BLB.waves) for(const tier in BLB.waves[rk]) for(const k in BLB.waves[rk][tier]){ ed++; L.push('  WAVE EDIT '+rk+' '+tier+' group '+k+' '+JSON.stringify(BLB.waves[rk][tier][k])); } if(!ed) L.push('  (no wave edits)');
   L.push('FIGHTS: '+BLB.log.length); for(const r of BLB.log){ const row=blbRow(r.rk), d=new Date(r.at); L.push('  '+d.toISOString().slice(0,16).replace('T',' ')+' · '+(row? row[1] : r.rk)+' · '+(RAID_TIER_NAMES[r.tier]||r.tier)+' · '+r.res+' in '+blbMMSS(r.sec)+' · boss '+(r.boss? r.boss.hp+'/'+r.boss.max : 'not met')+' · wave '+r.wave+'/'+r.waves+' · lives '+r.lives0+'->'+r.lives+' · tags '+r.tags+' · '+r.party+' cmdr'+(r.dials? ' · boss x'+r.dials.bossHp+' troops x'+r.dials.troops+' hp x'+r.dials.troopHp+(r.dials.god?' god':'')+(r.dials.bank?' banked':'')+(r.dials.speed>1? ' x'+r.dials.speed : '') : '')+(r.stock? ' · stock army LV '+r.stock.L+' '+r.stock.w+(r.stock.over? ' · promotions '+blbRanksText(r.stock.over) : '') : '')+(r.edits? ' · '+r.edits+' wave edits' : '')+(r.over && r.over.length? ' · rules '+r.over.join('; ') : '')+(BLB.notes[r.at]? ' · NOTE: '+BLB.notes[r.at] : '')); }
   return L.join('\n'); }
 function blbExport(){ const txt=blbExportText(); const ta=document.getElementById('blbOut'); if(ta){ ta.value=txt; try{ ta.focus(); ta.select(); }catch(e){} } try{ if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt); }catch(e){} return txt; }
+
+function blbSentLine(){ const s9=BLB.sent; if(!s9) return ''; if(s9.pending) return 'SENDING…'; return s9.ok? 'SENT TO THE RAZIYA CHANNEL ✓' : 'NOT SENT: '+(s9.err||'HQ unreachable')+', copied to the clipboard'; }
+function blbSentPaint(){ const e=document.getElementById('blbSent'); if(e) e.textContent=blbSentLine(); }
+function blbExportSend(txt){ const now=Date.now(); if(BLB.sentAt && now-BLB.sentAt<15000) return false; txt=(txt==null)? blbExportText() : String(txt); BLB.sentAt=now; BLB.sent={ at:now, pending:1, ok:0, id:null, err:null }; blbSentPaint();
+  const body={ device:META.deviceId, name:META.name, cv:GVT_CV, memo:(BLB.memo||'').slice(0,2000), notes:{}, fights:BLB.log.length, rules:blbOverN(), text:txt.slice(0,60000) };
+  for(const at in BLB.notes){ const r=BLB.log.find(x=>String(x.at)===String(at)), row=r? blbRow(r.rk) : null; body.notes[at]=((r? (row? row[1] : r.rk)+' · '+(RAID_TIER_NAMES[r.tier]||r.tier)+' · '+r.res+': ' : '')+BLB.notes[at]).slice(0,2200); }
+  const done=(ok,id,err)=>{ BLB.sent={ at:now, pending:0, ok:ok?1:0, id:id||null, err:err||null }; blbSentPaint(); };
+  try{ netFetch(NET+'/blb/export', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify(body) })
+      .then(r=>{ const st=(r && r.status)|0; return Promise.resolve(r.json()).then(j=>({ st, j }), ()=>({ st, j:null })); })
+      .then(o=>{ const j=o.j||{}; if(j.ok) done(1, j.id, null); else done(0, null, (o.st===429 || j.err==='slow down')? 'slow down, try in a minute' : (o.st===404? 'HQ has no export door yet' : ((j.err && j.err!=='offline')? String(j.err).slice(0,60) : 'HQ unreachable'))); })
+      .catch(()=>done(0, null, 'HQ unreachable')); }catch(e){ done(0, null, 'HQ unreachable'); }
+  return true; }
 
 function blbPillSync(){ const on=blbOn() && S.mode==='menu'; if(!on){ if(BLB.pill) BLB.pill.classList.add('hidden'); return; } blbCss(); if(!BLB.pill){ const p=document.createElement('div'); p.id='blbPill'; p.textContent='BOSS LAB'; p.onclick=()=>blbOpen(); document.body.appendChild(p); BLB.pill=p; } BLB.pill.classList.remove('hidden'); }
 
@@ -762320,11 +762336,11 @@ function blbRig(o){ o=o||{}; const g=f=>{ try{ return f(); }catch(e){ return 'ER
   if(o.fight) for(const k in o.fight) BLB.ui.dial(k, o.fight[k]); if(o.dialsReset) BLB.ui.dialsReset(); if(o.stock){ if(o.stock.on!=null) BLB.ui.dial('stock', o.stock.on? 'STOCK' : 'OWN'); if(o.stock.lv!==undefined) BLB.ui.stockLv(o.stock.lv); if(o.stock.w) BLB.ui.dial('sw', o.stock.w); if(o.stock.reset) BLB.ui.stockReset(); if(o.stock.rank) BLB.ui.stockRank(o.stock.rank[0], o.stock.rank[1]); if(o.stock.doff) did=blbStockDoff('rig'); }
   if(o.set){ const a=Array.isArray(o.set[0])? o.set : [o.set]; did=a.map(s=>blbCellSet(s[0], s[1], s[2])); blbSave(); if(BLB.open) blbRender(); } if(o.resetTable) blbResetTable(o.resetTable); if(o.reset){ blbResetAll(); blbSave(); }
   if(o.grp) BLB.ui.grp(o.grp[0], o.grp[1], o.grp[2], o.grp[3]); if(o.wavesReset) BLB.ui.wavesReset();
-  if(o.launch) did=g(()=>blbLaunch(o.launch[0], o.launch[1])); if(o.abort) did=g(()=>blbAbort()); if(o.skip) did=g(()=>blbSkipWave()); if(o.tags!=null) did=blbTags(o.tags); if(o.speed) did=blbSpeed(o.speed); if(o.clearLog) BLB.ui.clearLog();
+  if(o.send) did=g(()=>blbExportSend((o.send===true || o.send===1)? null : String(o.send))); if(o.memo!=null) BLB.ui.memo(o.memo); if(o.note) BLB.ui.note(o.note[0], o.note[1]); if(o.launch) did=g(()=>blbLaunch(o.launch[0], o.launch[1])); if(o.abort) did=g(()=>blbAbort()); if(o.skip) did=g(()=>blbSkipWave()); if(o.tags!=null) did=blbTags(o.tags); if(o.speed) did=blbSpeed(o.speed); if(o.clearLog) BLB.ui.clearLog();
   const b=S.mode==='play'? blbBossNow() : null;
   return { cv:GVT_CV, on:blbOn(), booted:BLB.booted, q:BLB.q, open:!!(BLB.el && !BLB.el.classList.contains('hidden')), tab:BLB.tab, sel:BLB.sel, tier:BLB.tier, pill:!!(BLB.pill && !BLB.pill.classList.contains('hidden')), hud:!!(BLB.hud && !BLB.hud.classList.contains('hidden')), did,
     rows:BLB.ROWS.map(r=>({ k:r[0], name:r[1], king:r[2], place:raidInfo(r[0]).name, tiers:blbTiers(r[0]) })), rules:BLB_RULES.map(r=>({ id:r[0], ok:!!blbTable(r[0]), rows:r[3], cells:blbCells(r[0]).length })), over:blbOverList(), overN:blbOverN(), fight:Object.assign({},BLB.fight), waves:JSON.parse(JSON.stringify(BLB.waves)), ffK:BLB.ffK, stock:g(()=>blbStockRead()),
-    sheet:o.sheet? g(()=>blbSheet(o.sheet[0], o.sheet[1], o.sheet[2])) : null, log:BLB.log.slice(-5), logN:BLB.log.length, export:o.export? blbExportText() : null,
+    sheet:o.sheet? g(()=>blbSheet(o.sheet[0], o.sheet[1], o.sheet[2])) : null, log:BLB.log.slice(-5), logN:BLB.log.length, export:o.export? blbExportText() : null, sent:BLB.sent? Object.assign({},BLB.sent) : null, sentAt:BLB.sentAt, memo:BLB.memo,
     fightNow:(S.raid && S.raid.blb)? { rk:S.raid.k, t:S.raid.t, party:S.raid.blb.party, void:S.raid.void?1:0, mode:S.mode, wave:S.wave, waves:S.cfg? S.cfg.waves.length : 0, sec:+blbClock().toFixed(2), lives:S.lives, tags:S.plastic, sq:S.sq? { p:S.sq.p, bp:S.sq.bp } : null, boss:b? { t:b.type, hp:Math.round(b.hp), max:Math.round(b.hpMax) } : null, foes:S.foes.filter(f=>!f.dead).length, hpMul:S.cfg? S.cfg.hpMul : null } : null,
     meta:{ bossLab:META.bossLab|0, ice:Object.assign({},META.ice||{}), bbs:Object.assign({},META.bbs||{}), sky:Object.assign({},META.sky||{}), starBank:META.starBank|0 }, dev:{ blb:blbLS('gvt_blb'), log:blbLS('gvt_blb_log') } }; }
 
@@ -974303,7 +974319,7 @@ let BFQ=null;
 
 
 
-let GVT_CV='28.54';
+let GVT_CV='28.55';
 let NX_CAP_MUL=4;
 
 
@@ -2640727,7 +2640743,10 @@ window.GVT = {
 
 
 
-const BLB={ v:1, open:0, tab:'fights', sel:'bone', tier:'e', ship:{}, over:{}, fight:{ bossHp:1, troops:1, troopHp:1, party:1, tags:null, speed:1, god:0, bank:0 }, waves:{}, notes:{}, log:[], ret:0, ffK:1, inFF:0, lives0:10, last:null, pendN:0, el:null, hud:null, pill:null, hudI:0, css:0, booted:0, q:null, blp:1, auto:0, keep:null, stock:{ on:1, lv:{}, w:{}, rk:{} },
+
+
+
+const BLB={ v:1, open:0, tab:'fights', sel:'bone', tier:'e', ship:{}, over:{}, fight:{ bossHp:1, troops:1, troopHp:1, party:1, tags:null, speed:1, god:0, bank:0 }, waves:{}, notes:{}, log:[], ret:0, ffK:1, inFF:0, lives0:10, last:null, pendN:0, el:null, hud:null, pill:null, hudI:0, css:0, booted:0, q:null, blp:1, auto:0, keep:null, stock:{ on:1, lv:{}, w:{}, rk:{} }, memo:'', sent:null, sentAt:0,
   ROWS:[ ['bone','KING REX','kingrex','8 34 96 96'], ['ice','KING YETI','kingyeti','14 -30 104 104'], ['croak','KING CROAK','kingcroak',null], ['fields','EMPEROR BEAR','bearnaparte',null], ['palace','PRINCESS CROAK','princess',null], ['caves','THE ICE CAVES','fyeti',null], ['sky','THE SKY FORTRESS','skyfort',null], ['bbs','BUFFALO BILL','bbshow',null] ],   
   TIERC:{ e:'#BFE39A', m:'#9FC5DE', h:'#E8A070', g:'#B77DE8', u:'#FFD24A' }, MAXLOG:200 };
 
@@ -2640883,13 +2640902,26 @@ const BLB_CSS='#blbPage{position:fixed;inset:0;z-index:99980;background:#141810;
  +'.blb-rules{flex:1;min-width:0}.blb-rule{margin-bottom:8px;border:1px solid rgba(127,163,92,.3);border-radius:8px;padding:5px 7px;background:rgba(38,40,31,.6)}.blb-rule .rh{display:flex;justify-content:space-between;align-items:center;gap:6px;font-size:11px}.blb-rule .rh small{color:#9a8a6a;font-size:9px;text-transform:none;font-weight:normal;display:block}'
  +'.blb-cells{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}.blb-cell{display:flex;flex-direction:column;align-items:center;min-width:64px}.blb-cell b{font-size:9px;letter-spacing:.06em}.blb-cell input{width:64px;background:#0f120c;color:#EDEADF;border:1px solid var(--bd);border-radius:6px;padding:3px 4px;font-size:11px;text-align:center}.blb-cell input.ed{border-color:var(--gold);color:var(--gold)}.blb-cell small{color:#9a8a6a;font-size:9px;text-transform:none;font-weight:normal}'
  +'.blb-mini{background:rgba(38,40,31,.92);border:1px solid var(--bd);color:#EDEADF;border-radius:6px;padding:2px 7px;font:inherit;font-size:10px;cursor:pointer}.blb-mini.warn{border-color:#E07A7A;color:#E07A7A}'
- +'.blb-log{flex:1;min-width:0}.blb-logrow{display:grid;grid-template-columns:92px 1fr;gap:6px;border-bottom:1px solid rgba(127,163,92,.2);padding:4px 0;font-size:10px;text-transform:none;font-weight:normal;color:#C9BFA8}.blb-logrow b{color:#EDEADF}.blb-logrow .res-WIN{color:#BFE39A}.blb-logrow .res-LOSS{color:#E07A7A}.blb-logrow .res-ABORT{color:#9a8a6a}.blb-logrow input{width:100%;background:#0f120c;color:#EDEADF;border:1px solid var(--bd);border-radius:5px;padding:2px 4px;font-size:10px;margin-top:2px}'
+ +'.blb-log{flex:1;min-width:0}.blb-logrow{display:grid;grid-template-columns:92px 1fr;gap:6px;border-bottom:1px solid rgba(127,163,92,.2);padding:4px 0;font-size:10px;text-transform:none;font-weight:normal;color:#C9BFA8}.blb-logrow b{color:#EDEADF}.blb-logrow .res-WIN{color:#BFE39A}.blb-logrow .res-LOSS{color:#E07A7A}.blb-logrow .res-ABORT{color:#9a8a6a}.blb-logrow input,.blb-logrow textarea{width:100%;background:#0f120c;color:#EDEADF;border:1px solid var(--bd);border-radius:5px;padding:2px 4px;font-size:10px;margin-top:2px}.blb-logrow textarea{resize:vertical;min-height:34px;display:block}.blb-memo{display:block;width:100%;min-height:54px;resize:vertical;background:#0f120c;color:#EDEADF;border:1px solid var(--bd);border-radius:6px;padding:4px 6px;font-size:11px;margin:0 0 8px}.blb-sent{color:#9a8a6a;font-size:9px;text-transform:none;font-weight:normal}'
  +'.blb-help{flex:1;min-width:0;text-transform:none;font-weight:normal;font-size:12px;line-height:1.45;color:#C9BFA8}.blb-help b{color:#EDEADF}.blb-help h3{text-transform:uppercase}.blb-help code{color:var(--gold);font-family:ui-monospace,Menlo,monospace}'
  +'#blbPage textarea.blb-out{width:100%;height:120px;background:#0f120c;color:#EDEADF;border:1px solid var(--bd);border-radius:6px;padding:4px 6px;font-size:10px;margin-top:6px}'
  +'#blbPill{position:fixed;right:0;top:46%;z-index:9000;background:rgba(18,15,11,.92);border:2px solid #BFE39A;border-right:0;color:#FFE07A;border-radius:10px 0 0 10px;padding:8px 6px 8px 8px;font-family:var(--uih);font-weight:bold;font-size:12px;letter-spacing:.08em;cursor:pointer;writing-mode:vertical-rl;text-orientation:mixed;user-select:none;-webkit-user-select:none}#blbPill.hidden{display:none}'
  +'#blbHud{position:fixed;right:6px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:9100;box-sizing:border-box;background:rgba(18,15,11,.88);border:2px solid var(--bd,rgba(127,163,92,.45));border-radius:10px;padding:4px 6px;font-family:var(--uih);font-weight:bold;text-transform:uppercase;color:#EDEADF;font-size:11px;display:flex;flex-direction:column;gap:3px;max-width:46vw;user-select:none;-webkit-user-select:none}#blbHud.hidden{display:none}'
  +'#blbHud .rd{color:#FFE07A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#blbHud .bt{display:flex;gap:3px;flex-wrap:wrap}#blbHud button{background:rgba(38,40,31,.92);border:1px solid rgba(127,163,92,.45);color:#EDEADF;border-radius:6px;padding:2px 6px;font:inherit;font-size:10px;cursor:pointer}#blbHud button.on{border-color:#BFE39A;background:#2e4a66}#blbHud button.end{border-color:#E07A7A;color:#E07A7A}#blbHud.fold .rd,#blbHud.fold .bt{display:none}#blbHud .fd{align-self:flex-end;color:#9a8a6a;font-size:9px;cursor:pointer}'
  +'@media (max-width:700px){.blb-tiers{width:170px}.blb-dials{width:200px}}';
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2640972,7 +2641004,7 @@ BLB.ui={ tab(x){ BLB.tab=x; blbSave(); blbRender(); }, close(){ blbClose(); try{
   grp(wi,gi,f,v){ const rk=BLB.sel, tier=BLB.tier, W=(BLB.waves[rk]||(BLB.waves[rk]={})), T9=(W[tier]||(W[tier]={})), k=wi+':'+gi, e=(T9[k]||(T9[k]={})); const n=+v; if(v==='' || !isFinite(n) || n<=0) delete e[f]; else e[f]=(f==='n')? Math.max(1,Math.round(n)) : +n.toFixed(3); if(!Object.keys(e).length) delete T9[k]; if(!Object.keys(T9).length) delete W[tier]; if(!Object.keys(W).length) delete BLB.waves[rk]; blbSave(); blbRender(); },
   wavesReset(){ if(BLB.waves[BLB.sel]){ delete BLB.waves[BLB.sel][BLB.tier]; if(!Object.keys(BLB.waves[BLB.sel]).length) delete BLB.waves[BLB.sel]; } blbSave(); blbRender(); },
   cell(id,key,v){ blbCellSet(id,key,v); blbSave(); blbRender(); }, resetTable(id){ blbResetTable(id); blbSave(); blbRender(); }, resetAll(){ blbResetAll(); blbSave(); blbRender(); },
-  note(at,v){ if(v) BLB.notes[at]=String(v).slice(0,400); else delete BLB.notes[at]; blbSave(); }, exportIt(){ blbExport(); }, clearLog(){ BLB.log=[]; BLB.notes={}; blbSave(); blbRender(); },
+  note(at,v){ if(v) BLB.notes[at]=String(v).slice(0,2000); else delete BLB.notes[at]; blbSave(); }, memo(v){ BLB.memo=String(v||'').slice(0,2000); blbSave(); }, exportIt(){ const t9=blbExport(); blbExportSend(t9); }, clearLog(){ BLB.log=[]; BLB.notes={}; blbSave(); blbRender(); },
   speed(k){ blbSpeed(k); }, tags(n){ blbTags(n); blbHudPaint(); }, skip(){ blbSkipWave(); blbHudPaint(); }, god(){ BLB.fight.god=BLB.fight.god?0:1; if(S.raid && S.raid.blb) S.raid.blb.dials.god=BLB.fight.god; blbSave(); blbHudPaint(); }, abort(){ blbAbort(); }, fold(){ if(BLB.hud){ BLB.hud.classList.toggle('fold'); blbHudPaint(); } } };
 
 
