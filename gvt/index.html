@@ -762184,12 +762184,50 @@ function hld2Room(b){ return !!(hld2On() && b && b.seat!=null && S.bf && b.seat!
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+function blbStockOn(){ return !!(BLB.blp && BLB.stock && BLB.stock.on); }
+function blbStockDef(rk, tier){ const r=BLB_STOCK_LV[rk]||[20,20], T=blbTiers(rk), i=Math.max(0,T.indexOf(tier)), n=T.length; return Math.max(1,Math.min(RANK_MAX,Math.round(r[0]+(r[1]-r[0])*(n>1? i/(n-1) : 0)))); }
+function blbStockLv(rk, tier){ const v=(BLB.stock.lv||{})[rk+':'+tier]; return (v!=null && isFinite(+v) && +v>=1)? Math.min(RANK_MAX,Math.round(+v)) : blbStockDef(rk, tier); }
+function blbStockMen(L){ const men=['rifleman','mgunner','bazooka','mortar']; for(const r of RSC_ROAD){ if(L>=r.n && men.indexOf(r.t)<0) men.push(r.t); } return men; }
+function blbStockIrons(L){ return SARGE_ORDER.filter(w=>w==='pistol' || (w!=='commander' && SARGE_WEAPONS[w] && SARGE_WEAPONS[w].unlock>0 && L>=SARGE_WEAPONS[w].unlock)); }
+function blbWName(w){ const d=SARGE_WEAPONS[w]; return (d && d.name) || String(w||'').toUpperCase(); }
+function blbStockPlan(rk, tier){ const L=blbStockLv(rk, tier), men=blbStockMen(L), irons=blbStockIrons(L), extra=(L>=CMDO_LVL? ['commando'] : []).concat(L>=LENS_FREE_CAMP? ['spy'] : []), rides=(L>=20? ['bfjeep'] : []).concat(L>=40? ['bftank'] : []);
+  const pick=(BLB.stock.w||{})[rk+':'+tier], w=(pick && irons.indexOf(pick)>=0)? pick : (irons.indexOf('lightsaber')>=0? 'lightsaber' : irons[irons.length-1]); return { L, men, extra, irons, w, rides }; }
+function blbStockSet(key, val){ const cur=META[key]; if(Array.isArray(cur) && Array.isArray(val)){ cur.length=0; for(const x of val) cur.push(x); } else if(cur && typeof cur==='object' && !Array.isArray(cur) && val && typeof val==='object' && !Array.isArray(val)){ for(const k in cur) delete cur[k]; Object.assign(cur, val); } else META[key]=val; }
+function blbStockWear(rk, tier){ if(BLB.keep) return null; const P=blbStockPlan(rk, tier), L=P.L, m={}, miss=[]; for(const key of BLB_STOCK_KEYS){ if((key in META) && META[key]!==undefined) m[key]=JSON.parse(JSON.stringify(META[key])); else miss.push(key); } BLB.keep={ at:Date.now(), rk, tier, L, w:P.w, m, miss }; blbSave();
+  const up={}; for(const k of BF_TYPES) up[k]=L; const su={}; for(const w of P.irons) su[w]=L; const men=P.men.concat(P.extra); const pr=Object.assign({}, META.premiered||{}); for(const k of PREM_UNITS) pr[k]=1;   
+  blbStockSet('lvl', L); blbStockSet('xp', 0); blbStockSet('pendingPicks', 0); blbStockSet('campaign', L); blbStockSet('unlocked', ['sarge'].concat(P.men)); blbStockSet('platoon', men.slice(0, APL_FREE)); blbStockSet('platoonMet', men.slice(0, APL_FREE)); blbStockSet('up', up); blbStockSet('sargeUp', su);
+  blbStockSet('sargeUnlocked', P.irons.filter(w=>w!=='pistol')); blbStockSet('sargeWeapon', P.w); blbStockSet('spy', P.extra.indexOf('spy')>=0? 1 : 0); blbStockSet('vehOwned', P.rides.slice()); blbStockSet('enh', { own:[], on:[] }); blbStockSet('premiered', pr); saveMeta(); return P; }
+function blbStockDoff(why){ const K=BLB.keep; if(!K) return false; for(const key in K.m) blbStockSet(key, JSON.parse(JSON.stringify(K.m[key]))); for(const key of (K.miss||[])) delete META[key]; BLB.keep=null; saveMeta(); blbSave(); return true; }
+function blbStockRoom(){ if(META.opener) return false; META.opener=1; META.ciDone=1; META.tour=TOUR_DONE; META.tourV=1; META.tourEnd=1; META.gearTut=1; META.surpTut=1; META.frDone=1; META.planeIn=1; META.labBeat=1; saveMeta(); return true; }
+function blbTitleUp(){ try{ const e=document.getElementById('title'); return !!(e && !e.classList.contains('hidden') && getComputedStyle(e).display!=='none' && e.getBoundingClientRect().width>0); }catch(e){ return false; } }
+function blbStockRead(){ const rk=BLB.sel, t=BLB.tier; return { blp:BLB.blp?1:0, on:blbStockOn()?1:0, auto:BLB.auto|0, L:blbStockLv(rk,t), def:blbStockDef(rk,t), plan:blbStockPlan(rk,t), keep:BLB.keep? { L:BLB.keep.L, rk:BLB.keep.rk, tier:BLB.keep.tier, w:BLB.keep.w, keys:Object.keys(BLB.keep.m), miss:(BLB.keep.miss||[]).slice() } : null, lv:Object.assign({},BLB.stock.lv), w:Object.assign({},BLB.stock.w),
+  table:BLB.ROWS.map(r=>({ k:r[0], lv:blbTiers(r[0]).map(x=>blbStockLv(r[0],x)), def:blbTiers(r[0]).map(x=>blbStockDef(r[0],x)) })), room:{ opener:META.opener|0, tour:META.tour|0, tourEnd:(META.tourEnd==null? null : META.tourEnd), title:blbTitleUp()?1:0 } }; }
+function blbStockHTML(rk, tier){ const on=blbStockOn(), P=blbStockPlan(rk, tier), def=blbStockDef(rk, tier), row=blbRow(rk), key=rk+':'+tier, typed=(BLB.stock.lv||{})[key]!=null, picked=!!(BLB.stock.w||{})[key];
+  let h='<h3>THE PLAYER · THIS FIGHT</h3><div class="blb-dial"><label>THE ARMY<small>stock = default men at the level below · own = this account\'s</small></label><div class="blb-seg"><button type="button" class="'+(on?'on':'')+'" onclick="BLB.ui.dial(\'stock\',\'STOCK\')">STOCK</button><button type="button" class="'+(on?'':'on')+'" onclick="BLB.ui.dial(\'stock\',\'OWN\')">OWN</button></div></div>';
+  if(!on) return h+'<div style="color:#C9BFA8;margin:2px 0 10px;text-transform:none;font-weight:normal;font-size:10px;line-height:1.35">the fight uses this account\'s own men, ranks and irons (BANK REWARDS as set below)</div>';
+  h+='<div class="blb-dial"><label>LEVEL<small>'+blbEsc(row[1])+' · '+blbEsc(RAID_TIER_NAMES[tier])+': Wyatt\'s call '+def+' · the men\'s rank, Sarge\'s irons, the commander level and the campaign rung</small></label><input type="number" step="1" min="1" max="'+RANK_MAX+'" class="'+(typed?'ed':'')+'" value="'+P.L+'" onchange="BLB.ui.stockLv(this.value)"></div>';
+  h+='<div class="blb-dial" style="flex-direction:column;align-items:stretch;gap:4px"><label>SARGE<small>the irons a level-'+P.L+' commander holds</small></label><div class="blb-seg" style="flex-wrap:wrap">'+P.irons.map(w=>'<button type="button" class="'+(P.w===w?'on':'')+'" onclick="BLB.ui.dial(\'sw\',\''+w+'\')">'+blbEsc(blbWName(w).replace(/^(THE |SERVICE )/,'').replace(/ RIFLE$/,''))+'</button>').join('')+'</div></div>';
+  const names=P.men.concat(P.extra).map(k=>{ let nm=''; try{ nm=rscName(k); }catch(e){} return nm || k.toUpperCase(); }).concat(P.rides.map(k=>BLB_RIDE_NAME[k]||k.toUpperCase()));
+  h+='<div style="color:#C9BFA8;margin:2px 0 10px;text-transform:none;font-weight:normal;font-size:10px;line-height:1.35">'+blbEsc(names.join(' · '))+' · every man and iron at rank '+P.L+' · nothing of this fight is banked on the account'+((typed || picked)? ' · <button type="button" class="blb-mini" onclick="BLB.ui.stockReset()">RESET LEVELS</button>' : '')+'</div>';
+  return h; }
 function blbOn(){ return !!(META && META.bossLab); }
 function blbRow(k){ return BLB.ROWS.find(r=>r[0]===k)||null; }
 function blbTiers(k){ const r=raidInfo(k); return ['e','m','h'].concat(r.g? ['g'] : []).concat(r.u? ['u'] : []); }
 function blbLS(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
-function blbSave(){ try{ localStorage.setItem('gvt_blb', JSON.stringify({ v:1, over:BLB.over, fight:BLB.fight, waves:BLB.waves, notes:BLB.notes, sel:BLB.sel, tier:BLB.tier, tab:BLB.tab })); localStorage.setItem('gvt_blb_log', JSON.stringify(BLB.log)); }catch(e){} }
-function blbLoad(){ try{ const o=JSON.parse(blbLS('gvt_blb')||'null'); if(o && o.v===1){ BLB.over=o.over||{}; Object.assign(BLB.fight, o.fight||{}); BLB.waves=o.waves||{}; BLB.notes=o.notes||{}; if(blbRow(o.sel)) BLB.sel=o.sel; if(BLB_TIERS.indexOf(o.tier)>=0) BLB.tier=o.tier; if(o.tab) BLB.tab=o.tab; } const L=JSON.parse(blbLS('gvt_blb_log')||'null'); if(Array.isArray(L)) BLB.log=L; }catch(e){} }
+function blbSave(){ try{ localStorage.setItem('gvt_blb', JSON.stringify({ v:1, over:BLB.over, fight:BLB.fight, waves:BLB.waves, notes:BLB.notes, sel:BLB.sel, tier:BLB.tier, tab:BLB.tab, stock:BLB.stock, keep:BLB.keep })); localStorage.setItem('gvt_blb_log', JSON.stringify(BLB.log)); }catch(e){} }
+function blbLoad(){ try{ const o=JSON.parse(blbLS('gvt_blb')||'null'); if(o && o.v===1){ BLB.over=o.over||{}; Object.assign(BLB.fight, o.fight||{}); BLB.waves=o.waves||{}; BLB.notes=o.notes||{}; if(blbRow(o.sel)) BLB.sel=o.sel; if(BLB_TIERS.indexOf(o.tier)>=0) BLB.tier=o.tier; if(o.tab) BLB.tab=o.tab; if(o.stock && typeof o.stock==='object'){ BLB.stock.on=(o.stock.on==null)? 1 : (o.stock.on? 1 : 0); BLB.stock.lv=(o.stock.lv && typeof o.stock.lv==='object')? o.stock.lv : {}; BLB.stock.w=(o.stock.w && typeof o.stock.w==='object')? o.stock.w : {}; } BLB.keep=(o.keep && typeof o.keep==='object' && o.keep.m && typeof o.keep.m==='object')? o.keep : null; } const L=JSON.parse(blbLS('gvt_blb_log')||'null'); if(Array.isArray(L)) BLB.log=L; }catch(e){} }
 function blbTable(id){ const r=BLB_RULES.find(x=>x[0]===id); if(!r) return null; try{ const T=r[1](); return (T && typeof T==='object')? T : null; }catch(e){ return null; } }
 function blbShip(){ for(const r of BLB_RULES){ const T=blbTable(r[0]); if(T && !BLB.ship[r[0]]) BLB.ship[r[0]]=JSON.parse(JSON.stringify(T)); } }
 function blbCells(id){ const T=blbTable(id), S0=BLB.ship[id]; if(!T || !S0) return []; const out=[]; for(const k of BLB_TIERS){ if(!(k in S0)) continue; const v=S0[k]; if(typeof v==='number') out.push({ key:k, tier:k, field:null, ship:v, now:T[k] }); else if(v && typeof v==='object' && !Array.isArray(v)){ for(const f in v) if(typeof v[f]==='number') out.push({ key:k+'.'+f, tier:k, field:f, ship:v[f], now:(T[k]||{})[f] }); } } return out; }
@@ -762226,17 +762264,18 @@ function blbSheet(rk, tier, N){ const R=blbCfg(rk, tier, null, N); if(!R.cfg) re
 
 function blbLaunch(rk, tier){ const row=raidInfo(rk); if(!row || !blbRow(rk)) return false; if(blbTiers(rk).indexOf(tier)<0) tier='e'; const F=BLB.fight, N=Math.max(1,Math.min(SQ_MAX,(F.party|0)||1));
   blbClose(); try{ if(raidSceneOpen()) closeRaidScene(); }catch(e){}
+  const SK=blbStockOn()? blbStockWear(rk, tier) : null;   
   RAID_CUR=rk; RAID_SEL=tier; BLB.pendN=N; FO_PASS=1;
   try{ startRaidBattle(tier, rk); } finally{ FO_PASS=0; BLB.pendN=0; }
-  if(!S.raid || S.raid.k!==row.k) return false;
+  if(!S.raid || S.raid.k!==row.k){ if(SK) blbStockDoff('nodoor'); return false; }
   blbStamp(S.cfg, F, rk, S.raid.t);
   raidArm(raidHmul(S.raid.k, S.raid.t));
   sqScaleCfg(S.cfg, N, false, N); S.sq={ p:N, bp:N, t:0, nextT:sqGrace() };
   spdInit();
   if(F.tags!=null && isFinite(+F.tags)) S.plastic=Math.max(0, Math.round(+F.tags));
-  if(!F.bank) S.raid.void=1;   
+  if(!F.bank || SK) S.raid.void=1;   
   BLB.ffK=[1,2,4].indexOf(+F.speed)>=0? +F.speed : 1; BLB.lives0=S.lives; BLB.last=null;
-  S.raid.blb={ rk, tier:S.raid.t, at:Date.now(), t0:S.t, party:N, dials:{ bossHp:F.bossHp, troops:F.troops, troopHp:F.troopHp, tags:S.plastic, speed:BLB.ffK, god:F.god?1:0, bank:F.bank?1:0 }, over:blbOverList().map(o=>o.id+'.'+o.key+' '+o.ship+' -> '+o.now), edits:Object.keys((BLB.waves[rk]||{})[S.raid.t]||{}).length, lives0:S.lives, logged:0 };
+  S.raid.blb={ rk, tier:S.raid.t, at:Date.now(), t0:S.t, party:N, dials:{ bossHp:F.bossHp, troops:F.troops, troopHp:F.troopHp, tags:S.plastic, speed:BLB.ffK, god:F.god?1:0, bank:F.bank?1:0 }, over:blbOverList().map(o=>o.id+'.'+o.key+' '+o.ship+' -> '+o.now), edits:Object.keys((BLB.waves[rk]||{})[S.raid.t]||{}).length, lives0:S.lives, logged:0, stock:SK? { L:SK.L, w:SK.w, men:SK.men.concat(SK.extra).length } : null };
   S.ann={ txt:t(row.name), t:2.8, sub:t(RAID_TIER_NAMES[S.raid.t]) };
   olDeal();
   blbHudOpen(); return true; }
@@ -762245,7 +762284,7 @@ function blbBossNow(){ const king=S.raid? raidInfo(S.raid.k).king : null; let b=
 function blbClock(){ return (S.raid && S.raid.blb)? Math.max(0, S.t-S.raid.blb.t0) : 0; }
 function blbMMSS(s){ s=Math.max(0,Math.round(s)); return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
 function blbNote(res){ const rd=S.raid; if(!rd || !rd.blb || rd.blb.logged) return null; rd.blb.logged=1; const b=blbBossNow(), bb=b? { hp:Math.round(b.hp), max:Math.round(b.hpMax), t:b.type } : (BLB.last||null);
-  const row={ at:Date.now(), rk:rd.blb.rk, tier:rd.blb.tier, res, sec:+blbClock().toFixed(1), wave:S.wave|0, waves:S.cfg? S.cfg.waves.length : 0, boss:bb, lives:S.lives|0, lives0:rd.blb.lives0|0, tags:S.plastic|0, party:rd.blb.party, dials:rd.blb.dials, over:rd.blb.over, edits:rd.blb.edits, cv:GVT_CV };
+  const row={ at:Date.now(), rk:rd.blb.rk, tier:rd.blb.tier, res, sec:+blbClock().toFixed(1), wave:S.wave|0, waves:S.cfg? S.cfg.waves.length : 0, boss:bb, lives:S.lives|0, lives0:rd.blb.lives0|0, tags:S.plastic|0, party:rd.blb.party, dials:rd.blb.dials, over:rd.blb.over, edits:rd.blb.edits, stock:rd.blb.stock||null, cv:GVT_CV };
   BLB.log.push(row); while(BLB.log.length>BLB.MAXLOG) BLB.log.shift(); blbSave(); BLB.ret=1; return row; }
 function blbAbort(){ if(!blbFight() || S.mode!=='play') return false; S.raid.void=1; blbNote('ABORT'); if(S.mode==='play') telLv(2); S.drag=null; hqClose(); showMenu(); return true; }
 function blbSkipWave(){ if(!blbFight() || S.mode!=='play') return 0; let n=0; for(let i=S.foes.length-1;i>=0;i--){ const f=S.foes[i]; if(f.boss) continue; S.fx.push({k:'smoke',x:f.x,y:f.y-14,t:0,dur:0.5}); S.foes.splice(i,1); n++; } S.forms.length=0; S.queue.length=0; S.waveActive=false; if(S.sq) S.sq.nextT=S.sq.t; return n; }
@@ -762302,10 +762341,10 @@ function blbRender(){ const d=BLB.el; if(!d || !BLB.open) return; const tabs=[['
 function blbFightsHTML(){ const rk=BLB.sel, tiers=blbTiers(rk); if(tiers.indexOf(BLB.tier)<0) BLB.tier=tiers[0]; const F=BLB.fight;
   const facts=tiers.map(k=>{ const sh=blbSheet(rk, k, F.party); const kb=sh.boss.filter(b=>b.king); const bar=kb.length? kb.map(b=>blbNum(b.bar,0)).join(' / ') : (sh.boss.length? blbNum(sh.boss[0].bar,0) : '?'); return { k, sh, bar }; });
   let h='<div class="blb-col blb-tiers"><h3>'+blbEsc(blbRow(rk)[1])+' · THE TIERS</h3>'+facts.map(o=>'<div class="blb-tier'+(BLB.tier===o.k?' on':'')+'" onclick="BLB.ui.tier(\''+o.k+'\')"><div class="nm" style="color:'+BLB.TIERC[o.k]+'">'+blbEsc(RAID_TIER_NAMES[o.k])+(o.k==='u'? ' <small style="color:#9a8a6a;font-size:9px">(THE NIGHT\'S FIGHT)</small>' : '')+'</div>'
-    +'<div class="fx">'+(o.sh.err? 'cfg: '+blbEsc(o.sh.err) : 'boss bar '+o.bar+' · '+o.sh.waves.length+' wave'+(o.sh.waves.length===1?'':'s')+' · '+blbNum(o.sh.troops,0)+' troops'+(o.sh.hpMul && o.sh.hpMul!==1? ' · hp x'+blbNum(o.sh.hpMul) : '')+(o.sh.cntMul && o.sh.cntMul!==1? ' · count x'+blbNum(o.sh.cntMul) : '')+(o.sh.sideX && o.sh.sideX!==1? ' · his whole side x'+blbNum(o.sh.sideX)+' at birth' : ''))+'</div>'
+    +'<div class="fx">'+(o.sh.err? 'cfg: '+blbEsc(o.sh.err) : 'boss bar '+o.bar+' · '+o.sh.waves.length+' wave'+(o.sh.waves.length===1?'':'s')+' · '+blbNum(o.sh.troops,0)+' troops'+(o.sh.hpMul && o.sh.hpMul!==1? ' · hp x'+blbNum(o.sh.hpMul) : '')+(o.sh.cntMul && o.sh.cntMul!==1? ' · count x'+blbNum(o.sh.cntMul) : '')+(o.sh.sideX && o.sh.sideX!==1? ' · his whole side x'+blbNum(o.sh.sideX)+' at birth' : '')+(blbStockOn()? ' · stock army LV '+blbStockLv(rk,o.k) : ''))+'</div>'
     +(BLB.tier===o.k? '<button type="button" class="blb-go" onclick="BLB.ui.go()">⚔ DEPLOY · '+blbEsc(RAID_TIER_NAMES[o.k])+'</button>' : '')+'</div>').join('')+'</div>';
   const seg=(id,vals,cur)=>'<div class="blb-seg">'+vals.map(v=>'<button type="button" class="'+(String(cur)===String(v)?'on':'')+'" onclick="BLB.ui.dial(\''+id+'\','+(typeof v==='number'? v : '\''+v+'\'')+')">'+(typeof v==='number'? (id==='party'? v : 'x'+v) : v)+'</button>').join('')+'</div>';
-  h+='<div class="blb-col blb-dials"><h3>THE DIALS · THE LAB\'S FIGHTS</h3>'
+  h+='<div class="blb-col blb-dials">'+(BLB.blp? blbStockHTML(rk, BLB.tier) : '')+'<h3>THE DIALS · THE LAB\'S FIGHTS</h3>'
     +'<div class="blb-dial"><label>BOSS HEALTH<small>his bar x (every boss row)</small></label><input type="number" step="0.05" min="0.05" value="'+F.bossHp+'" onchange="BLB.ui.dial(\'bossHp\',this.value)"></div>'
     +'<div class="blb-dial"><label>TROOPS<small>every other row\'s count x</small></label><input type="number" step="0.05" min="0.05" value="'+F.troops+'" onchange="BLB.ui.dial(\'troops\',this.value)"></div>'
     +'<div class="blb-dial"><label>TROOP HEALTH<small>their bars x</small></label><input type="number" step="0.05" min="0.05" value="'+F.troopHp+'" onchange="BLB.ui.dial(\'troopHp\',this.value)"></div>'
@@ -762334,20 +762373,21 @@ function blbLogHTML(){ const rows=BLB.log.slice().reverse();
   if(!rows.length) h+='<div style="text-transform:none;font-weight:normal;color:#C9BFA8">No lab fight yet. DEPLOY one from FIGHTS; its row lands here with WIN / LOSS / ABORT, the clock, the boss\'s bar and the dials.</div>';
   h+=rows.map(r=>{ const row=blbRow(r.rk), d=new Date(r.at), i=BLB.log.indexOf(r); return '<div class="blb-logrow"><span>'+blbEsc((d.getMonth()+1)+'/'+d.getDate()+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'))+'<br><span class="res-'+blbEsc(r.res)+'">'+blbEsc(r.res)+'</span> in '+blbMMSS(r.sec)+'</span>'
     +'<span><b>'+blbEsc(row? row[1] : r.rk)+' · '+blbEsc(RAID_TIER_NAMES[r.tier]||r.tier)+'</b> · boss '+(r.boss? blbNum(r.boss.hp,0)+'/'+blbNum(r.boss.max,0) : 'not met')+' · wave '+r.wave+'/'+r.waves+' · lives '+r.lives0+'→'+r.lives+' · tags '+blbNum(r.tags,0)+' · '+r.party+' cmdr'+(r.party===1?'':'s')
-    +(r.dials? ' · boss x'+r.dials.bossHp+' troops x'+r.dials.troops+' hp x'+r.dials.troopHp+(r.dials.god?' · god':'')+(r.dials.bank?' · banked':'')+(r.dials.speed>1? ' · x'+r.dials.speed : '') : '')+(r.edits? ' · '+r.edits+' wave edit'+(r.edits===1?'':'s') : '')+(r.over && r.over.length? ' · rules: '+blbEsc(r.over.join('; ')) : '')
+    +(r.dials? ' · boss x'+r.dials.bossHp+' troops x'+r.dials.troops+' hp x'+r.dials.troopHp+(r.dials.god?' · god':'')+(r.dials.bank?' · banked':'')+(r.dials.speed>1? ' · x'+r.dials.speed : '') : '')+(r.stock? ' · stock army LV '+r.stock.L+' ('+blbEsc(blbWName(r.stock.w))+')' : '')+(r.edits? ' · '+r.edits+' wave edit'+(r.edits===1?'':'s') : '')+(r.over && r.over.length? ' · rules: '+blbEsc(r.over.join('; ')) : '')
     +'<input type="text" placeholder="your note on this fight" value="'+blbEsc(BLB.notes[r.at]||'')+'" onchange="BLB.ui.note('+r.at+',this.value)"></span></div>'; }).join('');
   h+='<textarea class="blb-out" id="blbOut" readonly placeholder="EXPORT writes the ledger and the rule changes here (and copies them)"></textarea></div>'; return h; }
 function blbHelpHTML(){ return '<div class="blb-col blb-help"><h3>HOW TO USE THE BOSS LAB</h3>'
   +'<p><b>FIGHTS.</b> Pick a boss on the strip, a tier on the left, then <b>DEPLOY</b>. The fight starts at once: no key, no ladder, no films. Under the tiers the <b>WAVE SHEET</b> lists the fight as the engine will build it: every wave, what it waits for, every group with its count and its health factor, and each boss row\'s bar in numbers. Type a new count or factor on a group to change the lab\'s next fight of that tier (gold = edited; RESET puts the sheet back).</p>'
   +'<p><b>THE DIALS</b> apply to the lab\'s fights only: BOSS HEALTH x, TROOPS x, TROOP HEALTH x, COMMANDERS (the game\'s own party laws: ten percent more troops a commander and the boss\'s bar x (1 + 0.9 (n - 1)); Buffalo Bill\'s bar is flat), DOG TAGS at the whistle, SPEED (x2 and x4 run extra simulation steps a frame, the physics unchanged), GOD MODE (the toy box never falls), BANK REWARDS (OFF by default: the fight pays nothing and marks nothing, so every tier stays a first clear on your account; ON = a normal fight).</p>'
+  +'<p><b>THE PLAYER (10/30).</b> Every lab fight is fought by a <b>stock army</b> at a LEVEL: Wyatt\'s call per fight is filled in (King Rex 20, King Yeti 25, the Sky Fortress 30, King Croak 30 to 40, the Ice Caves 45 to 50, Emperor Bear 50 to 70, Princess Croak\'s palace behind Gnome Park 70 to 90, Buffalo Bill 80 and up; a range runs from EASY to the top tier). Retype it for any fight (gold = yours; RESET LEVELS puts the calls back). That one number is the commander level, the campaign rung, every man\'s rank and every iron\'s rank; the men are the ones a player has by that rung (the rescue road, the commando past 50, the spy past 30), the jeep from 20 and the tank from 40, and Sarge holds the irons a commander of that level has (the saber by default; pick another). Your own account is kept aside for the fight and put back at the verdict or at END; a stock fight never banks anything. Switch THE ARMY to OWN to fight with this account\'s own men and ranks.</p>'
   +'<p><b>RULES</b> are the game\'s own difficulty tables, one grid per table, the shipped number under each cell. A changed cell is live on this device at once and stays through reloads while the lab is open on this account, in the lab\'s fights and at the real doors alike. Nothing leaves your device: use <b>EXPORT</b> on RESULTS to copy the changes as text for Wyatt.</p>'
   +'<p><b>IN THE FIGHT</b> the strip at the bottom right shows the boss\'s bar in numbers, the wave, the clock and the lives, with x1 x2 x4, +100 TAGS, SKIP WAVE (melts the standing troops, the next wave comes now) and END (back here, logged as ABORT). After any verdict the lab reopens on RESULTS.</p>'
   +'<p><b>RESULTS</b> keeps every lab fight (WIN / LOSS / ABORT, the clock, the boss\'s bar left, the waves reached, the lives, the dials and the rules in force). Add a note to a row. EXPORT copies the whole ledger and the rules as plain text (and shows it below the list).</p>'
-  +'<p><b>THE DOORS.</b> The code <code>BOSSLAB</code> at Sarge\'s Surplus opens the lab and marks this account; the LAB tab on the bedroom\'s right edge reopens it. <code>BOSSLABOFF</code> takes the mark off (the rules you changed are reset first). On the web, <code>?bosslab=1</code> and <code>?bosslab=0</code> do the same.</p>'
+  +'<p><b>THE DOORS.</b> The code <code>BOSSLAB</code> at Sarge\'s Surplus opens the lab and marks this account; the LAB tab on the bedroom\'s right edge reopens it. <code>BOSSLABOFF</code> takes the mark off (the rules you changed are reset first). On the web, <code>?bosslab=1</code> and <code>?bosslab=0</code> do the same. Opened by that link, a new account skips the opening mission and the tours and lands in the lab; ✕ shows the bedroom behind it, and every boot lands here again while the lab is on.</p>'
   +'<p><b>THE EIGHT.</b> King Rex (the lair: EASY MEDIUM HARD MEGA ULTRA MEGA), King Yeti (the castle: the same five), King Croak (the hideout), Emperor Bear (the pillow fields), Princess Croak (the palace), the Ice Caves (the ferocious yeti), the Sky Fortress (the big bomber), Buffalo Bill (the showdown: EASY MEDIUM HARD). ULTRA MEGA is the kings\' night fight, built for a room of ten; MEGA and the rest are the doors as players reach them.</p></div>'; }
 function blbExportText(){ const L=[ 'THE BOSS LAB · GREEN VS TAN v'+GVT_CV+' · '+new Date().toISOString() ]; const ov=blbOverList(); L.push('RULES CHANGED ON THIS DEVICE: '+ov.length); for(const o of ov) L.push('  '+o.id+'.'+o.key+'  '+o.ship+' -> '+o.now);
   let ed=0; for(const rk in BLB.waves) for(const tier in BLB.waves[rk]) for(const k in BLB.waves[rk][tier]){ ed++; L.push('  WAVE EDIT '+rk+' '+tier+' group '+k+' '+JSON.stringify(BLB.waves[rk][tier][k])); } if(!ed) L.push('  (no wave edits)');
-  L.push('FIGHTS: '+BLB.log.length); for(const r of BLB.log){ const row=blbRow(r.rk), d=new Date(r.at); L.push('  '+d.toISOString().slice(0,16).replace('T',' ')+' · '+(row? row[1] : r.rk)+' · '+(RAID_TIER_NAMES[r.tier]||r.tier)+' · '+r.res+' in '+blbMMSS(r.sec)+' · boss '+(r.boss? r.boss.hp+'/'+r.boss.max : 'not met')+' · wave '+r.wave+'/'+r.waves+' · lives '+r.lives0+'->'+r.lives+' · tags '+r.tags+' · '+r.party+' cmdr'+(r.dials? ' · boss x'+r.dials.bossHp+' troops x'+r.dials.troops+' hp x'+r.dials.troopHp+(r.dials.god?' god':'')+(r.dials.bank?' banked':'')+(r.dials.speed>1? ' x'+r.dials.speed : '') : '')+(r.edits? ' · '+r.edits+' wave edits' : '')+(r.over && r.over.length? ' · rules '+r.over.join('; ') : '')+(BLB.notes[r.at]? ' · NOTE: '+BLB.notes[r.at] : '')); }
+  L.push('FIGHTS: '+BLB.log.length); for(const r of BLB.log){ const row=blbRow(r.rk), d=new Date(r.at); L.push('  '+d.toISOString().slice(0,16).replace('T',' ')+' · '+(row? row[1] : r.rk)+' · '+(RAID_TIER_NAMES[r.tier]||r.tier)+' · '+r.res+' in '+blbMMSS(r.sec)+' · boss '+(r.boss? r.boss.hp+'/'+r.boss.max : 'not met')+' · wave '+r.wave+'/'+r.waves+' · lives '+r.lives0+'->'+r.lives+' · tags '+r.tags+' · '+r.party+' cmdr'+(r.dials? ' · boss x'+r.dials.bossHp+' troops x'+r.dials.troops+' hp x'+r.dials.troopHp+(r.dials.god?' god':'')+(r.dials.bank?' banked':'')+(r.dials.speed>1? ' x'+r.dials.speed : '') : '')+(r.stock? ' · stock army LV '+r.stock.L+' '+r.stock.w : '')+(r.edits? ' · '+r.edits+' wave edits' : '')+(r.over && r.over.length? ' · rules '+r.over.join('; ') : '')+(BLB.notes[r.at]? ' · NOTE: '+BLB.notes[r.at] : '')); }
   return L.join('\n'); }
 function blbExport(){ const txt=blbExportText(); const ta=document.getElementById('blbOut'); if(ta){ ta.value=txt; try{ ta.focus(); ta.select(); }catch(e){} } try{ if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt); }catch(e){} return txt; }
 
@@ -762356,7 +762396,7 @@ function blbPillSync(){ const on=blbOn() && S.mode==='menu'; if(!on){ if(BLB.pil
 function blbHudOpen(){ blbCss(); if(!BLB.hud){ const d=document.createElement('div'); d.id='blbHud'; document.body.appendChild(d); BLB.hud=d; } BLB.hud.classList.remove('hidden'); BLB.hud.classList.remove('fold'); blbHudPaint(); clearInterval(BLB.hudI); BLB.hudI=setInterval(blbHudPaint, 250); }
 function blbHudClose(){ clearInterval(BLB.hudI); BLB.hudI=0; if(BLB.hud) BLB.hud.classList.add('hidden'); }
 function blbHudPaint(){ const d=BLB.hud; if(!d || d.classList.contains('hidden')) return; if(!blbFight() || S.mode!=='play'){ if(S.mode!=='play') blbHudClose(); return; } const b=blbBossNow(); if(b) BLB.last={ hp:Math.round(b.hp), max:Math.round(b.hpMax), t:b.type };
-  const rd=S.raid, row=blbRow(rd.blb.rk); const line=(row? row[1] : rd.k)+' · '+RAID_TIER_NAMES[rd.t]+' · '+(b? blbTypeName(b.type)+' '+blbNum(Math.round(b.hp),0)+'/'+blbNum(Math.round(b.hpMax),0) : 'BOSS NOT OUT YET')+' · W'+(S.wave|0)+'/'+(S.cfg? S.cfg.waves.length : 0)+(rd.p3? ' P3' : '')+' · '+blbMMSS(blbClock())+' · L'+(S.lives|0)+' T'+blbNum(S.plastic|0,0)+' M'+S.units.filter(u=>!u.dead).length;
+  const rd=S.raid, row=blbRow(rd.blb.rk); const line=(row? row[1] : rd.k)+' · '+RAID_TIER_NAMES[rd.t]+(rd.blb.stock? ' · STOCK LV '+rd.blb.stock.L : '')+' · '+(b? blbTypeName(b.type)+' '+blbNum(Math.round(b.hp),0)+'/'+blbNum(Math.round(b.hpMax),0) : 'BOSS NOT OUT YET')+' · W'+(S.wave|0)+'/'+(S.cfg? S.cfg.waves.length : 0)+(rd.p3? ' P3' : '')+' · '+blbMMSS(blbClock())+' · L'+(S.lives|0)+' T'+blbNum(S.plastic|0,0)+' M'+S.units.filter(u=>!u.dead).length;
   const bt='<div class="bt">'+[1,2,4].map(k=>'<button type="button" class="'+(BLB.ffK===k?'on':'')+'" onclick="BLB.ui.speed('+k+')">x'+k+'</button>').join('')+'<button type="button" onclick="BLB.ui.tags(100)">+100 TAGS</button><button type="button" onclick="BLB.ui.skip()">SKIP WAVE</button><button type="button" class="'+(BLB.fight.god?'on':'')+'" onclick="BLB.ui.god()">GOD</button><button type="button" class="end" onclick="BLB.ui.abort()">END</button></div>';
   d.innerHTML='<div class="fd" onclick="BLB.ui.fold()">'+(d.classList.contains('fold')? '▲ LAB' : '▼ LAB')+'</div><div class="rd">'+blbEsc(line)+'</div>'+bt; }
 
@@ -762368,19 +762408,21 @@ function blbHudPaint(){ const d=BLB.hud; if(!d || d.classList.contains('hidden')
 
 
 
+
 function blbBoot(){ if(BLB.booted) return; blbShip(); BLB.q=(function(){ try{ const q=/[?&]bosslab=([01])/.exec(location.search||''); return q? q[1] : null; }catch(e){ return null; } })();
-  if(BLB.q==='1' && !META.bossLab){ META.bossLab=1; saveMeta(); } else if(BLB.q==='0' && META.bossLab){ META.bossLab=0; saveMeta(); }
-  if(!blbOn()) return; BLB.booted=1; blbLoad(); blbApplyOver(); blbPillSync(); }
+  BLB.blp=!/[?&]blp=0\b/.test(location.search||'');   
+  if(BLB.q==='1' && !META.bossLab){ META.bossLab=1; saveMeta(); } else if(BLB.q==='0' && META.bossLab){ blbLoad(); try{ if(BLB.keep) blbStockDoff('off'); }catch(e){} META.bossLab=0; saveMeta(); }
+  if(!blbOn()) return; BLB.booted=1; blbLoad(); try{ if(BLB.keep) blbStockDoff('boot'); }catch(e){} blbApplyOver(); if(BLB.blp){ blbStockRoom(); BLB.auto=1; } blbPillSync(); }
 function blbRig(o){ o=o||{}; const g=f=>{ try{ return f(); }catch(e){ return 'ERR:'+String(e && e.message || e).slice(0,120); } }; let did=null;
   if(o.flag!=null){ META.bossLab=o.flag?1:0; saveMeta(); if(META.bossLab){ BLB.booted=0; blbBoot(); } else { blbResetAll(); blbSave(); blbClose(); blbPillSync(); } }
   if(o.open) did=g(()=>blbOpen(typeof o.open==='string'? o.open : null)); if(o.close) blbClose(); if(o.tab) BLB.ui.tab(o.tab); if(o.sel) BLB.ui.sel(o.sel); if(o.tier) BLB.ui.tier(o.tier);
-  if(o.fight) for(const k in o.fight) BLB.ui.dial(k, o.fight[k]); if(o.dialsReset) BLB.ui.dialsReset();
+  if(o.fight) for(const k in o.fight) BLB.ui.dial(k, o.fight[k]); if(o.dialsReset) BLB.ui.dialsReset(); if(o.stock){ if(o.stock.on!=null) BLB.ui.dial('stock', o.stock.on? 'STOCK' : 'OWN'); if(o.stock.lv!==undefined) BLB.ui.stockLv(o.stock.lv); if(o.stock.w) BLB.ui.dial('sw', o.stock.w); if(o.stock.reset) BLB.ui.stockReset(); if(o.stock.doff) did=blbStockDoff('rig'); }
   if(o.set){ const a=Array.isArray(o.set[0])? o.set : [o.set]; did=a.map(s=>blbCellSet(s[0], s[1], s[2])); blbSave(); if(BLB.open) blbRender(); } if(o.resetTable) blbResetTable(o.resetTable); if(o.reset){ blbResetAll(); blbSave(); }
   if(o.grp) BLB.ui.grp(o.grp[0], o.grp[1], o.grp[2], o.grp[3]); if(o.wavesReset) BLB.ui.wavesReset();
   if(o.launch) did=g(()=>blbLaunch(o.launch[0], o.launch[1])); if(o.abort) did=g(()=>blbAbort()); if(o.skip) did=g(()=>blbSkipWave()); if(o.tags!=null) did=blbTags(o.tags); if(o.speed) did=blbSpeed(o.speed); if(o.clearLog) BLB.ui.clearLog();
   const b=S.mode==='play'? blbBossNow() : null;
   return { cv:GVT_CV, on:blbOn(), booted:BLB.booted, q:BLB.q, open:!!(BLB.el && !BLB.el.classList.contains('hidden')), tab:BLB.tab, sel:BLB.sel, tier:BLB.tier, pill:!!(BLB.pill && !BLB.pill.classList.contains('hidden')), hud:!!(BLB.hud && !BLB.hud.classList.contains('hidden')), did,
-    rows:BLB.ROWS.map(r=>({ k:r[0], name:r[1], king:r[2], place:raidInfo(r[0]).name, tiers:blbTiers(r[0]) })), rules:BLB_RULES.map(r=>({ id:r[0], ok:!!blbTable(r[0]), rows:r[3], cells:blbCells(r[0]).length })), over:blbOverList(), overN:blbOverN(), fight:Object.assign({},BLB.fight), waves:JSON.parse(JSON.stringify(BLB.waves)), ffK:BLB.ffK,
+    rows:BLB.ROWS.map(r=>({ k:r[0], name:r[1], king:r[2], place:raidInfo(r[0]).name, tiers:blbTiers(r[0]) })), rules:BLB_RULES.map(r=>({ id:r[0], ok:!!blbTable(r[0]), rows:r[3], cells:blbCells(r[0]).length })), over:blbOverList(), overN:blbOverN(), fight:Object.assign({},BLB.fight), waves:JSON.parse(JSON.stringify(BLB.waves)), ffK:BLB.ffK, stock:g(()=>blbStockRead()),
     sheet:o.sheet? g(()=>blbSheet(o.sheet[0], o.sheet[1], o.sheet[2])) : null, log:BLB.log.slice(-5), logN:BLB.log.length, export:o.export? blbExportText() : null,
     fightNow:(S.raid && S.raid.blb)? { rk:S.raid.k, t:S.raid.t, party:S.raid.blb.party, void:S.raid.void?1:0, mode:S.mode, wave:S.wave, waves:S.cfg? S.cfg.waves.length : 0, sec:+blbClock().toFixed(2), lives:S.lives, tags:S.plastic, sq:S.sq? { p:S.sq.p, bp:S.sq.bp } : null, boss:b? { t:b.type, hp:Math.round(b.hp), max:Math.round(b.hpMax) } : null, foes:S.foes.filter(f=>!f.dead).length, hpMul:S.cfg? S.cfg.hpMul : null } : null,
     meta:{ bossLab:META.bossLab|0, ice:Object.assign({},META.ice||{}), bbs:Object.assign({},META.bbs||{}), sky:Object.assign({},META.sky||{}), starBank:META.starBank|0 }, dev:{ blb:blbLS('gvt_blb'), log:blbLS('gvt_blb_log') } }; }
@@ -973961,7 +974003,7 @@ let BFQ=null;
 
 
 
-let GVT_CV='28.45';
+let GVT_CV='28.46';
 let NX_CAP_MUL=4;
 
 
@@ -2639516,7 +2639558,10 @@ window.GVT = {
 
 
 
-const BLB={ v:1, open:0, tab:'fights', sel:'bone', tier:'e', ship:{}, over:{}, fight:{ bossHp:1, troops:1, troopHp:1, party:1, tags:null, speed:1, god:0, bank:0 }, waves:{}, notes:{}, log:[], ret:0, ffK:1, inFF:0, lives0:10, last:null, pendN:0, el:null, hud:null, pill:null, hudI:0, css:0, booted:0, q:null,
+
+
+
+const BLB={ v:1, open:0, tab:'fights', sel:'bone', tier:'e', ship:{}, over:{}, fight:{ bossHp:1, troops:1, troopHp:1, party:1, tags:null, speed:1, god:0, bank:0 }, waves:{}, notes:{}, log:[], ret:0, ffK:1, inFF:0, lives0:10, last:null, pendN:0, el:null, hud:null, pill:null, hudI:0, css:0, booted:0, q:null, blp:1, auto:0, keep:null, stock:{ on:1, lv:{}, w:{} },
   ROWS:[ ['bone','KING REX','kingrex','8 34 96 96'], ['ice','KING YETI','kingyeti','14 -30 104 104'], ['croak','KING CROAK','kingcroak',null], ['fields','EMPEROR BEAR','bearnaparte',null], ['palace','PRINCESS CROAK','princess',null], ['caves','THE ICE CAVES','fyeti',null], ['sky','THE SKY FORTRESS','skyfort',null], ['bbs','BUFFALO BILL','bbshow',null] ],   
   TIERC:{ e:'#BFE39A', m:'#9FC5DE', h:'#E8A070', g:'#B77DE8', u:'#FFD24A' }, MAXLOG:200 };
 
@@ -2639534,6 +2639579,42 @@ const BLB_RULES=[
   ['SKY_T', ()=>SKY_T, 'THE SKY FORTRESS: hp · spd · stick · every · drop · dropEvery · open · warn · aax · rarm · aceOpen · fhp · ahp · fcd ...', 'sky'], ['SKY_RANSOM', ()=>SKY_RANSOM, 'FIRST-CLEAR STARS', 'sky'],
   ['BBS_HP', ()=>BBS_HP, "BILL'S HEALTH (flat)", 'bbs'], ['BBS_PIP', ()=>BBS_PIP, 'HIS FAN: SECONDS A PIP', 'bbs'], ['BBS_X', ()=>BBS_X, 'THE STANDING RAID COUNT x', 'bbs'], ['BBS_RIDER', ()=>BBS_RIDER, 'THE RIDERS: hpX · spdx', 'bbs'], ['BBS_GUNS', ()=>BBS_GUNS, 'BIG GUNS DUG IN', 'bbs'], ['BBS_PLANES', ()=>BBS_PLANES, 'PLANES: fighter every (s) · v2 every (s) · first (s)', 'bbs'] ];
 const BLB_TIERS=['e','m','h','g','u'];
+
+
+
+
+
+
+const BLB_STOCK_LV={ bone:[20,20], ice:[25,25], sky:[30,30], croak:[30,40], caves:[45,50], fields:[50,70], palace:[70,90], bbs:[80,100] };
+const BLB_STOCK_KEYS=['lvl','xp','pendingPicks','campaign','unlocked','platoon','platoonMet','up','sargeUp','sargeUnlocked','sargeWeapon','spy','vehOwned','enh','premiered'];
+const BLB_RIDE_NAME={ bfjeep:'THE SCOUT JEEP', bftank:'THE HEAVY TANK' };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2639604,12 +2639685,12 @@ const BLB_TIERS=['e','m','h','g','u'];
 
 if(typeof codeRedeem==='function'){ const cr0=codeRedeem; codeRedeem=function(){ const inp=document.getElementById('shCodeIn'); const w=inp? codeNorm(inp.value) : '';
   if(w==='BOSSLAB' || w==='BOSSLABOFF'){ inp.value=''; try{ inp.blur(); }catch(e){}
-    if(w==='BOSSLABOFF'){ META.bossLab=0; saveMeta(); blbPillSync(); codeSay('THE BOSS LAB IS CLOSED','yes'); try{ SFX.clack(); }catch(e){} return; }
+    if(w==='BOSSLABOFF'){ try{ if(BLB.keep) blbStockDoff('off'); }catch(e){} META.bossLab=0; saveMeta(); blbPillSync(); codeSay('THE BOSS LAB IS CLOSED','yes'); try{ SFX.clack(); }catch(e){} return; }
     META.bossLab=1; saveMeta(); blbBoot(); codeSay('THE BOSS LAB IS OPEN…','yes'); try{ SFX.fanfare(); }catch(e){} codeShut(1); blbOpen('fights'); return; }
   return cr0.apply(this, arguments); }; }
-if(typeof endBattle==='function'){ const eb0=endBattle; endBattle=function(win){ try{ if(blbFight() && S.mode==='play') blbNote(win? 'WIN' : 'LOSS'); blbHudClose(); }catch(e){} return eb0.apply(this, arguments); }; }
-if(typeof showMenu==='function'){ const sm0=showMenu; showMenu=function(){ const r=sm0.apply(this, arguments); try{ blbHudClose(); blbPillSync(); if(BLB.ret){ BLB.ret=0; setTimeout(()=>{ try{ if(raidSceneOpen()) closeRaidScene(); }catch(e){} blbOpen('log'); }, 0); } }catch(e){} return r; }; }
-if(typeof update==='function'){ const up0=update; update=function(dt){ const r=up0.apply(this, arguments); try{ if(BLB.pill && S.mode!=='menu' && !BLB.pill.classList.contains('hidden')) BLB.pill.classList.add('hidden'); if(blbFight() && !S.coop && S.mode==='play'){ const b9=blbBossNow(); if(b9) BLB.last={ hp:Math.round(b9.hp), max:Math.round(b9.hpMax), t:b9.type }; if(BLB.fight.god && S.lives<BLB.lives0) S.lives=BLB.lives0; if(BLB.ffK>1 && !BLB.inFF){ BLB.inFF=1; try{ for(let i=1;i<BLB.ffK && S.mode==='play';i++) up0.call(this, dt); } finally{ BLB.inFF=0; } } } }catch(e){} return r; }; }
+if(typeof endBattle==='function'){ const eb0=endBattle; endBattle=function(win){ try{ if(blbFight() && S.mode==='play') blbNote(win? 'WIN' : 'LOSS'); blbHudClose(); }catch(e){} const r9=eb0.apply(this, arguments); try{ if(BLB.keep) blbStockDoff('verdict'); }catch(e){} return r9; }; }
+if(typeof showMenu==='function'){ const sm0=showMenu; showMenu=function(){ try{ if(BLB.keep) blbStockDoff('home'); }catch(e){} const r=sm0.apply(this, arguments); try{ blbHudClose(); blbPillSync(); if(BLB.ret){ BLB.ret=0; setTimeout(()=>{ try{ if(raidSceneOpen()) closeRaidScene(); }catch(e){} blbOpen('log'); }, 0); } else if(BLB.auto && blbOn() && !blbTitleUp()){ BLB.auto=0; setTimeout(()=>{ try{ blbOpen('fights'); }catch(e){} }, 0); } }catch(e){} return r; }; }
+if(typeof update==='function'){ const up0=update; update=function(dt){ const r=up0.apply(this, arguments); try{ if(BLB.auto && blbOn() && S.mode==='menu' && !blbTitleUp()){ BLB.auto=0; blbOpen('fights'); } if(BLB.pill && S.mode!=='menu' && !BLB.pill.classList.contains('hidden')) BLB.pill.classList.add('hidden'); if(blbFight() && !S.coop && S.mode==='play'){ const b9=blbBossNow(); if(b9) BLB.last={ hp:Math.round(b9.hp), max:Math.round(b9.hpMax), t:b9.type }; if(BLB.fight.god && S.lives<BLB.lives0) S.lives=BLB.lives0; if(BLB.ffK>1 && !BLB.inFF){ BLB.inFF=1; try{ for(let i=1;i<BLB.ffK && S.mode==='play';i++) up0.call(this, dt); } finally{ BLB.inFF=0; } } } }catch(e){} return r; }; }
 if(typeof raidCount9==='function'){ const rc0=raidCount9; raidCount9=function(){ return BLB.pendN>0? BLB.pendN : rc0.apply(this, arguments); }; }
 
 const BLB_CSS='#blbPage{position:fixed;inset:0;z-index:99980;background:#141810;color:#EDEADF;font-family:var(--uih);font-weight:bold;text-transform:uppercase;user-select:none;-webkit-user-select:none;display:flex;flex-direction:column;overflow:hidden;--bg:#1b1f17;--bd:rgba(127,163,92,0.45);--gold:#FFE07A;font-size:12px;line-height:1.25}'
@@ -2639709,15 +2639790,18 @@ const BLB_CSS='#blbPage{position:fixed;inset:0;z-index:99980;background:#141810;
 
 
 
+
 BLB.ui={ tab(x){ BLB.tab=x; blbSave(); blbRender(); }, close(){ blbClose(); try{ SFX.blip(); }catch(e){} }, sel(k){ if(blbRow(k)) BLB.sel=k; blbSave(); blbRender(); }, tier(k){ BLB.tier=k; blbSave(); blbRender(); },
   go(){ try{ SFX.blip(); }catch(e){} blbLaunch(BLB.sel, BLB.tier); },
-  dial(id,v){ const F=BLB.fight; if(id==='party') F.party=Math.max(1,Math.min(SQ_MAX,v|0)); else if(id==='speed') F.speed=[1,2,4].indexOf(+v)>=0? +v : 1; else if(id==='god') F.god=(v==='ON'||v===1||v===true)?1:0; else if(id==='bank') F.bank=(v==='ON'||v===1||v===true)?1:0; else if(id==='tags') F.tags=(v==='' || v==null)? null : Math.max(0,Math.round(+v)||0); else { const n=+v; F[id]=(isFinite(n) && n>0)? +n.toFixed(3) : 1; } blbSave(); blbRender(); },
+  dial(id,v){ const F=BLB.fight; if(id==='party') F.party=Math.max(1,Math.min(SQ_MAX,v|0)); else if(id==='speed') F.speed=[1,2,4].indexOf(+v)>=0? +v : 1; else if(id==='god') F.god=(v==='ON'||v===1||v===true)?1:0; else if(id==='bank') F.bank=(v==='ON'||v===1||v===true)?1:0; else if(id==='tags') F.tags=(v==='' || v==null)? null : Math.max(0,Math.round(+v)||0); else if(id==='stock') BLB.stock.on=(v==='STOCK'||v===1||v===true)? 1 : 0; else if(id==='sw') BLB.stock.w[BLB.sel+':'+BLB.tier]=String(v); else { const n=+v; F[id]=(isFinite(n) && n>0)? +n.toFixed(3) : 1; } blbSave(); blbRender(); },
   dialsReset(){ BLB.fight={ bossHp:1, troops:1, troopHp:1, party:1, tags:null, speed:1, god:0, bank:0 }; blbSave(); blbRender(); },
+  stockLv(v){ const k=BLB.sel+':'+BLB.tier, n=Math.round(+v); if(v==='' || v==null || !isFinite(n) || n<1) delete BLB.stock.lv[k]; else BLB.stock.lv[k]=Math.min(RANK_MAX,n); blbSave(); blbRender(); }, stockReset(){ BLB.stock.lv={}; BLB.stock.w={}; blbSave(); blbRender(); },
   grp(wi,gi,f,v){ const rk=BLB.sel, tier=BLB.tier, W=(BLB.waves[rk]||(BLB.waves[rk]={})), T9=(W[tier]||(W[tier]={})), k=wi+':'+gi, e=(T9[k]||(T9[k]={})); const n=+v; if(v==='' || !isFinite(n) || n<=0) delete e[f]; else e[f]=(f==='n')? Math.max(1,Math.round(n)) : +n.toFixed(3); if(!Object.keys(e).length) delete T9[k]; if(!Object.keys(T9).length) delete W[tier]; if(!Object.keys(W).length) delete BLB.waves[rk]; blbSave(); blbRender(); },
   wavesReset(){ if(BLB.waves[BLB.sel]){ delete BLB.waves[BLB.sel][BLB.tier]; if(!Object.keys(BLB.waves[BLB.sel]).length) delete BLB.waves[BLB.sel]; } blbSave(); blbRender(); },
   cell(id,key,v){ blbCellSet(id,key,v); blbSave(); blbRender(); }, resetTable(id){ blbResetTable(id); blbSave(); blbRender(); }, resetAll(){ blbResetAll(); blbSave(); blbRender(); },
   note(at,v){ if(v) BLB.notes[at]=String(v).slice(0,400); else delete BLB.notes[at]; blbSave(); }, exportIt(){ blbExport(); }, clearLog(){ BLB.log=[]; BLB.notes={}; blbSave(); blbRender(); },
   speed(k){ blbSpeed(k); }, tags(n){ blbTags(n); blbHudPaint(); }, skip(){ blbSkipWave(); blbHudPaint(); }, god(){ BLB.fight.god=BLB.fight.god?0:1; if(S.raid && S.raid.blb) S.raid.blb.dials.god=BLB.fight.god; blbSave(); blbHudPaint(); }, abort(){ blbAbort(); }, fold(){ if(BLB.hud){ BLB.hud.classList.toggle('fold'); blbHudPaint(); } } };
+
 
 
 
