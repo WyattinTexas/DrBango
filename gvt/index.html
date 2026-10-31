@@ -759436,6 +759436,60 @@ function bnfRead(o){ o=o||{}; if(o.on!=null) BNF.on=o.on? 1 : 0; if(o.reset){ fo
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+function bfeOn(){ return !!(BFE.on && !S.bf && bbsOn()); }
+function bfeParty(){ return !!(S.coop && COOP && !COOP.ended && !COOP.watch && coopHumans()>=2); }
+function bfeTurned(f){ return !!(f && (f.bbsRide || (f.bbs && (f.bbs.st==='mount' || f.bbs.st==='ride')))); }
+function bfeErr(e){ BFE.stats.errs++; BFE.err=String((e && e.message) || e).slice(0,200); }
+function bfeSay(n,f){ const cm={ k:'bbx', n:n|0, id:(f && (f.foN|0)) || 0 }; if(f){ cm.x=Math.round(f.x); cm.y=Math.round(f.y); }
+  coopSend(cm); BFE.stats[n===1? 'said1' : 'said2']++; BFE.last={ said:n|0, t:+S.t.toFixed(2), ref:sqRef()? 1 : 0 }; }
+function bfeHear(cm){ try{
+  if(!bfeOn() || !S.coop || !COOP || COOP.ended || S.mode!=='play'){ BFE.stats.idle++; return; }
+  const rd=S.raid; if(rd.won || rd.kingDown || S.cleared){ BFE.stats.idle++; return; }
+  const n=cm.n|0, bill=bbsBill();
+  if(n===1){ BFE.stats.heard1++;   
+    if(!bill){ BFE.stats.idle++; return; }
+    rd.bfeTurn=1; if(bfeTurned(bill)) return;
+    BFE.hear=1; try{ bbsMount(bill,null); }finally{ BFE.hear=0; }
+    BFE.stats.mounted++; BFE.last={ heard:1, t:+S.t.toFixed(2), from:String(cm.p==null? '' : cm.p) }; return; }
+  if(n===2){ BFE.stats.heard2++;   
+    if(!sqRef()){ BFE.stats.waited++; return; }
+    if(!bill || !bfeTurned(bill)){ BFE.stats.idle++; return; }
+    rd.bfeFall=1; evKillByWord(bill);
+    BFE.stats.felled++; BFE.last={ heard:2, t:+S.t.toFixed(2), from:String(cm.p==null? '' : cm.p) }; return; }
+  BFE.stats.idle++;
+}catch(e){ bfeErr(e); } }
+
+
+
+
+
+
+
+
+
+function bfeRead(){ const b=bbsBill(), rd=S.raid;
+  return { on:BFE.on, live:BFE_LIVE, active:bfeOn()? 1 : 0, party:bfeParty()? 1 : 0, ref:sqRef()? 1 : 0, guest:coopGuest()? 1 : 0, turn:(rd && rd.bfeTurn)? 1 : 0, fall:(rd && rd.bfeFall)? 1 : 0,
+    bill:b? { st:b.bbs? b.bbs.st : null, ride:b.bbsRide|0, hp:Math.round(b.hp), max:b.hpMax, foN:b.foN|0 } : null, won:!!(rd && rd.won), kingDown:!!(rd && rd.kingDown), mode:S.mode,
+    stats:Object.assign({}, BFE.stats), last:BFE.last? Object.assign({}, BFE.last) : null, err:BFE.err }; }
+
+
+
+
+
+
+
 function nclOn(){ return !NCL_OFF; }
 
 function nclStrip(){ if(!nclOn()) return 0; const id=NCL.id; let n=0; try{
@@ -975233,7 +975287,7 @@ let BFQ=null;
 
 
 
-let GVT_CV='28.74';
+let GVT_CV='28.75';
 let NX_CAP_MUL=4;
 
 
@@ -2641240,6 +2641294,60 @@ document.addEventListener('click', function(e){ try{ const b=e.target && e.targe
 
 
 setTimeout(function(){ try{ if(window.GVT && !GVT.bnf) GVT.bnf=function(o){ return bnfRead(o); }; }catch(e){} }, 0);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const BFE_LIVE=1;
+const BFE={ on:(function(){ try{ const q=/[?&]bfe=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_bfe','0'); else localStorage.removeItem('gvt_bfe'); } return localStorage.getItem('gvt_bfe')==='0'? 0 : BFE_LIVE; }catch(e){ return BFE_LIVE; } })(),
+  hear:0, stats:{ said1:0, said2:0, heard1:0, heard2:0, mounted:0, felled:0, waited:0, idle:0, errs:0 }, err:null, last:null };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+{ const m0=bbsMount; bbsMount=function(f,u){ const was=bfeTurned(f); const r=m0.apply(this, arguments);   
+  try{ const rd=S.raid; if(!BFE.hear && !was && bfeOn() && f && f.type==='bbshow' && bfeTurned(f) && !rd.bfeTurn){ rd.bfeTurn=1; if(bfeParty()) bfeSay(1,f); } }catch(e){ bfeErr(e); }
+  return r; }; }
+{ const f0=foeFell; foeFell=function(f,u){ let go=false;   
+  try{ go=!!(bfeOn() && f && f.type==='bbshow' && !f.fdBless && bfeTurned(f) && S.foes.indexOf(f)>=0 && coopGuest() && bfeParty() && !S.raid.bfeFall); }catch(e){ bfeErr(e); }
+  const r=f0.apply(this, arguments);
+  if(go){ try{ S.raid.bfeFall=1; bfeSay(2,f); }catch(e){ bfeErr(e); } }
+  return r; }; }
+{ const ca0=coopApply; coopApply=function(cm){ if(cm && cm.k==='bbx'){ bfeHear(cm); return; } return ca0.apply(this, arguments); }; }
+
+
+
+
+setTimeout(function(){ try{ if(window.GVT && !GVT.bfe) GVT.bfe=function(){ return bfeRead(); }; }catch(e){} }, 0);
 
 
 
