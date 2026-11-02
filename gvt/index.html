@@ -766468,18 +766468,22 @@ function icn3DrawFaller(o,img,w,flip){ const fl=o.falling, k=Math.min(1,fl.t/fl.
 
 
 
+
+
+
 function dmpTier(){ try{ if(typeof dhtTier==='function') return dhtTier(); }catch(e){} const R=S.raid; return (R && R.t && 'emhgu'.indexOf(R.t)>=0)? R.t : 'e'; }
-function dmpShare(){ const v=DMG_DAMP[dmpTier()]; return (typeof v==='number' && isFinite(v) && v>0)? Math.min(0.95, v) : 0; }
-function dmpX(u,src){ if(!DMP.on || S.bf) return 1; if(src && src.dmpRaw){ DMP.raw++; return 1; } const s=dmpShare(); if(!(s>0)) return 1; DMP.n++; DMP.last=u? u.type : null; return 1-s; }
-function dmpHp(f,src){ if(!DMP.on || S.bf || !f || f.hp==null || S.units.indexOf(f)<0) return 1; const x=dmpX(f,src); if(x!==1) DMP.hp++; return x; }
+function dmpShare(){ const v=S.bf? DMG_DAMP_BF.x : DMG_DAMP[dmpTier()]; return (typeof v==='number' && isFinite(v) && v>0)? Math.min(0.95, v) : 0; }
+function dmpX(u,src){ if(!DMP.on) return 1; if(src && src.dmpRaw){ DMP.raw++; return 1; } const s=dmpShare(); if(!(s>0)) return 1; DMP.n++; if(S.bf) DMP.bf++; DMP.last=u? u.type : null; return 1-s; }
+function dmpHp(f,src){ if(!DMP.on || !f || f.hp==null) return 1; if(S.bf? !f.side : S.units.indexOf(f)<0) return 1; const x=dmpX(f,src); if(x!==1) DMP.hp++; return x; }
 
 
 
 
 
 
-function dmpRead(){ const bf=!!S.bf, t=dmpTier(); return { cv:GVT_CV, on:DMP.on, damp:Object.assign({},DMG_DAMP), tier:t, share:DMP.on? dmpShare() : 0, x:(DMP.on && !bf)? 1-dmpShare() : 1, bf:bf? 1 : 0, mode:S.mode, n:DMP.n, raw:DMP.raw, hp:DMP.hp, last:DMP.last, err:DMP.err, e:DMP.e,
+function dmpRead(){ const bf=!!S.bf, t=dmpTier(); return { cv:GVT_CV, on:DMP.on, take:2, damp:Object.assign({},DMG_DAMP), bfShare:DMG_DAMP_BF.x, tier:t, share:DMP.on? dmpShare() : 0, x:DMP.on? 1-dmpShare() : 1, bf:bf? 1 : 0, mode:S.mode, n:DMP.n, raw:DMP.raw, hp:DMP.hp, nBf:DMP.bf, last:DMP.last, err:DMP.err, e:DMP.e,
   lab:(typeof BLB_RULES!=='undefined')? BLB_RULES.filter(function(r){ return r[0]==='DMG_DAMP'; }).map(function(r){ return r[3]; }) : null }; }
+
 
 
 
@@ -977814,7 +977818,7 @@ let BFQ=null;
 
 
 
-let GVT_CV='29.16';
+let GVT_CV='29.17';
 let NX_CAP_MUL=4;
 
 
@@ -2435291,7 +2435295,7 @@ Object.assign(TR["ar"]||(TR["ar"]={}), {"A ZIGZAG, TOP TO BOTTOM":"خط متعر
 
 const BBS={ on:(function(){ try{ const q=/[?&]bbs=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_bbs','0'); else localStorage.removeItem('gvt_bbs'); } return localStorage.getItem('gvt_bbs')==='0'? 0 : 1; }catch(e){ return 1; } })() };
 const BBS_FILL=4, BBS_PIN_P=4;
-const BBS_HP={ e:20000, m:40000, h:60000 };
+const BBS_HP={ e:16000, m:32000, h:48000 };
 const BBS_PIP={ e:0.8, m:0.6, h:0.6 };
 const BBS_FAN={ n:{ e:6, m:6, h:8 }, gap:0.2, reload:4.0, half:54, thru:3, R:230, cd:0.3 };
 const BBS_X={ e:1, m:2, h:4 };
@@ -2651159,16 +2651163,19 @@ try{ if(window.GVT && !GVT.icn3) GVT.icn3=function(){ let live=null, R=null, ins
 
 
 
+
+
 const DMP_ON=(function(){ try{ const q=/[?&]dmp=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_dmp','0'); else localStorage.removeItem('gvt_dmp'); } return localStorage.getItem('gvt_dmp')==='0'? 0 : 1; }catch(e){ return 1; } })();
-const DMG_DAMP={ e:0.3, m:0.3, h:0.3, g:0.3, u:0.3 };
-const DMP={ on:DMP_ON, n:0, raw:0, hp:0, last:null, err:0, e:'' };
+const DMG_DAMP={ e:0.5, m:0.5, h:0.5, g:0.5, u:0.5 };
+const DMG_DAMP_BF={ x:0.3 };
+const DMP={ on:DMP_ON, n:0, raw:0, hp:0, bf:0, last:null, err:0, e:'' };
 
 
 
 
 
 if(DMP_ON){ try{ if(typeof BLB_RULES!=='undefined' && Array.isArray(BLB_RULES)){
-  BLB_RULES.push(['DMG_DAMP', ()=>DMG_DAMP, 'THE DAMPER: the share off every hit on your men (0.3 = a hit lands at 70 %; 0 = as shipped)', 'bone ice croak fields palace caves sky bbs']);
+  BLB_RULES.push(['DMG_DAMP', ()=>DMG_DAMP, 'THE DAMPER: the share off every hit on your men (0.5 = a hit lands at 50 %; 0 = as shipped)', 'bone ice croak fields palace caves sky bbs']);
   if(typeof blbShip==='function' && typeof BLB==='object' && BLB && BLB.ship) blbShip();
   if(typeof BLB==='object' && BLB && BLB.booted && BLB.over && typeof blbCellSet==='function'){ const o=BLB.over.DMG_DAMP; if(o) for(const k of Object.keys(o)) blbCellSet('DMG_DAMP',k,o[k]); }
 } }catch(e){ DMP.err++; DMP.e+='lab:'+String(e&&e.message||e).slice(0,80); } }
@@ -2651176,7 +2651183,8 @@ if(DMP_ON){ try{ if(typeof BLB_RULES!=='undefined' && Array.isArray(BLB_RULES)){
 
 setTimeout(function(){ try{ if(window.GVT && !GVT.dmp) GVT.dmp=function(o){ o=o||{};
   if(o.damp) for(const k of Object.keys(o.damp)) DMG_DAMP[k]=+o.damp[k];
-  if(o.reset){ DMP.n=0; DMP.raw=0; DMP.hp=0; DMP.last=null; }
+  if(o.bf!=null) DMG_DAMP_BF.x=+o.bf;
+  if(o.reset){ DMP.n=0; DMP.raw=0; DMP.hp=0; DMP.bf=0; DMP.last=null; }
   return dmpRead(); }; }catch(e){} }, 0);
 
 
