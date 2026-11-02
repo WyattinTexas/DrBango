@@ -104,11 +104,21 @@ function glNote(d) {
   if (!by || !land) return { title: 'GREEN VS TAN', body: w[1], dir: 'auto', lang: 'en', id: '' };
   return { title: glLine(w[0], by, land), body: left > 3 ? w[1] + ' · ' + glLine(w[2], String(left)) : glLine(w[3], land), dir: d.lang === 'ar' ? 'rtl' : 'auto', lang: d.lang || 'en', id: String(d.id || '') };
 }
+// CARD-RKC THE LEADERBOARD CHALLENGE RINGS THE COMMANDER (design/rank-challenge-ring-1101/00-CARD-RKC.md; Wyatt by phone 11/1/2026: "the player who gets challenged will receive a push notification … They get 90 seconds
+// to respond"): HQ v159 sends a leaderboard knock's FACTS sealed for this phone ({k:'rk', id, by, secs, until, lang}); the words are written here in the commander's tongue (the game's own rows), ONE standing
+// notification under its own tag (rk: a newer knock replaces it; the globe's gl stands beside it); its tap brings the game to the front (the listener below, unchanged), where the game's own beat shows the knock card.
+const RK_WORDS = {"en":["⚔ %1 CALLS YOU OUT!","COME DEFEND YOUR RANK","YOU HAVE %1 SECONDS","YOUR ARMY IS DEFENDING YOUR RANK"],"ar":["⚔ %1 يتحداك!","تعال ودافع عن مرتبتك","أمامك %1 ثانية","جيشك يدافع عن مرتبتك"],"ja":["⚔ %1 が しょうぶを かけてきた！","じゅんいを まもりに いこう","のこり %1びょう","キミの ぐんたいが じゅんいを まもっている"],"ko":["⚔ %1 님이 대결을 신청했어요!","네 순위를 지키러 와!","남은 시간 %1초","네 군대가 순위를 지키는 중"],"zh":["⚔ %1 向你发起对战！","快来保卫你的排名","你有 %1 秒","你的军队正在保卫你的排名"],"de":["⚔ %1 FORDERT DICH HERAUS!","KOMM UND VERTEIDIGE DEINEN RANG","DU HAST %1 SEKUNDEN","DEINE ARMEE VERTEIDIGT DEINEN RANG"],"ru":["⚔ %1 ВЫЗЫВАЕТ ТЕБЯ НА БОЙ!","ИДИ ЗАЩИЩАТЬ СВОЙ РАНГ","У ТЕБЯ %1 СЕКУНД","ТВОЯ АРМИЯ ЗАЩИЩАЕТ ТВОЙ РАНГ"],"es":["⚔ ¡%1 TE RETA!","VEN A DEFENDER TU PUESTO","TIENES %1 SEGUNDOS","TU EJÉRCITO DEFIENDE TU PUESTO"]};
+function rkNote(d) {
+  const w = RK_WORDS[d.lang] || RK_WORDS.en, by = String(d.by || '').toUpperCase().slice(0, 12);
+  const left = Math.min(d.secs | 0, Math.round((+d.until || 0) - Date.now() / 1000));
+  if (!by) return { title: 'GREEN VS TAN', body: w[1], dir: 'auto', lang: 'en', id: '' };
+  return { title: glLine(w[0], by), body: left > 3 ? w[1] + ' · ' + glLine(w[2], String(left)) : w[3], dir: d.lang === 'ar' ? 'rtl' : 'auto', lang: d.lang || 'en', id: String(d.id || '') };
+}
 self.addEventListener('push', e => {
   let d = null; try { d = e.data ? e.data.json() : null; } catch (err) { d = null; }
-  const n = glNote(d);
-  e.waitUntil(self.registration.showNotification(n.title, { body: n.body, tag: 'gl', renotify: true, dir: n.dir, lang: n.lang,
-    icon: new URL('./icon-192.png', self.location.href).href, data: { k: 'gl', id: n.id } }));
+  const rk = !!(d && d.k === 'rk'), n = rk ? rkNote(d) : glNote(d);   // CARD-RKC: the leaderboard knock by its bag
+  e.waitUntil(self.registration.showNotification(n.title, { body: n.body, tag: rk ? 'rk' : 'gl', renotify: true, dir: n.dir, lang: n.lang,
+    icon: new URL('./icon-192.png', self.location.href).href, data: { k: rk ? 'rk' : 'gl', id: n.id } }));
 });
 self.addEventListener('notificationclick', e => {
   e.notification.close();
