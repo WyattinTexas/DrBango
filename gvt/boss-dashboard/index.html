@@ -157,6 +157,19 @@ table.bd .links{margin-top:0}
 .fsel{display:none;gap:6px;width:100%} .fsel label{display:flex;flex-direction:column;gap:2px;flex:1 1 0;min-width:0;font-size:9.5px;letter-spacing:.5px;color:var(--mute);font-weight:700} .fsel label.w2{flex:1.6 1 0} .fsel label.w15{flex:1.35 1 0} .fsel label.w08{flex:.75 1 0} .fsel select{width:100%;min-width:0;height:30px;min-height:30px;font-size:12.5px;font-weight:600;padding:2px 4px;text-overflow:ellipsis}
 main section{scroll-margin-top:calc(var(--navh,0px) + 10px)}
 svg text.vlab{paint-order:stroke;stroke:var(--card);stroke-width:3px;stroke-linejoin:round}
+/* THE ARMY (CARD-ARM) */
+.lvbar{display:flex;gap:10px;align-items:center;margin:8px 0 2px;flex-wrap:wrap}
+.lvbar input[type=range]{flex:1 1 220px;max-width:460px;min-height:28px;accent-color:var(--green)}
+.lvn{width:68px;font:inherit;font-size:13px;padding:3px 6px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink);height:30px}
+.chip.on{background:var(--green);border-color:var(--green);color:var(--onbtn)}
+.chips .fl{align-self:center}
+td.spk{padding:2px 6px;min-width:140px} .spkw{display:inline-block;line-height:0;border-radius:4px}
+svg.spk .ln{fill:none;stroke:var(--green);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+svg.spk .dt{fill:var(--green);stroke:var(--card);stroke-width:2} svg.spk .tk{stroke:var(--dim2);stroke-width:1.5}
+.lvb{font:inherit;font-weight:700;font-size:12.5px;border:1px solid var(--line);background:var(--card);color:var(--green);border-radius:6px;min-width:40px;min-height:28px;cursor:pointer}
+.lvb.on{background:var(--green);border-color:var(--green);color:var(--onbtn)}
+table.atl th.rowh,table.byl th.rowh{min-width:190px;max-width:260px} th.rowh .srow small{display:block;margin-top:1px}
+.armydoor{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 @media (max-width:700px){h1{font-size:20px} .wrap{padding:10px 16px 32px} .theme{margin-left:0} nav.filters{gap:4px 14px;padding:6px 0 5px} nav.filters .fg{display:none} nav.filters .fsel{display:flex} .seg{padding:3px 8px;font-size:12px} th,td{padding:4px 5px} .fhead h2{font-size:19px} .meter{grid-template-columns:minmax(96px,130px) 1fr auto;gap:6px 8px} .board{grid-template-columns:1fr} table.bd td{min-width:180px} table.bd th.rowl{min-width:0;max-width:96px;white-space:normal;font-size:10px} th.rowh{min-width:156px;max-width:196px;line-height:1.25} th.rowh b{font-size:11.5px} th.rowh .srow{gap:5px} th.rowh .srow .tile{width:20px;height:20px;--sz:20px} th.rowh .kind{font-size:10.5px}
   tr.sep th{text-align:left;padding-left:8px} td.clamp,th.clamph{display:none} td.bt{max-width:160px} td.bt.long{min-width:200px;max-width:220px} tr.detail td{padding:4px 10px 8px 12px} tr.detail .dwrap{position:sticky;left:12px;max-width:calc(100vw - 56px)}
@@ -191,6 +204,7 @@ svg text.vlab{paint-order:stroke;stroke:var(--card);stroke-width:3px;stroke-line
 'use strict';
 const D=window.BOSS_DATA||{fights:[],meta:{}};
 const F=(D.fights||[]).slice().sort((a,b)=>((a.order==null?99:a.order)-(b.order==null?99:b.order))||String(a.key).localeCompare(String(b.key)));
+const ARMY=D.army||null;   // CARD-ARM (11/2): THE ARMY, the player's units level by level (data/army.json)
 const META=D.meta||{}; const DIALS=META.dials||{}; const EXTRAS=META.extras||{}; const NOBREAK=META.noBreakdown||[]; const RIDES=META.rides||{};
 const NUMW=n=>({3:'three',4:'four',5:'five',6:'six',7:'seven',8:'eight',9:'nine',10:'ten'}[n]||String(n)); const NFW=NUMW(F.length);   // the fight count in words (six since THE ICE CAVES joined on Nov 1)
 const TIERS=[['e','EASY'],['m','MEDIUM'],['h','HARD'],['g','MEGA'],['u','ULTRA MEGA']];
@@ -209,22 +223,23 @@ const main=document.getElementById('main'),filtersEl=document.getElementById('fi
 
 /* ---------- state: a link (the hash) is the whole view; a bare address reads the browser's memory; then the defaults ---------- */
 function readState(){
-  const s={f:'all',t:'e',p:'1',v:'cards'}; let fromHash=false;
+  const s={f:'all',t:'e',p:'1',v:'cards',l:'50',m:'hp'}; let fromHash=false;
   const h=location.hash.replace(/^#/,'');
-  if(h){ try{const q=new URLSearchParams(h); ['f','t','p','v'].forEach(k=>{ if(q.has(k)){ s[k]=q.get(k); fromHash=true; } });}catch(e){} }
+  if(h){ try{const q=new URLSearchParams(h); ['f','t','p','v','l','m'].forEach(k=>{ if(q.has(k)){ s[k]=q.get(k); fromHash=true; } });}catch(e){} }
   // only a bare address reads localStorage: a cards-view link copied by one viewer never opens as the board for another whose browser last chose it
   if(!fromHash){ try{const o=JSON.parse(localStorage.getItem(LS)||'null'); if(o&&typeof o==='object') Object.assign(s,o);}catch(e){} }
-  if(s.f!=='all'&&!byKey[s.f]) s.f='all';
+  if(s.f!=='all'&&!(s.f==='army'&&ARMY)&&!byKey[s.f]) s.f='all';
+  { const n=parseInt(s.l,10); s.l=String(isFinite(n)?Math.max(0,Math.min(100,n)):50); } if(!['hp','bar','hit','dps'].includes(s.m)) s.m='hp';   // THE ARMY's level and what its table shows
   if(!TN[s.t]) s.t='e';
   s.p=String(s.p); if(!PARTIES.includes(s.p)) s.p='1';
   if(!VIEWS.includes(s.v)) s.v='cards';
   return s;
 }
 function writeState(){
-  const q=new URLSearchParams(); q.set('f',S.f); q.set('t',S.t); q.set('p',S.p); if(S.f==='all') q.set('v',S.v==='board'?'board':'cards');
+  const q=new URLSearchParams(); q.set('f',S.f); q.set('t',S.t); q.set('p',S.p); if(S.f==='all') q.set('v',S.v==='board'?'board':'cards'); if(S.f==='army'){ q.set('l',S.l); q.set('m',S.m); }
   const hash='#'+q.toString();
   if(location.hash!==hash){ try{history.replaceState(null,'',hash);}catch(e){ location.hash=hash; } }
-  try{localStorage.setItem(LS,JSON.stringify({f:S.f,t:S.t,p:S.p,v:S.v}));}catch(e){}
+  try{localStorage.setItem(LS,JSON.stringify({f:S.f,t:S.t,p:S.p,v:S.v,l:S.l,m:S.m}));}catch(e){}
 }
 let S=readState();
 
@@ -380,25 +395,27 @@ function segBtn(label,on,fn,title,disabled,cls){ return el('button',{class:'seg'
 function renderFilters(f){ filtersEl.textContent='';
   const g1=el('div',{class:'fg',role:'group','aria-label':'Fight'},el('span',{class:'fl'},'FIGHT'),segBtn('ALL',S.f==='all',()=>{S.f='all';render();},'all '+NFW+' fights'));
   F.forEach(x=>g1.appendChild(segBtn(x.boss,S.f===x.key,()=>{S.f=x.key;render();},x.fight)));
+  if(ARMY) g1.appendChild(segBtn('THE ARMY',S.f==='army',()=>{S.f='army';render();},'every man, Sarge’s irons and the heroes, level 0 to 100',false,'army'));   // CARD-ARM
   const g2=el('div',{class:'fg',role:'group','aria-label':'Tier'},el('span',{class:'fl'},'TIER'));
-  TIERS.forEach(([k,n])=>{ const dis=f?!hasTier(f,k):false; g2.appendChild(segBtn(n,S.t===k,()=>{S.t=k;render();},dis?f.fight+' has no '+n:(f?'the lab fights '+n+' at level '+tierOf(f,k).labLevel:n),dis)); });
+  TIERS.forEach(([k,n])=>{ const dis=f?!hasTier(f,k):false; g2.appendChild(segBtn(n,S.t===k,()=>{S.t=k;render();},dis?f.fight+' has no '+n:(f?'the lab fights '+n+' at level '+tierOf(f,k).labLevel:(S.f==='army'?'marks the fights’ lab levels on '+n:n)),dis)); });
   const g3=el('div',{class:'fg',role:'group','aria-label':'Party size for the bosses’ bars'},el('span',{class:'fl'},'PARTY'));
   PARTIES.forEach(p=>g3.appendChild(segBtn(p,S.p===p,()=>{S.p=p;render();},party(p)+' · the boss’s bar grows with the party (a real party’s bar; 1 = solo)',false,'p')));
-  filtersEl.append(g1,g2,g3);
-  if(!f){ const g0=el('div',{class:'fg',role:'group','aria-label':'View'},el('span',{class:'fl'},'VIEW'),segBtn('CARDS',S.v!=='board',()=>{S.v='cards';render();},'the '+NFW+' fights as cards'),segBtn('BOARD',S.v==='board',()=>{S.v='board';render();},'one table: the fights in columns, the facts in rows')); filtersEl.appendChild(g0); }
+  if(S.f==='army') filtersEl.append(g1,g2); else filtersEl.append(g1,g2,g3);   // THE ARMY has no party: the bosses' bars are not on it
+  if(!f&&S.f!=='army'){ const g0=el('div',{class:'fg',role:'group','aria-label':'View'},el('span',{class:'fl'},'VIEW'),segBtn('CARDS',S.v!=='board',()=>{S.v='cards';render();},'the '+NFW+' fights as cards'),segBtn('BOARD',S.v==='board',()=>{S.v='board';render();},'one table: the fights in columns, the facts in rows')); filtersEl.appendChild(g0); }
   filtersEl.appendChild(strip(f)); }
 // a phone's one-line strip: the same choices as native selects (the chip groups hide under 700 px, the selects above it)
 function selOf(label,opts,cur,fn,cls){ const s=el('select',{'aria-label':label==='GO TO'?'go to a section of this fight':label==='PARTY'?'party size (commanders) for the bosses’ bars':label.toLowerCase(),onchange:e=>fn(e.target)}); opts.forEach(([v,n,dis])=>s.appendChild(el('option',{value:v,disabled:dis?true:null},n))); s.value=cur; return el('label',{class:cls||null},label,s); }
 function strip(f){ const w=el('div',{class:'fsel'});
-  w.appendChild(selOf('FIGHT',[['all','ALL FIGHTS']].concat(F.map(x=>[x.key,x.boss])),S.f,s=>{S.f=s.value;render();},'w2'));
+  w.appendChild(selOf('FIGHT',[['all','ALL FIGHTS']].concat(F.map(x=>[x.key,x.boss]),ARMY?[['army','THE ARMY']]:[]),S.f,s=>{S.f=s.value;render();},'w2'));
   w.appendChild(selOf('TIER',TIERS.map(([k,n])=>[k,n,f?!hasTier(f,k):false]),S.t,s=>{S.t=s.value;render();},'w15'));
-  w.appendChild(selOf('PARTY',PARTIES.map(p=>[p,p]),S.p,s=>{S.p=s.value;render();},'w08'));
-  if(!f) w.appendChild(selOf('VIEW',[['cards','CARDS'],['board','BOARD']],S.v==='board'?'board':'cards',s=>{S.v=s.value;render();},'w15'));
+  if(S.f!=='army') w.appendChild(selOf('PARTY',PARTIES.map(p=>[p,p]),S.p,s=>{S.p=s.value;render();},'w08'));
+  if(S.f==='army') w.appendChild(selOf('GO TO',[['','section…']].concat(armyIds()),'',s=>{ const v=s.value; s.value=''; if(v) jumpTo(v); },'w15'));
+  else if(!f) w.appendChild(selOf('VIEW',[['cards','CARDS'],['board','BOARD']],S.v==='board'?'board':'cards',s=>{S.v=s.value;render();},'w15'));
   else w.appendChild(selOf('GO TO',[['','section…']].concat(sectionIds(f)),'',s=>{ const v=s.value; s.value=''; if(v) jumpTo(v); },'w15'));
   return w; }
 function copyLink(e){ const b=e.currentTarget; const url=location.href; const done=()=>{ b.textContent='Link copied'; setTimeout(()=>{b.textContent='Copy link to this view';},1600); };
   try{ if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(url).then(done,()=>{ prompt('Copy this link',url); }); return; } }catch(x){} try{prompt('Copy this link',url);}catch(x){} }
-function renderScope(f){ scopeEl.textContent=''; if(f){ const t=tierOf(f,S.t); scopeEl.append(el('span',{},el('b',{},f.boss),' · '+f.fight),el('span',{},el('b',{},TN[S.t]),' · the lab fights at level '+t.labLevel)); } else scopeEl.append(el('span',{},el('b',{},'ALL FIGHTS'),' · '+TN[S.t]));
+function renderScope(f){ scopeEl.textContent=''; if(S.f==='army'){ scopeEl.append(el('span',{},el('b',{},'THE ARMY'),' · every man, Sarge’s irons and the heroes'),el('span',{},el('b',{},'LEVEL '+S.l),' · TIER '+TN[S.t]+' marks the fights’ lab levels'),el('button',{class:'lnk',type:'button',onclick:copyLink},'Copy link to this view')); return; } if(f){ const t=tierOf(f,S.t); scopeEl.append(el('span',{},el('b',{},f.boss),' · '+f.fight),el('span',{},el('b',{},TN[S.t]),' · the lab fights at level '+t.labLevel)); } else scopeEl.append(el('span',{},el('b',{},'ALL FIGHTS'),' · '+TN[S.t]));
   scopeEl.append(el('span',{},el('b',{},party(S.p)),' for the bosses’ bars (a real party’s; 1 = solo)'),el('button',{class:'lnk',type:'button',onclick:copyLink},'Copy link to this view')); }
 
 /* ---------- ALL FIGHTS: the same facts as five cards or as one board ---------- */
@@ -502,6 +519,7 @@ function overviewSources(){ const bits=[]; F.forEach((f,i)=>{ const s=f.source; 
 function renderOverview(){ const t=S.t,p=S.p;
   main.appendChild(el('h2',{},'ALL FIGHTS',el('small',{},F.length+' boss fights · '+TN[t]+' · '+party(p)+(S.v==='board'?' · the '+NFW+' side by side, the facts in rows':''))));
   main.appendChild(S.v==='board'?board():cards());
+  if(ARMY) main.appendChild(el('div',{class:'note armydoor'},el('b',{},'THE ARMY'),' · every man, Sarge’s '+NUMW(ARMY.irons.length)+' irons and the heroes, level 0 to 100: HP, the bar, the hit and per second, with the fights’ lab levels marked. ',el('button',{class:'lnk',type:'button',onclick:()=>{S.f='army';render();}},'Open THE ARMY')));   // CARD-ARM
   if(NOBREAK.length) main.appendChild(el('p',{class:'quiet'},'No breakdown yet: '+NOBREAK.join(' · ')+'.'));
   main.appendChild(el('h2',{},"THE BOSSES' BARS AT "+TN[t],el('small',{},party(p)+' · the '+NFW+' on one scale · a real party’s bar (1 = solo) · a boss who fights on two bars shows both (named on the card) · where THE BOSS LAB’s slider differs, the table has its row')));
   main.appendChild(crossBars()); if(F.some(f=>f.bossBars2)) main.appendChild(legend([['the first bar','s1'],['the second bar','s1b']])); main.appendChild(crossTwin());
@@ -642,19 +660,98 @@ function renderFight(f){ const t=S.t,p=S.p; main.appendChild(fightHead(f,t));
   main.appendChild(ruleSection(f)); main.appendChild(tiersSection(f,t)); main.appendChild(strikesSection(f,t)); main.appendChild(surviveSection(f,t)); main.appendChild(firstSection(f,t)); main.appendChild(bodiesSection(f,t)); main.appendChild(bossSection(f,t,p)); const mo=moreSection(f,t); if(mo) main.appendChild(mo); main.appendChild(wavesSection(f,t)); main.appendChild(changesSection(f));
   const q=questionsSection(f); if(q) main.appendChild(q); const n=notesSection(f); if(n) main.appendChild(n); main.appendChild(sourcesSection(f)); }
 
+/* ---------- THE ARMY (CARD-ARM, 11/2): the player's units level by level — every man, Sarge on each iron, the heroes; HP, the bar, the hit, per second ---------- */
+const MET={hp:['HP','HP on his unit sheet',0],bar:['THE BAR','bar hits he stands in the campaign',0],hit:['THE HIT','one blow on one man',2],dps:['PER SECOND','his blows on one man a second (60 frames a second)',1]};
+const AGRP=[['men','THE MEN'],['sarge','SARGE’S IRONS'],['hero','THE HEROES']];
+function armyIds(){ return [['ahead','THE ARMY'],['arule','THE RULE'],['alevel','AT ONE LEVEL'],['aby','BY LEVEL'],['airons','SARGE’S IRONS'],['afights','THE FIGHTS’ LEVELS'],['aq','QUESTIONS'],['asources','SOURCES']]; }
+function lvl(){ return Math.max(0,Math.min(100,parseInt(S.l,10)||0)); }
+function setL(v){ S.l=String(Math.max(0,Math.min(100,(+v)|0))); render(); }
+function dampAt(t){ const d=ARMY.damper&&ARMY.damper.tiers; const v=d?d[t]:0; return (typeof v==='number'&&v>0)?Math.min(0.95,v):0; }
+function blowsAt(u,L,t){ const g=u.bar[L], x=u.share[L]; if(!(g>0)||!(x>0)) return null; return Math.ceil(g/(x*(1-dampAt(t)))-1e-9); }   // blows of one bar hit he stands: his bar ÷ (his share × what the damper lets land)
+function fightsAt(t){ return (ARMY.fights||[]).map(f=>{ const x=(f.tiers||[]).find(q=>q.k===t); return x?{f,lv:x.level}:null; }).filter(Boolean).sort((a,b)=>a.lv-b.lv||(a.f.order-b.f.order)); }   // a ladder: the lowest level first
+function unitWhat(u){ if(u.group==='sarge') return ({round:'a round',cone:'every man in the cone',cut:'the cut',swing:'the swing'}[u.kind]||'')+(u.note?' ('+u.note+')':'')+' · opens: '+(u.opens||'—');
+  if(u.group==='hero') return ({x1:'his blow on the hero lane',x2:'two bites a blow',sword:'his sword, on the men’s ladder'}[u.law]||'a blow of his own, measured'); return u.what||''; }
+function spark(arr,L,marks,label,dec){ const W=132,H=28,pl=4,pr=4,pt=5,pb=6; const xs=v=>pl+v*(W-pl-pr)/100; const vals=arr.filter(v=>v!=null); if(!vals.length) return el('span',{class:'quiet'},'—');
+  const lo=Math.min(...vals), hi=Math.max(...vals), span=(hi-lo)||1, ys=v=>pt+(H-pt-pb)*(1-(v-lo)/span); let d='', pen=false;
+  arr.forEach((v,i)=>{ if(v==null){ pen=false; return; } d+=(pen?'L':'M')+xs(i).toFixed(1)+','+ys(v).toFixed(1); pen=true; });
+  const g=sv('svg',{class:'spk',viewBox:'0 0 '+W+' '+H,width:W,height:H,role:'img','aria-label':label+': '+fmt(arr[0],dec)+' at level 0, '+fmt(arr[L],dec)+' at '+L+', '+fmt(arr[100],dec)+' at 100'});
+  marks.forEach(m=>g.appendChild(sv('line',{class:'tk',x1:xs(m).toFixed(1),x2:xs(m).toFixed(1),y1:H-4,y2:H})));
+  g.appendChild(sv('path',{class:'ln',d})); if(arr[L]!=null) g.appendChild(sv('circle',{class:'dt',cx:xs(L).toFixed(1),cy:ys(arr[L]).toFixed(1),r:4}));
+  return el('span',{class:'spkw',tabindex:'0','data-tip':label+'\nlevel 0: '+fmt(arr[0],dec)+'\nlevel '+L+': '+fmt(arr[L],dec)+'\nlevel 100: '+fmt(arr[100],dec)+(marks.length?'\nthe ticks: the fights’ lab levels on '+TN[S.t]:'')},g); }
+function armyHead(){ const s=ARMY.source||{}; const nh=ARMY.units.filter(u=>u.group==='hero').length;
+  return el('section',{id:'ahead',class:'fhead'},el('div',{},el('h2',{},'THE ARMY',el('small',{},'every man, Sarge’s '+NUMW(ARMY.irons.length)+' irons and the '+NUMW(nh)+' heroes · level 0 to 100 · read out of v'+s.cv+' and measured in a lab fight')),el('ul',{class:'heads'},(ARMY.headlines||[]).map(h=>el('li',{},h))))); }
+function armyRule(){ const sec=el('section',{id:'arule'},el('h2',{},'THE RULE',el('small',{},'how a man grows with his level')));
+  sec.appendChild(el('div',{class:'rule'},ARMY.rule[0])); ARMY.rule.slice(1).forEach(r=>sec.appendChild(el('p',{class:'pnote'},r)));
+  const LV=[0,1,5,10,15,20,30,50,75,100], lad=ARMY.ladder, t=el('table');
+  t.appendChild(el('thead',{},el('tr',{},el('th',{class:'rowh',scope:'col'},'LEVEL'),LV.map(v=>el('th',{class:'num',scope:'col'},String(v))))));
+  const rows=[['the ladder’s units',lad.units,1,''],['a man’s hit ×',lad.men,2,''],['a hero’s hit ×',lad.heroes,2,''],['Sarge’s crit odds',lad.sargeCrit.map(x=>x*100),1,' %']];
+  const tb=el('tbody'); rows.forEach(([n,a,d,u])=>tb.appendChild(el('tr',{},el('th',{class:'rowh',scope:'row'},n),LV.map(v=>el('td',{class:'num'},fmt(a[v],d)+u))))); t.appendChild(tb);
+  sec.appendChild(scrollBox(t,true)); return sec; }
+function armyLevel(t){ const L=lvl(); const lands=Math.round(100*(1-dampAt(t)));
+  const sec=el('section',{id:'alevel'},el('h2',{},'AT LEVEL '+L,el('small',{},'every unit at one level · on '+TN[t]+' an enemy’s blow lands at '+lands+' % (the damper), then × his share')));
+  const rg=el('input',{type:'range',min:'0',max:'100',step:'1',value:String(L),id:'alv','aria-label':'the level'}), nb=el('input',{type:'number',min:'0',max:'100',step:'1',value:String(L),id:'alvn','aria-label':'the level, typed',class:'lvn'});
+  rg.addEventListener('input',()=>{ nb.value=rg.value; }); rg.addEventListener('change',()=>setL(rg.value)); nb.addEventListener('change',()=>setL(nb.value));
+  sec.appendChild(el('div',{class:'lvbar'},el('label',{for:'alv',class:'fl'},'LEVEL'),rg,nb));
+  sec.appendChild(el('div',{class:'chips',role:'group','aria-label':'the fights’ lab levels on '+TN[t]},el('span',{class:'fl'},'THE LAB ON '+TN[t]),fightsAt(t).map(({f,lv})=>el('button',{class:'chip'+(lv===L?' on':''),type:'button','aria-pressed':lv===L?'true':'false',onclick:()=>setL(lv),title:f.fight+' · THE BOSS LAB fights '+TN[t]+' at level '+lv},(f.boss||f.fight)+' · '+lv))));
+  const hd=[['THE UNIT',''],['HP','HP on his unit sheet'],['THE BAR','bar hits he stands in the campaign'],['BLOWS HE STANDS','blows of one bar hit on '+TN[t]+': his bar ÷ (his share × '+lands+' %)'],['THE HIT','one blow'],['A CRIT','the hit × the crit’s size'],['PER SECOND','his blows on one man a second, 60 frames a second'],['CRIT ODDS',''],['REACH','px']];
+  const table=el('table',{class:'atl'}); table.appendChild(el('thead',{},el('tr',{},hd.map(([h,w],i)=>el('th',{class:i?'num':'rowh',scope:'col',title:w||null},h)))));
+  const tb=el('tbody');
+  AGRP.forEach(([g,gn])=>{ const us=ARMY.units.filter(u=>u.group===g); if(!us.length) return; tb.appendChild(el('tr',{class:'sep'},el('th',{colspan:String(hd.length),scope:'colgroup'},gn)));
+    us.forEach(u=>{ const hit=u.hit[L], dps=u.dps[L], cr=u.crit?u.crit[L]:null, ch=u.critHit?u.critHit[L]:((cr!=null&&u.critX&&hit!=null)?hit*u.critX:null), reach=Array.isArray(u.reach)?u.reach[L]:u.reach;
+      tb.appendChild(el('tr',{'data-unit':u.k},el('th',{class:'rowh',scope:'row'},el('div',{class:'srow'},tile(u.name,artFor(u.k),28,{man:u.k}),el('span',{},el('b',{},u.name),el('small',{},unitWhat(u))))),
+        el('td',{class:'num'},fmt(u.hp[L],0)),el('td',{class:'num'},fmt(u.bar[L],0)),el('td',{class:'num'},fmt(blowsAt(u,L,t),0)),
+        el('td',{class:'num'},hit==null?'—':fmt(hit,2)),el('td',{class:'num'},ch==null?'—':fmt(ch,2)),el('td',{class:'num'},dps==null?'—':fmt(dps,1)),
+        el('td',{class:'num'},cr==null?'—':fmt(100*cr,1)+' %'),el('td',{class:'num'},reach==null?'—':fmt(reach,0)))); }); });
+  table.appendChild(tb); sec.appendChild(scrollBox(table,true));
+  sec.appendChild(el('p',{class:'pnote'},'THE BAR counts bar hits (the campaign’s count); BLOWS HE STANDS is how many blows of one bar hit he takes before he goes down on '+TN[t]+'. A blow that is a KO, or one priced in HP, is the fight’s own: each fight’s sheet has it.'));
+  return sec; }
+function armyBy(t){ const L=lvl(), m=S.m, dec=MET[m][2];
+  const sec=el('section',{id:'aby'},el('h2',{},'BY LEVEL',el('small',{},MET[m][1]+' · levels 0 to 100 · the curve marks level '+L+'; its ticks, the fights’ lab levels on '+TN[t])));
+  sec.appendChild(el('div',{class:'fg',role:'group','aria-label':'what the table shows'},el('span',{class:'fl'},'SHOW'),Object.keys(MET).map(k=>segBtn(MET[k][0],m===k,()=>{S.m=k;render();},MET[k][1]))));
+  const lv=ARMY.tableLevels.slice(); if(lv.indexOf(L)<0){ lv.push(L); lv.sort((a,b)=>a-b); }
+  const marks=fightsAt(t).map(x=>x.lv);
+  const table=el('table',{class:'byl'}); table.appendChild(el('thead',{},el('tr',{},el('th',{class:'rowh',scope:'col'},'THE UNIT'),lv.map(v=>el('th',{class:'num'+(v===L?' on':''),scope:'col'},String(v))),el('th',{scope:'col'},'THE CURVE, 0 TO 100'))));
+  const tb=el('tbody');
+  AGRP.forEach(([g,gn])=>{ const us=ARMY.units.filter(u=>u.group===g); if(!us.length) return; tb.appendChild(el('tr',{class:'sep'},el('th',{colspan:String(lv.length+2),scope:'colgroup'},gn)));
+    us.forEach(u=>{ const a=u[m]||[]; tb.appendChild(el('tr',{'data-unit':u.k},el('th',{class:'rowh',scope:'row'},el('div',{class:'srow'},tile(u.name,artFor(u.k),24,{man:u.k}),el('b',{},u.name))),
+      lv.map(v=>el('td',{class:'num'+(v===L?' on':'')},a[v]==null?'—':fmt(a[v],dec))),el('td',{class:'spk'},spark(a,L,marks,u.name+' · '+MET[m][0],dec)))); }); });
+  table.appendChild(tb); sec.appendChild(scrollBox(table,true)); return sec; }
+function armyIrons(){ const LV=[0,10,20,50,100], ir=ARMY.units.filter(u=>u.group==='sarge');
+  const sec=el('section',{id:'airons'},el('h2',{},'SARGE’S IRONS',el('small',{},'the '+NUMW(ir.length)+' he carries today · the hit · a crit · per second on one man')));
+  const t=el('table'); t.appendChild(el('thead',{},el('tr',{},el('th',{class:'rowh',scope:'col'},'THE IRON'),el('th',{scope:'col'},'OPENS'),LV.map(v=>el('th',{class:'num',scope:'col'},'LEVEL '+v)))));
+  const tb=el('tbody'); ir.forEach(u=>tb.appendChild(el('tr',{'data-unit':u.k},el('th',{class:'rowh',scope:'row'},el('div',{class:'srow'},tile(u.name,artFor(u.k),24,{man:u.k}),el('b',{},u.iron))),el('td',{},u.opens||'—'),
+    LV.map(v=>el('td',{class:'num'},fmt(u.hit[v],1)+' · '+fmt(u.critHit[v],1)+' · '+fmt(u.dps[v],1)+' /s')))));
+  t.appendChild(tb); sec.appendChild(scrollBox(t,true));
+  if(ARMY.shelved&&ARMY.shelved.length) sec.appendChild(el('p',{class:'quiet'},ARMY.shelved.map(x=>x.name).join(' · ')+' is shelved (off every surface on Wyatt’s 10/21 word); its numbers stand in the game’s file.'));
+  sec.appendChild(el('p',{class:'links'},el('a',{href:ARMY.page.html},'SARGE’S IRONS: every number, iron by iron (the look page)'),el('a',{href:ARMY.page.pdf},'its PDF')));
+  return sec; }
+function armyFights(t){ const L=lvl();
+  const sec=el('section',{id:'afights'},el('h2',{},'THE FIGHTS’ LEVELS',el('small',{},'the level THE BOSS LAB fights each tier at · tap one to read the army there')));
+  const tbl=el('table'); tbl.appendChild(el('thead',{},el('tr',{},el('th',{class:'rowh',scope:'col'},'THE FIGHT'),TIERS.map(([k,n])=>el('th',{class:'num'+(k===t?' on':''),scope:'col'},n)))));
+  const tb=el('tbody'); (ARMY.fights||[]).forEach(f=>tb.appendChild(el('tr',{},el('th',{class:'rowh',scope:'row'},el('b',{},f.boss||f.fight),el('small',{},f.boss?f.fight:'no breakdown yet')),
+    TIERS.map(([k,n])=>{ const x=(f.tiers||[]).find(q=>q.k===k); return el('td',{class:'num'+(k===t?' on':'')},x?el('button',{class:'lvb'+(x.level===L&&k===t?' on':''),type:'button',onclick:()=>{ S.t=k; setL(x.level); },title:(f.boss||f.fight)+' · '+n+' · level '+x.level,'aria-label':(f.boss||f.fight)+', '+n+': level '+x.level},String(x.level)):'—'); }))));
+  tbl.appendChild(tb); sec.appendChild(scrollBox(tbl,true)); return sec; }
+function armyQs(){ const qs=ARMY.questions||[], ns=ARMY.notes||[]; const sec=el('section',{id:'aq'},el('h2',{},'🟨 QUESTIONS',el('small',{},qs.length+' for Wyatt')));
+  qs.forEach(q=>sec.appendChild(el('div',{class:'q'},el('b',{},'🟨 '+(q.id||'')),plain(q.text),q.rec?el('span',{},' ',el('b',{style:'margin-left:4px'},'REC '),plain(q.rec)):null)));
+  if(ns.length) sec.appendChild(el('details',{},el('summary',{},'How these numbers were read · '+ns.length),el('ul',{class:'heads'},ns.map(n=>el('li',{},n)))));
+  return sec; }
+function armySources(){ const s=ARMY.source||{},e=s.engines||{}; const eng=k=>e[k]?e[k].pass+'/'+(e[k].pass+e[k].fail):'—';
+  return el('section',{id:'asources'},el('p',{class:'srcline'},'SOURCES · THE ARMY · kit '+s.kit+' · record '+s.record+' · '+s.card+' · client v'+s.cv+' · md5 '+String(s.md5||'').slice(0,8)+' · read on Chrome for Testing and WebKit (the two reads the same to the byte) · measured in a lab fight: Chrome for Testing '+eng('chrome')+' · WebKit '+eng('webkit')+' · read '+nyTime(s.readAt)+' · per second at '+s.fps+' frames a second · ',el('a',{href:ARMY.page.html},'SARGE’S IRONS'),' · ',el('a',{href:ARMY.page.pdf},'PDF'),' · ',el('a',{href:'data/army.json'},'the data file'),' · ',el('a',{href:'README.md'},'how this page is made (README)'))); }
+function renderArmy(){ const t=S.t; main.appendChild(armyHead()); main.appendChild(chips(armyIds())); main.appendChild(armyRule()); main.appendChild(armyLevel(t)); main.appendChild(armyBy(t)); main.appendChild(armyIrons()); main.appendChild(armyFights(t)); main.appendChild(armyQs()); main.appendChild(armySources()); }
+
 /* ---------- round-3 helpers: focus kept across a re-render, the live line, header scopes, labels that fit their SVG ---------- */
 // a chip activated from the keyboard is destroyed by renderFilters(); its twin (same group, same label) takes the focus back, a strip select by its name
 function navFocusKey(){ const a=document.activeElement; if(!a||!filtersEl.contains(a)) return null; if(a.tagName==='SELECT') return {sel:a.getAttribute('aria-label')}; const g=a.closest('[role="group"]'); return {g:g?g.getAttribute('aria-label'):'',label:a.textContent}; }
 function refocusNav(k){ if(!k) return; let x=null; if(k.sel) x=Array.from(filtersEl.querySelectorAll('select')).find(s=>s.getAttribute('aria-label')===k.sel); else { const g=Array.from(filtersEl.querySelectorAll('[role="group"]')).find(y=>y.getAttribute('aria-label')===k.g); if(g){ const segs=Array.from(g.querySelectorAll('.seg')); x=segs.find(y=>y.textContent===k.label&&!y.disabled)||segs.find(y=>y.getAttribute('aria-pressed')==='true')||segs[0]; } } if(x) x.focus({preventScroll:true}); }
 function focusHead(){ const h=main.querySelector('#head h2'); if(h){ h.setAttribute('tabindex','-1'); h.focus({preventScroll:true}); } }
-function liveSay(f){ const l=document.getElementById('live'); if(!l) return; const s=(f?f.boss+' · '+f.fight:'ALL FIGHTS'+(S.v==='board'?' as a board':' as cards'))+' · '+TN[S.t]+' · '+party(S.p); if(l.textContent!==s) l.textContent=s; }
+function liveSay(f){ const l=document.getElementById('live'); if(!l) return; const s=(S.f==='army')?'THE ARMY · level '+S.l+' · '+TN[S.t]:(f?f.boss+' · '+f.fight:'ALL FIGHTS'+(S.v==='board'?' as a board':' as cards'))+' · '+TN[S.t]+' · '+party(S.p); if(l.textContent!==s) l.textContent=s; }
 function a11yPass(){ main.querySelectorAll('thead th').forEach(th=>{ if(!th.hasAttribute('scope')) th.setAttribute('scope',th.colSpan>1?'colgroup':'col'); }); }
 // an SVG label marked data-fit is trimmed to that width with an ellipsis, measured in the page (the full name stays in the mark's tooltip and the table twin)
 function fitText(){ main.querySelectorAll('svg text[data-fit]').forEach(t=>{ const max=+t.getAttribute('data-fit'); if(!(max>0)||!t.getComputedTextLength) return; const full=t.getAttribute('data-full')||t.textContent; t.setAttribute('data-full',full); let s=full; t.textContent=s; let n=0; while(s.length>3&&t.getComputedTextLength()>max&&n++<80){ s=s.slice(0,-1).replace(/[\s·']+$/,''); t.textContent=s+'…'; } }); }
 
 /* ---------- root ---------- */
-function render(){ const f=S.f==='all'?null:byKey[S.f]; if(f){ const t2=snapTier(f,S.t); if(t2!==S.t) S.t=t2; } const fk=navFocusKey(); writeState(); renderFilters(f); navH(); renderScope(f); hideTip(); main.textContent=''; if(f) renderFight(f); else renderOverview(); a11yPass(); fitText(); liveSay(f); refocusNav(fk); document.title=(f?f.boss+' · ':'')+'The Boss Dashboard · Green vs. Tan'; }
-document.getElementById('meta').textContent=(META.versions&&META.versions.length?'Read out of the live client v'+META.versions.join(' / v'):'')+(META.read?' · '+META.read+' (the kits’ read clocks; each fight’s own page carries its own stamp, shown on its SOURCES line)':'')+' · every number is the game’s own, read in the booted client or measured in a lab fight on Chrome for Testing and WebKit (each fight’s proof counts are on its card). Pick a fight, a tier and a party size; the link in the address bar remembers them.';
+function render(){ const army=S.f==='army'&&!!ARMY; const f=(S.f==='all'||army)?null:byKey[S.f]; if(f){ const t2=snapTier(f,S.t); if(t2!==S.t) S.t=t2; } const fk=navFocusKey(); const aid=(document.activeElement&&main.contains(document.activeElement))?document.activeElement.id:''; writeState(); renderFilters(f); navH(); renderScope(f); hideTip(); main.textContent=''; if(army) renderArmy(); else if(f) renderFight(f); else renderOverview(); a11yPass(); fitText(); liveSay(f); refocusNav(fk); if(aid){ const e=document.getElementById(aid); if(e) e.focus({preventScroll:true}); } document.title=(army?'THE ARMY · ':f?f.boss+' · ':'')+'The Boss Dashboard · Green vs. Tan'; }
+document.getElementById('meta').textContent=(META.versions&&META.versions.length?'Read out of the live client v'+META.versions.join(' / v'):'')+(ARMY&&ARMY.source?' (THE ARMY: v'+ARMY.source.cv+')':'')+(META.read?' · '+META.read+' (the kits’ read clocks; each fight’s own page carries its own stamp, shown on its SOURCES line)':'')+' · every number is the game’s own, read in the booted client or measured in a lab fight on Chrome for Testing and WebKit (each fight’s proof counts are on its card). Pick a fight, a tier and a party size; the link in the address bar remembers them.';
 const themeSel=document.getElementById('theme'); function applyTheme(v){ if(v==='light'||v==='dark') document.documentElement.setAttribute('data-theme',v); else document.documentElement.removeAttribute('data-theme'); }
 try{ const tv=localStorage.getItem(LS+':theme'); if(tv){ themeSel.value=tv; applyTheme(tv); } }catch(e){}
 themeSel.addEventListener('change',()=>{ applyTheme(themeSel.value); try{localStorage.setItem(LS+':theme',themeSel.value);}catch(e){} });

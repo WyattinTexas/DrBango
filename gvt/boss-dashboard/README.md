@@ -17,14 +17,17 @@ and also opens from a plain copy of this folder (`index.html` from `file://`): t
 - **Three kinds of hit**, and the page never adds one to another: **HP** takes HP off the man's sheet (in King Rex's lair these grow with the tier); **bar hits** take a share of his health bar (90 % + 10 % × bar ÷ HP of the weight lands); **KO** takes him out in one, whatever his HP. Each fight's rule says which law it follows: the lair mixes all three, the hideout and the palace are bar hits with a KO or two, the Ice Castle and the Pillow Fields are KOs with a few bar hits.
 - Dark mode follows the system (or the Theme control), with its own colour steps; every chart has a table twin; a tooltip closes with Escape and stays while the pointer rests on it; every control is reachable by keyboard, and a chart is one Tab stop whose marks the arrow keys walk (Home and End to the ends).
 
-Three Boss Lab fights have no breakdown yet and get one quiet line: THE SKY FORTRESS · THE ICE CAVES · THE BUFFALO BILL SHOWDOWN.
+Two Boss Lab fights have no breakdown yet and get one quiet line: THE SKY FORTRESS · THE BUFFALO BILL SHOWDOWN (THE ICE CAVES joined as the sixth on Nov 1, 2026).
+
+- **THE ARMY** (the last chip on the FIGHT row; CARD-ARM, Nov 2, 2026, Wyatt's word: "Please add in the player unit scaling as well"): the player's units level by level, every man, Sarge on each of his irons and the heroes from level 0 to 100. THE RULE (the ladder: the units, a man's hit ×, a hero's hit ×, Sarge's crit odds) · AT LEVEL n (a slider and a box for the level; the fights' lab levels on the chosen tier as one-tap chips; HP, the bar, the blows of one bar hit a man stands at the tier's damper, the hit, a crit, per second, crit odds, reach) · BY LEVEL (HP, THE BAR, THE HIT or PER SECOND at 0 · 1 · 5 · 10 … 100, a curve per row with the chosen level and the fights' lab levels marked) · SARGE'S IRONS (and the look page with every number, iron by iron) · THE FIGHTS' LEVELS (tap a level to read the army there) · the questions. The link remembers the level (`l`) and what the table shows (`m`).
 
 ## What is in this folder
 
 - `index.html` the page (markup, style and a small script; no framework).
 - `data.js` the six data files' numbers and words inlined as `window.BOSS_DATA` (so the page opens from `file://`); `art.js` the units' and men's pictures as `window.BOSS_ART`, loaded after the numbers have rendered (a monogram tile stands in until a picture arrives).
-- `data/<key>.json` one file per fight in the shape `design/boss-dashboard-1031/SCHEMA.md` (gvt-boss-breakdown/1): `bone` King Rex's lair · `croak` King Croak's hideout · `ice` the Ice Castle (King Yeti) · `palace` Princess Croak's palace · `fields` the Pillow Fields (Emperor Bear).
-- `pages/` each fight's full breakdown as a one-file HTML page, a Letter PDF and a front PNG.
+- `data/<key>.json` one file per fight in the shape `design/boss-dashboard-1031/SCHEMA.md` (gvt-boss-breakdown/1): `bone` King Rex's lair · `croak` King Croak's hideout · `ice` the Ice Castle (King Yeti) · `palace` Princess Croak's palace · `fields` the Pillow Fields (Emperor Bear) · `caves` the Ice Caves (THE FEROCIOUS YETI).
+- `data/army.json` THE ARMY: the player's units at every level 0 to 100 (schema gvt-army-scale/1, in the same SCHEMA.md); folded into `data.js` as `BOSS_DATA.army`.
+- `pages/` each fight's full breakdown as a one-file HTML page, a Letter PDF and a front PNG; and SARGE'S IRONS (`GVT-Sarge-Irons-v29.21.*`), every damage number of his irons, level by level.
 - `README.md` this file.
 
 No file here carries a key, a token, an e-mail address, a home path, a machine name or a chat id; nothing on the page is typed by hand.
@@ -45,6 +48,7 @@ Each fight has its own kit. A kit **reads** the game's own tables in the booted 
 | PRINCESS CROAK'S PALACE · PRINCESS CROAK | palace | design/boss-princess-unit-breakdown-1031 | 00-CARD-BUDP.md | CARD-BUDP | v28.88 | 244/244 | 244/244 |
 | THE PILLOW FIELDS · EMPEROR BEAR | fields | design/boss-emperor-unit-breakdown-1031 | 00-CARD-BUDE.md | CARD-BUDE | v28.88 | 329/329 | 329/329 |
 | THE ICE CAVES · THE FEROCIOUS YETI | caves | design/boss-caves-unit-breakdown-1101 | 00-CARD-ICN-G5.md | CARD-ICN-G5 | v28.96 | 381/381 | 381/381 |
+| THE ARMY (the player's units, level 0 to 100) + SARGE'S IRONS | army | design/army-scaling-1102 | 00-CARD-ARM.md | CARD-ARM | v29.21 | 279/279 | 279/279 |
 
 The team's words everywhere a designer reads: HP, KO, and bar hits for the campaign's hit counter. Code names stay in the files' `k`, `id` and `code` fields and in the sources lines.
 
@@ -62,6 +66,8 @@ All commands run from the repo root; `NODE_PATH=/opt/homebrew/lib/node_modules` 
 4. **Validate** each file against the schema: `python3 -I design/boss-dashboard-1031/kit/validate.py boss-dashboard/data/<key>.json`
 5. **Build the page**: `python3 -I design/boss-dashboard-1031/kit/build_dash.py` → `boss-dashboard/index.html` + `boss-dashboard/data.js` + `boss-dashboard/art.js` (deterministic; the only clocks on the page are the files' own `readAt` and `builtAt`, shown in New York time by the zone's own rules).
 6. **Check it**: `NODE_PATH=/opt/homebrew/lib/node_modules node design/boss-dashboard-1031/rig/checkDash.mjs` serves the repo root on a free port above 8900 and reads the page in Chrome for Testing and WebKit at 1280 and 390 wide: every link answers, every fight and tier renders without an error, the numbers on the page equal the JSON, the team's words (and no code name outside SOURCES), dark mode, the hash round-trip, the pictures, the tap targets, the phone's sticky strip, the palettes' separation and the ink's contrast. Stills and logs land in `design/boss-dashboard-1031/proof/`.
+
+**THE ARMY**: `node design/army-scaling-1102/kit/readArmy.mjs chrome && node design/army-scaling-1102/kit/readArmy.mjs webkit && node design/army-scaling-1102/kit/proveArmy.mjs chrome && node design/army-scaling-1102/kit/proveArmy.mjs webkit` (HEAD's own client by `git show`), then `python3 -I design/army-scaling-1102/kit/export_army.py` (army.json; it refuses a proof with a failing check or two engines that disagree) and `python3 -I design/army-scaling-1102/kit/build_irons.py` + `node design/army-scaling-1102/kit/render.mjs <html> <png> <front.png> <pdf>` (SARGE'S IRONS), copied into `pages/`; then steps 4 to 6. THE ARMY's numbers were read at v29.21, after the damper (v29.17: every enemy blow on your men lands at 50 % in the campaign and the boss fights); the six fights' survive tables were read before it.
 
 A new fight is one more JSON in `data/` (and its page in `pages/`): the generator and the page count the files and need no change (THE ICE CAVES joined that way on Nov 1, 2026; a strike kept as a kill on Wyatt's word, its falling ice, is listed apart by THE KO PASS and not numbered); the rig counts them too.
 
