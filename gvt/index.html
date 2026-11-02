@@ -768832,7 +768832,198 @@ function dhpOn(){ return !!(DHP && DHP.on); }
 function dhpSgHp(w,r){ if(!dhpOn() || w!=='shotgun' || !(DHP.sgStep>0)) return 0; return Math.floor(Math.max(0,Math.min(RANK_MAX,r|0))/DHP.sgStep)*(+DHP.sgAdd||0); }
 function dhpSgRug(w,r){ return (DHP && DHP.rug)? dhpSgHp(w,r) : 0; }
 function dhpSgRow(){ return dhpOn()? [[DHP.sgStep, tf('EVERY %1 RANKS: +%2 HEALTH while the shotgun is in his hands.', DHP.sgStep, DHP.sgAdd)]] : []; }
-function dhpXhp(){ try{ if(typeof XHP==='object' && XHP && XHP.per){ const T=dhpOn()? DHP.now : DHP.was; XHP.per.bazooka=T.bazooka; XHP.per.commando=T.commando; } }catch(e){} }</script><script type="text/x-gvt-part">'use strict';
+function dhpXhp(){ try{ if(typeof XHP==='object' && XHP && XHP.per){ const T=dhpOn()? DHP.now : DHP.was; XHP.per.bazooka=T.bazooka; XHP.per.commando=T.commando; } }catch(e){} }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function lwnOn(){ return !!(LWN.on && !LWN_OFF); }
+function lwnKey(){ try{ return !!(lwnOn() && META.partyCode && typeof mptTeam==='function' && mptTeam()); }catch(e){ return false; } }
+function lwnOn9(){ const rd=S.raid; return !!(rd && rd.k==='party' && rd.cfg===S.cfg && S.cfg && S.cfg.lwn && !S.bf); }
+function lwnRng(seed){ let s=(seed>>>0)||1; return function(){ s=(Math.imul(s,1664525)+1013904223)>>>0; return s/4294967296; }; }
+
+
+
+
+
+function lwnRow(){ return (typeof RAID_INFO==='object' && RAID_INFO && RAID_INFO.party)? RAID_INFO.party : null; }
+
+
+function lwnImg(k){ if(LWN_IMG[k]) return LWN_IMG[k]; const im=new Image(); im.onload=function(){ im.lwnOk=1; LWN.cacheKey=''; }; im.src='data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="'+LWN_VB[k]+'">'+LWN_PROP[k]+'</svg>'); LWN_IMG[k]=im; return im; }
+function lwnJoin(){ if(LWN.joined) return 0; LWN.joined=1; let n=0;
+  for(const k in LWN_MOLD){ if(typeof SPRITES_SRC[k]!=='string'){ SPRITES_SRC[k]=LWN_MOLD[k]; n++; try{ spriteMint(k); }catch(e){ LWN.err++; } } }   
+  for(const k in LWN_PROP) lwnImg(k);
+  return n; }
+
+
+
+
+
+
+
+
+function lwnCfg(tier){ tier=LWN_T[tier]? tier : 'e'; const X=LWN_T[tier].hpX, cn=RAID_CNT_MUL[tier]||1, c=function(n){ return Math.max(1,Math.round(n*cn)); };   
+  const G=function(t,n,f,e,at){ const g={ f:f||'column', t:'lwn'+t, n:c(n), e:e||'right', at:at||0 }; if(X[t]!==1) g.hpX=X[t]; return g; };   
+  const W=[];
+  W.push({ name:'THE POODLES', groups:[ G('poodle',3,'column','right',0), G('poodle',3,'column','right-top',1.6), G('poodle',3,'column','right-bottom',3.2) ] });
+  W.push({ name:'THE KNIGHTS', groups:[ G('knight',2,'line','right',0), G('knight',2,'line','right-bottom',2.0), G('poodle',3,'column','right-top',3.0) ] });
+  W.push({ name:'THE GIRAFFES', groups:[ G('giraffe',2,'line','right',0), G('giraffe',1,'line','right-top',2.5), G('knight',2,'line','right-bottom',1.5) ] });
+  W.push({ name:'THE MIX', groups:[ G('poodle',3,'column','right-top',0), G('knight',3,'line','right',1.2), G('giraffe',2,'line','right-bottom',2.4) ] });
+  if(tier!=='e') W.push({ name:'THE MIX', groups:[ G('poodle',4,'column','right',0), G('knight',3,'line','right-top',1.4), G('giraffe',2,'line','right-bottom',2.6) ] });   
+  if(tier==='h') W.push({ name:'THE GIRAFFES', groups:[ G('giraffe',3,'line','right',0), G('giraffe',2,'line','right-top',2.0), G('poodle',3,'column','right-bottom',1.0) ] });   
+  W.push({ name:'THE WHOLE ARMY', groups:[ G('poodle',6,'column','right-top',0), G('knight',4,'line','right',1.5), G('giraffe',3,'line','right-bottom',3.0) ] });   
+  return { n:0, oneBoss:1, hpMul:1, cntMul:1, bossF:1, rateMul:1, waves:W, terrain:{ rocks:[], river:null, ground:'grass', lwn:1 }, lwn:1, lwnTier:tier }; }
+
+function lwnL(){ const rd=S.raid; if(!rd || rd.k!=='party') return null; return rd.lwn||(rd.lwn={ t:0, rng:lwnRng(6101*(['e','m','h'].indexOf(rd.t)+1)+17), fx:[], pops:0, parries:0, darts:0 }); }
+
+function lwnTick(dt){ if(!lwnOn9() || S.mode!=='play') return; const L=lwnL(); if(!L) return; L.t+=dt;
+  if(!S.waveActive && S.interT>LWN.lull) S.interT=LWN.lull;   
+  for(const f of S.foes){ if(!f.dead && f.def && f.def.lwn && !f.gjAir) f.gjAir=1; }   
+  for(let i=L.fx.length-1;i>=0;i--){ const q=L.fx[i]; q.t+=dt; if(q.t>=q.dur) L.fx.splice(i,1); } }
+
+
+
+
+
+
+
+
+
+
+function lwnPopSfx(){ try{ SFX.snap(); tone(900,180,0.09,'square',0.06); noise(0.05,0.05,2600); }catch(e){} }
+function lwnPop(f){ LWN.pops++; const L=lwnL(), col=LWN_COL[f.def.lwn]||'#EF5A62', w=f.def.w, rng=L? L.rng : lwnRng(f.id|0);
+  if(L){ L.pops++; const bits=[]; for(let i=0;i<10;i++) bits.push({ a:(i/10)*6.283+rng()*0.5, s:0.6+rng()*0.8, c:['#EF5A62','#FFD75A','#6BA1F0','#F58BC2','#9BD36A','#FFFFFF'][i%6], r:rng()*6.283 }); L.fx.push({ k:'pop', x:f.x, y:f.y, w:w, col:col, t:0, dur:0.9, bits:bits }); }
+  S.fx.push({ k:'ring', x:f.x, y:f.y-w*0.55, r:6, R:w*0.9, t:0, dur:0.28, col:'#FFFFFF' });
+  S.floats.push({ x:f.x, y:f.y-w-10, txt:t('POP!'), t:0, col:col });
+  try{ bfSfx(lwnPopSfx, f.x, f.y); }catch(e){} }
+
+function lwnBpm(){ try{ if(typeof msmOn==='function' && msmOn()) return 120; }catch(e){} return LWN_BPM[lwnSongId()]||100; }
+function lwnBob(f){ if(f.dead || f.falling) return LWN.lift; if(reducedMotion()) return LWN.lift; const ph=((S.t*lwnBpm()/60)+((f.id|0)%2)*0.5)%1; return LWN.lift+LWN.bob*Math.abs(Math.sin(Math.PI*ph)); }
+
+
+function lwnSongs(){ const out=[]; try{ for(const r of RCP_SONGS){ if(!r.id || r.up || r.cd || !LOC_TRACKS[r.id]) continue; let has=false; try{ has=!!r.has(); }catch(e){} if(has) out.push(r.id); } }catch(e){ LWN.err++; } if(!out.length) out.push('drumcadence'); return out; }
+function lwnSongId(){ const L=lwnSongs(); if(LWN.song && L.indexOf(LWN.song)>=0) return LWN.song; return L.indexOf('bearpark')>=0? 'bearpark' : L[0]; }
+function lwnSongName(id){ try{ for(const r of RCP_SONGS) if(r.id===id) return t(r.name); }catch(e){} return String(id||'').toUpperCase(); }
+function lwnCycle(){ const L=lwnSongs(); const i=L.indexOf(lwnSongId()); LWN.song=L[(i+1)%L.length]; LWN.cycles++; try{ locSync(); }catch(e){ LWN.err++; } lwnChipSync(); return LWN.song; }
+
+
+function lwnChipText(){ return '♪ '+escH(lwnSongName(lwnSongId())); }
+function lwnChipSync(){ const c=document.getElementById('lwnChip'); if(c) c.innerHTML=lwnChipText(); }
+function lwnType(){ const el=document.getElementById('lwnTxt'); if(!el) return; const full=commNoDash(t(LWN_LINE)); clearTimeout(LWN.typeT); if(reducedMotion() || !LWN.fresh){ el.textContent=full; return; } LWN.fresh=0; el.textContent=''; let i=0;
+  const tick=function(){ if(!el.isConnected) return; i++; el.textContent=full.slice(0,i); const ch=full.charAt(i-1); if(COMM_SKIP.indexOf(ch)<0){ try{ commBlip(full.charCodeAt(i-1)); }catch(e){} } if(i<full.length) LWN.typeT=setTimeout(tick, (ch===','||ch==='、')? COMM_TYPE*7 : (ch==='.'||ch==='。'||ch==='!'||ch==='！'||ch==='?'||ch==='？')? COMM_TYPE*10 : COMM_TYPE); };
+  LWN.typeT=setTimeout(tick, 420); }
+function lwnLobbyDress(){ const sc=document.getElementById('raidscene'); if(!sc) return; sc.classList.add('lwn');
+  const tiers=sc.querySelector('.rd-tiers');
+  if(tiers && !sc.querySelector('#lwnSay')) tiers.insertAdjacentHTML('afterend', '<div class="mbbill" id="lwnSay"><div class="bbw-say" data-notr><span class="bbw-port"><img src="'+raidFlankURI('party')+'" alt=""></span><span class="bbw-nm" style="color:#EF5A62">'+escH(t('TWISTY'))+'</span><span class="bbw-txt" id="lwnTxt"></span></div><div class="rd-rec" id="lwnChip" data-notr>'+lwnChipText()+'</div></div>');   
+  lwnType();
+  const bg=document.getElementById('raidBg'); if(bg && !document.getElementById('lwnBoomHot')) bg.insertAdjacentHTML('beforeend', '<button type="button" id="lwnBoomHot" aria-label="boombox" onclick="lwnBoomTap()" style="position:absolute;z-index:3;background:transparent;border:none;padding:0;cursor:pointer"></button>');   
+  lwnBoomSeat(); try{ requestAnimationFrame(lwnBoomSeat); }catch(e){} }
+function lwnBoomSeat(){ const bg=document.getElementById('raidBg'), el=document.getElementById('lwnBoomHot'); if(!bg || !el) return; const r=bg.getBoundingClientRect(); if(!r.width || !r.height) return;
+  const f9=heroFit(r.width, r.height), s2=f9.s2, ox=f9.ox, oy=f9.oy, B=LWN_HALL.boom;
+  el.style.left=((B.x-B.w/2-ox)*s2)+'px'; el.style.top=((B.y-B.h-oy)*s2)+'px'; el.style.width=(B.w*s2)+'px'; el.style.height=((B.h+14)*s2)+'px'; }
+function lwnBoomTap(){ LWN.taps++; try{ audio(); }catch(e){}
+  if(typeof RAID_INFO==='object' && RAID_INFO && RAID_INFO.music && typeof openRaidScene==='function'){ try{ SFX.blip(); }catch(e){} openRaidScene('music'); return; }   
+  const id=lwnCycle(); try{ SFX.blip(); }catch(e){} return id; }
+
+
+
+
+
+function lwnDoor(){ return !!(lwnRow() && LWN.hq===true); }
+function lwnPartyOpen(){ const R=lwnRow(); if(!R || R.plc) return 0; try{ PTY_PLACES.party='THE PARTY LAWN'; R.plc='party'; return 1; }catch(e){ LWN.err++; return 0; } }
+function lwnAsk(){ if(!lwnRow() || LWN.hq===true || LWN.busy) return; const now=Date.now(); if(LWN.asks && now-LWN.askT<60000) return; LWN.busy=1; LWN.asks++; LWN.askT=now;   
+  try{ netFetch(NET+'/health', { cache:'no-store' }).then(function(r){ return r.json(); }).then(function(j){ LWN.busy=0; LWN.hq=!!(j && j.party===true); if(LWN.hq) lwnPartyOpen(); }, function(){ LWN.busy=0; }); }catch(e){ LWN.busy=0; LWN.err++; } }
+
+
+
+
+
+
+
+
+function lwnFloor(){ const key=W+'x'+WORLD_H+'|'+(S.raid? S.raid.t : '')+'|'+Object.keys(LWN_IMG).filter(function(k){ return !!LWN_IMG[k].lwnOk; }).length;
+  if(!LWN.cache || LWN.cacheKey!==key){ const c=document.createElement('canvas'), k=Math.min(1.5, Math.max(1, window.devicePixelRatio||1)); c.width=Math.round(W*k); c.height=Math.round(WORLD_H*k); const g=c.getContext('2d'); g.scale(k,k); lwnPaint(g, W, WORLD_H); LWN.cache=c; LWN.cacheKey=key; }   
+  cx.drawImage(LWN.cache, 0, 0, W, WORLD_H); LWN.paints++; }
+function lwnPaint(g, WD, HT){ const rng=lwnRng(911), I='#3F5A30';
+  const grad=function(a,b,y0,y1){ const q=g.createLinearGradient(0,y0||0,0,y1==null? HT : y1); q.addColorStop(0,a); q.addColorStop(1,b); return q; };
+  g.fillStyle=grad('#A8DC78','#5E9B3A'); g.fillRect(0,0,WD,HT);   
+  g.fillStyle='rgba(255,255,255,0.07)'; for(let y=0;y<HT;y+=96) g.fillRect(0,y,WD,48);   
+  g.fillStyle=grad('rgba(255,196,120,0.38)','rgba(255,196,120,0)',0,HT*0.45); g.fillRect(0,0,WD,HT*0.45);   
+  g.strokeStyle='rgba(60,110,40,0.35)'; g.lineWidth=1.4; for(let i=0;i<160;i++){ const x=rng()*WD, y=rng()*HT; g.beginPath(); g.moveTo(x,y); g.lineTo(x+2-rng()*4,y-6-rng()*6); g.stroke(); }   
+  g.lineCap='round'; g.lineJoin='round';   
+  const path=function(wd,col){ g.strokeStyle=col; g.lineWidth=wd; g.beginPath(); g.moveTo(WD-120,HT*0.5); g.bezierCurveTo(WD*0.78,HT*0.2,WD*0.62,HT*0.82,WD*0.46,HT*0.56); g.bezierCurveTo(WD*0.34,HT*0.36,WD*0.22,HT*0.72,120,HT*0.5); g.stroke(); };
+  path(118,'#B99257'); path(104,'#DDBE82'); g.fillStyle='rgba(176,138,82,0.35)'; for(let i=0;i<40;i++){ const tq=rng(); const x=120+(WD-240)*tq, y=HT*0.5+Math.sin(tq*9)*HT*0.14; g.beginPath(); g.ellipse(x,y,2.4,1.5,0,0,7); g.fill(); }   
+  const post=function(x,y0,y1){ g.fillStyle='#8F6238'; g.strokeStyle='#4E3218'; g.lineWidth=1.4; g.fillRect(x-5,y0,10,y1-y0); g.strokeRect(x-5,y0,10,y1-y0); g.fillStyle='#B98A5A'; g.fillRect(x-5,y0,4,y1-y0); };
+  post(300,40,210); post(WD-300,40,210);   
+  g.strokeStyle='#4E3218'; g.lineWidth=2.6; g.beginPath(); g.moveTo(300,56); g.quadraticCurveTo(WD/2,150,WD-300,56); g.stroke();
+  const PC=[['#C9242D','#EF5A62','#6E0F16'],['#E3B11E','#FFD75A','#8A6A0A'],['#2C66CF','#6BA1F0','#163A80'],['#D8429A','#F58BC2','#7A2457']];
+  for(let i=1;i<22;i++){ const tq=i/22, mx=(1-tq)*(1-tq)*300+2*(1-tq)*tq*(WD/2)+tq*tq*(WD-300), my=(1-tq)*(1-tq)*56+2*(1-tq)*tq*150+tq*tq*56, c=PC[i%4];
+    g.fillStyle=c[0]; g.strokeStyle=c[2]; g.lineWidth=1.2; g.beginPath(); g.moveTo(mx-14,my); g.lineTo(mx+14,my); g.lineTo(mx,my+30); g.closePath(); g.fill(); g.stroke(); g.fillStyle=c[1]; g.beginPath(); g.moveTo(mx-14,my); g.lineTo(mx+14,my); g.lineTo(mx,my+12); g.closePath(); g.fill(); }
+  const CF=['#EF5A62','#FFD75A','#6BA1F0','#F58BC2','#9BD36A','#FFFFFF']; for(let i=0;i<70;i++){ const x=60+rng()*(WD-120), y=60+rng()*(HT-120), a=rng()*3.14; g.save(); g.translate(x,y); g.rotate(a); g.globalAlpha=0.8; g.fillStyle=CF[i%6]; g.fillRect(-6,-3,12,6); g.restore(); }   
+  const tx0=620, tx1=1300, ty=HT-26;   
+  g.fillStyle='rgba(0,0,0,0.16)'; g.fillRect(tx0-6,ty-18,tx1-tx0+12,30);
+  g.fillStyle='#E2CFA6'; g.strokeStyle='#8A7650'; g.lineWidth=1.6; g.fillRect(tx0,ty-26,tx1-tx0,20); g.strokeRect(tx0,ty-26,tx1-tx0,20); g.fillStyle='#FFF4DC'; g.fillRect(tx0,ty-26,tx1-tx0,6); g.fillStyle='#F58BC2'; g.fillRect(tx0,ty-14,tx1-tx0,3);
+  g.fillStyle='#8F6238'; g.strokeStyle='#4E3218'; g.lineWidth=1; for(const lx of [tx0+14, tx1-22]){ g.fillRect(lx,ty-6,8,24); g.strokeRect(lx,ty-6,8,24); }
+  const CU=['#D8429A','#2C66CF','#E3B11E','#C9242D','#5E9B3A']; let ci=0; for(let x=tx0+40;x<tx1-30;x+=58){ if(Math.abs(x-960)<70) continue; g.fillStyle=CU[ci++%5]; g.globalAlpha=0.9; g.beginPath(); g.arc(x,ty-20,4.5,0,7); g.fill(); g.globalAlpha=1; }   
+  const im=function(k){ const q=LWN_IMG[k]; return (q && q.lwnOk)? q : null; }, VB=function(k){ return LWN_VB[k].split(' ').map(Number); };
+  const prop=function(k,x,y,s){ const q=im(k); if(!q) return; const vb=VB(k); g.drawImage(q, x+vb[0]*s, y+vb[1]*s, vb[2]*s, vb[3]*s); };   
+  prop('cake',960,ty-28,1.0);
+  prop('chair',700,ty-30,1.0); prop('chairB',820,ty-30,1.0); prop('chairP',1100,ty-30,1.0); prop('chairR',1220,ty-30,1.0);   
+  const B=LWN_BOOM; g.fillStyle='rgba(0,0,0,0.2)'; g.beginPath(); g.ellipse(B.x,B.y+4,B.w*0.46,8,0,0,7); g.fill(); prop('boombox',B.x,B.y-16*B.k,B.k);   
+  g.fillStyle='#3F5A30'; g.globalAlpha=0.9; g.fillRect(B.x-B.w/2+8,B.y+10,B.w-16,3); g.globalAlpha=1; }
+
+function lwnActors(A){ const L=lwnL(); if(!L) return; const B=LWN_BOOM;
+  A.push({ y:B.y+1, f:function(){ const nm='♪ '+lwnSongName(lwnSongId()); cx.save(); cx.font='bold 13px ui-rounded, system-ui, -apple-system, Helvetica, Arial, sans-serif'; const w=cx.measureText(nm).width+16; cx.globalAlpha=0.88; cx.fillStyle='#2B1D00'; cx.beginPath(); cx.roundRect? cx.roundRect(B.x-w/2,B.y+16,w,20,7) : cx.rect(B.x-w/2,B.y+16,w,20); cx.fill(); cx.globalAlpha=1; cx.fillStyle='#FFD966'; cx.textAlign='center'; cx.textBaseline='middle'; cx.fillText(nm,B.x,B.y+26); cx.restore(); } });   
+  for(const q of L.fx){ if(q.k==='dart'){ A.push({ y:1e6-2, f:function(){ const k=Math.min(1,q.t/q.dur), x=q.x0+(q.x1-q.x0)*k, y=q.y0+(q.y1-q.y0)*k-30*4*k*(1-k), a=Math.atan2(q.y1-q.y0,q.x1-q.x0); cx.save(); cx.translate(x,y); cx.rotate(a); cx.fillStyle='#E3B11E'; cx.strokeStyle='#8A6A0A'; cx.lineWidth=1.2; cx.beginPath(); cx.ellipse(0,0,9,4,0,0,7); cx.fill(); cx.stroke(); cx.fillStyle='#C9242D'; cx.beginPath(); cx.moveTo(-9,0); cx.lineTo(-16,-5); cx.lineTo(-16,5); cx.closePath(); cx.fill(); cx.restore(); } }); continue; }
+    if(q.k!=='pop') continue;
+    A.push({ y:1e6-1, f:function(){ const k=Math.min(1,q.t/q.dur), out=Math.max(0,1-k); cx.save();
+      cx.globalAlpha=Math.min(1,out*1.4); for(const b of q.bits){ const d=q.w*(0.3+1.1*k)*b.s, x=q.x+Math.cos(b.a)*d, y=q.y-q.w*0.6+Math.sin(b.a)*d*0.7+k*k*60; cx.save(); cx.translate(x,y); cx.rotate(b.r+k*4); cx.fillStyle=b.c; cx.fillRect(-5,-2.5,10,5); cx.restore(); }   
+      const sy=q.y-q.w*0.5+k*k*(q.w*0.5), sx=q.x+k*14; cx.globalAlpha=Math.max(0,1-Math.max(0,k-0.55)/0.45); cx.fillStyle=q.col; cx.strokeStyle='rgba(0,0,0,0.35)'; cx.lineWidth=1; cx.beginPath(); cx.ellipse(sx,sy,8,3.2,0.6+k,0,7); cx.fill(); cx.stroke(); cx.beginPath(); cx.moveTo(sx+6,sy); cx.quadraticCurveTo(sx+14,sy-6,sx+18,sy-2); cx.stroke();   
+      cx.restore(); } }); } }
+
+function lwnHallSVG(){ const rng=lwnRng(433); let s='<defs><linearGradient id="lwnSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F2A65A"/><stop offset="0.55" stop-color="#FFD9A8"/><stop offset="1" stop-color="#FFF0D6"/></linearGradient><linearGradient id="lwnLawn" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#A8DC78"/><stop offset="1" stop-color="#5E9B3A"/></linearGradient></defs>';
+  s+='<rect width="1600" height="650" fill="url(#lwnSky)"/><circle cx="1180" cy="150" r="58" fill="#FFE9A8" opacity="0.95"/><circle cx="1180" cy="150" r="96" fill="#FFE9A8" opacity="0.25"/>';   
+  [[260,96,1],[760,70,0.8],[1380,120,0.7]].forEach(function(c){ s+='<g transform="translate('+c[0]+' '+c[1]+') scale('+c[2]+')" fill="#FFF7EC" opacity="0.9"><ellipse cx="0" cy="0" rx="70" ry="22"/><ellipse cx="-30" cy="-10" rx="34" ry="24"/><ellipse cx="22" cy="-14" rx="40" ry="28"/></g>'; });
+  s+='<rect y="262" width="1600" height="70" fill="#4E9A3A"/>'; for(let x=-40, i=0; x<1700; x+=130, i++) s+='<ellipse cx="'+x+'" cy="'+(270+(i%2)*6)+'" rx="86" ry="30" fill="'+((i%2)? '#5FAF45' : '#4E9A3A')+'"/>'; s+='<rect y="296" width="1600" height="40" fill="#5FAF45"/>';   
+  s+='<rect y="330" width="1600" height="320" fill="url(#lwnLawn)"/>'; for(let y=330;y<650;y+=64) s+='<rect y="'+y+'" width="1600" height="32" fill="#FFFFFF" opacity="0.07"/>';   
+  const CF=['#EF5A62','#FFD75A','#6BA1F0','#F58BC2','#9BD36A','#FFFFFF']; for(let i=0;i<46;i++){ const x=Math.round(60+rng()*1480), y=Math.round(350+rng()*290), a=Math.round(rng()*180); s+='<rect x="'+x+'" y="'+y+'" width="10" height="5" rx="1" fill="'+CF[i%6]+'" opacity="0.8" transform="rotate('+a+' '+x+' '+y+')"/>'; }   
+  const post=function(x){ return '<rect x="'+(x-5)+'" y="130" width="10" height="200" fill="#8F6238" stroke="#4E3218" stroke-width="1.4"/><rect x="'+(x-5)+'" y="130" width="4" height="200" fill="#B98A5A"/>'; };
+  s+=post(240)+post(1360)+'<path d="M240 136Q800 236 1360 136" stroke="#4E3218" stroke-width="3" fill="none"/>';   
+  const PC=[['#C9242D','#EF5A62','#6E0F16'],['#E3B11E','#FFD75A','#8A6A0A'],['#2C66CF','#6BA1F0','#163A80'],['#D8429A','#F58BC2','#7A2457']];
+  for(let i=1;i<20;i++){ const tq=i/20, mx=Math.round((1-tq)*(1-tq)*240+2*(1-tq)*tq*800+tq*tq*1360), my=Math.round((1-tq)*(1-tq)*136+2*(1-tq)*tq*236+tq*tq*136), c=PC[i%4]; s+='<path d="M'+(mx-14)+' '+my+'L'+(mx+14)+' '+my+'L'+mx+' '+(my+30)+'Z" fill="'+c[0]+'" stroke="'+c[2]+'" stroke-width="1.2"/><path d="M'+(mx-14)+' '+my+'L'+(mx+14)+' '+my+'L'+mx+' '+(my+12)+'Z" fill="'+c[1]+'"/>'; }
+  if(typeof MPT_CASTLE==='string') s+='<g transform="translate(1040 300) scale(0.95)">'+MPT_CASTLE+'</g>';   
+  const mold=function(k,x,y,sc){ return '<g transform="translate('+(x-60*sc)+' '+(y-129*sc)+') scale('+sc+')">'+(LWN_MOLD[k]||'')+'</g>'; };   
+  s+=mold('lwngiraffe',1250,560,1.0)+mold('lwnknight',1000,540,1.0)+mold('lwnpoodle',920,580,0.9)+mold('lwnpoodle',1120,596,0.9);   
+  s+='<rect x="500" y="566" width="520" height="20" fill="#E2CFA6" stroke="#8A7650" stroke-width="1.6"/><rect x="500" y="566" width="520" height="6" fill="#FFF4DC"/><rect x="500" y="578" width="520" height="3" fill="#F58BC2"/><rect x="514" y="586" width="8" height="34" fill="#8F6238" stroke="#4E3218" stroke-width="1"/><rect x="996" y="586" width="8" height="34" fill="#8F6238" stroke="#4E3218" stroke-width="1"/>';   
+  ['#D8429A','#2C66CF','#E3B11E','#C9242D','#5E9B3A','#D8429A','#2C66CF'].forEach(function(c,i){ const x=540+i*62; if(Math.abs(x-760)>50) s+='<circle cx="'+x+'" cy="574" r="4.5" fill="'+c+'" opacity="0.9"/>'; });   
+  s+='<g transform="translate(760 574)">'+LWN_PROP.cake+'</g>';
+  s+='<g transform="translate(560 572)">'+LWN_PROP.chair+'</g><g transform="translate(660 572)">'+LWN_PROP.chairB+'</g><g transform="translate(860 572)">'+LWN_PROP.chairP+'</g><g transform="translate(960 572)">'+LWN_PROP.chairR+'</g>';   
+  const Bq=LWN_HALL.boom; s+='<ellipse cx="'+Bq.x+'" cy="'+(Bq.y+4)+'" rx="'+Math.round(Bq.w*0.45)+'" ry="9" fill="#000" opacity="0.2"/><g id="lwnBoomG" transform="translate('+Bq.x+' '+(Bq.y-16*Bq.k)+') scale('+Bq.k+')">'+LWN_PROP.boombox+'</g>';   
+  s+='<text x="'+Bq.x+'" y="'+(Bq.y+34)+'" text-anchor="middle" font-family="-apple-system, Helvetica, Arial, sans-serif" font-weight="900" font-size="17" fill="#FFF4DC" stroke="#2B1D00" stroke-width="3" paint-order="stroke" data-notr>♪</text>';
+  return s; }</script><script type="text/x-gvt-part">'use strict';
 
 
 
@@ -979901,7 +980092,7 @@ let BFQ=null;
 
 
 
-let GVT_CV='29.43';
+let GVT_CV='29.44';
 let NX_CAP_MUL=4;
 
 
@@ -2656312,7 +2656503,216 @@ var DHP={ on:(function(){ try{ const q=/[?&]dhp=([01])/.exec(location.search||''
 dhpXhp();
 setTimeout(function(){ try{ if(window.GVT && !GVT.dhp) GVT.dhp=function(o){ o=o||{}; if(o.on!=null){ DHP.on=o.on? 1 : 0; dhpXhp(); } if(o.rug!=null) DHP.rug=o.rug? 1 : 0; if(o.sgAdd!=null) DHP.sgAdd=+o.sgAdd; if(o.sgStep!=null) DHP.sgStep=+o.sgStep;
   const L=[0,9,10,50,100]; return { cv:GVT_CV, on:DHP.on, rug:DHP.rug, sgStep:DHP.sgStep, sgAdd:DHP.sgAdd, xhp:{ on:XHP.on, per:Object.assign({},XHP.per) }, sg:L.map(function(r){ return [r, dhpSgHp('shotgun',r), dhpSgHp('pistol',r)]; }), hp:{ bazooka:L.map(function(r){ return bfHpAt('bazooka',r); }), commando:L.map(function(r){ return bfHpAt('commando',r); }) },
-    sheet:{ shotgun100:sgBfHP({w:'shotgun',r:100},100), pistol100:sgBfHP({w:'pistol',r:100},100), shotgun0:sgBfHP({w:'shotgun',r:0},100) }, row:dhpSgRow().length, bag:sargeStats().w, sgRank:Math.min(RANK_MAX,((META.sargeUp||{}).shotgun)|0) }; }; }catch(e){} }, 0);</script><script>(function(){var ps=document.querySelectorAll('script[type="text/x-gvt-part"]');for(var i=0;i<ps.length;i++){var p=ps[i],s=document.createElement('script');s.text=p.text;p.parentNode.replaceChild(s,p);if(s.parentNode)s.parentNode.removeChild(s);}})();</script>
+    sheet:{ shotgun100:sgBfHP({w:'shotgun',r:100},100), pistol100:sgBfHP({w:'pistol',r:100},100), shotgun0:sgBfHP({w:'shotgun',r:0},100) }, row:dhpSgRow().length, bag:sargeStats().w, sgRank:Math.min(RANK_MAX,((META.sargeUp||{}).shotgun)|0) }; }; }catch(e){} }, 0);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const LWN_OFF=(function(){ try{ const q=/[?&]lwn=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_lwnoff','1'); else localStorage.removeItem('gvt_lwnoff'); } return localStorage.getItem('gvt_lwnoff')==='1'; }catch(e){ return false; } })();
+const LWN={ v:1, on:1, fightSong:1, lull:6, bob:7, lift:4, enc:9300, joined:0, song:null, hq:null, asks:0, askT:0, busy:0, held:0, fresh:0, typeT:0, paints:0, pops:0, parries:0, darts:0, taps:0, cycles:0, opens:0, err:0, cache:null, cacheKey:'' };
+const LWN_T={ e:{ hpX:{ poodle:1, knight:1, giraffe:1 } }, m:{ hpX:{ poodle:2, knight:5/3, giraffe:1.5 } }, h:{ hpX:{ poodle:3, knight:7/3, giraffe:2.25 } } };
+const LWN_COL={ poodle:'#D8429A', knight:'#2C66CF', giraffe:'#E3B11E' };
+const LWN_BPM={ bearpark:75, dinopark:70, fields:101, croak:120, icecastle:133, rexlair:120, outlaw:83, yetipark:92, drumcadence:114, drumcadencea:112, militaire:123, nemesis:86, moondoor:89, moongarden:112, palace:78, icecaves:100, chessset:100, nutball:100 };
+const LWN_BOOM={ x:150, y:548, w:130, h:100, k:1.35 };
+const LWN_HALL={ boom:{ x:330, y:548, w:150, h:110, k:1.3 } };
+const LWN_LINE="TWISTY'S PARTY. FIVE WAVES, ONE BALLOON DOG. BRING A PIN.", LWN_SOLO='THE PARTY LAWN IS SOLO FOR NOW', LWN_LOST='Squeak. Better luck at the next party.';
+
+
+
+
+const LWN_MOLD={"twisty": "<ellipse cx=\"60\" cy=\"129\" rx=\"40\" ry=\"6.4\" fill=\"#000\" opacity=\"0.24\"/><path d=\"M80 88L78 114\" stroke=\"#6E0F16\" stroke-width=\"22.2\" stroke-opacity=\"0.9\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M80 88L78 114\" stroke=\"#C9242D\" stroke-width=\"20\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M77.0 86.8L75.4 107.2\" stroke=\"#EF5A62\" stroke-width=\"10.0\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M92 88L96 114\" stroke=\"#6E0F16\" stroke-width=\"22.2\" stroke-opacity=\"0.9\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M92 88L96 114\" stroke=\"#C9242D\" stroke-width=\"20\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M89.6 86.8L92.8 107.2\" stroke=\"#EF5A62\" stroke-width=\"10.0\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M94 72L108 50\" stroke=\"#6E0F16\" stroke-width=\"18.2\" stroke-opacity=\"0.9\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M94 72L108 50\" stroke=\"#C9242D\" stroke-width=\"16\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M93.0 66.9L104.6 48.7\" stroke=\"#EF5A62\" stroke-width=\"8.0\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M32 77L90 77\" stroke=\"#6E0F16\" stroke-width=\"32.2\" stroke-opacity=\"0.9\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M32 77L90 77\" stroke=\"#C9242D\" stroke-width=\"30\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M32.0 71.0L81.6 71.0\" stroke=\"#EF5A62\" stroke-width=\"15.0\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M36 88L32 114\" stroke=\"#6E0F16\" stroke-width=\"22.2\" stroke-opacity=\"0.9\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M36 88L32 114\" stroke=\"#C9242D\" stroke-width=\"20\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M32.8 86.8L29.6 107.2\" stroke=\"#EF5A62\" stroke-width=\"10.0\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M50 88L52 114\" stroke=\"#6E0F16\" stroke-width=\"22.2\" stroke-opacity=\"0.9\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M50 88L52 114\" stroke=\"#C9242D\" stroke-width=\"20\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M47.4 86.8L49.0 107.2\" stroke=\"#EF5A62\" stroke-width=\"10.0\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M34 70L28 50\" stroke=\"#6E0F16\" stroke-width=\"24.2\" stroke-opacity=\"0.9\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M34 70L28 50\" stroke=\"#C9242D\" stroke-width=\"22\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M30.0 62.6L25.8 48.6\" stroke=\"#EF5A62\" stroke-width=\"11.0\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M36 40L44 18\" stroke=\"#6E0F16\" stroke-width=\"16.2\" stroke-opacity=\"0.9\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M36 40L44 18\" stroke=\"#C9242D\" stroke-width=\"14\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M34.7 35.4L41.4 17.0\" stroke=\"#EF5A62\" stroke-width=\"7.0\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M27 40L27 16\" stroke=\"#6E0F16\" stroke-width=\"16.2\" stroke-opacity=\"0.9\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M27 40L27 16\" stroke=\"#C9242D\" stroke-width=\"14\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M25.0 35.2L25.0 15.2\" stroke=\"#EF5A62\" stroke-width=\"7.0\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M32 46L18 51\" stroke=\"#6E0F16\" stroke-width=\"24.2\" stroke-opacity=\"0.9\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M32 46L18 51\" stroke=\"#C9242D\" stroke-width=\"22\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M26.0 42.6L17.8 45.6\" stroke=\"#EF5A62\" stroke-width=\"11.0\" stroke-linecap=\"round\" fill=\"none\"/><circle cx=\"34\" cy=\"74\" r=\"2.4\" fill=\"#6E0F16\" opacity=\"0.8\"/><circle cx=\"93\" cy=\"74\" r=\"2.4\" fill=\"#6E0F16\" opacity=\"0.8\"/><circle cx=\"31\" cy=\"48\" r=\"2.4\" fill=\"#6E0F16\" opacity=\"0.8\"/><circle cx=\"31\" cy=\"40\" r=\"2\" fill=\"#6E0F16\" opacity=\"0.8\"/><ellipse cx=\"9\" cy=\"47\" rx=\"3.8\" ry=\"3.2\" fill=\"#15120F\"/><circle cx=\"8\" cy=\"46\" r=\"1.1\" fill=\"#fff\" opacity=\"0.8\"/><circle cx=\"22\" cy=\"44\" r=\"2.6\" fill=\"#15120F\"/><circle cx=\"21.2\" cy=\"43.2\" r=\"0.9\" fill=\"#fff\"/><path d=\"M14 56q3.0 2.7 6 0\" stroke=\"#15120F\" stroke-width=\"1.4\" fill=\"none\" stroke-linecap=\"round\"/>", "lwnpoodle": "<ellipse cx=\"60\" cy=\"129\" rx=\"36\" ry=\"5.8\" fill=\"#000\" opacity=\"0.24\"/><path d=\"M78 92L76 112\" stroke=\"#7A2457\" stroke-width=\"17.2\" stroke-opacity=\"0.9\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M78 92L76 112\" stroke=\"#D8429A\" stroke-width=\"15\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M75.7 91.1L74.1 106.9\" stroke=\"#F58BC2\" stroke-width=\"7.5\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M88 92L92 112\" stroke=\"#7A2457\" stroke-width=\"17.2\" stroke-opacity=\"0.9\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M88 92L92 112\" stroke=\"#D8429A\" stroke-width=\"15\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M86.3 91.1L89.5 106.9\" stroke=\"#F58BC2\" stroke-width=\"7.5\" stroke-linecap=\"round\" fill=\"none\"/><circle cx=\"75\" cy=\"118\" r=\"10.1\" fill=\"#7A2457\" opacity=\"0.9\"/><circle cx=\"75\" cy=\"118\" r=\"9\" fill=\"#D8429A\"/><path d=\"M66.9 117.5A8.3 8.3 0 0 1 81.5 113.0A9.0 6.8 0 0 0 66.9 117.5Z\" fill=\"#F58BC2\"/><circle cx=\"93\" cy=\"118\" r=\"10.1\" fill=\"#7A2457\" opacity=\"0.9\"/><circle cx=\"93\" cy=\"118\" r=\"9\" fill=\"#D8429A\"/><path d=\"M84.9 117.5A8.3 8.3 0 0 1 99.5 113.0A9.0 6.8 0 0 0 84.9 117.5Z\" fill=\"#F58BC2\"/><path d=\"M92 78L104 60\" stroke=\"#7A2457\" stroke-width=\"14.2\" stroke-opacity=\"0.9\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M92 78L104 60\" stroke=\"#D8429A\" stroke-width=\"12\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M91.3 74.2L101.4 59.0\" stroke=\"#F58BC2\" stroke-width=\"6.0\" stroke-linecap=\"round\" fill=\"none\"/><circle cx=\"107\" cy=\"54\" r=\"12.1\" fill=\"#7A2457\" opacity=\"0.9\"/><circle cx=\"107\" cy=\"54\" r=\"11\" fill=\"#D8429A\"/><path d=\"M97.1 53.5A10.1 10.1 0 0 1 114.9 48.0A11.0 8.2 0 0 0 97.1 53.5Z\" fill=\"#F58BC2\"/><path d=\"M36 82L90 82\" stroke=\"#7A2457\" stroke-width=\"28.2\" stroke-opacity=\"0.9\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M36 82L90 82\" stroke=\"#D8429A\" stroke-width=\"26\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M36.0 76.8L82.7 76.8\" stroke=\"#F58BC2\" stroke-width=\"13.0\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M40 92L36 112\" stroke=\"#7A2457\" stroke-width=\"17.2\" stroke-opacity=\"0.9\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M40 92L36 112\" stroke=\"#D8429A\" stroke-width=\"15\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M37.5 91.1L34.3 106.9\" stroke=\"#F58BC2\" stroke-width=\"7.5\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M50 92L54 112\" stroke=\"#7A2457\" stroke-width=\"17.2\" stroke-opacity=\"0.9\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M50 92L54 112\" stroke=\"#D8429A\" stroke-width=\"15\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M48.3 91.1L51.5 106.9\" stroke=\"#F58BC2\" stroke-width=\"7.5\" stroke-linecap=\"round\" fill=\"none\"/><circle cx=\"35\" cy=\"118\" r=\"10.1\" fill=\"#7A2457\" opacity=\"0.9\"/><circle cx=\"35\" cy=\"118\" r=\"9\" fill=\"#D8429A\"/><path d=\"M26.9 117.5A8.3 8.3 0 0 1 41.5 113.0A9.0 6.8 0 0 0 26.9 117.5Z\" fill=\"#F58BC2\"/><circle cx=\"55\" cy=\"118\" r=\"10.1\" fill=\"#7A2457\" opacity=\"0.9\"/><circle cx=\"55\" cy=\"118\" r=\"9\" fill=\"#D8429A\"/><path d=\"M46.9 117.5A8.3 8.3 0 0 1 61.5 113.0A9.0 6.8 0 0 0 46.9 117.5Z\" fill=\"#F58BC2\"/><path d=\"M38 78L32 58\" stroke=\"#7A2457\" stroke-width=\"20.2\" stroke-opacity=\"0.9\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M38 78L32 58\" stroke=\"#D8429A\" stroke-width=\"18\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M34.8 72.0L30.2 56.8\" stroke=\"#F58BC2\" stroke-width=\"9.0\" stroke-linecap=\"round\" fill=\"none\"/><circle cx=\"42\" cy=\"52\" r=\"11.1\" fill=\"#7A2457\" opacity=\"0.9\"/><circle cx=\"42\" cy=\"52\" r=\"10\" fill=\"#D8429A\"/><path d=\"M33.0 51.5A9.2 9.2 0 0 1 49.2 46.5A10.0 7.5 0 0 0 33.0 51.5Z\" fill=\"#F58BC2\"/><circle cx=\"30\" cy=\"42\" r=\"18.1\" fill=\"#7A2457\" opacity=\"0.9\"/><circle cx=\"30\" cy=\"42\" r=\"17\" fill=\"#D8429A\"/><path d=\"M14.7 41.1A15.6 15.6 0 0 1 42.2 32.6A17.0 12.8 0 0 0 14.7 41.1Z\" fill=\"#F58BC2\"/><path d=\"M26 50L10 56\" stroke=\"#7A2457\" stroke-width=\"17.2\" stroke-opacity=\"0.9\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M26 50L10 56\" stroke=\"#D8429A\" stroke-width=\"15\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M21.9 47.7L9.9 52.3\" stroke=\"#F58BC2\" stroke-width=\"7.5\" stroke-linecap=\"round\" fill=\"none\"/><circle cx=\"38\" cy=\"80\" r=\"2.4\" fill=\"#7A2457\" opacity=\"0.8\"/><circle cx=\"92\" cy=\"80\" r=\"2.4\" fill=\"#7A2457\" opacity=\"0.8\"/><circle cx=\"7\" cy=\"57\" r=\"3\" fill=\"#7A2457\" opacity=\"0.85\"/><circle cx=\"24\" cy=\"40\" r=\"2.6\" fill=\"#15120F\"/><circle cx=\"23.2\" cy=\"39.2\" r=\"0.9\" fill=\"#fff\"/><path d=\"M13 58q3.0 2.7 6 0\" stroke=\"#15120F\" stroke-width=\"1.4\" fill=\"none\" stroke-linecap=\"round\"/>", "lwnknight": "<ellipse cx=\"60\" cy=\"129\" rx=\"36\" ry=\"5.8\" fill=\"#000\" opacity=\"0.24\"/><path d=\"M50 94L44 116\" stroke=\"#163A80\" stroke-width=\"20.2\" stroke-opacity=\"0.9\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M50 94L44 116\" stroke=\"#2C66CF\" stroke-width=\"18\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M46.8 92.8L42.1 110.0\" stroke=\"#6BA1F0\" stroke-width=\"9.0\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M66 94L72 116\" stroke=\"#163A80\" stroke-width=\"20.2\" stroke-opacity=\"0.9\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M66 94L72 116\" stroke=\"#2C66CF\" stroke-width=\"18\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M64.1 92.8L68.8 110.0\" stroke=\"#6BA1F0\" stroke-width=\"9.0\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M68 64L84 78\" stroke=\"#163A80\" stroke-width=\"16.2\" stroke-opacity=\"0.9\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M68 64L84 78\" stroke=\"#2C66CF\" stroke-width=\"14\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M67.5 62.5L80.6 73.9\" stroke=\"#6BA1F0\" stroke-width=\"7.0\" stroke-linecap=\"round\" fill=\"none\"/><circle cx=\"92\" cy=\"84\" r=\"17.1\" fill=\"#8A7650\" opacity=\"0.9\"/><circle cx=\"92\" cy=\"84\" r=\"16\" fill=\"#E2CFA6\"/><path d=\"M77.6 83.2A14.7 14.7 0 0 1 103.5 75.2A16.0 12.0 0 0 0 77.6 83.2Z\" fill=\"#FFF4DC\"/><circle cx=\"92\" cy=\"84\" r=\"6\" fill=\"#8A7650\" opacity=\"0.35\"/><path d=\"M58 58L58 94\" stroke=\"#163A80\" stroke-width=\"30.2\" stroke-opacity=\"0.9\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M58 58L58 94\" stroke=\"#2C66CF\" stroke-width=\"28\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M54.1 56.3L54.1 84.5\" stroke=\"#6BA1F0\" stroke-width=\"14.0\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M48 64L24 52\" stroke=\"#163A80\" stroke-width=\"16.2\" stroke-opacity=\"0.9\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M48 64L24 52\" stroke=\"#2C66CF\" stroke-width=\"14\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M44.3 60.3L23.8 50.1\" stroke=\"#6BA1F0\" stroke-width=\"7.0\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M22 54L14 10\" stroke=\"#8F6B0C\" stroke-width=\"12.2\" stroke-opacity=\"0.9\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M22 54L14 10\" stroke=\"#E8B62A\" stroke-width=\"10\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M20.3 50.6L12.9 9.4\" stroke=\"#FFE27A\" stroke-width=\"5.0\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M8 26L28 20\" stroke=\"#8F6B0C\" stroke-width=\"10.2\" stroke-opacity=\"0.9\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M8 26L28 20\" stroke=\"#E8B62A\" stroke-width=\"8\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M8.0 24.1L25.8 18.7\" stroke=\"#FFE27A\" stroke-width=\"4.0\" stroke-linecap=\"round\" fill=\"none\"/><circle cx=\"58\" cy=\"38\" r=\"19.1\" fill=\"#163A80\" opacity=\"0.9\"/><circle cx=\"58\" cy=\"38\" r=\"18\" fill=\"#2C66CF\"/><path d=\"M41.8 37.1A16.6 16.6 0 0 1 71.0 28.1A18.0 13.5 0 0 0 41.8 37.1Z\" fill=\"#6BA1F0\"/><path d=\"M58 22L66 8\" stroke=\"#8F6B0C\" stroke-width=\"10.2\" stroke-opacity=\"0.9\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M58 22L66 8\" stroke=\"#E8B62A\" stroke-width=\"8\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M57.4 19.4L64.3 7.4\" stroke=\"#FFE27A\" stroke-width=\"4.0\" stroke-linecap=\"round\" fill=\"none\"/><circle cx=\"58\" cy=\"58\" r=\"2.4\" fill=\"#163A80\" opacity=\"0.8\"/><circle cx=\"24\" cy=\"52\" r=\"2\" fill=\"#8F6B0C\" opacity=\"0.8\"/><circle cx=\"50\" cy=\"36\" r=\"2.6\" fill=\"#15120F\"/><circle cx=\"49.2\" cy=\"35.2\" r=\"0.9\" fill=\"#fff\"/><circle cx=\"59\" cy=\"36\" r=\"2.6\" fill=\"#15120F\"/><circle cx=\"58.2\" cy=\"35.2\" r=\"0.9\" fill=\"#fff\"/><path d=\"M50 44q4.5 4.05 9 0\" stroke=\"#15120F\" stroke-width=\"1.4\" fill=\"none\" stroke-linecap=\"round\"/>", "lwngiraffe": "<ellipse cx=\"60\" cy=\"129\" rx=\"36\" ry=\"5.8\" fill=\"#000\" opacity=\"0.24\"/><path d=\"M80 92L84 116\" stroke=\"#8A6A0A\" stroke-width=\"15.2\" stroke-opacity=\"0.9\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M80 92L84 116\" stroke=\"#E3B11E\" stroke-width=\"13\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M78.5 91.2L81.9 111.6\" stroke=\"#FFD75A\" stroke-width=\"6.5\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M90 92L96 116\" stroke=\"#8A6A0A\" stroke-width=\"15.2\" stroke-opacity=\"0.9\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M90 92L96 116\" stroke=\"#E3B11E\" stroke-width=\"13\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M88.6 91.2L93.7 111.6\" stroke=\"#FFD75A\" stroke-width=\"6.5\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M92 80L102 98\" stroke=\"#8A6A0A\" stroke-width=\"11.2\" stroke-opacity=\"0.9\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M92 80L102 98\" stroke=\"#E3B11E\" stroke-width=\"9\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M91.4 79.3L100.1 95.1\" stroke=\"#FFD75A\" stroke-width=\"4.5\" stroke-linecap=\"round\" fill=\"none\"/><circle cx=\"104\" cy=\"102\" r=\"6.1\" fill=\"#8A6A0A\" opacity=\"0.9\"/><circle cx=\"104\" cy=\"102\" r=\"5\" fill=\"#E3B11E\"/><path d=\"M99.5 101.8A4.6 4.6 0 0 1 107.6 99.2A5.0 3.8 0 0 0 99.5 101.8Z\" fill=\"#FFD75A\"/><path d=\"M34 84L90 84\" stroke=\"#8A6A0A\" stroke-width=\"26.2\" stroke-opacity=\"0.9\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M34 84L90 84\" stroke=\"#E3B11E\" stroke-width=\"24\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M34.0 79.2L83.3 79.2\" stroke=\"#FFD75A\" stroke-width=\"12.0\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M34 92L30 116\" stroke=\"#8A6A0A\" stroke-width=\"15.2\" stroke-opacity=\"0.9\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M34 92L30 116\" stroke=\"#E3B11E\" stroke-width=\"13\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M31.9 91.2L28.5 111.6\" stroke=\"#FFD75A\" stroke-width=\"6.5\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M44 92L42 116\" stroke=\"#8A6A0A\" stroke-width=\"15.2\" stroke-opacity=\"0.9\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M44 92L42 116\" stroke=\"#E3B11E\" stroke-width=\"13\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M42.0 91.2L40.3 111.6\" stroke=\"#FFD75A\" stroke-width=\"6.5\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M38 80L30 24\" stroke=\"#8A6A0A\" stroke-width=\"18.2\" stroke-opacity=\"0.9\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M38 80L30 24\" stroke=\"#E3B11E\" stroke-width=\"16\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M35.4 74.6L28.1 23.0\" stroke=\"#FFD75A\" stroke-width=\"8.0\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M32 20L10 26\" stroke=\"#8A6A0A\" stroke-width=\"17.2\" stroke-opacity=\"0.9\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M32 20L10 26\" stroke=\"#E3B11E\" stroke-width=\"15\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M27.9 17.6L9.9 22.4\" stroke=\"#FFD75A\" stroke-width=\"7.5\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M28 13L30 5\" stroke=\"#8A6A0A\" stroke-width=\"8.2\" stroke-opacity=\"0.9\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M28 13L30 5\" stroke=\"#E3B11E\" stroke-width=\"6\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M27.4 11.0L29.0 4.6\" stroke=\"#FFD75A\" stroke-width=\"3.0\" stroke-linecap=\"round\" fill=\"none\"/><circle cx=\"30\" cy=\"4\" r=\"4.7\" fill=\"#8A6A0A\" opacity=\"0.9\"/><circle cx=\"30\" cy=\"4\" r=\"3.6\" fill=\"#E3B11E\"/><path d=\"M26.8 3.8A3.3 3.3 0 0 1 32.6 2.0A3.6 2.7 0 0 0 26.8 3.8Z\" fill=\"#FFD75A\"/><path d=\"M22 15L20 7\" stroke=\"#8A6A0A\" stroke-width=\"8.2\" stroke-opacity=\"0.9\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M22 15L20 7\" stroke=\"#E3B11E\" stroke-width=\"6\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M21.0 13.0L19.4 6.6\" stroke=\"#FFD75A\" stroke-width=\"3.0\" stroke-linecap=\"round\" fill=\"none\"/><circle cx=\"20\" cy=\"6\" r=\"4.7\" fill=\"#8A6A0A\" opacity=\"0.9\"/><circle cx=\"20\" cy=\"6\" r=\"3.6\" fill=\"#E3B11E\"/><path d=\"M16.8 5.8A3.3 3.3 0 0 1 22.6 4.0A3.6 2.7 0 0 0 16.8 5.8Z\" fill=\"#FFD75A\"/><ellipse cx=\"54\" cy=\"82\" rx=\"5\" ry=\"4\" fill=\"#C97F12\" opacity=\"0.75\"/><ellipse cx=\"74\" cy=\"87\" rx=\"5\" ry=\"4\" fill=\"#C97F12\" opacity=\"0.75\"/><ellipse cx=\"35\" cy=\"52\" rx=\"4\" ry=\"5\" fill=\"#C97F12\" opacity=\"0.75\"/><ellipse cx=\"31\" cy=\"36\" rx=\"3.5\" ry=\"4.5\" fill=\"#C97F12\" opacity=\"0.75\"/><circle cx=\"38\" cy=\"82\" r=\"2.4\" fill=\"#8A6A0A\" opacity=\"0.8\"/><circle cx=\"92\" cy=\"82\" r=\"2.4\" fill=\"#8A6A0A\" opacity=\"0.8\"/><circle cx=\"7\" cy=\"27\" r=\"2.8\" fill=\"#8A6A0A\" opacity=\"0.85\"/><circle cx=\"18\" cy=\"21\" r=\"2.3\" fill=\"#15120F\"/><circle cx=\"17.3\" cy=\"20.3\" r=\"0.8\" fill=\"#fff\"/><path d=\"M11 29q2.5 2.25 5 0\" stroke=\"#15120F\" stroke-width=\"1.4\" fill=\"none\" stroke-linecap=\"round\"/>"};
+const LWN_PROP={"chair": "<g transform=\"translate(0 0) scale(1.0)\"><rect x=\"-14\" y=\"-6\" width=\"28\" height=\"7\" rx=\"2\" fill=\"#8F6238\" stroke=\"#4E3218\" stroke-width=\"1.2\"/><rect x=\"8\" y=\"-34\" width=\"6\" height=\"30\" rx=\"2\" fill=\"#B98A5A\" stroke=\"#4E3218\" stroke-width=\"1\"/><rect x=\"-12\" y=\"0\" width=\"4\" height=\"20\" fill=\"#4E3218\"/><rect x=\"8\" y=\"0\" width=\"4\" height=\"20\" fill=\"#4E3218\"/><path d=\"M11 -34Q14 -66 10 -86\" stroke=\"#333\" stroke-width=\"1.2\" fill=\"none\"/><circle cx=\"10\" cy=\"-96\" r=\"13.1\" fill=\"#8A6A0A\" opacity=\"0.9\"/><circle cx=\"10\" cy=\"-96\" r=\"12\" fill=\"#E3B11E\"/><path d=\"M-0.8 -96.6A11.0 11.0 0 0 1 18.6 -102.6A12.0 9.0 0 0 0 -0.8 -96.6Z\" fill=\"#FFD75A\"/></g>", "chairB": "<g transform=\"translate(0 0) scale(1.0)\"><rect x=\"-14\" y=\"-6\" width=\"28\" height=\"7\" rx=\"2\" fill=\"#8F6238\" stroke=\"#4E3218\" stroke-width=\"1.2\"/><rect x=\"8\" y=\"-34\" width=\"6\" height=\"30\" rx=\"2\" fill=\"#B98A5A\" stroke=\"#4E3218\" stroke-width=\"1\"/><rect x=\"-12\" y=\"0\" width=\"4\" height=\"20\" fill=\"#4E3218\"/><rect x=\"8\" y=\"0\" width=\"4\" height=\"20\" fill=\"#4E3218\"/><path d=\"M11 -34Q14 -66 10 -86\" stroke=\"#333\" stroke-width=\"1.2\" fill=\"none\"/><circle cx=\"10\" cy=\"-96\" r=\"13.1\" fill=\"#163A80\" opacity=\"0.9\"/><circle cx=\"10\" cy=\"-96\" r=\"12\" fill=\"#2C66CF\"/><path d=\"M-0.8 -96.6A11.0 11.0 0 0 1 18.6 -102.6A12.0 9.0 0 0 0 -0.8 -96.6Z\" fill=\"#6BA1F0\"/></g>", "chairP": "<g transform=\"translate(0 0) scale(1.0)\"><rect x=\"-14\" y=\"-6\" width=\"28\" height=\"7\" rx=\"2\" fill=\"#8F6238\" stroke=\"#4E3218\" stroke-width=\"1.2\"/><rect x=\"8\" y=\"-34\" width=\"6\" height=\"30\" rx=\"2\" fill=\"#B98A5A\" stroke=\"#4E3218\" stroke-width=\"1\"/><rect x=\"-12\" y=\"0\" width=\"4\" height=\"20\" fill=\"#4E3218\"/><rect x=\"8\" y=\"0\" width=\"4\" height=\"20\" fill=\"#4E3218\"/><path d=\"M11 -34Q14 -66 10 -86\" stroke=\"#333\" stroke-width=\"1.2\" fill=\"none\"/><circle cx=\"10\" cy=\"-96\" r=\"13.1\" fill=\"#7A2457\" opacity=\"0.9\"/><circle cx=\"10\" cy=\"-96\" r=\"12\" fill=\"#D8429A\"/><path d=\"M-0.8 -96.6A11.0 11.0 0 0 1 18.6 -102.6A12.0 9.0 0 0 0 -0.8 -96.6Z\" fill=\"#F58BC2\"/></g>", "chairR": "<g transform=\"translate(0 0) scale(1.0)\"><rect x=\"-14\" y=\"-6\" width=\"28\" height=\"7\" rx=\"2\" fill=\"#8F6238\" stroke=\"#4E3218\" stroke-width=\"1.2\"/><rect x=\"8\" y=\"-34\" width=\"6\" height=\"30\" rx=\"2\" fill=\"#B98A5A\" stroke=\"#4E3218\" stroke-width=\"1\"/><rect x=\"-12\" y=\"0\" width=\"4\" height=\"20\" fill=\"#4E3218\"/><rect x=\"8\" y=\"0\" width=\"4\" height=\"20\" fill=\"#4E3218\"/><path d=\"M11 -34Q14 -66 10 -86\" stroke=\"#333\" stroke-width=\"1.2\" fill=\"none\"/><circle cx=\"10\" cy=\"-96\" r=\"13.1\" fill=\"#6E0F16\" opacity=\"0.9\"/><circle cx=\"10\" cy=\"-96\" r=\"12\" fill=\"#C9242D\"/><path d=\"M-0.8 -96.6A11.0 11.0 0 0 1 18.6 -102.6A12.0 9.0 0 0 0 -0.8 -96.6Z\" fill=\"#EF5A62\"/></g>", "cake": "<g transform=\"translate(0 0) scale(1.0)\"><ellipse cx=\"0\" cy=\"10\" rx=\"38\" ry=\"9\" fill=\"#fff\" stroke=\"#8E8A80\" stroke-width=\"1.2\"/><path d=\"M-32 -16h64v24a6 6 0 0 1 -6 6h-52a6 6 0 0 1 -6 -6z\" fill=\"#D8429A\" stroke=\"#7A2457\" stroke-width=\"1.6\" stroke-opacity=\"0.9\" stroke-linejoin=\"round\"/><path d=\"M-32 -16h64v8h-64z\" fill=\"#F58BC2\"/><path d=\"M-20 -38h40v22h-40z\" fill=\"#E2CFA6\" stroke=\"#8A7650\" stroke-width=\"1.6\" stroke-opacity=\"0.9\" stroke-linejoin=\"round\"/><path d=\"M-20 -38h40v7h-40z\" fill=\"#FFF4DC\"/><rect x=\"-14\" y=\"-56\" width=\"4\" height=\"18\" fill=\"#2C66CF\"/><ellipse cx=\"-12\" cy=\"-60\" rx=\"3\" ry=\"5\" fill=\"#FFB347\"/><rect x=\"-2\" y=\"-56\" width=\"4\" height=\"18\" fill=\"#E3B11E\"/><ellipse cx=\"0\" cy=\"-60\" rx=\"3\" ry=\"5\" fill=\"#FFB347\"/><rect x=\"10\" y=\"-56\" width=\"4\" height=\"18\" fill=\"#C9242D\"/><ellipse cx=\"12\" cy=\"-60\" rx=\"3\" ry=\"5\" fill=\"#FFB347\"/></g>", "boombox": "<g transform=\"translate(0 0) scale(1.0)\"><path d=\"M-44 -30h88a7 7 0 0 1 7 7v32a7 7 0 0 1 -7 7h-88a7 7 0 0 1 -7 -7v-32a7 7 0 0 1 7 -7z\" fill=\"#3B3F47\" stroke=\"#15181D\" stroke-width=\"1.6\" stroke-opacity=\"0.9\" stroke-linejoin=\"round\"/><path d=\"M-44 -30h88a7 7 0 0 1 7 7v10h-102v-10a7 7 0 0 1 7 -7z\" fill=\"#6B717C\"/><path d=\"M-26 -30q26 -22 52 0\" stroke=\"#2b2e34\" stroke-width=\"5\" fill=\"none\" stroke-linecap=\"round\"/><circle cx=\"-24\" cy=\"-4\" r=\"13\" fill=\"#15181d\"/><circle cx=\"-24\" cy=\"-4\" r=\"7\" fill=\"#2b2e34\"/><circle cx=\"24\" cy=\"-4\" r=\"13\" fill=\"#15181d\"/><circle cx=\"24\" cy=\"-4\" r=\"7\" fill=\"#2b2e34\"/><rect x=\"-10\" y=\"-14\" width=\"20\" height=\"12\" rx=\"2\" fill=\"#E3B11E\"/></g>"};
+
+if(lwnOn()){ RAID_INFO.party={ k:'party', plc:'', enc:LWN.enc, name:'THE PARTY LAWN', king:'twisty', show:null, falls:'VICTORY', wing:'party', get bed(){ return lwnSongId(); }, g:false, u:false, hmul:1.2, hmulU:0, retreat:null, posts:[],
+  flankVB:'0 0 120 140', crop:'0 0 120 140', bg:'linear-gradient(180deg,#F2A65A,#FFDDB0 44%,#7FB84E 70%,#5E9B3A)', hall:function(){ return lwnHallSVG(); }, mega:function(){ return false; }, key:function(){ return lwnKey(); }, cel:function(){ return ''; }, lost:LWN_LOST, pg:0 }; }
+
+
+const LWN_IMG={}, LWN_VB={ chair:'-20 -112 40 136', chairB:'-20 -112 40 136', chairP:'-20 -112 40 136', chairR:'-20 -112 40 136', cake:'-42 -70 84 92', boombox:'-54 -58 108 80' };
+
+
+
+
+
+if(lwnOn() && META.partyCode){ try{ lwnJoin(); }catch(e){ LWN.err++; } }
+
+{ const r0=raidTierOpenFor; raidTierOpenFor=function(rk,tier){ if(rk==='party' && lwnRow()){ if(tier==='g' || tier==='u') return false; if((tier==='m' || tier==='h') && pnTierPast(raidLed(rk,false), tier)) return true; if(tier==='e') return raidDoorKey('party'); if(tier==='m') return !!(META.party&&META.party.e); return !!(META.party&&META.party.m); } return r0.apply(this, arguments); }; }
+
+FDEF.lwnpoodle={ hp:1, spd:70, bounty:2, leak:1, w:46, rng:34, fireCd:1.6, pips:1, lwn:'poodle' };
+FDEF.lwnknight={ hp:3, spd:44, bounty:4, leak:1, w:52, rng:44, fireCd:2.4, aim:0.3, pips:1, lwn:'knight' };
+FDEF.lwngiraffe={ hp:4, spd:22, bounty:5, leak:1, w:54, rng:250, fireCd:4.2, aim:1.2, pips:1, lwn:'giraffe' };
+{ const c0=raidCfg; raidCfg=function(tier,rk){ if(rk && lwnRow() && RAID_INFO[rk] && RAID_INFO[rk].k==='party') return lwnCfg(tier); return c0.apply(this, arguments); }; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+{ const t0=raidTick; raidTick=function(dt){ t0.apply(this, arguments); try{ lwnTick(dt); }catch(e){ LWN.err++; try{ console.error('CARD-LWN tick', e); }catch(e2){} } }; }
+
+
+
+
+
+{ const h0=hurt; hurt=function(f,dmg,src,fire9){ try{ if(f && f.def && f.def.lwn==='knight' && lwnOn9() && !fire9 && !f.dead && f.hp>0 && src){ f.lwnN=(f.lwnN|0)+1; if(f.lwnN%3===0){ LWN.parries++; const L=lwnL(); if(L) L.parries++;
+    S.fx.push({ k:'ring', x:f.x, y:f.y-f.def.w*0.6, r:4, R:24, t:0, dur:0.3, col:'#BFE3FF' }); S.floats.push({ x:f.x, y:f.y-f.def.w-8, txt:t('PARRIED!'), t:0, col:'#BFE3FF' }); try{ bfSfx(SFX.snap, f.x, f.y); }catch(e){} return; } } }catch(e){ LWN.err++; }
+  return h0.apply(this, arguments); }; }
+
+{ const s0=tanShoot; tanShoot=function(f){ let tg=null; try{ if(f && f.def && f.def.lwn==='giraffe' && lwnOn9() && typeof tanPick==='function') tg=tanPick(f); }catch(e){ tg=null; } const r=s0.apply(this, arguments);   
+  try{ if(r && tg && f.def && f.def.lwn==='giraffe' && lwnOn9()){ const L=lwnL(); if(L){ L.darts++; LWN.darts++; L.fx.push({ k:'dart', x0:f.x-10, y0:f.y-f.def.w*1.1, x1:tg.x, y1:tg.y-18, t:0, dur:0.22 }); } } }catch(e){ LWN.err++; } return r; }; }
+
+{ const f0=foeFell; foeFell=function(f,u){ const pop=!!(f && f.def && f.def.lwn && !S.bf); const n9=S.fx.length; const r=f0.apply(this, arguments);
+  if(pop){ try{ for(let i=S.fx.length-1;i>=n9;i--){ if(S.fx[i] && S.fx[i].k==='fallen') S.fx.splice(i,1); } lwnPop(f); }catch(e){ LWN.err++; } } return r; }; }
+
+
+
+
+
+
+
+
+
+{ const d0=drawFoe; drawFoe=function(f){ if(f && f.def && f.def.lwn && !S.bf){ const b=lwnBob(f); cx.save(); cx.translate(0,-b); try{ d0.apply(this, arguments); } finally{ cx.restore(); } return; } return d0.apply(this, arguments); }; }
+
+
+
+
+
+{ const n0=locNow; locNow=function(){ try{ if(LWN.fightSong && S.mode==='play' && lwnOn9()) return lwnSongId(); }catch(e){ LWN.err++; } return n0.apply(this, arguments); }; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+window.addEventListener('resize', function(){ try{ if(raidSceneOpen() && RAID_CUR==='party') lwnBoomSeat(); }catch(e){} });
+{ const r0=renderRaidScene; renderRaidScene=function(){ r0.apply(this, arguments); if(RAID_CUR==='party' && lwnRow()){ try{ lwnLobbyDress(); }catch(e){ LWN.err++; try{ console.error('CARD-LWN lobby', e); }catch(e2){} } try{ lwnAsk(); }catch(e){ LWN.err++; } } }; }
+{ const o0=openRaidScene; openRaidScene=function(id){ try{ if(id==='party' && lwnRow()){ lwnJoin(); LWN.fresh=1; LWN.opens++; } }catch(e){ LWN.err++; } return o0.apply(this, arguments); }; }
+{ const s0=startRaidBattle; startRaidBattle=function(tier, rk){ try{ if(rk==='party' && lwnRow()){ lwnJoin(); LWN.cacheKey=''; } }catch(e){ LWN.err++; } return s0.apply(this, arguments); }; }
+
+
+
+
+
+{ const b0=crewRaidBoom; crewRaidBoom=function(tier){ try{ if(RAID_CUR==='party' && lwnRow() && !lwnDoor() && typeof COOP!=='undefined' && COOP && COOP.code && (COOP.members||[]).length>=2){ LWN.held++; lwnAsk(); try{ wtToast(t(LWN_SOLO)); }catch(e){} return Promise.resolve(true); } }catch(e){ LWN.err++; } return b0.apply(this, arguments); }; }
+
+window.addEventListener('pointerdown', function(e){ try{ if(!lwnOn9() || S.mode!=='play' || e.target!==cv || e.isPrimary===false) return; const p=evPosW(e), B=LWN_BOOM;
+  if(Math.abs(p.x-B.x)<=B.w/2+12 && p.y>=B.y-B.h-12 && p.y<=B.y+18){ e.stopPropagation(); e.preventDefault(); LWN.taps++;
+    if(typeof RAID_INFO==='object' && RAID_INFO && RAID_INFO.music){ try{ SFX.blip(); }catch(e2){} return; }   
+    const id=lwnCycle(); S.floats.push({ x:B.x, y:B.y-B.h-24, txt:'♪ '+lwnSongName(id), t:0, col:'#FFD966' }); try{ SFX.blip(); }catch(e2){} } }catch(e){ LWN.err++; } }, true);
+
+{ const l0=lagRugBand; lagRugBand=function(){ const r=l0.apply(this, arguments); try{ if(lwnOn9()) lwnFloor(); }catch(e){ LWN.err++; } return r; }; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+{ const o0=olvActors; olvActors=function(A){ const r=o0.apply(this, arguments); try{ if(lwnOn9()) lwnActors(A); }catch(e){ LWN.err++; } return r; }; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+(function(){ const W9={
+  ja:{"THE PARTY LAWN":"パーティーの しばふ","TWISTY":"ツイスティ","TWISTY'S PARTY. FIVE WAVES, ONE BALLOON DOG. BRING A PIN.":"ツイスティの パーティーだ。ウェーブは 5つ、バルーンドッグは 1ぴき。ピンを もってこい。","THE POODLES":"プードルたち","THE KNIGHTS":"ナイトたち","THE GIRAFFES":"キリンたち","THE MIX":"ごちゃまぜ","THE WHOLE ARMY":"ぜんぐん","POP!":"パン！","PARRIED!":"はじいた！","THE PARTY LAWN IS SOLO FOR NOW":"パーティーの しばふは いまは ひとりで","Squeak. Better luck at the next party.":"キュッ。つぎの パーティーで がんばれ。"},
+  ko:{"THE PARTY LAWN":"파티 잔디밭","TWISTY":"트위스티","TWISTY'S PARTY. FIVE WAVES, ONE BALLOON DOG. BRING A PIN.":"트위스티의 파티. 다섯 웨이브, 풍선 개 한 마리. 핀을 가져와.","THE POODLES":"푸들들","THE KNIGHTS":"기사들","THE GIRAFFES":"기린들","THE MIX":"뒤섞인 무리","THE WHOLE ARMY":"전군","POP!":"펑!","PARRIED!":"막았다!","THE PARTY LAWN IS SOLO FOR NOW":"파티 잔디밭은 지금은 혼자만","Squeak. Better luck at the next party.":"삑. 다음 파티에서 행운을 빌어."},
+  "zh-Hans":{"THE PARTY LAWN":"派对草坪","TWISTY":"扭扭","TWISTY'S PARTY. FIVE WAVES, ONE BALLOON DOG. BRING A PIN.":"扭扭的派对。五波敌人，一只气球狗。带根针来。","THE POODLES":"贵宾狗们","THE KNIGHTS":"骑士们","THE GIRAFFES":"长颈鹿们","THE MIX":"混合部队","THE WHOLE ARMY":"全军","POP!":"啪！","PARRIED!":"挡住了！","THE PARTY LAWN IS SOLO FOR NOW":"派对草坪目前只能单人挑战","Squeak. Better luck at the next party.":"吱。下次派对再加油吧。"},
+  de:{"THE PARTY LAWN":"DIE PARTYWIESE","TWISTY":"TWISTY","TWISTY'S PARTY. FIVE WAVES, ONE BALLOON DOG. BRING A PIN.":"TWISTYS PARTY. FÜNF WELLEN, EIN BALLONHUND. BRING EINE NADEL MIT.","THE POODLES":"DIE PUDEL","THE KNIGHTS":"DIE RITTER","THE GIRAFFES":"DIE GIRAFFEN","THE MIX":"DER MIX","THE WHOLE ARMY":"DIE GANZE ARMEE","POP!":"KNALL!","PARRIED!":"PARIERT!","THE PARTY LAWN IS SOLO FOR NOW":"DIE PARTYWIESE IST VORERST NUR SOLO","Squeak. Better luck at the next party.":"Quiek. Mehr Glück bei der nächsten Party."},
+  ru:{"THE PARTY LAWN":"ПРАЗДНИЧНАЯ ЛУЖАЙКА","TWISTY":"ТВИСТИ","TWISTY'S PARTY. FIVE WAVES, ONE BALLOON DOG. BRING A PIN.":"ВЕЧЕРИНКА ТВИСТИ. ПЯТЬ ВОЛН, ОДНА СОБАКА ИЗ ШАРИКОВ. ВОЗЬМИ БУЛАВКУ.","THE POODLES":"ПУДЕЛИ","THE KNIGHTS":"РЫЦАРИ","THE GIRAFFES":"ЖИРАФЫ","THE MIX":"ВСЕ ВМЕСТЕ","THE WHOLE ARMY":"ВСЯ АРМИЯ","POP!":"ХЛОП!","PARRIED!":"ОТБИЛ!","THE PARTY LAWN IS SOLO FOR NOW":"ПРАЗДНИЧНАЯ ЛУЖАЙКА ПОКА ТОЛЬКО В ОДИНОЧКУ","Squeak. Better luck at the next party.":"Пи. Повезёт на следующей вечеринке."},
+  es:{"THE PARTY LAWN":"EL CÉSPED DE LA FIESTA","TWISTY":"TWISTY","TWISTY'S PARTY. FIVE WAVES, ONE BALLOON DOG. BRING A PIN.":"LA FIESTA DE TWISTY. CINCO OLEADAS, UN PERRO DE GLOBOS. TRAE UN ALFILER.","THE POODLES":"LOS CANICHES","THE KNIGHTS":"LOS CABALLEROS","THE GIRAFFES":"LAS JIRAFAS","THE MIX":"LA MEZCLA","THE WHOLE ARMY":"TODO EL EJÉRCITO","POP!":"¡POP!","PARRIED!":"¡PARADO!","THE PARTY LAWN IS SOLO FOR NOW":"EL CÉSPED DE LA FIESTA ES SOLO INDIVIDUAL POR AHORA","Squeak. Better luck at the next party.":"Chirrido. Más suerte en la próxima fiesta."},
+  ar:{"THE PARTY LAWN":"ساحة الحفلة","TWISTY":"تويستي","TWISTY'S PARTY. FIVE WAVES, ONE BALLOON DOG. BRING A PIN.":"حفلة تويستي. خمس موجات، كلب بالون واحد. أحضر دبوسًا.","THE POODLES":"كلاب البودل","THE KNIGHTS":"الفرسان","THE GIRAFFES":"الزرافات","THE MIX":"الخليط","THE WHOLE ARMY":"الجيش كله","POP!":"طاخ!","PARRIED!":"صدّها!","THE PARTY LAWN IS SOLO FOR NOW":"ساحة الحفلة للعب الفردي فقط حاليًا","Squeak. Better luck at the next party.":"صرير. حظًا أوفر في الحفلة القادمة."} };
+  for(const lg in W9){ const tb=TR[lg]||(TR[lg]={}); for(const k in W9[lg]) if(!(k in tb)) tb[k]=W9[lg][k]; } })();
+
+setTimeout(function(){ try{ if(window.GVT && !GVT.lwn) GVT.lwn=function(o){ o=o||{}; const R=lwnRow();
+  if(o.hq!==undefined) LWN.hq=o.hq; if(o.hq===true) lwnPartyOpen(); if(o.ask){ LWN.askT=0; lwnAsk(); } if(o.cycle) lwnCycle(); if(o.song){ LWN.song=o.song; lwnChipSync(); } if(o.fightSong!=null) LWN.fightSong=o.fightSong? 1 : 0; if(o.lull!=null) LWN.lull=+o.lull;
+  if(o.spawn && lwnOn9()){ try{ spawnFoe('lwn'+o.spawn, o.x||(W-60), o.y||(WORLD_H/2), null, false); }catch(e){ LWN.err++; } }
+  const bg=document.getElementById('raidBg'), hot=document.getElementById('lwnBoomHot'), say=document.getElementById('lwnTxt'), chip=document.getElementById('lwnChip'), hb=hot? hot.getBoundingClientRect() : null, gr=bg? bg.getBoundingClientRect() : null;
+  const L=S.raid && S.raid.lwn;
+  return { cv:GVT_CV, v:LWN.v, on:lwnOn()? 1 : 0, off:LWN_OFF? 1 : 0, row:!!R, key:R? (lwnKey()? 1 : 0) : null, plc:R? R.plc : null, bed:R? R.bed : null, hq:LWN.hq, asks:LWN.asks, held:LWN.held, place:PTY_PLACES.party||null, joined:LWN.joined, molds:Object.keys(LWN_MOLD).filter(function(k){ return typeof SPRITES_SRC[k]==='string'; }).length, minted:Object.keys(LWN_MOLD).filter(function(k){ return !!(IMG[k] && IMG[k].width>0); }).length, props:Object.keys(LWN_IMG).filter(function(k){ return !!LWN_IMG[k].lwnOk; }).length,
+    tiers:R? ['e','m','h','g'].map(function(k){ return raidTierOpenFor('party',k)? 1 : 0; }) : null, lobby:!!(raidSceneOpen() && RAID_CUR==='party'), say:say? say.textContent : null, chip:chip? chip.textContent : null, hot:hb? { l:+hb.left.toFixed(1), t:+hb.top.toFixed(1), w:+hb.width.toFixed(1), h:+hb.height.toFixed(1) } : null, glass:gr? { l:gr.left, t:gr.top, w:gr.width, h:gr.height } : null,
+    song:lwnSongId(), songName:lwnSongName(lwnSongId()), songs:lwnSongs(), bpm:lwnBpm(), cycles:LWN.cycles, taps:LWN.taps, opens:LWN.opens, fightSong:LWN.fightSong, loc:(typeof locNow==='function')? locNow() : null, locId:(typeof LOC==='object' && LOC)? LOC.id : null,
+    fight:lwnOn9()? { tier:S.raid.t, wave:S.wave|0, waves:S.cfg.waves.map(function(w){ return w.name+':'+w.groups.map(function(g){ return g.t.replace('lwn','')+'x'+g.n+(g.hpX? '@'+(+g.hpX.toFixed(2)) : ''); }).join('+'); }), active:S.waveActive? 1 : 0, interT:+(S.interT||0).toFixed(2), queue:S.queue.length, foes:S.foes.filter(function(f){ return !f.dead; }).map(function(f){ return { t:f.type, hp:f.hp, max:f.hpMax, air:f.gjAir? 1 : 0, x:Math.round(f.x), y:Math.round(f.y), n:f.lwnN|0 }; }), cleared:S.cleared? 1 : 0, mode:S.mode, paints:LWN.paints, cache:!!LWN.cache, fx:L? L.fx.map(function(q){ return q.k; }) : null, L:L? { pops:L.pops, parries:L.parries, darts:L.darts } : null, fallen:S.fx.filter(function(e){ return e.k==='fallen'; }).length, floats:S.floats.map(function(f){ return f.txt; }).slice(-6) } : null,
+    pops:LWN.pops, parries:LWN.parries, darts:LWN.darts, paints:LWN.paints, err:LWN.err, party:META.party? JSON.parse(JSON.stringify(META.party)) : null, raidDay:META.raidDay? (META.raidDay.party|0) : null, bank:META.starBank|0,
+    words7:['ja','ko','zh-Hans','de','ru','es','ar'].filter(function(l){ const T=TR[l]; return !!(T && T['THE PARTY LAWN'] && T[LWN_LINE] && T['THE POODLES'] && T['THE WHOLE ARMY'] && T['POP!'] && T['PARRIED!'] && T[LWN_SOLO] && T[LWN_LOST]); }).length }; }; }catch(e){} }, 0);</script><script>(function(){var ps=document.querySelectorAll('script[type="text/x-gvt-part"]');for(var i=0;i<ps.length;i++){var p=ps[i],s=document.createElement('script');s.text=p.text;p.parentNode.replaceChild(s,p);if(s.parentNode)s.parentNode.removeChild(s);}})();</script>
 <svg id="bcnDefs" width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute;left:0;top:0;width:0;height:0;overflow:hidden;pointer-events:none"><defs><filter id="bcnS" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="9" flood-color="rgb(255,210,74)" flood-opacity="0.7"/></filter><filter id="bcnCS" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="5.952" flood-color="rgb(255,210,74)" flood-opacity="0.7"/></filter><filter id="bcnT" x="-70%" y="-70%" width="240%" height="240%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="10" flood-color="rgb(255,210,74)" flood-opacity="0.95"/><feDropShadow dx="0" dy="0" stdDeviation="24" flood-color="rgb(255,210,74)" flood-opacity="0.55"/></filter><filter id="bcnH0" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="rgb(255,210,74)" flood-opacity="0.55"/></filter><filter id="bcnW0" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="rgb(255,210,74)" flood-opacity="0.55"/></filter><filter id="bcnC0" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="3.968" flood-color="rgb(255,210,74)" flood-opacity="0.55"/></filter><filter id="bcnH1" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="6.5" flood-color="rgb(255,210,74)" flood-opacity="0.57"/></filter><filter id="bcnW1" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="6.5" flood-color="rgb(255,210,74)" flood-opacity="0.57"/></filter><filter id="bcnC1" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="4.299" flood-color="rgb(255,210,74)" flood-opacity="0.57"/></filter><filter id="bcnH2" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="7" flood-color="rgb(255,210,74)" flood-opacity="0.59"/></filter><filter id="bcnW2" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="7" flood-color="rgb(255,210,74)" flood-opacity="0.59"/></filter><filter id="bcnC2" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="4.63" flood-color="rgb(255,210,74)" flood-opacity="0.59"/></filter><filter id="bcnH3" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="7.5" flood-color="rgb(255,211,74)" flood-opacity="0.61"/></filter><filter id="bcnW3" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="7.5" flood-color="rgb(255,211,74)" flood-opacity="0.61"/></filter><filter id="bcnC3" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="4.96" flood-color="rgb(255,211,74)" flood-opacity="0.61"/></filter><filter id="bcnH4" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="rgb(255,211,74)" flood-opacity="0.63"/></filter><filter id="bcnW4" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="rgb(255,211,74)" flood-opacity="0.63"/></filter><filter id="bcnC4" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="5.291" flood-color="rgb(255,211,74)" flood-opacity="0.63"/></filter><filter id="bcnH5" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="8.5" flood-color="rgb(255,211,74)" flood-opacity="0.65"/></filter><filter id="bcnW5" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="8.5" flood-color="rgb(255,211,74)" flood-opacity="0.65"/></filter><filter id="bcnC5" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="5.622" flood-color="rgb(255,211,74)" flood-opacity="0.65"/></filter><filter id="bcnH6" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="9" flood-color="rgb(255,211,74)" flood-opacity="0.67"/></filter><filter id="bcnW6" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="9" flood-color="rgb(255,211,74)" flood-opacity="0.67"/></filter><filter id="bcnC6" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="5.952" flood-color="rgb(255,211,74)" flood-opacity="0.67"/></filter><filter id="bcnH7" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="9.5" flood-color="rgb(255,211,74)" flood-opacity="0.69"/></filter><filter id="bcnW7" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="9.5" flood-color="rgb(255,211,74)" flood-opacity="0.69"/></filter><filter id="bcnC7" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="6.283" flood-color="rgb(255,211,74)" flood-opacity="0.69"/></filter><filter id="bcnH8" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="10" flood-color="rgb(255,212,74)" flood-opacity="0.71"/></filter><filter id="bcnW8" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="10" flood-color="rgb(255,212,74)" flood-opacity="0.71"/></filter><filter id="bcnC8" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="6.614" flood-color="rgb(255,212,74)" flood-opacity="0.71"/></filter><filter id="bcnH9" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="10.5" flood-color="rgb(255,212,74)" flood-opacity="0.73"/></filter><filter id="bcnW9" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="10.5" flood-color="rgb(255,212,74)" flood-opacity="0.73"/></filter><filter id="bcnC9" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="6.944" flood-color="rgb(255,212,74)" flood-opacity="0.73"/></filter><filter id="bcnH10" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="11" flood-color="rgb(255,212,74)" flood-opacity="0.75"/></filter><filter id="bcnW10" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="11" flood-color="rgb(255,212,74)" flood-opacity="0.75"/></filter><filter id="bcnC10" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="7.275" flood-color="rgb(255,212,74)" flood-opacity="0.75"/></filter><filter id="bcnH11" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="11.5" flood-color="rgb(255,212,74)" flood-opacity="0.77"/></filter><filter id="bcnW11" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="11.5" flood-color="rgb(255,212,74)" flood-opacity="0.77"/></filter><filter id="bcnC11" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="7.606" flood-color="rgb(255,212,74)" flood-opacity="0.77"/></filter><filter id="bcnH12" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="12" flood-color="rgb(255,212,74)" flood-opacity="0.79"/></filter><filter id="bcnW12" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="12" flood-color="rgb(255,212,74)" flood-opacity="0.79"/></filter><filter id="bcnC12" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="7.937" flood-color="rgb(255,212,74)" flood-opacity="0.79"/></filter><filter id="bcnH13" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="12.5" flood-color="rgb(255,213,74)" flood-opacity="0.81"/></filter><filter id="bcnW13" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="12.5" flood-color="rgb(255,213,74)" flood-opacity="0.81"/></filter><filter id="bcnC13" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="8.267" flood-color="rgb(255,213,74)" flood-opacity="0.81"/></filter><filter id="bcnH14" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="13" flood-color="rgb(255,213,74)" flood-opacity="0.83"/></filter><filter id="bcnW14" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="13" flood-color="rgb(255,213,74)" flood-opacity="0.83"/></filter><filter id="bcnC14" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="8.598" flood-color="rgb(255,213,74)" flood-opacity="0.83"/></filter><filter id="bcnH15" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="13.5" flood-color="rgb(255,213,74)" flood-opacity="0.85"/></filter><filter id="bcnW15" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="13.5" flood-color="rgb(255,213,74)" flood-opacity="0.85"/></filter><filter id="bcnC15" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="8.929" flood-color="rgb(255,213,74)" flood-opacity="0.85"/></filter><filter id="bcnH16" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="14" flood-color="rgb(255,213,74)" flood-opacity="0.87"/></filter><filter id="bcnW16" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="14" flood-color="rgb(255,213,74)" flood-opacity="0.87"/></filter><filter id="bcnC16" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="9.259" flood-color="rgb(255,213,74)" flood-opacity="0.87"/></filter><filter id="bcnH17" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="14.5" flood-color="rgb(255,213,74)" flood-opacity="0.89"/></filter><filter id="bcnW17" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="14.5" flood-color="rgb(255,213,74)" flood-opacity="0.89"/></filter><filter id="bcnC17" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="9.59" flood-color="rgb(255,213,74)" flood-opacity="0.89"/></filter><filter id="bcnH18" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="15" flood-color="rgb(255,214,74)" flood-opacity="0.91"/></filter><filter id="bcnW18" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="15" flood-color="rgb(255,214,74)" flood-opacity="0.91"/></filter><filter id="bcnC18" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="9.921" flood-color="rgb(255,214,74)" flood-opacity="0.91"/></filter><filter id="bcnH19" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="15.5" flood-color="rgb(255,214,74)" flood-opacity="0.93"/></filter><filter id="bcnW19" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="15.5" flood-color="rgb(255,214,74)" flood-opacity="0.93"/></filter><filter id="bcnC19" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="10.251" flood-color="rgb(255,214,74)" flood-opacity="0.93"/></filter><filter id="bcnH20" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="16" flood-color="rgb(255,214,74)" flood-opacity="0.95"/></filter><filter id="bcnW20" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="16" flood-color="rgb(255,214,74)" flood-opacity="0.95"/></filter><filter id="bcnC20" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="10.582" flood-color="rgb(255,214,74)" flood-opacity="0.95"/></filter><filter id="bcnB0" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="rgb(255,210,74)" flood-opacity="0.4"/></filter><filter id="bcnB1" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="4.5" flood-color="rgb(255,210,74)" flood-opacity="0.423"/></filter><filter id="bcnB2" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="5" flood-color="rgb(255,210,74)" flood-opacity="0.446"/></filter><filter id="bcnB3" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="5.5" flood-color="rgb(255,210,74)" flood-opacity="0.469"/></filter><filter id="bcnB4" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="rgb(255,211,74)" flood-opacity="0.492"/></filter><filter id="bcnB5" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="6.5" flood-color="rgb(255,211,74)" flood-opacity="0.515"/></filter><filter id="bcnB6" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="7" flood-color="rgb(255,211,74)" flood-opacity="0.537"/></filter><filter id="bcnB7" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="7.5" flood-color="rgb(255,211,74)" flood-opacity="0.56"/></filter><filter id="bcnB8" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="rgb(255,211,74)" flood-opacity="0.583"/></filter><filter id="bcnB9" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="8.5" flood-color="rgb(255,212,74)" flood-opacity="0.606"/></filter><filter id="bcnB10" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="9" flood-color="rgb(255,212,74)" flood-opacity="0.629"/></filter><filter id="bcnB11" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="9.5" flood-color="rgb(255,212,74)" flood-opacity="0.652"/></filter><filter id="bcnB12" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="10" flood-color="rgb(255,212,74)" flood-opacity="0.675"/></filter><filter id="bcnB13" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="10.5" flood-color="rgb(255,212,74)" flood-opacity="0.698"/></filter><filter id="bcnB14" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="11" flood-color="rgb(255,212,74)" flood-opacity="0.721"/></filter><filter id="bcnB15" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="11.5" flood-color="rgb(255,212,74)" flood-opacity="0.744"/></filter><filter id="bcnB16" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="12" flood-color="rgb(255,213,74)" flood-opacity="0.767"/></filter><filter id="bcnB17" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="12.5" flood-color="rgb(255,213,74)" flood-opacity="0.79"/></filter><filter id="bcnB18" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="13" flood-color="rgb(255,213,74)" flood-opacity="0.812"/></filter><filter id="bcnB19" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="13.5" flood-color="rgb(255,213,74)" flood-opacity="0.835"/></filter><filter id="bcnB20" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="14" flood-color="rgb(255,213,74)" flood-opacity="0.858"/></filter><filter id="bcnB21" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="14.5" flood-color="rgb(255,214,74)" flood-opacity="0.881"/></filter><filter id="bcnB22" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="15" flood-color="rgb(255,214,74)" flood-opacity="0.904"/></filter><filter id="bcnB23" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="15.5" flood-color="rgb(255,214,74)" flood-opacity="0.927"/></filter><filter id="bcnB24" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="16" flood-color="rgb(255,214,74)" flood-opacity="0.95"/></filter></defs></svg>
 <script> try{ if(typeof olrOn==='function' && olrOn()) document.documentElement.classList.add('olrmen'); }catch(e){} </script>
 </body>
