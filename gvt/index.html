@@ -766628,13 +766628,17 @@ function gfeRead(){ const r={ cv:GVT_CV, on:GFE.on, n:GFE.n, err:GFE.err, miss:G
 
 
 
+
+
+
 function nfpOn(){ return NFP.on===1; }
 function nfpDue(){ try{ return nfpOn() && typeof bcrDue==='function' && bcrDue(); }catch(e){ return false; } }
 function nfpN(v){ return +(+v).toFixed(1); }
-function nfpLay(){ const B=NFP, L=bcrLay(), cb=bcrBox('case'), lo=cb[0]+cb[2]+B.GAP, hi=L.xE-B.GAP;   
-  const s=Math.max(B.MIN, Math.min(1, (hi-lo)/B.W)), w=B.W*s, h=B.H*s;   
-  let cx=Math.max(L.RX+B.DX, lo+w/2); cx=Math.min(cx, hi-w/2);   
-  const x0=cx-w/2, y0=B.TOP; return { s:+s.toFixed(4), w:nfpN(w), h:nfpN(h), cx:nfpN(cx), x0:nfpN(x0), y0:y0, x1:nfpN(x0+w), y1:nfpN(y0+h), ny:nfpN(y0-B.NAIL*s), RX:L.RX, xE:L.xE, lo:nfpN(lo), hi:nfpN(hi) }; }
+function nfpLay(){ const B=NFP, L=bcrLay(), cb=bcrBox('case'), rb=bcrBox('rocker'), lo=cb[0]+cb[2]+B.GAP, hi=L.xE-B.GAP, want=rb[0];   
+  let s, x0, rule;
+  if(want-lo>=B.W*B.MIN){ s=Math.min(1, (want-lo)/B.W); x0=want-B.W*s; rule='chair'; }   
+  else { s=Math.max(B.MIN, Math.min(1, (hi-lo)/B.W)); x0=Math.min(lo, hi-B.W*s); rule='case'; }   
+  const w=B.W*s, h=B.H*s, y0=B.TOP; return { s:+s.toFixed(4), w:nfpN(w), h:nfpN(h), cx:nfpN(x0+w/2), x0:nfpN(x0), y0:y0, x1:nfpN(x0+w), y1:nfpN(y0+h), ny:nfpN(y0-B.NAIL*s), RX:L.RX, xE:L.xE, lo:nfpN(lo), hi:nfpN(hi), want:nfpN(want), rule:rule }; }
 function nfpBox(){ try{ const F=nfpLay(); return [nfpN(F.x0-4), nfpN(F.ny-4), nfpN(F.w+8), nfpN(F.y1-F.ny+8)]; }catch(e){ return [0, 0, 0, 0]; } }
 function nfpArt(){ if(NFP.art) return NFP.art;   
   const B=NFP, O=(typeof BCR_OAK==='object' && BCR_OAK)? BCR_OAK : { wood:'#B97A3E', far:'#8C5A2B', lit:'#D49A58', ink:'#5A3615' }, W=B.W, H=B.H, m=B.MOLD, t=B.MAT, n=nfpN;
@@ -977939,7 +977943,7 @@ let BFQ=null;
 
 
 
-let GVT_CV='29.19';
+let GVT_CV='29.20';
 let NX_CAP_MUL=4;
 
 
@@ -2651442,11 +2651446,15 @@ if(gfeOn()) try{
 
 
 
+
+
+
 const NFP={ on:(function(){ try{ const q=/[?&]nfp=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_nfp','0'); else localStorage.removeItem('gvt_nfp'); } return localStorage.getItem('gvt_nfp')==='0'? 0 : 1; }catch(e){ return 1; } })(),   
-  W:84, H:96, TOP:76, NAIL:12, MOLD:9, MAT:5, DX:6, GAP:8, MIN:0.6,   
+  W:84, H:96, TOP:76, NAIL:12, MOLD:9, MAT:5, GAP:6, MIN:0.55,   
   NANA:[-2, 244, 94, 334],   
   swingMs:2300, swingDeg:4.5, swingPer:1.1, art:'', lay:null, err:0, n:0 };
 const NFP_SWING={ raf:0, t0:0, a:0, n:0 };
+
 
 
 
