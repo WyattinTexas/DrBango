@@ -768258,7 +768258,7 @@ function thpLeaves(){ const L=[]; for(let i=0;i<70;i++) L.push({ x:70+tkhRnd(900
 function thpCfg(tier){ tkhWarm(); thpWarm(); const T=THP.tiers[tier]||THP.tiers.e;   
   return { n:0, hpMul:RAID_HP_MUL[tier]||1, cntMul:1, bossF:1, rateMul:1, waves:[ { name:'THE HOLD', groups:[ { f:'solo', t:'turkey', n:0, e:'right', at:1e9 } ] } ], terrain:{ rocks:thpRocks(), river:null, ground:'grass', tkhFlat:[] }, tkh:{ n:T.n, clock:9999, quota:9999, night:0, beat:null }, thp:{ tier:tier } }; }
 function thpEvery(K){ return (K.tier==='g')? THP.everyG : THP.every; }
-function thpK(){ let K=S.thp; if(!K || K.cfg!==S.cfg){ const tier=(S.cfg&&S.cfg.thp&&S.cfg.thp.tier)||'e'; K=S.thp={ cfg:S.cfg, seat:0, tier:tier, pass:0, g:0, tn:0, st:'empty', leaves:thpLeaves(), payAcc:0, alt:0, t:0, passes:0, flockT:3, pilT:THP.pilAfter, slide:null, over:0, win:0, sd:0, sdT:0 }; K.pass=thpEvery(K); } return K; }
+function thpK(){ let K=S.thp; if(!K || K.cfg!==S.cfg){ const tier=(S.cfg&&S.cfg.thp&&S.cfg.thp.tier)||'e'; K=S.thp={ cfg:S.cfg, seat:0, tier:tier, pass:0, g:0, tn:0, st:'empty', leaves:thpLeaves(), payAcc:0, alt:0, t:0, passes:0, flockT:3, pilT:THP.pilAfter, slide:null, over:0, win:0, sd:0, sdT:0, armSide:null, armT:0 }; K.pass=thpEvery(K); } return K; }
 function thpSeat(K){ return THP.seats[K.seat%THP.seats.length]; }
 function thpNextSeat(K){ if(K.tier==='g'){ let i=Math.floor(tkhRnd(700+(K.passes|0),9)*(THP.seats.length-1)); if(i>=K.seat) i++; return i%THP.seats.length; } return (K.seat+1)%THP.seats.length; }
 function thpNext(K){ return THP.seats[thpNextSeat(K)]; }
@@ -768292,12 +768292,15 @@ function thpVerdictWords(win){ try{ const K=S.thp, tier=(K&&K.tier)||'e';
     saveMeta(); }
   else { const el=document.getElementById('loseTitle'); if(el){ el.__enHTML=undefined; el.innerHTML=vdCamp1(t('THE TURKEYS ATE THE FEAST')); } const tx=document.getElementById('loseText'); if(tx){ tx.__enHTML=undefined; tx.textContent=t('THEY HELD THE CORNUCOPIA FOR THREE MINUTES. HOLD IT LONGER NEXT TIME.'); } } }catch(e){} }
 function thpTick(dt){ if(!thpOn() || S.mode!=='play') return; const K=thpK(); if(K.over) return; const c=thpCentre(K);
+  for(const q of S.foes){ if(q.dead || !(q.def&&q.def.tkh===1) || q.thpHp) continue; q.thpHp=1; q.hpMax=q.hpMax*THP.birdHp; q.hp=q.hp*THP.birdHp; if(q.tkh) q.tkh.hp=q.hp; }   
   for(const q of S.foes){ if(q.dead || !(q.def&&q.def.thpPil)) continue; const d=Math.hypot(q.x-c[0],q.y-c[1]);   
     if(d>THP.r-THP.pilStop){ const vx=(c[0]-q.x)/d*THP.pilSpd, vy=(c[1]-q.y)/d*THP.pilSpd; q.x+=vx*dt; q.y+=vy*dt; tkhStamp(q,vx); q.thpIn=0; } else q.thpIn=1; }
   thpSlideTick(K,dt); thpDirector(K,dt);
   const st=thpState(K);
   if(st!==K.st){ K.st=st; if(st!=='empty'){ S.floats.push({ x:c[0], y:c[1]-THP.r-22, txt:t(st==='held'? 'HELD!' : st==='taken'? 'TAKEN!' : 'CONTESTED'), t:0, col:st==='held'? '#7FE08A' : st==='taken'? '#E8C98A' : '#FFD24A' }); try{ if(st==='held') SFX.trumpet(); else if(st==='taken') SFX.clack(); }catch(e){} } }
-  K.t+=dt; if(st==='held'){ K.g+=dt; K.payAcc+=THP.pay*dt; if(K.payAcc>=1){ const n=Math.floor(K.payAcc); K.payAcc-=n; thpPay(n); } } else if(st==='taken') K.tn+=dt;
+  if(st==='held' || st==='taken'){ if(K.armSide!==st){ K.armSide=st; K.armT=0; } K.armT+=dt; } else { K.armSide=null; K.armT=0; }   
+  const live=(K.armSide===st) && K.armT>=THP.arm;
+  K.t+=dt; if(live && st==='held'){ K.g+=dt; K.payAcc+=THP.pay*dt; if(K.payAcc>=1){ const n=Math.floor(K.payAcc); K.payAcc-=n; thpPay(n); } } else if(live && st==='taken') K.tn+=dt;
   if(K.g>=THP.goal){ thpEnd(K,true); return; } if(K.tn>=THP.goal){ thpEnd(K,false); return; }
   if(!K.sd && K.t>=thpEvery(K)*THP.cap){ if(K.g>K.tn+0.5){ thpEnd(K,true); return; } if(K.tn>K.g+0.5){ thpEnd(K,false); return; } K.sd=1; K.sdT=0; S.floats.push({ x:c[0], y:c[1]-THP.r-46, txt:t('SUDDEN DEATH! HOLD IT FOR ONE SECOND'), t:0, col:'#FFD24A' }); try{ SFX.horn(); }catch(e){} }   
   else if(K.sd){ if(st==='held'){ K.sdT=Math.max(0,K.sdT)+dt; if(K.sdT>=1){ thpEnd(K,true); return; } } else if(st==='taken'){ K.sdT=Math.min(0,K.sdT)-dt; if(K.sdT<=-1){ thpEnd(K,false); return; } } else K.sdT=0; }
@@ -768313,6 +768316,7 @@ function thpDrawRing(K){ const c=thpCentre(K), st=K.st||'empty', col={ held:'#4F
   cx.globalAlpha=.14; cx.fillStyle=col; cx.beginPath(); cx.arc(c[0],c[1],THP.r,0,6.283); cx.fill(); cx.globalAlpha=1; cx.lineWidth=7;
   if(st==='cont'){ cx.strokeStyle='#4FB35A'; cx.beginPath(); cx.arc(c[0],c[1],THP.r,0,6.283); cx.stroke(); cx.strokeStyle='#C9A777'; cx.setLineDash([22,22]); cx.beginPath(); cx.arc(c[0],c[1],THP.r,0,6.283); cx.stroke(); cx.setLineDash([]); }
   else { cx.strokeStyle=col; cx.beginPath(); cx.arc(c[0],c[1],THP.r,0,6.283); cx.stroke(); cx.globalAlpha=.5; cx.lineWidth=2; cx.setLineDash([6,10]); cx.beginPath(); cx.arc(c[0],c[1],THP.r-10,0,6.283); cx.stroke(); cx.setLineDash([]); cx.globalAlpha=1; }
+  if(K.armSide && K.armT<THP.arm){ cx.globalAlpha=.95; cx.strokeStyle=(K.armSide==='held')? '#7FE08A' : '#F0D9A8'; cx.lineWidth=10; cx.lineCap='round'; cx.beginPath(); cx.arc(c[0],c[1],THP.r+9,-1.5708,-1.5708+6.283*Math.min(1,K.armT/THP.arm)); cx.stroke(); cx.lineCap='butt'; cx.globalAlpha=1; }   
   if(K.pass<=THP.tell && !K.sd && !K.slide){ const n=thpNext(K); cx.globalAlpha=.3; cx.fillStyle='#F2B134'; cx.beginPath(); cx.arc(n[0],n[1],54,0,6.283); cx.fill(); cx.globalAlpha=1; cx.strokeStyle='#F2B134'; cx.lineWidth=4; cx.setLineDash([10,8]); cx.beginPath(); cx.arc(n[0],n[1],46,0,6.283); cx.stroke(); cx.setLineDash([]);
     cx.fillStyle='#1A1008'; thpRR(n[0]-34,n[1]-84,68,24,12); cx.fill(); cx.fillStyle='#F2B134'; cx.font=cf('bold 15px'); cx.textAlign='center'; cx.textBaseline='middle'; cx.fillText(t('NEXT'), n[0], n[1]-72); }   
   cx.restore(); }
@@ -768363,9 +768367,9 @@ function thpStart(tier){ tier=(tier==='m'||tier==='h'||tier==='g')? tier : 'e'; 
 
 
 function thpRig(v){ v=v||{}; const K=thpOn()? thpK() : null;
-  if(K){ if(v.seat!=null){ K.seat=v.seat|0; const rk=thpCorn(), s=thpSeat(K); if(rk){ rk.x=s[0]; rk.y=s[1]; } K.slide=null; } if(v.pass!=null) K.pass=+v.pass; if(v.g!=null) K.g=+v.g; if(v.tn!=null) K.tn=+v.tn; if(v.t!=null) K.t=+v.t; if(v.showSeats!=null) THP.showSeats=v.showSeats|0; if(v.showTags!=null) THP.showTags=v.showTags|0; if(v.march!=null) THP.march=v.march|0; }
+  if(K){ if(v.seat!=null){ K.seat=v.seat|0; const rk=thpCorn(), s=thpSeat(K); if(rk){ rk.x=s[0]; rk.y=s[1]; } K.slide=null; } if(v.pass!=null) K.pass=+v.pass; if(v.g!=null) K.g=+v.g; if(v.tn!=null) K.tn=+v.tn; if(v.t!=null) K.t=+v.t; if(v.showSeats!=null) THP.showSeats=v.showSeats|0; if(v.showTags!=null) THP.showTags=v.showTags|0; if(v.march!=null) THP.march=v.march|0; if(v.noFlock!=null) K.flockT=v.noFlock? 1e9 : 3; if(v.noPil!=null) K.pilT=v.noPil? 1e9 : THP.pilAfter; }   
   const rk=thpCorn(), open=(typeof tkhOpen==='function')? !!tkhOpen() : null; let shelf=null; try{ const el=document.getElementById('ro-tkhbook'); shelf=el? (el.innerHTML.indexOf('tkb')>=0? 'cornucopia' : 'book') : 'none'; }catch(e){}
-  return { cv:GVT_CV, on:THP.on, hold:!!K, open:open, shelf:shelf, lobby:(typeof RAID_CUR!=='undefined')? RAID_CUR : null, tier:K? K.tier : null, seat:K? K.seat : null, zone:K? thpZone(K) : null, foeSide:K? thpFoeSide(K) : null, passes:K? K.passes : null, pass:K? +K.pass.toFixed(2) : null, g:K? +K.g.toFixed(2) : null, tn:K? +K.tn.toFixed(2) : null, t:K? +K.t.toFixed(2) : null, st:K? K.st : null, over:K? K.over : null, win:K? K.win : null, sd:K? K.sd : null, slide:!!(K&&K.slide), corn:rk? [Math.round(rk.x),Math.round(rk.y)] : null,
+  return { cv:GVT_CV, on:THP.on, hold:!!K, open:open, shelf:shelf, lobby:(typeof RAID_CUR!=='undefined')? RAID_CUR : null, tier:K? K.tier : null, seat:K? K.seat : null, zone:K? thpZone(K) : null, foeSide:K? thpFoeSide(K) : null, passes:K? K.passes : null, pass:K? +K.pass.toFixed(2) : null, g:K? +K.g.toFixed(2) : null, tn:K? +K.tn.toFixed(2) : null, t:K? +K.t.toFixed(2) : null, st:K? K.st : null, over:K? K.over : null, win:K? K.win : null, sd:K? K.sd : null, slide:!!(K&&K.slide), armSide:K? K.armSide : null, armT:K? +K.armT.toFixed(2) : null, cap:THP.cap, birdHp:(function(){ try{ const b=S.foes.find(q=>!q.dead&&q.def&&q.def.tkh===1&&q.thpHp); return b? Math.round(b.hpMax) : null; }catch(e){ return null; } })(), corn:rk? [Math.round(rk.x),Math.round(rk.y)] : null,
     marching:K? S.units.filter(u=>!u.dead&&u.marching).length : null, inRing:K? S.units.filter(u=>thpStanding(u)&&thpInside(u.x,u.y,K)).length : null, pil:K? S.foes.filter(q=>!q.dead&&q.def&&q.def.thpPil).length : null, birds:K? S.foes.filter(q=>!q.dead&&q.def&&q.def.tkh===1).length : null, bosses:K? S.foes.filter(q=>!q.dead&&q.def&&q.def.tkh===2).map(q=>q.type) : null,
     ground:(S.cfg&&S.cfg.terrain)? S.cfg.terrain.ground : null, rocks:(S.cfg&&S.cfg.terrain&&S.cfg.terrain.rocks)? S.cfg.terrain.rocks.length : null, plastic:S.plastic, led:Object.assign({}, META.turkey||{}), lv:(typeof parkLedger==='function')? (parkLedger('turkey').lv|0) : null, mode:S.mode, every:K? thpEvery(K) : null, goal:THP.goal }; }
 
@@ -979462,7 +979466,7 @@ let BFQ=null;
 
 
 
-let GVT_CV='29.28';
+let GVT_CV='29.29';
 let NX_CAP_MUL=4;
 
 
@@ -2655092,14 +2655096,18 @@ setTimeout(function(){ try{ if(window.GVT && !GVT.fcl) GVT.fcl=function(o){ o=o|
 
 
 const THP_ON=(function(){ try{ const q=/[?&]thp=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_thp','0'); else localStorage.removeItem('gvt_thp'); } return localStorage.getItem('gvt_thp')==='0'? 0 : 1; }catch(e){ return 1; } })();
-const THP={ on:THP_ON, r:130, every:60, everyG:45, tell:10, goal:180, cap:8, slide:1.2, pay:2, pilSpd:46, pilStop:24, pilAfter:6, zoneL:480, zoneQ:310, march:1, slot:100, showSeats:0, showTags:1,
+const THP={ on:THP_ON, r:130, every:30, everyG:30, tell:10, goal:180, cap:16, arm:3, birdHp:2, slide:1.2, pay:2, pilSpd:46, pilStop:24, pilAfter:6, zoneL:480, zoneQ:310, march:1, slot:100, showSeats:0, showTags:1,   
   seats:[[620,300],[860,190],[980,300],[860,400],[380,400],[320,300],[380,190]], side:[0,1,1,1,-1,-1,-1],   
-  tiers:{ e:{ n:1, flockEvery:6, flock:3, hens:0, jakes:0, cap:6, pil:1, blun:0, guard:0 }, m:{ n:2, flockEvery:5, flock:3, hens:1, jakes:0, cap:8, pil:2, blun:0, guard:0 }, h:{ n:3, flockEvery:4.5, flock:3, hens:1, jakes:1, cap:10, pil:3, blun:1, guard:4 }, g:{ n:4, flockEvery:4, flock:4, hens:1, jakes:2, cap:12, pil:4, blun:2, guard:4 } },
+  tiers:{ e:{ n:1, flockEvery:6, flock:9, hens:0, jakes:0, cap:18, pil:1, blun:0, guard:0 }, m:{ n:2, flockEvery:5, flock:9, hens:3, jakes:0, cap:24, pil:2, blun:0, guard:0 }, h:{ n:3, flockEvery:4.5, flock:9, hens:3, jakes:3, cap:30, pil:3, blun:1, guard:4 }, g:{ n:4, flockEvery:4, flock:12, hens:3, jakes:6, cap:36, pil:4, blun:2, guard:4 } },   
   bosses:['bigtom','cranhen','gobbler'] };
 const THP_TIER_OF={ 1:'e', 2:'m', 3:'h', 4:'g' };
 
 
 const THP_PIC_KEYS=[];
+
+
+
+
 
 
 
