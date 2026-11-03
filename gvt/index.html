@@ -768669,19 +768669,24 @@ function thpStanding(u){ return !(u.dead || u.down || u.dropT>0 || u.jetT>0 || u
 function thpZone(K){ const sd=THP.side[K.seat%THP.seats.length]; return sd>0? 'L' : sd<0? 'R' : 'B'; }
 function thpZoneOk(x,z){ if(z==='L') return x<=THP.zoneL; if(z==='R') return x>=W-THP.zoneL; return x<=THP.zoneQ || x>=W-THP.zoneQ; }
 function thpFoeSide(K){ const z=thpZone(K); return z==='L'? 'E' : z==='R'? 'W' : 'B'; }
+function thpSideOf(i){ const sd=THP.side[i%THP.seats.length]; return sd>0? 'E' : sd<0? 'W' : 'B'; }
+function thpRot(K){ return !!(THP.rotate && K && !K.sd && !K.slide && !K.over && K.pass<=THP.tell); }
+function thpGoal(K){ return thpRot(K)? thpNext(K) : thpCentre(K); }
 function thpHalt(u){ const r=(u.def.rng||120)*0.85; for(const q of S.foes){ if(q.dead || q.tkhAir) continue; if(!(q.def&&(q.def.tkh||q.def.thpPil))) continue; if(Math.hypot(q.x-u.x,q.y-u.y)<r) return true; } return false; }
 function thpState(K){ let g=0,f=0; for(const u of S.units){ if(!thpStanding(u)) continue; if(thpInside(u.x,u.y,K)){ g=1; break; } }
   for(const q of S.foes){ if(q.dead || q.tkhAir || (q.def&&q.def.boss)) continue; if(!(q.def&&(q.def.tkh||q.def.thpPil))) continue; if(thpInside(q.x,q.y,K)){ f=1; break; } }
   return (g&&!f)? 'held' : (f&&!g)? 'taken' : (g&&f)? 'cont' : 'empty'; }
 function thpPay(n){ if(!(n>0)) return; if(typeof S.plastic==='number') S.plastic+=n; }
-function thpBossAt(K){ const T=THP.tiers[K.tier]||THP.tiers.e, i=(K.passes|0)-1; if(i<0 || i>=THP.bosses.length) return; const b=THP.bosses[i]; spawnGroup({ f:'boss', t:b, n:1, e:'right' }); if(b==='gobbler' && T.guard>0) spawnGroup({ f:'column', t:'jake', n:T.guard, e:'right-bottom' }); }
-function thpPass(K){ const from=thpCentre(K); K.seat=thpNextSeat(K); K.passes=(K.passes|0)+1; K.pass=thpEvery(K); const to=thpSeat(K); K.slide={ x0:from[0], y0:from[1], x1:to[0], y1:to[1], t:0 }; K.pilT=THP.pilAfter; K.owner=null; K.armSide=null; K.armT=0;   
+function thpBossAt(K){ const T=THP.tiers[K.tier]||THP.tiers.e, i=(K.passes|0)-1; if(i<0 || i>=THP.bosses.length) return; const b=THP.bosses[i]; spawnGroup({ f:'boss', t:b, n:1, e:'right' });
+  { const f=S.foes.slice().reverse().find(q=>q.type===b && !q.dead && !q.thpBoss); if(f){ f.thpBoss=1; f.thpHp0=f.hpMax; f.hpMax=f.hpMax*THP.bossHpX; f.hp=f.hpMax; } }     if(b==='gobbler' && T.guard>0) spawnGroup({ f:'column', t:'jake', n:T.guard, e:'right-bottom' }); }
+function thpPass(K){ const from=thpCentre(K); K.seat=thpNextSeat(K); K.passes=(K.passes|0)+1; K.pass=thpEvery(K); const to=thpSeat(K); K.slide={ x0:from[0], y0:from[1], x1:to[0], y1:to[1], t:0 }; K.pilT=THP.pilAfter; K.owner=null; K.armSide=null; K.armT=0; K.rotT=0;   
   S.floats.push({ x:to[0], y:to[1]-96, txt:t('PASS THE CORNUCOPIA!'), t:0, col:'#FFD24A' }); try{ bfSfx(SFX.thump,to[0],to[1]); }catch(e){} thpBossAt(K); }
 function thpSlideTick(K,dt){ const sl=K.slide; if(!sl) return; sl.t+=dt; const k=Math.min(1, sl.t/THP.slide), e=k*k*(3-2*k), rk=thpCorn(); if(rk){ rk.x=sl.x0+(sl.x1-sl.x0)*e; rk.y=sl.y0+(sl.y1-sl.y0)*e; } if(k>=1) K.slide=null; }
+function thpSquad(K){ const T=THP.tiers[K.tier]||THP.tiers.e; if(K.noPil) return 0; let alive=0; for(const q of S.foes){ if(!q.dead && q.def && q.def.thpPil) alive++; } const room=Math.max(0,(T.pilCap||99)-alive); if(!room) return 0; const np=Math.min(T.pil,room), nb=Math.min(T.blun,Math.max(0,room-np)); if(np>0) spawnGroup({ f:'column', t:'pilgrim', n:np, e:'right' }); if(nb>0) spawnGroup({ f:'column', t:'blunder', n:nb, e:'right-bottom' }); return np+nb; }
 function thpDirector(K,dt){ const T=THP.tiers[K.tier]||THP.tiers.e;
-  K.flockT-=dt; if(K.flockT<=0){ K.flockT=T.flockEvery; let alive=0; for(const q of S.foes){ if(!q.dead && q.def && q.def.tkh===1) alive++; }
+  K.flockT-=dt; if(K.flockT<=0 && !K.noFlock){ K.flockT=T.flockEvery; let alive=0; for(const q of S.foes){ if(!q.dead && q.def && q.def.tkh===1) alive++; }
     if(alive<T.cap){ const tk=Math.max(0,T.flock-T.hens-T.jakes); if(tk>0) spawnGroup({ f:'column', t:'turkey', n:tk, e:'right' }); if(T.hens>0) spawnGroup({ f:'column', t:'hen', n:T.hens, e:'right-top' }); if(T.jakes>0) spawnGroup({ f:'column', t:'jake', n:T.jakes, e:'right-bottom' }); } }   
-  K.pilT-=dt; if(K.pilT<=0){ K.pilT=1e9; if(T.pil>0) spawnGroup({ f:'column', t:'pilgrim', n:T.pil, e:'right' }); if(T.blun>0) spawnGroup({ f:'column', t:'blunder', n:T.blun, e:'right-bottom' }); } }
+  K.pilT-=dt; if(K.pilT<=0){ K.pilT=THP.pilEvery; thpSquad(K); } }
 function thpEnd(K,win){ if(K.over) return; K.over=1; K.win=win? 1 : 0; const c=thpCentre(K); S.queue.length=0; S.waveActive=false; S.forms.length=0; if(win) S.cleared=true;
   startVictoryFlag(c[0], 1, null, win? (dyeHex()||GREEN) : campFoeHex(), ()=>{ if(S.mode==='play') endBattle(win); thpVerdictWords(win); }, !win); }
 function thpVerdictWords(win){ try{ const K=S.thp, tier=(K&&K.tier)||'e';
@@ -768692,10 +768697,14 @@ function thpVerdictWords(win){ try{ const K=S.thp, tier=(K&&K.tier)||'e';
     saveMeta(); }
   else { const el=document.getElementById('loseTitle'); if(el){ el.__enHTML=undefined; el.innerHTML=vdCamp1(t('THE TURKEYS ATE THE FEAST')); } const tx=document.getElementById('loseText'); if(tx){ tx.__enHTML=undefined; tx.textContent=t('THEY HELD THE CORNUCOPIA LONGER THAN YOU. HOLD IT LONGER NEXT TIME.'); } } }catch(e){} }
 function thpTick(dt){ if(!thpOn() || S.mode!=='play') return; const K=thpK(); if(K.over) return; const c=thpCentre(K);
-  for(const q of S.foes){ if(q.dead || !(q.def&&q.def.tkh===1) || q.thpHp) continue; q.thpHp=1; q.hpMax=q.hpMax*THP.birdHp; q.hp=q.hp*THP.birdHp; if(q.tkh) q.tkh.hp=q.hp; }   
-  for(const q of S.foes){ if(q.dead || !(q.def&&q.def.thpPil)) continue; const d=Math.hypot(q.x-c[0],q.y-c[1]);   
-    if(d>THP.r-THP.pilStop){ const vx=(c[0]-q.x)/d*THP.pilSpd, vy=(c[1]-q.y)/d*THP.pilSpd; q.x+=vx*dt; q.y+=vy*dt; tkhStamp(q,vx); q.thpIn=0; } else q.thpIn=1; }
+  for(const q of S.foes){ if(q.dead || !(q.def&&q.def.tkh===1) || q.thpHp) continue; q.thpHp=1; q.hpMax=q.hpMax*THP.birdHp; q.hp=q.hp*THP.birdHp; if(q.tkh) q.tkh.hp=q.hp; q.bountyMul=(q.bountyMul||1)*THP.bountyX; }
+  for(const q of S.foes){ if(q.dead || !(q.def&&q.def.thpPil) || q.thpB) continue; q.thpB=1; q.bountyMul=(q.bountyMul||1)*THP.bountyX; }   
+  const cg=thpGoal(K);   
+  for(const q of S.foes){ if(q.dead || !(q.def&&q.def.thpPil)) continue; const d=Math.hypot(q.x-cg[0],q.y-cg[1]);   
+    if(d>THP.r-THP.pilStop){ const vx=(cg[0]-q.x)/d*THP.pilSpd, vy=(cg[1]-q.y)/d*THP.pilSpd; q.x+=vx*dt; q.y+=vy*dt; tkhStamp(q,vx); q.thpIn=0; } else q.thpIn=1; }
   thpSlideTick(K,dt); thpDirector(K,dt);
+  if(thpRot(K) && !K.rotT){ K.rotT=1; thpSquad(K); for(const q of S.foes){ if(!q.dead && q.def && q.def.tkh===1 && q.tkh && q.tkh.st!=='fly' && !thpInside(q.x,q.y,K)) tkhWay(q); } }   
+  for(const u of S.units){ if(!(u.thpPushT>0)) continue; const k=Math.min(dt,u.thpPushT); u.thpPushT-=dt; u.x+=u.thpPushVX*k; u.y+=u.thpPushVY*k; u.x=Math.max(40,Math.min(W-30,u.x)); u.y=Math.max(70,Math.min(WORLD_H-90,u.y)); }   
   const st=thpState(K);
   if(st!==K.st){ K.st=st; if(st!=='empty'){ S.floats.push({ x:c[0], y:c[1]-THP.r-22, txt:t(st==='held'? 'HELD!' : st==='taken'? 'TAKEN!' : 'CONTESTED'), t:0, col:st==='held'? '#7FE08A' : st==='taken'? '#E8C98A' : '#FFD24A' }); try{ if(st==='held') SFX.trumpet(); else if(st==='taken') SFX.clack(); }catch(e){} } }
   if(st==='held' || st==='taken'){ if(K.owner===st){ K.armSide=null; K.armT=0; } else { if(K.armSide!==st){ K.armSide=st; K.armT=0; } K.armT+=dt; if(K.armT>=THP.arm){ K.owner=st; K.armSide=null; K.armT=0; } } } else { K.armSide=null; K.armT=0; }   
@@ -768731,6 +768740,12 @@ function thpDrawHud(){ const K=thpK(), goal=THP.goal, w=Math.min(300, Math.round
   thpMeter(18, 13, w, 20, Math.min(1,K.g/goal), '#4FB35A', t('YOUR FEAST'), thpMMSS(K.g)+' / '+thpMMSS(goal));
   thpMeter(VW-18-w, 13, w, 20, Math.min(1,K.tn/goal), '#C9A777', t('THE TURKEYS'), thpMMSS(K.tn)+' / '+thpMMSS(goal));
   const secs=Math.max(0,Math.ceil(K.pass)), gold=secs<=THP.tell && !K.sd; cx.textAlign='center'; cx.textBaseline='middle'; cx.font=cf('bold '+(gold? 26 : 23)+'px'); cx.fillStyle=gold? '#F2B134' : '#F3EAD3'; cx.fillText(K.sd? t('SUDDEN DEATH! HOLD IT FOR ONE SECOND') : tf('PASS IN %1', thpMMSS(secs)), VW/2-60, 23); cx.restore(); }
+function thpSlam(f){ const K=thpK(), c=thpCentre(K), p=THP.slam[K.tier]||THP.slam.e; let n=0, ko=0;   
+  for(const u of S.units.slice()){ if(!thpStanding(u) || !thpInside(u.x,u.y,K)) continue; n++; const was=!!(u.dead||u.down); f.pipN=p; try{ tanHit(u,c[0],c[1]-10,f); }catch(e){} f.pipN=0; if(!was && (u.dead || u.down || S.units.indexOf(u)<0)){ ko++; continue; }
+    if(THP.slamPush && !u.dead && S.units.indexOf(u)>=0){ let dx=u.x-c[0], dy=u.y-c[1], d=Math.hypot(dx,dy); if(d<1){ dx=1; dy=0; d=1; } const far=THP.r+THP.pushOut-d; u.thpPushT=THP.pushT; u.thpPushVX=dx/d*far/THP.pushT; u.thpPushVY=dy/d*far/THP.pushT; u.marching=false; } }   
+  S.fx.push({k:'ring',x:c[0],y:c[1],r:20,R:THP.r+34,t:0,dur:0.55,col:'#FFD24A'}); S.fx.push({k:'puff',x:c[0],y:c[1]-8,t:0,dur:0.5,R:64,col:'#C89B5A'}); if(!reducedMotion()) S.shake=Math.max(S.shake||0,0.6);
+  try{ bfSfx(SFX.thump,c[0],c[1]); SFX.rumble(); }catch(e){} S.floats.push({ x:c[0], y:c[1]-THP.r-22, txt:t('SLAM!'), t:0, col:'#FFD24A' });   
+  K.slams=(K.slams|0)+1; K.lastSlam={ t:+K.t.toFixed(2), boss:f.type, pips:p, men:n, ko:ko }; return K.lastSlam; }
 
 
 
@@ -768767,10 +768782,13 @@ function thpStart(tier){ tier=(tier==='m'||tier==='h'||tier==='g')? tier : 'e'; 
 
 
 
+
+
+
 function thpRig(v){ v=v||{}; const K=thpOn()? thpK() : null;
-  if(K){ if(v.seat!=null){ K.seat=v.seat|0; const rk=thpCorn(), s=thpSeat(K); if(rk){ rk.x=s[0]; rk.y=s[1]; } K.slide=null; } if(v.pass!=null) K.pass=+v.pass; if(v.g!=null) K.g=+v.g; if(v.tn!=null) K.tn=+v.tn; if(v.t!=null) K.t=+v.t; if(v.showSeats!=null) THP.showSeats=v.showSeats|0; if(v.showTags!=null) THP.showTags=v.showTags|0; if(v.march!=null) THP.march=v.march|0; if(v.noFlock!=null) K.flockT=v.noFlock? 1e9 : 3; if(v.noPil!=null) K.pilT=v.noPil? 1e9 : THP.pilAfter; }   
+  if(K){ if(v.seat!=null){ K.seat=v.seat|0; const rk=thpCorn(), s=thpSeat(K); if(rk){ rk.x=s[0]; rk.y=s[1]; } K.slide=null; } if(v.pass!=null) K.pass=+v.pass; if(v.g!=null) K.g=+v.g; if(v.tn!=null) K.tn=+v.tn; if(v.t!=null) K.t=+v.t; if(v.showSeats!=null) THP.showSeats=v.showSeats|0; if(v.showTags!=null) THP.showTags=v.showTags|0; if(v.march!=null) THP.march=v.march|0; if(v.noFlock!=null) K.noFlock=v.noFlock? 1 : 0; if(v.noPil!=null) K.noPil=v.noPil? 1 : 0; }   
   const rk=thpCorn(), open=(typeof tkhOpen==='function')? !!tkhOpen() : null; let shelf=null; try{ const el=document.getElementById('ro-tkhbook'); shelf=el? (el.innerHTML.indexOf('tkb')>=0? 'cornucopia' : 'book') : 'none'; }catch(e){}
-  return { cv:GVT_CV, on:THP.on, hold:!!K, open:open, shelf:shelf, lobby:(typeof RAID_CUR!=='undefined')? RAID_CUR : null, tier:K? K.tier : null, seat:K? K.seat : null, zone:K? thpZone(K) : null, foeSide:K? thpFoeSide(K) : null, passes:K? K.passes : null, pass:K? +K.pass.toFixed(2) : null, g:K? +K.g.toFixed(2) : null, tn:K? +K.tn.toFixed(2) : null, t:K? +K.t.toFixed(2) : null, st:K? K.st : null, over:K? K.over : null, win:K? K.win : null, sd:K? K.sd : null, slide:!!(K&&K.slide), armSide:K? K.armSide : null, armT:K? +K.armT.toFixed(2) : null, owner:K? K.owner : null, cap:THP.cap, peck:TKH.peck, jakePeck:(FDEF.jake&&FDEF.jake.peck)||null, birdHp:(function(){ try{ const b=S.foes.find(q=>!q.dead&&q.def&&q.def.tkh===1&&q.thpHp); return b? Math.round(b.hpMax) : null; }catch(e){ return null; } })(), corn:rk? [Math.round(rk.x),Math.round(rk.y)] : null,
+  return { cv:GVT_CV, on:THP.on, hold:!!K, open:open, shelf:shelf, lobby:(typeof RAID_CUR!=='undefined')? RAID_CUR : null, tier:K? K.tier : null, seat:K? K.seat : null, zone:K? thpZone(K) : null, foeSide:K? thpFoeSide(K) : null, passes:K? K.passes : null, pass:K? +K.pass.toFixed(2) : null, g:K? +K.g.toFixed(2) : null, tn:K? +K.tn.toFixed(2) : null, t:K? +K.t.toFixed(2) : null, st:K? K.st : null, over:K? K.over : null, win:K? K.win : null, sd:K? K.sd : null, slide:!!(K&&K.slide), armSide:K? K.armSide : null, armT:K? +K.armT.toFixed(2) : null, owner:K? K.owner : null, slams:K? (K.slams|0) : null, lastSlam:K? (K.lastSlam||null) : null, bossBars:K? S.foes.filter(q=>!q.dead&&q.thpBoss).map(q=>[q.type, Math.round(q.hpMax), Math.round(q.thpHp0||0)]) : null, cap:THP.cap, peck:TKH.peck, jakePeck:(FDEF.jake&&FDEF.jake.peck)||null, birdHp:(function(){ try{ const b=S.foes.find(q=>!q.dead&&q.def&&q.def.tkh===1&&q.thpHp); return b? Math.round(b.hpMax) : null; }catch(e){ return null; } })(), corn:rk? [Math.round(rk.x),Math.round(rk.y)] : null,
     marching:K? S.units.filter(u=>!u.dead&&u.marching).length : null, inRing:K? S.units.filter(u=>thpStanding(u)&&thpInside(u.x,u.y,K)).length : null, pil:K? S.foes.filter(q=>!q.dead&&q.def&&q.def.thpPil).length : null, birds:K? S.foes.filter(q=>!q.dead&&q.def&&q.def.tkh===1).length : null, bosses:K? S.foes.filter(q=>!q.dead&&q.def&&q.def.tkh===2).map(q=>q.type) : null,
     ground:(S.cfg&&S.cfg.terrain)? S.cfg.terrain.ground : null, rocks:(S.cfg&&S.cfg.terrain&&S.cfg.terrain.rocks)? S.cfg.terrain.rocks.length : null, plastic:S.plastic, led:Object.assign({}, META.turkey||{}), lv:(typeof parkLedger==='function')? (parkLedger('turkey').lv|0) : null, mode:S.mode, every:K? thpEvery(K) : null, goal:THP.goal }; }
 
@@ -981483,7 +981501,7 @@ let BFQ=null;
 
 
 
-let GVT_CV='29.63';
+let GVT_CV='29.64';
 let NX_CAP_MUL=4;
 
 
@@ -2657833,14 +2657851,29 @@ setTimeout(function(){ try{ if(window.GVT && !GVT.fcl) GVT.fcl=function(o){ o=o|
 
 
 const THP_ON=(function(){ try{ const q=/[?&]thp=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_thp','0'); else localStorage.removeItem('gvt_thp'); } return localStorage.getItem('gvt_thp')==='0'? 0 : 1; }catch(e){ return 1; } })();
-const THP={ on:THP_ON, r:130, every:30, everyG:30, tell:10, goal:90, cap:16, arm:3, birdHp:4, peckX:3, slide:1.2, pay:2, pilSpd:46, pilStop:24, pilAfter:6, zoneL:480, zoneQ:310, march:1, slot:100, showSeats:0, showTags:1,   
+const THP={ on:THP_ON, r:130, every:30, everyG:30, tell:10, goal:90, cap:16, arm:3, birdHp:4, peckX:3, bossHpX:3, slam:{ e:11, m:13, h:13, g:16 }, slamLv:{ e:10, m:20, h:30, g:60 }, slide:1.2,     pay:2, pilSpd:46, pilStop:24, pilAfter:6, pilEvery:30, rotate:1, slamPush:0, pushOut:110, pushT:0.45, bountyX:1,     zoneL:480, zoneQ:310, march:1, slot:100, showSeats:0, showTags:1,   
   seats:[[620,300],[860,190],[980,300],[860,400],[380,400],[320,300],[380,190]], side:[0,1,1,1,-1,-1,-1],   
-  tiers:{ e:{ n:1, flockEvery:6, flock:9, hens:0, jakes:0, cap:18, pil:1, blun:0, guard:0 }, m:{ n:2, flockEvery:5, flock:9, hens:3, jakes:0, cap:24, pil:2, blun:0, guard:0 }, h:{ n:3, flockEvery:4.5, flock:9, hens:3, jakes:3, cap:30, pil:3, blun:1, guard:4 }, g:{ n:4, flockEvery:4, flock:12, hens:3, jakes:6, cap:36, pil:4, blun:2, guard:4 } },   
+  tiers:{ e:{ n:1, flockEvery:6, flock:9, hens:0, jakes:0, cap:18, pil:2, blun:1, pilCap:8, guard:0 }, m:{ n:2, flockEvery:5, flock:9, hens:3, jakes:0, cap:24, pil:4, blun:2, pilCap:12, guard:0 }, h:{ n:3, flockEvery:4.5, flock:9, hens:3, jakes:3, cap:30, pil:6, blun:3, pilCap:16, guard:4 }, g:{ n:4, flockEvery:4, flock:12, hens:3, jakes:6, cap:36, pil:8, blun:4, pilCap:20, guard:4 } },   
   bosses:['bigtom','cranhen','gobbler'] };
 const THP_TIER_OF={ 1:'e', 2:'m', 3:'h', 4:'g' };
 
 
 const THP_PIC_KEYS=[];
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2657948,11 +2657981,14 @@ RAID_INFO.turkey={ k:'turkey', plc:'turkey', enc:9100, name:'TURKEY HUNT', wm:'T
   const openParkScene0=openParkScene; openParkScene=function(id){ if(id==='turkey'){ thpStamp(); return openRaidScene('turkey'); } return openParkScene0.apply(this,arguments); };   
   const parkCfgTurkey0=parkCfgTurkey; parkCfgTurkey=function(n){ return thpCfg(thpTierOf(n)); };   
   const tkhBookSVG0=tkhBookSVG; tkhBookSVG=function(){ if(!(tkhOpen() && !gmyOpen())) return ''; let pic=''; try{ pic='<ellipse cx="0" cy="1" rx="36" ry="5" fill="#000" opacity="0.22"/><g transform="translate(-35,-38) scale(0.219)">'+TKH_PIC.corn.s.replace(/id="t([0-9A-F]{6})"/g,'id="tkb$1"').replace(/url\(#t([0-9A-F]{6})\)/g,'url(#tkb$1)')+'</g>'; }catch(e){ return tkhBookSVG0.apply(this,arguments); } return '<g id="ro-tkhbook" pointer-events="none" transform="translate(630,285)">'+pic+'</g>'; };   
-  const tkhWay0=tkhWay; tkhWay=function(f){ tkhWay0(f); if(!thpOn() || !f.tkh) return; const K=thpK(), c=thpCentre(K), a=tkhRnd(f.tkh.i*13+f.tkh.k,5)*6.283, rr=16+tkhRnd(f.tkh.i*13+f.tkh.k,6)*70; f.tkh.wx=c[0]+Math.cos(a)*rr; f.tkh.wy=c[1]+Math.sin(a)*rr; };   
+  const tkhWay0=tkhWay; tkhWay=function(f){ tkhWay0(f); if(!thpOn() || !f.tkh) return; const K=thpK(), c=thpGoal(K), a=tkhRnd(f.tkh.i*13+f.tkh.k,5)*6.283, rr=16+tkhRnd(f.tkh.i*13+f.tkh.k,6)*70; f.tkh.wx=c[0]+Math.cos(a)*rr; f.tkh.wy=c[1]+Math.sin(a)*rr; };   
   const tkhMove0=tkhMove; tkhMove=function(f,dt,K9){ if(thpOn() && f.tkh && f.def.tkh===1 && f.tkh.st!=='fly' && thpInside(f.x,f.y,thpK())){ f.tkh.t+=dt; f.tkh.eat=(f.tkh.eat||0)+dt; if(f.tkh.eat>3){ f.tkh.eat=0; S.floats.push({ x:f.x, y:f.y-54, txt:t('GOBBLE!'), t:0, col:'#FFD24A' }); } return; } return tkhMove0.apply(this,arguments); };   
-  const tkhSeat0=tkhSeat; tkhSeat=function(f,i){ tkhSeat0(f,i); if(!thpOn()) return; const fs=thpFoeSide(thpK()); if(fs==='B') return;
+  const tkhSeat0=tkhSeat; tkhSeat=function(f,i){ tkhSeat0(f,i); if(!thpOn()) return; const K0=thpK(), fs=thpRot(K0)? thpSideOf(thpNextSeat(K0)) : thpFoeSide(K0); if(fs==='B') return;
     if(f.def.tkh===2){ f.x=(fs==='W')? -80 : W+80; return; }   
     if(f.def.tkh===1){ const m=40, x0=240, x1=W-40, a=tkhRnd(i,8); if(f.x<0 || f.x>W){ f.x=(fs==='W')? -m : W+m; } else { const h=(fs==='W')? [x0, W/2-60] : [W/2+60, x1]; f.x=h[0]+a*(h[1]-h[0]); } } };   
+  const tkhTomMove0=tkhTomMove; tkhTomMove=function(f,dt,K9){ if(!thpOn() || !f.thpBoss || !f.tkh || f.tkh.thpSlam) return tkhTomMove0.apply(this,arguments);   
+    const K=f.tkh; if(!K.st || K.st==='run'){ K.st='in'; f.tkhAir=1; K.laps=0; K.dropT=TKH.dropEvery; } const c=thpCentre(thpK()), dx=c[0]-f.x, dy=(c[1]-12)-f.y, d=Math.hypot(dx,dy);
+    if(d<14){ K.thpSlam=1; thpSlam(f); K.st='in'; return; } const mv=Math.min(d, TKH.fly*1.3*dt); f.x+=dx/d*mv; f.y+=dy/d*mv; f.vx=dx/d*TKH.fly*1.3; tkhStamp(f,dx); };
   const tkhTick0=tkhTick; tkhTick=function(dt){ tkhTick0(dt); thpTick(dt); };
   const tkhDrawUnder0=tkhDrawUnder; tkhDrawUnder=function(){ tkhDrawUnder0(); if(!thpOn()) return; const K=thpK(); thpDrawLeaves(K); thpDrawZone(K); thpDrawRing(K); if(THP.showSeats) thpDrawSeats(); };
   const tkhDrawClock0=tkhDrawClock; tkhDrawClock=function(){ if(!thpOn()) return tkhDrawClock0(); thpDrawHud(); };
@@ -2657963,8 +2657999,8 @@ RAID_INFO.turkey={ k:'turkey', plc:'turkey', enc:9100, name:'TURKEY HUNT', wm:'T
     if(x<58||x>W-24||y<70||y>WORLD_H-92) return false; if(!thpZoneOk(x,thpZone(thpK()))) return false;
     for(const rk of S.cfg.terrain.rocks){ if(Math.hypot(rk.x-x,rk.y-y)<rk.r+14) return false; } for(const u of S.units){ if(Math.hypot(u.x-x,u.y-y)<40) return false; } return true; };
   const edgePt0=edgePt; edgePt=function(e){ if(e==='left'||e==='left-top'||e==='left-bottom'){ const p=edgePt0(e==='left'? 'right' : e==='left-top'? 'right-top' : 'right-bottom'); p.x=-60; return p; } return edgePt0.apply(this,arguments); };   
-  const spawnGroup0=spawnGroup; spawnGroup=function(g,wk9){ if(thpOn() && g && /^right/.test(g.e||'')){ const K=thpK(), fs=thpFoeSide(K); if(fs==='W' || (fs==='B' && ((K.alt=(K.alt|0)+1)%2===0))) g=Object.assign({}, g, { e:(g.e==='right')? 'left' : (g.e==='right-top')? 'left-top' : 'left-bottom' }); } return spawnGroup0.call(this,g,wk9); };   
-  const campUnitStep0=campUnitStep; campUnitStep=function(u,dt){ if(!thpOn() || !THP.march || u.dead || u.falling || u.shv || u.jhs || u.jetT>0 || u.dropT>0 || u.down || u.type==='mortar' || u.type==='aagun' || (u.def&&u.def.vehicle)) return campUnitStep0.apply(this,arguments);   
+  const spawnGroup0=spawnGroup; spawnGroup=function(g,wk9){ if(thpOn() && g && /^right/.test(g.e||'')){ const K=thpK(), fs=thpRot(K)? thpSideOf(thpNextSeat(K)) : thpFoeSide(K); if(fs==='W' || (fs==='B' && ((K.alt=(K.alt|0)+1)%2===0))) g=Object.assign({}, g, { e:(g.e==='right')? 'left' : (g.e==='right-top')? 'left-top' : 'left-bottom' }); } return spawnGroup0.call(this,g,wk9); };   
+  const campUnitStep0=campUnitStep; campUnitStep=function(u,dt){ if(thpOn() && u.thpPushT>0){ u.marching=false; return false; }     if(!thpOn() || !THP.march || u.dead || u.falling || u.shv || u.jhs || u.jetT>0 || u.dropT>0 || u.down || u.type==='mortar' || u.type==='aagun' || (u.def&&u.def.vehicle)) return campUnitStep0.apply(this,arguments);   
     const K=thpK(), c=thpCentre(K); if(thpInside(u.x,u.y,K) || thpHalt(u)){ u.marching=false; return campUnitStep0.apply(this,arguments); }   
     const i=Math.max(0,S.units.indexOf(u)), a=Math.atan2(u.y-c[1],u.x-c[0])+((i%5)-2)*0.3; bfMarch(u,dt,{ x:c[0]+Math.cos(a)*THP.slot, y:c[1]+Math.sin(a)*THP.slot }); u.marching=true; return true; };   
   try{ OUTFIT_EARN.tkhhat=1; OUTFIT_EARN.tkhapron=2; OUTFIT_EARN.tkhboots=3; for(const r of TKH_OF){ r.lv=(r.id==='tkhhat')? 1 : (r.id==='tkhapron')? 2 : 3; } PET_EARN.gobbles=4; if(DECOR_INFO.tkhcorn) DECOR_INFO.tkhcorn.sub='TURKEY HUNT · HARD'; }catch(e){}   
