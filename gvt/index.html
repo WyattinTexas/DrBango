@@ -763658,6 +763658,7 @@ function hld2Room(b){ return !!(hld2On() && b && b.seat!=null && S.bf && b.seat!
 
 
 
+
 function blbUnCat(){ if(BLB.ucat) return BLB.ucat; const all=[], add=(g,o)=>{ o.g=g; all.push(o); return o; }, nm=s=>String(s||'').toUpperCase();
   const px=[], LL=(typeof LAB_LINE!=='undefined' && Array.isArray(LAB_LINE))? LAB_LINE : [];   
   for(const id of ENH_ORDER){ const d=ENH_INFO[id]; if(!d || BLB_UN_DEAD[id] || (typeof lsvShelved==='function' && lsvShelved(id))) continue; let sub, need, ord;
@@ -763763,6 +763764,7 @@ function blbSargeHTML(rk, tier, P, st){ const d=(st && st.d && st.d.un)||{}, all
   h+='<div class="blb-dial"><label>HIS LEVEL<small>the LV of his '+blbEsc(wn(P.w))+' for this fight (blank = the LEVEL, '+P.L+') · every iron\'s LV is under PROMOTIONS</small></label><div class="blb-lv"><button type="button" onclick="BLB.ui.sargeLv(-1)">−</button><input type="number" step="1" min="0" max="'+RANK_MAX+'" class="'+(lvEd?'ed':'')+'" value="'+P.ranks[k]+'" onchange="BLB.ui.stockRank(\''+k+'\',this.value)"><button type="button" onclick="BLB.ui.sargeLv(1)">+</button></div></div>';
   const cry=all.filter(it=>it.id==='s:cry' || it.id==='s:cry2'); if(cry.length) h+='<h5>THE SABER\'S CRYSTALS'+(sab? '' : ' <small>(they act with the saber in hand)</small>')+'</h5>'+blbUnItemsHTML(cry, P, d);
   h+='<div class="blb-dial"><label>JET PACK<small>Sarge\'s jet pack (a player has it from level '+JET_UNLOCK+')</small></label><div class="blb-seg"><button type="button" class="'+(P.jet?'':'on')+'" onclick="BLB.ui.dial(\'jet\',\'OFF\')">OFF</button><button type="button" class="'+(P.jet?'on':'')+'" onclick="BLB.ui.dial(\'jet\',\'ON\')">ON</button></div></div>';   
+  if(blbGearOn()) h+=blbGearDoorHTML('HIS GEAR WITH PICTURES');   
   for(const g of BLB_SARGE_GRP) h+=blbFoldHTML(g[0], g[1], all.filter(it=>it.g===g[0] && it.id!=='s:cry' && it.id!=='s:cry2'), P, d);
   return h+(duo? '</div>' : '')+'</div>'; }
 function blbVehHTML(rk, tier, P, st){ const d=(st && st.d && st.d.un)||{}, ON=P.platoon, seatOf={ 'v:jeep':'bfjeep', 'v:tank':'bftank', 'v:df':'dogfighter' }, anyOn=BLB_RIDES.some(k=>ON.indexOf(k)>=0);
@@ -763772,6 +763774,7 @@ function blbVehHTML(rk, tier, P, st){ const d=(st && st.d && st.d.un)||{}, ON=P.
   return h+'</div>'; }
 function blbUnHTML(rk, tier, P, st){ const all=blbUnCat().all, d=(st && st.d && st.d.un)||{}, skip=BLB_SARGE_GRP.map(g=>g[0]).concat(['garage']);   
   let h='<div class="blb-dial" style="flex-direction:column;align-items:stretch;gap:3px"><label>UNLOCKS<small>on or off for this fight · Sarge\'s things are in SARGE, the machines\' in VEHICLES · a level-'+P.L+' player\'s own unless the intended set says otherwise · gold = not as intended · dim = cannot act in this fight</small></label>';
+  if(blbGearOn()) h+=blbGearDoorHTML("FLOOP'S LAB WITH PICTURES AND FILMS");   
   for(const g of BLB_UN_GRP){ if(skip.indexOf(g[0])>=0) continue; h+=blbFoldHTML(g[0], g[1], all.filter(it=>it.g===g[0]), P, d); }
   return h+'</div>'; }
 
@@ -764017,19 +764020,97 @@ function blbHeldTick(){ if(BLB.heldT) return; BLB.heldT=setInterval(function(){ 
 
 
 
+
 function blbCss(){ if(BLB.css) return; BLB.css=1; const st=document.createElement('style'); st.id='blbCss'; st.textContent=BLB_CSS; document.head.appendChild(st); }
 function blbEsc(s){ return escH(s==null? '' : s); }
 function blbNum(v, d){ return (v==null || !isFinite(+v))? '' : (+v).toLocaleString('en-US', { maximumFractionDigits:d==null? 3 : d }); }
 function blbPortrait(k){ const row=blbRow(k), r=raidInfo(k); try{ return sprURI(row[2], null, row[3]||r.crop); }catch(e){ return ''; } }
 function blbEnsure(){ blbCss(); if(BLB.el) return BLB.el; const d=document.createElement('div'); d.id='blbPage'; d.className='hidden'; document.body.appendChild(d); BLB.el=d; return d; }
 function blbOpen(tab){ if(!blbOn()) return false; blbEnsure(); if(tab) BLB.tab=tab; BLB.open=1; BLB.el.classList.remove('hidden'); if(BLB.pill) BLB.pill.classList.add('hidden'); blbRender(); return true; }
-function blbClose(){ if(BLB.el) BLB.el.classList.add('hidden'); BLB.open=0; blbSave(); blbPillSync(); }
-function blbRender(){ const d=BLB.el; if(!d || !BLB.open) return; const tabs=[['fights','FIGHTS'],['rules','RULES'],['log','RESULTS'],['help','HELP']];
+function blbClose(){ if(BLB.el) BLB.el.classList.add('hidden'); BLB.open=0; try{ if(BLB.film) blbFilmClose(); }catch(e){} blbSave(); blbPillSync(); }
+
+
+
+
+
+function blbGearOn(){ if(BLB.blgQ==null){ try{ BLB.blgQ=/[?&]blg=0\b/.test(location.search||'')? 0 : 1; }catch(e){ BLB.blgQ=1; } } return BLB.blgQ; }
+function blbGearRoomOf(id){ const d=ENH_INFO[id]||{}, a=LAB_ARM[id]; return a? String(a).toLowerCase() : (d.unit==='hero'? 'hero' : String(d.unit||'sarge')); }
+function blbGearRoomWord(k){ const K=String(k).toUpperCase(); if(k==='hero') return 'HEROES'; if(k==='sarge') return 'SARGE'; if(LAB_ARMS.indexOf(K)>=0) return K; try{ if(UDEF[k] && UDEF[k].name) return String(UDEF[k].name).toUpperCase(); }catch(e){} return K; }
+function blbGearRoomIcon(k){ const K=String(k).toUpperCase(); try{ if(BLB_ARM_W[K]) return blbIcon('w:'+BLB_ARM_W[K]); if(k==='hero') return blbIcon(HEROES[0]); return blbIcon(k); }catch(e){ return ''; } }
+function blbGearDead(){ const out=[]; for(const id of ENH_ORDER){ if(ENH_INFO[id] && (BLB_UN_DEAD[id] || (typeof lsvShelved==='function' && lsvShelved(id)))) out.push(id); }   
+  const shelf=[].concat((typeof LSV!=='undefined' && LSV && LSV.ids)||[], (typeof SPS!=='undefined' && SPS && SPS.ids)||[]); for(const id of shelf){ if(ENH_INFO[id] && ENH_ORDER.indexOf(id)<0 && out.indexOf(id)<0) out.push(id); } return out; }
+function blbGearWhy(id){ return BLB_UN_DEAD[id] || ((ENH_ORDER.indexOf(id)<0)? 'shelved: not in the game today' : 'shelved'); }
+function blbGearIx(id){ const i=ENH_ORDER.indexOf(id); return i<0? 9000+(typeof LSV!=='undefined' && LSV && LSV.ids? LSV.ids.indexOf(id) : 0) : i; }
+function blbGearRooms(P){ const by={}, put=(k,o)=>{ (by[k]||(by[k]=[])).push(o); };
+  for(const it of blbUnCat().all){ if(it.part) put(blbGearRoomOf(it.part), { it, id:it.part }); }
+  for(const id of blbGearDead()){ if(blbUnItem('x:'+id)) continue; put(blbGearRoomOf(id), { id, dead:blbGearWhy(id) }); }
+  const line=LAB_LINE.slice(); for(const k in by) if(line.indexOf(k)<0) line.push(k);
+  const out=[]; for(const k of line){ const L=by[k]; if(!L || !L.length) continue; L.sort((a,b)=>blbGearIx(a.id)-blbGearIx(b.id)); out.push({ key:k, word:blbGearRoomWord(k), icon:blbGearRoomIcon(k), parts:L, on:L.filter(x=>x.it && P.un[x.it.id]).length }); } return out; }
+function blbGearNeed(it, P){ const n=it.need||{}; if(n.w) return (P.w===n.w? 'with the ' : 'needs the ')+blbWName(n.w).replace(/^(THE |SERVICE )/,'')+' in hand'; if(n.hero) return n.hero==='*'? (P.hero==='none'? 'needs a hero in command' : 'with the hero in command') : (P.hero===n.hero? 'with ' : 'needs ')+blbManName(n.hero)+' in command'; if(n.seat) return (P.platoon.indexOf(n.seat)>=0? 'with ' : 'needs ')+String(BLB_RIDE_NAME[n.seat]||blbManName(n.seat)).replace(/^THE /,'')+' seated'; return 'acts in every fight'; }
+function blbGearPic(id){ try{ return enhPartSVG(id)||''; }catch(e){ return ''; } }
+function blbGearPartHTML(x, P, d){ const id=x.id, info=ENH_INFO[id]||{}, sh=labShort(id)||{}, nm=String(info.name||id).toUpperCase(), pic=blbGearPic(id);
+  const door='<span class="pic">'+pic+'</span><button type="button" class="film" title="THE FILM" onclick="event.stopPropagation();BLB.ui.film(\''+id+'\')">▶ FILM</button>';   
+  if(x.dead) return '<div class="blb-gc dead" data-id="'+blbEsc(id)+'">'+door+'<div class="nm">'+blbEsc(nm)+'</div><div class="ud"><small>'+blbEsc(x.dead)+' · nothing to switch in a boss fight</small></div></div>';
+  const it=x.it, v=P.un[it.id]? 1 : 0, idle=blbUnIdle(it, P), ed=!!d[it.id];
+  return '<div class="blb-gc'+(v?' on':'')+(ed?' ed':'')+(idle?' idle':'')+'" data-id="'+blbEsc(id)+'" onclick="BLB.ui.un(\''+it.id+'\','+(v?0:1)+')">'+door+'<div class="nm">'+blbEsc(nm)+'</div>'
+    +'<div class="ud">'+(sh.up? '<b class="up">▲ '+blbEsc(sh.up)+'</b>' : '')+(sh.down? '<b class="dn">▼ '+blbEsc(sh.down)+'</b>' : '')+'</div>'
+    +'<div class="sw"><span class="st">'+(v? 'ON' : 'OFF')+'</span><small>'+blbEsc(blbGearNeed(it, P))+'</small></div></div>'; }
+function blbGearSargeURI(P){ try{ const U=P.un||{}, wear=[]; for(const sl of OUTFIT_SLOTS){ const id=U['o:'+sl.key]; if(id && OUTFIT_INFO[id]) wear.push(id); }
+  let k=P.w; if(P.w==='commander') k=U['x:iceblade']? 'iceblade' : U['x:flameblade']? 'flameblade' : U['c:high']? 'highblade' : U['c:blade']? 'claymore' : 'commander'; else if(P.w==='lightsaber' && U['x:unarmed']) k='unarmed'; else if(P.w==='pistol' && (P.ranks['w:pistol']|0)>=WPN_MILE.pistolLvl && !U['x:smuggler']) k='pistol2';   
+  if(!SARGE_ART[k]) k=SARGE_ART[P.w]? P.w : 'pistol';
+  const c=SABER_COLORS.find(x=>x.id===U['s:cry']), dy=U['o:dye'], a=dy? ARMIES.find(x=>x.id===dy) : null;
+  return sargeWepURI(k, a? a.hex : null, c? c.hex : null, null, wear); }catch(e){ try{ return sargeWepURI(P.w); }catch(x){ return ''; } } }
+function blbGearRackHTML(rk, tier, P, st){ const d=(st && st.d && st.d.un)||{}, all=blbUnCat().all, wn=w=>blbWName(w).replace(/^(THE |SERVICE )/,'').replace(/ RIFLE$/,''), duo=!!(P.un['k:duo'] && P.hero!=='none');
+  let h='<h4>SARGE\'S GEAR <small>as he fights this one</small></h4>'+(duo? '<div class="blb-intl" style="color:var(--gold);margin-bottom:4px">TWO HEROES is on (THE FIGHT, under UNLOCKS): the hero in charge takes Sarge\'s seat, so his gear does nothing in this fight</div>' : '');
+  h+='<div class="blb-gman"><img class="man" src="'+blbGearSargeURI(P)+'" alt=""><div class="blb-gside"><div class="blb-dial" style="flex-direction:column;align-items:stretch;gap:4px"><label>HIS WEAPON<small>a level-'+P.L+' commander carries the '+blbEsc(wn(P.nat0))+' by default · HIS LEVEL is on FIGHTS</small></label><div class="blb-seg" style="flex-wrap:wrap">'+P.irons.map(w=>{ const u=blbIcon('w:'+w); return '<button type="button" class="'+(u?'ic':'')+(P.w===w?' on':'')+'" onclick="BLB.ui.dial(\'sw\',\''+w+'\')">'+(u? '<img src="'+u+'" alt="">' : '')+blbEsc(wn(w))+'</button>'; }).join('')+'</div></div>';
+  const cry=all.filter(it=>it.id==='s:cry' || it.id==='s:cry2'); if(cry.length) h+=blbUnItemsHTML(cry, P, d);
+  h+='<div class="blb-dial"><label>JET PACK<small>a player has it from level '+JET_UNLOCK+'</small></label><div class="blb-seg"><button type="button" class="'+(P.jet?'':'on')+'" onclick="BLB.ui.dial(\'jet\',\'OFF\')">OFF</button><button type="button" class="'+(P.jet?'on':'')+'" onclick="BLB.ui.dial(\'jet\',\'ON\')">ON</button></div></div></div></div>';
+  for(const sl of OUTFIT_SLOTS){ const it=blbUnItem('o:'+sl.key); if(!it) continue; const cur=String(P.un[it.id]||''), ed=!!d[it.id];
+    h+='<div class="blb-grail" data-rail="'+blbEsc(sl.key)+'"><div class="rh"><span>'+blbEsc(String(sl.rule).toUpperCase())+'</span><small>'+(cur && OUTFIT_INFO[cur]? blbEsc(String(OUTFIT_INFO[cur].name).toUpperCase()) : 'NONE')+(ed? ' · not as intended' : '')+'</small></div><div class="blb-gtiles">';
+    h+='<button type="button" class="blb-gt none'+(cur===''?' on':'')+(cur==='' && ed?' ed':'')+'" data-id="" onclick="BLB.ui.un(\''+it.id+'\',\'\')"><span class="pic"></span><span class="nm">NONE</span></button>';
+    for(const o of it.opts){ const id=o[0]; if(!id || !OUTFIT_INFO[id]) continue; let pic='', rows=[]; try{ pic=outfitPartSVG(id)||''; }catch(e){} try{ rows=lensRows(id)||[]; }catch(e){}
+      h+='<button type="button" class="blb-gt'+(cur===id?' on':'')+(cur===id && ed?' ed':'')+'" data-id="'+blbEsc(id)+'" onclick="BLB.ui.un(\''+it.id+'\',this.dataset.id)"><span class="pic">'+pic+'</span><span class="nm">'+blbEsc(String(OUTFIT_INFO[id].name).toUpperCase())+'</span><span class="lz">'+rows.map(r=>'<b class="'+(r.dn?'dn':'up')+'">'+(r.dn?'▼ ':'▲ ')+r.s+'</b>').join('')+'</span></button>'; }
+    h+='</div></div>'; }
+  return h; }
+function blbGearHTML(){ const rk=BLB.sel, tiers=blbTiers(rk); if(tiers.indexOf(BLB.tier)<0) BLB.tier=tiers[0]; const tier=BLB.tier, row=blbRow(rk), on=blbStockOn();
+  let h='<div class="blb-col blb-gear"><div class="blb-gtop"><h3>LAB &amp; GEAR · '+blbEsc(row[1])+'</h3><div class="blb-seg">'+tiers.map(k=>'<button type="button" class="'+(tier===k?'on':'')+'" style="color:'+BLB.TIERC[k]+'" onclick="BLB.ui.tier(\''+k+'\')">'+blbEsc(RAID_TIER_NAMES[k])+'</button>').join('')+'</div>';
+  if(!on) return h+'</div><div class="blb-intl" style="margin-top:6px">THE ARMY is OWN for this fight: the account\'s own parts and gear fight. Switch it to STOCK to pick them here. <button type="button" class="blb-mini" onclick="BLB.ui.dial(\'stock\',\'STOCK\')">STOCK</button></div></div>';
+  const P=blbStockPlan(rk, tier), st=blbIntState(rk, tier, P), d=(st && st.d && st.d.un)||{}, rooms=blbGearRooms(P), f=BLB.gearF||''; let nOn=0, nAll=0; for(const r of rooms){ nOn+=r.on; nAll+=r.parts.filter(x=>x.it).length; }
+  h+='<div class="blb-intl">this fight\'s stock army (LEVEL '+P.L+') · green = ON · gold = not as intended · dim = cannot act in this fight · a tap switches it · ▶ FILM shows it working'+(BLB.gearMsg? ' · <b>'+blbEsc(BLB.gearMsg)+'</b>' : '')+' <button type="button" class="blb-mini" onclick="BLB.ui.gearCopy()">COPY TO EVERY TIER OF '+blbEsc(row[1])+'</button></div></div>';
+  h+='<div class="blb-gcols"><section class="blb-gsec lab"><h4>FLOOP\'S LAB <small>'+nOn+' OF '+nAll+' ON</small><span class="blb-seg"><button type="button" class="'+(f?'':'on')+'" onclick="BLB.ui.gearFilter(\'\')">ALL</button><button type="button" class="'+(f==='on'?'on':'')+'" onclick="BLB.ui.gearFilter(\'on\')">ON</button></span></h4>';
+  for(const r of rooms){ const L=f==='on'? r.parts.filter(x=>x.it && P.un[x.it.id]) : r.parts; if(!L.length) continue; h+='<div class="blb-groom" data-room="'+blbEsc(r.key)+'"><div class="rh">'+(r.icon? '<img src="'+r.icon+'" alt="">' : '')+'<span>'+blbEsc(r.word)+'</span><small>'+r.on+' ON</small></div><div class="blb-ggrid">'+L.map(x=>blbGearPartHTML(x, P, d)).join('')+'</div></div>'; }
+  h+='</section><section class="blb-gsec rack">'+blbGearRackHTML(rk, tier, P, st)+'</section></div></div>'; return h; }
+function blbGearDoorHTML(what){ return '<button type="button" class="blb-mini blb-gdoor" onclick="BLB.ui.tab(\'gear\')">'+blbEsc(what)+' → LAB &amp; GEAR</button>'; }
+function blbGearCopy(){ const rk=BLB.sel, t0=BLB.tier, P=blbStockPlan(rk, t0), keys=blbUnCat().all.filter(it=>it.part || /^o:/.test(it.id) || it.id==='s:cry' || it.id==='s:cry2').map(it=>it.id); let n=0;
+  for(const t of blbTiers(rk)){ if(t===t0) continue; const key=rk+':'+t, E=(BLB.stock.un[key]||(BLB.stock.un[key]={})); for(const id of keys) E[id]=P.un[id]; BLB.stock.w[key]=P.w; BLB.stock.jet[key]=P.jet? 1 : 0; n++; }
+  BLB.gearMsg='copied to '+n+' other tier'+(n===1?'':'s')+' of '+blbRow(rk)[1]; blbSave(); blbRender(); return n; }
+function blbFilmIds(){ const ids=[]; try{ const P=blbStockPlan(BLB.sel, BLB.tier); for(const r of blbGearRooms(P)) for(const x of r.parts) ids.push(x.id); }catch(e){} return ids; }
+function blbFilmOpen(id){ id=String(id||''); if(!ENH_INFO[id]) return false; blbCss(); if(!BLB.filmEl){ const d=document.createElement('div'); d.id='blbFilm'; d.className='hidden'; document.body.appendChild(d); BLB.filmEl=d; blbFilmWire(); } BLB.film=id; blbFilmPaint(); return true; }
+function blbFilmClose(){ BLB.film=null; const d=BLB.filmEl; if(d){ d.classList.add('hidden'); d.innerHTML=''; d.removeAttribute('data-id'); } return 1; }
+function blbFilmStep(dv){ const ids=blbFilmIds(), i=ids.indexOf(BLB.film); if(i<0 || ids.length<2) return false; BLB.film=ids[(i+(dv|0)+ids.length)%ids.length]; blbFilmPaint(); return BLB.film; }
+function blbFilmWire(){ if(BLB.filmWired) return; BLB.filmWired=1; document.addEventListener('keydown', e=>{ try{ if(!BLB.film) return; if(e.key==='Escape' || e.key==='Esc'){ blbFilmClose(); e.stopPropagation(); } else if(e.key==='ArrowRight') blbFilmStep(1); else if(e.key==='ArrowLeft') blbFilmStep(-1); }catch(x){} }, true); }
+function blbFilmNone(el){ try{ const s=el.closest('.scr'); if(!s) return; el.remove(); const n=s.querySelector('.nofilm'); if(n) n.classList.remove('hidden'); s.classList.add('nf'); }catch(e){} }
+function blbFilmPaint(){ const d=BLB.filmEl, id=BLB.film; if(!d || !id) return; const P=blbStockPlan(BLB.sel, BLB.tier), st=blbIntState(BLB.sel, BLB.tier, P), dd=(st && st.d && st.d.un)||{}, it=blbUnItem('x:'+id), v=it? (P.un[it.id]? 1 : 0) : 0;
+  if(d.getAttribute('data-id')===id && !d.classList.contains('hidden')){ const b=d.querySelectorAll('.row .blb-seg button'); if(b.length===2){ b[0].className=v? '' : 'on'; b[1].className=(v? 'on' : '')+((dd['x:'+id] && v)? ' ed' : ''); } const nd=d.querySelector('.row small'); if(nd) nd.textContent=(it && blbUnIdle(it, P))? blbGearNeed(it, P) : ''; return; }   
+  const info=ENH_INFO[id]||{}, sh=labShort(id)||{}, dead=it? '' : blbGearWhy(id), pst=bdPromoSrc('lab-'+id+'.jpg'), pic=blbGearPic(id), room=blbGearRoomWord(blbGearRoomOf(id)), cost=TROPHY_IDS[id]? 'A TROPHY: WON, NEVER SOLD' : (ENH_COST[id]? blbNum(ENH_COST[id],0)+'★ AT THE LAB' : '');
+  const vid=reducedMotion()? '<img class="clip on" src="'+pst+'" alt="" onerror="BLB.ui.filmNone(this)">' : '<video class="clip" muted loop playsinline autoplay preload="auto" poster="'+pst+'" onloadeddata="this.classList.add(\'on\')"><source src="'+bdPromoSrc('lab-'+id+'.webm')+'" type="video/webm"><source src="'+bdPromoSrc('lab-'+id+'.mp4')+'" type="video/mp4" onerror="BLB.ui.filmNone(this.parentNode)"></video>';
+  d.innerHTML='<div class="fv" onclick="if(event.target===this) BLB.ui.filmClose()"><div class="box"><div class="hd"><button type="button" class="nav" onclick="BLB.ui.filmStep(-1)">◀</button><h4>'+blbEsc(String(info.name||id).toUpperCase())+'<small>'+blbEsc(room)+(info.sub? ' · '+blbEsc(String(info.sub).toUpperCase()) : '')+'</small></h4><button type="button" class="nav" onclick="BLB.ui.filmStep(1)">▶</button><button type="button" class="x" onclick="BLB.ui.filmClose()">✕</button></div>'
+    +'<div class="scr"><div class="still">'+pic+'</div>'+vid+'<div class="nofilm hidden">NO FILM FOR THIS PART YET: ITS PICTURE STANDS IN</div></div>'
+    +'<div class="wd">'+(dead || !it? '<div class="row"><span>NOT IN A BOSS FIGHT: '+blbEsc(dead||'no switch')+'</span></div>' : '<div class="row"><span>THIS FIGHT: '+blbEsc(blbRow(BLB.sel)[1])+' · '+blbEsc(RAID_TIER_NAMES[BLB.tier])+'</span><div class="blb-seg"><button type="button" class="'+(v?'':'on')+'" onclick="BLB.ui.un(\'x:'+id+'\',0)">OFF</button><button type="button" class="'+(v?'on':'')+((dd['x:'+id] && v)? ' ed':'')+'" onclick="BLB.ui.un(\'x:'+id+'\',1)">ON</button></div><small>'+blbEsc(blbUnIdle(it, P)? blbGearNeed(it, P) : '')+'</small></div>')
+    +(info.up? '<div class="up">▲ '+blbEsc(info.up)+'</div>' : '')+(info.down? '<div class="dn">▼ '+blbEsc(info.down)+'</div>' : '')+((sh.up && sh.up!==info.up)? '<div class="sh">THE CARD\'S ROW: ▲ '+blbEsc(sh.up)+(sh.down? ' · ▼ '+blbEsc(sh.down) : '')+'</div>' : '')+(cost? '<div class="cost">'+blbEsc(cost)+'</div>' : '')+'</div></div></div>';
+  d.setAttribute('data-id', id); d.classList.remove('hidden'); }
+function blbGearRead(){ const rk=BLB.sel, t=BLB.tier, on=blbStockOn(), P=on? blbStockPlan(rk, t) : null, rooms=P? blbGearRooms(P) : [], el=BLB.el, fe=BLB.filmEl;
+  return { on:blbGearOn(), tab:BLB.tab, stock:on? 1 : 0, filter:BLB.gearF||'', film:BLB.film||null, filmUp:!!(fe && !fe.classList.contains('hidden')), filmClip:(fe && fe.querySelector('.clip.on'))? 1 : 0, filmNone:!!(fe && fe.querySelector('.scr.nf')), msg:BLB.gearMsg||'',
+    rooms:rooms.map(r=>({ key:r.key, word:r.word, n:r.parts.length, live:r.parts.filter(x=>x.it).length, dead:r.parts.filter(x=>x.dead).length, on:r.on, idle:r.parts.filter(x=>x.it && blbUnIdle(x.it, P)).length, ids:r.parts.map(x=>x.id) })),
+    rails:P? OUTFIT_SLOTS.map(sl=>({ key:sl.key, rule:sl.rule, n:sl.ids.filter(i=>OUTFIT_INFO[i]).length, worn:String(P.un['o:'+sl.key]||'') })) : [], wear:P? OUTFIT_SLOTS.map(sl=>P.un['o:'+sl.key]).filter(Boolean) : [], iron:P? P.w : null, jet:P? (P.jet? 1 : 0) : null, man:P? blbGearSargeURI(P).length : 0,
+    dom:(el && BLB.open)? { tab:!!el.querySelector('.blb-gear'), cards:el.querySelectorAll('.blb-gc').length, live:el.querySelectorAll('.blb-gc:not(.dead)').length, dead:el.querySelectorAll('.blb-gc.dead').length, lit:el.querySelectorAll('.blb-gc.on').length, idle:el.querySelectorAll('.blb-gc.idle').length, ed:el.querySelectorAll('.blb-gc.ed').length, tiles:el.querySelectorAll('.blb-gt').length, worn:el.querySelectorAll('.blb-gt.on').length, rooms:el.querySelectorAll('.blb-groom').length, rails:el.querySelectorAll('.blb-grail').length, doors:el.querySelectorAll('.blb-gdoor').length, tabs:[].slice.call(el.querySelectorAll('.blb-tab')).map(b=>b.textContent), ids:[].slice.call(el.querySelectorAll('.blb-gc')).map(c=>c.getAttribute('data-id')) } : null }; }
+function blbGearRig(o){ let did=null; if(o.filter!=null) did=BLB.ui.gearFilter(o.filter); if(o.film) did=BLB.ui.film(String(o.film)); if(o.step) did=BLB.ui.filmStep(o.step); if(o.filmClose) did=BLB.ui.filmClose(); if(o.copy) did=BLB.ui.gearCopy(); if(o.pick) did=BLB.ui.un(o.pick[0], o.pick[1]); return did; }
+function blbRender(){ const d=BLB.el; if(!d || !BLB.open) return; const tabs=blbGearOn()? [['fights','FIGHTS'],['gear','LAB & GEAR'],['rules','RULES'],['log','RESULTS'],['help','HELP']] : [['fights','FIGHTS'],['rules','RULES'],['log','RESULTS'],['help','HELP']];   
   let h='<div class="blb-top"><div class="blb-title">THE BOSS LAB</div><div class="blb-ver">v'+blbEsc(GVT_CV)+' · '+blbOverN()+' RULE'+(blbOverN()===1?'':'S')+' CHANGED · '+BLB.log.length+' FIGHT'+(BLB.log.length===1?'':'S')+' LOGGED</div>'
     +'<div class="blb-tabs">'+tabs.map(x=>'<button type="button" class="blb-tab'+(BLB.tab===x[0]?' on':'')+'" onclick="BLB.ui.tab(\''+x[0]+'\')">'+x[1]+'</button>').join('')+'</div><button type="button" class="blb-x" onclick="BLB.ui.close()">✕</button></div>';
-  if(BLB.tab==='fights' || BLB.tab==='rules'){ h+='<div class="blb-bosses">'+BLB.ROWS.map(r=>'<button type="button" class="blb-boss'+(BLB.sel===r[0]?' on':'')+'" onclick="BLB.ui.sel(\''+r[0]+'\')"><img src="'+blbPortrait(r[0])+'" alt=""><span>'+blbEsc(r[1])+'<small>'+blbEsc(raidInfo(r[0]).name)+' · '+blbTiers(r[0]).length+' TIERS</small></span></button>').join('')+'</div>'; }
-  h+='<div class="blb-body">'+(BLB.tab==='fights'? blbFightsHTML() : BLB.tab==='rules'? blbRulesHTML() : BLB.tab==='log'? blbLogHTML() : blbHelpHTML())+'</div>';
-  const sc9=blbScrollKeep(d); d.innerHTML=h; blbScrollBack(d, sc9); }
+  if(BLB.tab==='fights' || BLB.tab==='rules' || (BLB.tab==='gear' && blbGearOn())){ h+='<div class="blb-bosses">'+BLB.ROWS.map(r=>'<button type="button" class="blb-boss'+(BLB.sel===r[0]?' on':'')+'" onclick="BLB.ui.sel(\''+r[0]+'\')"><img src="'+blbPortrait(r[0])+'" alt=""><span>'+blbEsc(r[1])+'<small>'+blbEsc(raidInfo(r[0]).name)+' · '+blbTiers(r[0]).length+' TIERS</small></span></button>').join('')+'</div>'; }
+  h+='<div class="blb-body">'+(BLB.tab==='fights'? blbFightsHTML() : (BLB.tab==='gear' && blbGearOn())? blbGearHTML() : BLB.tab==='rules'? blbRulesHTML() : BLB.tab==='log'? blbLogHTML() : blbHelpHTML())+'</div>';
+  const sc9=blbScrollKeep(d); d.innerHTML=h; blbScrollBack(d, sc9); if(BLB.film){ try{ blbFilmPaint(); }catch(e){} } }
 function blbScKey(e){ return e.tagName+'.'+(((typeof e.className==='string')? e.className : '').trim().split(/\s+/)[0]||''); }
 function blbScrollKeep(d){ const out=[]; if(!d || !blbPageUp()) return { tab:BLB.tab, out }; const seen={}; for(const e of d.querySelectorAll('*')){ const k=blbScKey(e), i=seen[k]=(seen[k]||0)+1; if(e.scrollTop>0 || e.scrollLeft>0) out.push([k, i, e.scrollTop, e.scrollLeft]); } return { tab:BLB.tab, out }; }
 function blbScrollBack(d, sc){ if(!d || !sc || !sc.out.length || sc.tab!==BLB.tab) return; const want={}, seen={}; for(const s of sc.out) want[s[0]+'#'+s[1]]=s; for(const e of d.querySelectorAll('*')){ const k=blbScKey(e), i=seen[k]=(seen[k]||0)+1, s=want[k+'#'+i]; if(s){ e.scrollTop=s[2]; e.scrollLeft=s[3]; } } }
@@ -764082,6 +764163,7 @@ function blbHelpHTML(){ return '<div class="blb-col blb-help"><h3>HOW TO USE THE
   +'<p><b>THE INTENDED SETS (10/30).</b> Each boss has an <b>intended set</b>: the player its fights are meant for. It ships as Wyatt\'s table with a level-L player\'s own roster; the first time you save one it becomes YOURS for that boss on this device. A fight starts from it (the level, the hero, Sarge\'s iron, the platoon, the jet pack, the promotions, the unlocks), and whatever you change is counted against it: INTENDED +2 on the tier, gold on the box, INTENDED +2 on the strip in the fight. <b>SAVE AS INTENDED</b> makes this fight, as it stands, its tier\'s intended set. <b>SAVE FOR EVERY TIER</b> makes this fight\'s choices (not its level, not its promotions) the boss\'s at every tier: each tier keeps its own level and promotions, and its own choices give way. <b>RESET TO INTENDED</b> puts this fight back; RESET EVERY FIGHT (at the foot of THE PLAYER) clears every fight\'s changes. <b>FORGET MINE</b> puts the boss back to the shipped set (it asks once). EXPORT carries your sets; LOAD SETS on RESULTS takes another lab\'s INTENDED-JSON line.</p>'
   +'<p><b>YOUR ROOM\'S CARDS.</b> While the lab is open, the cards your own account is owed (a new recruit, a gift, a rite) wait; close the lab (✕) and they come over your bedroom one at a time, as the game deals them. If one already stands in your room, DEPLOY closes the lab to show it first.</p>'
   +'<p><b>RULES</b> are the game\'s own difficulty tables, one grid per table, the shipped number under each cell. A changed cell is live on this device at once and stays through reloads while the lab is open on this account, in the lab\'s fights and at the real doors alike. Nothing leaves your device: use <b>EXPORT</b> on RESULTS to copy the changes as text for Wyatt.</p>'
+  +'<p><b>LAB &amp; GEAR (11/2).</b> The fifth tab shows this fight\'s stock army\'s inventions and Sarge\'s gear the way the designer\'s sheet does. <b>FLOOP\'S LAB</b> stands in the lab\'s own rooms (the men, the irons\' cases, Sarge, the heroes, the machines), every part a card with its picture, its ▲/▼ row and the man or iron it needs: green = ON for this fight, gold = not as intended, dim = it cannot act here (its iron not in his hands, its man not seated, its hero not in command). Tap a card to switch it; tap its ▶ FILM badge for the lab television\'s film of it working, with every line and the same switch; ◀ ▶ walk the parts, Escape or ✕ closes. The parts that do nothing in a boss fight stand dim with the reason. <b>SARGE\'S GEAR</b> shows Sarge drawn as he will fight (his iron, the pieces, the crystal, the paint), HIS WEAPON, THE SABER\'S CRYSTALS, the JET PACK and every rail of his rack as tiles with THE MAGIC LENS\'s rows; the lit tile is worn (one a rail; NONE first). Everything here is the same per-fight sheet FIGHTS edits (SAVE AS INTENDED, EXPORT and RESULTS see it); <b>COPY TO EVERY TIER</b> writes this fight\'s parts, pieces, iron, crystals and jet pack into the boss\'s other tiers. The two doors in FIGHTS (under JET PACK and over UNLOCKS) open it. <code>?blg=0</code> = the lab without it.</p>'
   +'<p><b>IN THE FIGHT</b> the lab\'s strip sits just over the troop tray\'s right end (or under the game when the screen has room there), never on a card or one of the game\'s buttons. It shows the clock, the wave, the boss\'s bar in numbers and the lives, with x1 x2 x4, +100 TAGS, SKIP WAVE (melts the standing troops, the next wave comes now), GOD and END (tap it twice: back here, logged as ABORT). <b>▼ LAB</b> folds it to one small tab. After any verdict the lab reopens on RESULTS.</p>'
   +'<p><b>RESULTS</b> keeps every lab fight (WIN / LOSS / ABORT, the clock, the boss\'s bar left, the waves reached, the lives, the dials and the rules in force). Add a note to a row (up to 2,000 characters), and your notes in the box at the top. <b>EXPORT (COPY + SEND)</b> copies the whole ledger, the rules and the notes as plain text (and shows it below the list) and sends the same to HQ, which posts it to the Raziya channel on Discord within a minute, where Wyatt and Isaac read it; the line beside the button says SENT or why not (the copy is made either way). Each row also says whether the fight was AS INTENDED or what it changed (INTENDED +n), and the unlocks it wore that a player of its level would not have. EXPORT ends with every boss\'s intended set in words and one INTENDED-JSON line; paste that line under LOAD SETS on any lab to load those sets (PUT MINE BACK undoes the last load).</p>'
   +'<p><b>THE DOORS.</b> The code <code>BOSSLAB</code> at Sarge\'s Surplus opens the lab and marks this account; the LAB tab on the bedroom\'s right edge reopens it. <code>BOSSLABOFF</code> takes the mark off (the rules you changed are reset first). On the web, <code>?bosslab=1</code> and <code>?bosslab=0</code> do the same. Opened by that link, a new account skips the opening mission and the tours and lands in the lab; ✕ shows the bedroom behind it, and every boot lands here again while the lab is on.</p>'
@@ -764182,11 +764264,11 @@ function blbRig(o){ o=o||{}; const g=f=>{ try{ return f(); }catch(e){ return 'ER
   if(o.intended){ const I9=o.intended; if(I9.save) did=(I9.save==='all')? BLB.ui.intAll() : BLB.ui.intSave(); if(I9.reset) BLB.ui.intReset(); if(I9.forget){ BLB.intAsk='forget:'+BLB.sel; did=BLB.ui.intForget(); } if(I9.load!=null) did=BLB.ui.intLoad(I9.load); if(I9.back) did=BLB.ui.intBack(); }   
   if(o.set){ const a=Array.isArray(o.set[0])? o.set : [o.set]; did=a.map(s=>blbCellSet(s[0], s[1], s[2])); blbSave(); if(BLB.open) blbRender(); } if(o.resetTable) blbResetTable(o.resetTable); if(o.reset){ blbResetAll(); blbSave(); }
   if(o.grp) BLB.ui.grp(o.grp[0], o.grp[1], o.grp[2], o.grp[3]); if(o.wavesReset) BLB.ui.wavesReset();
-  if(o.send) did=g(()=>blbExportSend((o.send===true || o.send===1)? null : String(o.send))); if(o.memo!=null) BLB.ui.memo(o.memo); if(o.note) BLB.ui.note(o.note[0], o.note[1]); if(o.launch) did=g(()=>blbLaunch(o.launch[0], o.launch[1])); if(o.abort) did=g(()=>blbAbort()); if(o.skip) did=g(()=>blbSkipWave()); if(o.tags!=null) did=blbTags(o.tags); if(o.speed) did=blbSpeed(o.speed); if(o.clearLog) BLB.ui.clearLog();
+  if(o.send) did=g(()=>blbExportSend((o.send===true || o.send===1)? null : String(o.send))); if(o.memo!=null) BLB.ui.memo(o.memo); if(o.note) BLB.ui.note(o.note[0], o.note[1]); if(o.launch) did=g(()=>blbLaunch(o.launch[0], o.launch[1])); if(o.abort) did=g(()=>blbAbort()); if(o.skip) did=g(()=>blbSkipWave()); if(o.tags!=null) did=blbTags(o.tags); if(o.speed) did=blbSpeed(o.speed); if(o.clearLog) BLB.ui.clearLog(); if(o.gear) did=g(()=>blbGearRig(o.gear));   
   const b=S.mode==='play'? blbBossNow() : null;
   return { cv:GVT_CV, on:blbOn(), booted:BLB.booted, q:BLB.q, open:!!(BLB.el && !BLB.el.classList.contains('hidden')), tab:BLB.tab, sel:BLB.sel, tier:BLB.tier, pill:!!(BLB.pill && !BLB.pill.classList.contains('hidden')), hud:!!(BLB.hud && !BLB.hud.classList.contains('hidden')), did,
     rows:BLB.ROWS.map(r=>({ k:r[0], name:r[1], king:r[2], place:raidInfo(r[0]).name, tiers:blbTiers(r[0]) })), rules:BLB_RULES.map(r=>({ id:r[0], ok:!!blbTable(r[0]), rows:r[3], cells:blbCells(r[0]).length })), over:blbOverList(), overN:blbOverN(), fight:Object.assign({},BLB.fight), waves:JSON.parse(JSON.stringify(BLB.waves)), ffK:BLB.ffK, stock:g(()=>blbStockRead()),
-    sheet:o.sheet? g(()=>blbSheet(o.sheet[0], o.sheet[1], o.sheet[2])) : null, log:BLB.log.slice(-5), logN:BLB.log.length, export:o.export? blbExportText() : null, sent:BLB.sent? Object.assign({},BLB.sent) : null, sentAt:BLB.sentAt, memo:BLB.memo,
+    sheet:o.sheet? g(()=>blbSheet(o.sheet[0], o.sheet[1], o.sheet[2])) : null, log:BLB.log.slice(-5), logN:BLB.log.length, export:o.export? blbExportText() : null, sent:BLB.sent? Object.assign({},BLB.sent) : null, sentAt:BLB.sentAt, memo:BLB.memo, gear:g(()=>blbGearRead()),
     fightNow:(S.raid && S.raid.blb)? { rk:S.raid.k, t:S.raid.t, party:S.raid.blb.party, void:S.raid.void?1:0, mode:S.mode, wave:S.wave, waves:S.cfg? S.cfg.waves.length : 0, sec:+blbClock().toFixed(2), lives:S.lives, tags:S.plastic, sq:S.sq? { p:S.sq.p, bp:S.sq.bp } : null, boss:b? { t:b.type, hp:Math.round(b.hp), max:Math.round(b.hpMax) } : null, foes:S.foes.filter(f=>!f.dead).length, hpMul:S.cfg? S.cfg.hpMul : null } : null,
     meta:{ bossLab:META.bossLab|0, ice:Object.assign({},META.ice||{}), bbs:Object.assign({},META.bbs||{}), sky:Object.assign({},META.sky||{}), starBank:META.starBank|0 }, dev:{ blb:blbLS('gvt_blb'), log:blbLS('gvt_blb_log') } }; }
 
@@ -980821,7 +980903,7 @@ let BFQ=null;
 
 
 
-let GVT_CV='29.51';
+let GVT_CV='29.52';
 let NX_CAP_MUL=4;
 
 
@@ -2652005,6 +2652087,7 @@ window.GVT = {
 
 
 
+
 const BLB={ v:1, open:0, tab:'fights', sel:'bone', tier:'e', ship:{}, over:{}, fight:{ bossHp:1, troops:1, troopHp:1, party:1, tags:null, speed:1, god:0, bank:0 }, waves:{}, notes:{}, log:[], ret:0, ffK:1, inFF:0, lives0:10, last:null, pendN:0, el:null, hud:null, pill:null, hudI:0, css:0, booted:0, q:null, blp:1, auto:0, keep:null, stock:{ on:1, lv:{}, w:{}, rk:{}, hero:{}, pl:{}, jet:{}, un:{}, full:null }, int:{ v:1, sets:{}, sent:{} }, ugrp:'', intAsk:'', intLine:'', tail:0, again:null, againCfg:null, ucat:null, memo:'', sent:null, sentAt:0,
   ROWS:[ ['bone','KING REX','kingrex','8 34 96 96'], ['ice','KING YETI','kingyeti','14 -30 104 104'], ['croak','KING CROAK','kingcroak',null], ['fields','EMPEROR BEAR','bearnaparte',null], ['palace','PRINCESS CROAK','princess',null], ['caves','THE ICE CAVES','fyeti',null], ['sky','THE SKY FORTRESS','skyfort',null], ['bbs','BUFFALO BILL','bbshow',null] ],   
   TIERC:{ e:'#BFE39A', m:'#9FC5DE', h:'#E8A070', g:'#B77DE8', u:'#FFD24A' }, MAXLOG:200 };
@@ -2652138,6 +2652221,8 @@ const BLB_UN_GRP=[['parts',"FLOOP'S LAB"],['gear',"SARGE'S GEAR"],['clay','THE C
 
 
 const BLB_SARGE_GRP=[['gear','HIS GEAR'],['clay','THE SWORDS'],['saber','THE SABER'],['dress','HIS DRESS AND PET']];
+
+
 
 
 
@@ -2652419,7 +2652504,86 @@ const BLB_CSS='#blbPage{position:fixed;inset:0;z-index:99980;background:#141810;
  +'.blb-ugrp{display:flex;width:100%;justify-content:space-between;align-items:center;gap:6px;background:rgba(38,40,31,.92);border:1px solid var(--bd);color:#EDEADF;border-radius:7px;padding:4px 7px;margin:1px 0;font:inherit;font-size:11px;cursor:pointer;text-align:left}.blb-ugrp.on{border-color:#BFE39A}.blb-ugrp.ed{border-color:var(--gold)}.blb-ugrp small{color:#9a8a6a;font-size:9px;text-transform:none;font-weight:normal;white-space:nowrap}'
  +'.blb-usub{color:#9a8a6a;font-size:9px;margin:5px 0 2px;letter-spacing:.06em}.blb-seg button.ed{color:var(--gold);box-shadow:inset 0 0 0 1px var(--gold)}.blb-seg button.idle{opacity:.5}.blb-intl{color:#C9BFA8;font-size:10px;text-transform:none;font-weight:normal;line-height:1.35}.blb-intl b{color:var(--gold)}'
  +'#blbPage select.blb-pick{max-width:136px;background:#0f120c;color:#FFE07A;border:1px solid var(--bd);border-radius:6px;padding:3px 4px;font-size:11px;text-transform:none;font-family:ui-monospace,Menlo,monospace;font-weight:normal}#blbPage select.blb-pick.ed{border-color:var(--gold);color:var(--gold)}'
- +'@media (max-width:700px){.blb-tiers{width:170px}.blb-dials{width:200px}}';
+ +'@media (max-width:700px){.blb-tiers{width:170px}.blb-dials{width:200px}}'
+ +'.blb-gear{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}.blb-gtop{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}.blb-gtop h3{margin:0}.blb-gear>.blb-intl{margin:0 0 2px}.blb-gcols{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:10px;align-items:start}.blb-gsec{border:2px solid var(--bd);border-radius:10px;padding:6px 7px;background:rgba(38,40,31,.5);min-width:0}.blb-gsec.lab{border-color:#8FB7E8}.blb-gsec.rack{border-color:var(--gold)}.blb-gsec h4{display:flex;align-items:center;gap:8px;margin:0 0 6px;font-size:15px;letter-spacing:.14em;color:#BFD9F5}.blb-gsec.rack h4{color:var(--gold)}.blb-gsec h4 small{color:#9a8a6a;font-size:10px;letter-spacing:.04em;text-transform:none;font-weight:normal}.blb-gsec h4 .blb-seg{margin-left:auto}.blb-groom{margin:4px 0 8px}.blb-groom .rh,.blb-grail .rh{display:flex;align-items:center;gap:6px;font-size:11px;letter-spacing:.08em;color:#EDEADF;border-bottom:1px solid rgba(127,163,92,.3);padding:2px 0;margin-bottom:4px}.blb-groom .rh img{width:26px;height:26px;object-fit:contain}.blb-groom .rh small,.blb-grail .rh small{margin-left:auto;color:#9a8a6a;font-size:9px;text-transform:none;font-weight:normal;text-align:right}.blb-ggrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px}.blb-gc{position:relative;display:flex;flex-direction:column;gap:3px;background:rgba(38,40,31,.92);border:2px solid var(--bd);border-radius:9px;padding:5px 6px 4px;cursor:pointer;min-width:0}.blb-gc.on{border-color:#7FD66B;background:rgba(127,214,107,.14)}.blb-gc.ed{box-shadow:inset 0 0 0 2px var(--gold)}.blb-gc.idle{opacity:.55}.blb-gc.dead{opacity:.45;cursor:default}.blb-gc .pic{display:block;width:100%;height:58px;background:rgba(0,0,0,.25);border-radius:6px;overflow:hidden}.blb-gc .pic svg{width:100%;height:100%;display:block}.blb-gc .film{position:absolute;right:8px;top:41px;height:20px;padding:0 6px;font:inherit;font-size:8px;letter-spacing:.06em;color:#FFE07A;background:rgba(18,15,11,.88);border:1px solid rgba(255,224,122,.55);border-radius:5px;cursor:pointer;line-height:1}.blb-gc.dead .film{opacity:.9}@media (pointer:coarse){.blb-gc .film{height:24px;top:37px;padding:0 8px;font-size:9px}}.blb-gc .nm{font-size:10px;line-height:1.15;color:#EDEADF}.blb-gc .ud{display:flex;flex-direction:column;gap:1px;text-transform:none;font-weight:normal;font-size:9px;line-height:1.25}.blb-gc .ud b,.blb-gt .lz b{display:block;font-weight:normal}.blb-gc .ud .up,.blb-gt .lz .up,#blbFilm .up{color:#BFE39A}.blb-gc .ud .dn,.blb-gt .lz .dn,#blbFilm .dn{color:#E8A070}.blb-gc .ud small{color:#9a8a6a}.blb-gc .sw{display:flex;align-items:center;gap:5px;margin-top:auto}.blb-gc .sw .st{font-size:10px;padding:1px 7px;border-radius:5px;border:1px solid var(--bd);color:#9a8a6a}.blb-gc.on .sw .st{color:#10140D;background:#7FD66B;border-color:#BFE39A}.blb-gc .sw small{color:#9a8a6a;font-size:8px;text-transform:none;font-weight:normal;line-height:1.2}.blb-gman{display:flex;gap:8px;align-items:flex-start;margin-bottom:6px}.blb-gman img.man{width:96px;height:112px;object-fit:contain;flex:0 0 auto;background:rgba(0,0,0,.25);border-radius:8px}.blb-gside{flex:1;min-width:0}.blb-gside .blb-dial{padding:2px 0}.blb-grail{margin:4px 0 8px}.blb-gtiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:5px}.blb-gt{display:flex;flex-direction:column;align-items:stretch;gap:2px;background:rgba(38,40,31,.92);border:2px solid var(--bd);border-radius:8px;padding:4px 4px 3px;font:inherit;color:#EDEADF;cursor:pointer;text-align:center;min-width:0}.blb-gt.on{border-color:var(--gold);background:rgba(255,224,122,.14)}.blb-gt.ed{box-shadow:inset 0 0 0 2px var(--gold)}.blb-gt .pic{display:block;height:44px;border-radius:5px;background:rgba(0,0,0,.25)}.blb-gt .pic svg{width:100%;height:100%;display:block}.blb-gt.none .pic{background:transparent;border:1px dashed rgba(127,163,92,.5)}.blb-gt .nm{font-size:9px;line-height:1.15}.blb-gt .lz{display:flex;flex-direction:column;text-transform:none;font-weight:normal;font-size:8px;line-height:1.2}.blb-gdoor{border-color:#8FB7E8;color:#BFD9F5;margin:3px 0 5px;align-self:flex-start}#blbFilm{position:fixed;inset:0;z-index:99985;font-family:var(--uih);font-weight:bold;text-transform:uppercase;color:#EDEADF;font-size:12px;line-height:1.3;user-select:none;-webkit-user-select:none}#blbFilm.hidden{display:none}#blbFilm .hidden{display:none}#blbFilm *{box-sizing:border-box}#blbFilm .fv{position:absolute;inset:0;background:rgba(10,12,8,.82);display:flex;align-items:center;justify-content:center;padding:10px}#blbFilm .box{width:96vw;max-width:720px;max-height:96vh;overflow:auto;background:#1b1f17;border:2px solid #8FB7E8;border-radius:12px;padding:8px 10px 10px}#blbFilm .hd{display:flex;align-items:center;gap:6px}#blbFilm .hd h4{flex:1;min-width:0;margin:0;font-size:15px;letter-spacing:.1em;color:#BFD9F5}#blbFilm .hd h4 small{display:block;color:#9a8a6a;font-size:9px;letter-spacing:.04em}#blbFilm .hd button{background:rgba(38,40,31,.92);border:2px solid rgba(127,163,92,.45);color:#EDEADF;border-radius:8px;font:inherit;font-size:14px;cursor:pointer;min-width:34px;height:34px;flex:0 0 auto}#blbFilm .hd button.x{border-color:#E07A7A;color:#E07A7A}#blbFilm .scr{position:relative;margin:8px 0;background:#000;border-radius:8px;overflow:hidden;min-height:180px;display:flex;align-items:center;justify-content:center}#blbFilm .scr .still{position:absolute;left:14%;right:14%;top:14%;bottom:14%;display:flex;align-items:center;justify-content:center}#blbFilm .scr .still svg{width:100%;height:100%}#blbFilm .scr .clip{position:relative;display:block;width:100%;height:auto;max-height:50vh;object-fit:contain;opacity:0;transition:opacity .25s}#blbFilm .scr .clip.on{opacity:1}#blbFilm .scr .nofilm{position:absolute;left:0;right:0;bottom:6px;text-align:center;font-size:10px;color:#FFE07A}#blbFilm .wd{display:flex;flex-direction:column;gap:4px;text-transform:none;font-weight:normal;font-size:12px;line-height:1.35}#blbFilm .wd .sh,#blbFilm .wd .cost{color:#9a8a6a;font-size:10px}#blbFilm .wd .row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 4px;text-transform:uppercase;font-weight:bold;font-size:11px}#blbFilm .wd .row small{color:#9a8a6a;text-transform:none;font-weight:normal}@media (max-width:900px){.blb-gcols{grid-template-columns:1fr}}@media (max-width:700px){.blb-ggrid{grid-template-columns:repeat(auto-fill,minmax(128px,1fr))}.blb-gman img.man{width:72px;height:84px}}@media (max-height:520px){#blbFilm .scr{min-height:110px;margin:5px 0}#blbFilm .scr .clip{max-height:34vh}#blbFilm .box{padding:5px 8px 7px}#blbFilm .hd h4{font-size:13px}}';
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2652573,7 +2652737,7 @@ BLB.ui={ tab(x){ BLB.tab=x; blbSave(); blbRender(); }, close(){ blbClose(); try{
   wavesReset(){ if(BLB.waves[BLB.sel]){ delete BLB.waves[BLB.sel][BLB.tier]; if(!Object.keys(BLB.waves[BLB.sel]).length) delete BLB.waves[BLB.sel]; } blbSave(); blbRender(); },
   cell(id,key,v){ blbCellSet(id,key,v); blbSave(); blbRender(); }, resetTable(id){ blbResetTable(id); blbSave(); blbRender(); }, resetAll(){ blbResetAll(); blbSave(); blbRender(); },
   note(at,v){ if(v) BLB.notes[at]=String(v).slice(0,2000); else delete BLB.notes[at]; blbSave(); }, memo(v){ BLB.memo=String(v||'').slice(0,2000); blbSave(); }, exportIt(){ const t9=blbExport(); blbExportSend(t9); }, clearLog(){ BLB.log=[]; BLB.notes={}; blbSave(); blbRender(); },
-  speed(k){ blbSpeed(k); }, tags(n){ blbTags(n); blbHudPaint(); }, skip(){ blbSkipWave(); blbHudPaint(); }, god(){ BLB.fight.god=BLB.fight.god?0:1; if(S.raid && S.raid.blb) S.raid.blb.dials.god=BLB.fight.god; blbSave(); blbHudPaint(); }, abort(){ blbAbort(); }, endTap(){ return blbHudEndTap(); }, fold(){ if(BLB.hud){ BLB.hud.classList.toggle('fold'); blbHudPaint(); } } };
+  speed(k){ blbSpeed(k); }, tags(n){ blbTags(n); blbHudPaint(); }, skip(){ blbSkipWave(); blbHudPaint(); }, god(){ BLB.fight.god=BLB.fight.god?0:1; if(S.raid && S.raid.blb) S.raid.blb.dials.god=BLB.fight.god; blbSave(); blbHudPaint(); }, gearFilter(x){ BLB.gearF=(x==='on')? 'on' : ''; blbRender(); return BLB.gearF; }, film(id){ return blbFilmOpen(id); }, filmClose(){ return blbFilmClose(); }, filmStep(dv){ return blbFilmStep(dv); }, filmNone(el){ blbFilmNone(el); }, gearCopy(){ return blbGearCopy(); },     abort(){ blbAbort(); }, endTap(){ return blbHudEndTap(); }, fold(){ if(BLB.hud){ BLB.hud.classList.toggle('fold'); blbHudPaint(); } } };
 
 
 
