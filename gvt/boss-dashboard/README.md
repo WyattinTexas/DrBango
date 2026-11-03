@@ -34,6 +34,8 @@ No file here carries a key, a token, an e-mail address, a home path, a machine n
 
 ## The client since the read
 
+**Re-read on ULTRA MEGA HP, Nov 2, 2026** (CARD-UMH, client v29.45): King Rex's lair and the Ice Castle were read and proved again on v29.45, whose ULTRA MEGA bars are flat for any party: King Rex 15,000 the court and 15,000 the angry return, Sergeant Cold 9,000, Sergeant Snowman 10,000, King Yeti 17,000, with one commander or ten (and Sergeant Snowman hops toward the men there). The same read carries the day's other cards: the bosses' bars on EASY · MEDIUM · HARD follow the designers' time-to-kill chart (v29.37) and on MEGA the player-damage-threshold pass's number, and the men's tenth-rank HP moved (v29.40 the flame, v29.41 the bazooka and commando); both pages' WHAT CHANGED tables say so. One correction in the Ice Castle's arithmetic: THEIR turret's rounds to KO are counted as the game counts them (D × bar ÷ HP of a man's hits a round, a running sum, down at hits ≥ his bar), which differs from the HP ceiling only at an exact division (the bazooka at 33 HP on EASY: 265 rounds, measured on both engines). The other four fights still stand on their Nov 2 damper re-read (v29.23 / v29.24); their EASY-to-MEDIUM-to-HARD bars moved with v29.37 too and wait for their own re-read.
+
 **Re-read on the damper, Nov 2, 2026** (Wyatt's "Q1- yes. proceed.", CARD-ARM round 2): all six fights were read and proved again on HEAD's client after THE DAMPER (v29.17: every enemy blow on your men lands at 50 % in the campaign and the boss fights; a KO is not dampened): King Croak's hideout at v29.23, the Ice Castle, the Pillow Fields and the Ice Caves at v29.24, King Rex's lair and Princess Croak's palace at v29.25. Between those three clients nothing in these fights moved (v29.24 carries our guns' fire clock, v29.25 the Turkey Hunt). Every WHO SURVIVES and FIRST SURVIVES number counts the damper, and a strike's number in THE STRIKES is what one hit LANDS on your man before his share (the number shipped × the damper; each strike's note names the number shipped). One finding: King Croak's rattlesnake SWALLOW is dealt as a hit (his bar left + 1), so the damper halves it on MEDIUM and HARD (🟨 BUDC-Q4).
 
 Before that: the first five fights were read at client v28.88 on Oct 31, 2026; THE ICE CAVES (the sixth, CARD-ICN-G5) at v28.96 on Nov 1, 2026, HEAD's own client. The game moved to v28.89, v28.90 and v28.91 the same night (the audio hush on a phone call, the Boss Lab's strip over the troop tray, the night-king words): a 194-line change that touches no lab level, boss number, damage dial or wave sheet, so every number on this page stands on the live game. Any card that moves a lab level or a boss's dials re-runs the five kits and the exporters (the order below).
@@ -44,9 +46,9 @@ Each fight has its own kit. A kit **reads** the game's own tables in the booted 
 
 | Fight | Key | Kit | Record | Card | Client | Chrome | WebKit |
 |---|---|---|---|---|---|---|---|
-| KING REX'S LAIR · KING REX | bone | design/boss-unit-damage-1031 | 00-CARD-BUD.md | CARD-BUD | v29.25 | 136/136 | 136/136 |
+| KING REX'S LAIR · KING REX | bone | design/boss-unit-damage-1031 | 00-CARD-BUD.md | CARD-BUD | v29.45 | 136/136 | 136/136 |
 | KING CROAK'S HIDEOUT · KING CROAK | croak | design/boss-croak-unit-breakdown-1031 | 00-CARD-BUDC.md | CARD-BUD-CROAK | v29.23 | 101/101 | 101/101 |
-| THE ICE CASTLE · KING YETI | ice | design/boss-yeti-unit-breakdown-1031 | 00-CARD-BUY.md | CARD-BUD-YETI | v29.24 | 306/306 | 306/306 |
+| THE ICE CASTLE · KING YETI | ice | design/boss-yeti-unit-breakdown-1031 | 00-CARD-BUY.md | CARD-BUD-YETI | v29.45 | 306/306 | 306/306 |
 | PRINCESS CROAK'S PALACE · PRINCESS CROAK | palace | design/boss-princess-unit-breakdown-1031 | 00-CARD-BUDP.md | CARD-BUDP | v29.25 | 252/252 | 252/252 |
 | THE PILLOW FIELDS · EMPEROR BEAR | fields | design/boss-emperor-unit-breakdown-1031 | 00-CARD-BUDE.md | CARD-BUDE | v29.24 | 333/333 | 333/333 |
 | THE ICE CAVES · THE FEROCIOUS YETI | caves | design/boss-caves-unit-breakdown-1101 | 00-CARD-ICN-G5.md | CARD-ICN-G5 | v29.24 | 381/381 | 381/381 |
