@@ -768704,6 +768704,8 @@ function thpCorn(){ const T=S.cfg&&S.cfg.terrain; if(!T || !T.rocks) return null
 function thpCentre(K){ const rk=thpCorn(); return rk? [rk.x, rk.y] : thpSeat(K); }
 function thpInside(x,y,K){ const c=thpCentre(K); return Math.hypot(x-c[0],y-c[1])<=THP.r; }
 function thpStanding(u){ return !(u.dead || u.down || u.dropT>0 || u.jetT>0 || u.cloakT>0 || u.falling) && (u.hp==null || u.hp>0); }
+function thpN(n){ return (n>0)? Math.max(1, Math.round(n*THP.spawnX)) : 0; }
+function thpFoeX(src){ if(!src || !src.def || !(src.def.tkh || src.def.thpPil)) return 1; if(!thpOn() || !S.thp || S.thp.over) return 1; return THP.diffX; }
 function thpMenUp(){ for(const u of S.units){ if(thpStanding(u)) return true; } return false; }
 function thpNearMan(f){ let b=null, bd=1e9; for(const u of S.units){ if(!thpStanding(u)) continue; const d=Math.hypot(u.x-f.x,u.y-f.y); if(d<bd){ bd=d; b=u; } } return b; }
 function thpZone(K){ const sd=THP.side[K.seat%THP.seats.length]; return sd>0? 'L' : sd<0? 'R' : 'B'; }
@@ -768717,16 +768719,16 @@ function thpState(K){ let g=0,f=0; for(const u of S.units){ if(!thpStanding(u)) 
   for(const q of S.foes){ if(q.dead || q.tkhAir || (q.def&&q.def.boss)) continue; if(!(q.def&&(q.def.tkh||q.def.thpPil))) continue; if(thpInside(q.x,q.y,K)){ f=1; break; } }
   return (g&&!f)? 'held' : (f&&!g)? 'taken' : (g&&f)? 'cont' : 'empty'; }
 function thpPay(n){ if(!(n>0)) return; if(typeof S.plastic==='number') S.plastic+=n; }
-function thpBossBar(tier,b){ try{ const B=(typeof PDT==='object' && PDT && PDT.bars && PDT.bars.ice)? PDT.bars.ice : null, v=B? B[tier] : 0; return (v>0)? Math.round(v*(THP.bossShare[b]||1)) : 0; }catch(e){ return 0; } }
+function thpBossBar(tier,b){ try{ const B=(typeof PDT==='object' && PDT && PDT.bars && PDT.bars.ice)? PDT.bars.ice : null, v=B? B[tier] : 0; return (v>0)? Math.round(v*(THP.bossShare[b]||1)*THP.diffX) : 0; }catch(e){ return 0; } }
 function thpBossAt(K){ const T=THP.tiers[K.tier]||THP.tiers.e, i=(K.passes|0)-1; if(i<0 || i>=THP.bosses.length) return; const b=THP.bosses[i]; spawnGroup({ f:'boss', t:b, n:1, e:'right' });
-  { const f=S.foes.slice().reverse().find(q=>q.type===b && !q.dead && !q.thpBoss); if(f){ f.thpBoss=1; f.thpHp0=f.hpMax; const bar=thpBossBar(K.tier,b); f.hpMax=bar>0? bar : f.hpMax*THP.bossHpX; f.hp=f.hpMax; K.bosses.push(f); if(b==='gobbler'){ K.gobT=THP.gobT; try{ SFX.gobble? SFX.gobble() : bfSfx(SFX.thump,f.x,f.y); }catch(e){} } } }     if(b==='gobbler' && T.guard>0) spawnGroup({ f:'column', t:'jake', n:T.guard, e:'right-bottom' }); }
+  { const f=S.foes.slice().reverse().find(q=>q.type===b && !q.dead && !q.thpBoss); if(f){ f.thpBoss=1; f.thpHp0=f.hpMax; const bar=thpBossBar(K.tier,b); f.hpMax=bar>0? bar : f.hpMax*THP.bossHpX; f.hp=f.hpMax; K.bosses.push(f); if(b==='gobbler'){ K.gobT=THP.gobT; try{ SFX.gobble? SFX.gobble() : bfSfx(SFX.thump,f.x,f.y); }catch(e){} } } }     if(b==='gobbler' && thpN(T.guard)>0) spawnGroup({ f:'column', t:'jake', n:thpN(T.guard), e:'right-bottom' }); }
 function thpPass(K){ const from=thpCentre(K); K.seat=thpNextSeat(K); K.passes=(K.passes|0)+1; K.pass=thpEvery(K); const to=thpSeat(K); K.slide={ x0:from[0], y0:from[1], x1:to[0], y1:to[1], t:0 }; K.pilT=THP.pilAfter; K.owner=null; K.armSide=null; K.armT=0; K.rotT=0;   
   S.floats.push({ x:to[0], y:to[1]-96, txt:t('PASS THE CORNUCOPIA!'), t:0, col:'#FFD24A' }); try{ bfSfx(SFX.thump,to[0],to[1]); }catch(e){} thpBossAt(K); }
 function thpSlideTick(K,dt){ const sl=K.slide; if(!sl) return; sl.t+=dt; const k=Math.min(1, sl.t/THP.slide), e=k*k*(3-2*k), rk=thpCorn(); if(rk){ rk.x=sl.x0+(sl.x1-sl.x0)*e; rk.y=sl.y0+(sl.y1-sl.y0)*e; } if(k>=1) K.slide=null; }
 function thpSquad(K){ const T=THP.tiers[K.tier]||THP.tiers.e; if(K.noPil) return 0; let alive=0; for(const q of S.foes){ if(!q.dead && q.def && q.def.thpPil) alive++; } const room=Math.max(0,(T.pilCap||99)-alive); if(!room) return 0; const np=Math.min(T.pil,room), nb=Math.min(T.blun,Math.max(0,room-np)); if(np>0) spawnGroup({ f:'column', t:'pilgrim', n:np, e:'right' }); if(nb>0) spawnGroup({ f:'column', t:'blunder', n:nb, e:'right-bottom' }); return np+nb; }
 function thpDirector(K,dt){ const T=THP.tiers[K.tier]||THP.tiers.e;
   K.flockT-=dt; if(K.flockT<=0 && !K.noFlock){ K.flockT=T.flockEvery; let alive=0; for(const q of S.foes){ if(!q.dead && q.def && q.def.tkh===1) alive++; }
-    if(alive<T.cap){ const tk=Math.max(0,T.flock-T.hens-T.jakes); if(tk>0) spawnGroup({ f:'column', t:'turkey', n:tk, e:'right' }); if(T.hens>0) spawnGroup({ f:'column', t:'hen', n:T.hens, e:'right-top' }); if(T.jakes>0) spawnGroup({ f:'column', t:'jake', n:T.jakes, e:'right-bottom' }); } }   
+    const fl=thpN(T.flock), hn=thpN(T.hens), jk=thpN(T.jakes); if(alive<thpN(T.cap)){ const tk=Math.max(0,fl-hn-jk); if(tk>0) spawnGroup({ f:'column', t:'turkey', n:tk, e:'right' }); if(hn>0) spawnGroup({ f:'column', t:'hen', n:hn, e:'right-top' }); if(jk>0) spawnGroup({ f:'column', t:'jake', n:jk, e:'right-bottom' }); } }       
   K.pilT-=dt; if(K.pilT<=0){ K.pilT=THP.pilEvery; thpSquad(K); } }
 function thpEnd(K,win){ if(K.over) return; K.over=1; K.win=win? 1 : 0; const c=thpCentre(K); S.queue.length=0; S.waveActive=false; S.forms.length=0; if(win) S.cleared=true;
   startVictoryFlag(c[0], 1, null, win? (dyeHex()||GREEN) : campFoeHex(), ()=>{ if(S.mode==='play') endBattle(win); thpVerdictWords(win); }, !win); }
@@ -768738,8 +768740,8 @@ function thpVerdictWords(win){ try{ const K=S.thp, tier=(K&&K.tier)||'e';
     saveMeta(); }
   else { const el=document.getElementById('loseTitle'); if(el){ el.__enHTML=undefined; el.innerHTML=vdCamp1(t('THE TURKEYS ATE THE FEAST')); } const tx=document.getElementById('loseText'); if(tx){ tx.__enHTML=undefined; tx.textContent=t('THEY REACHED 100 FIRST. HOLD IT LONGER NEXT TIME.'); } } }catch(e){} }
 function thpTick(dt){ if(!thpOn() || S.mode!=='play') return; const K=thpK(); if(K.over) return; const c=thpCentre(K);
-  for(const q of S.foes){ if(q.dead || !(q.def&&q.def.tkh===1) || q.thpHp) continue; q.thpHp=1; q.hpMax=q.hpMax*THP.birdHp; q.hp=q.hp*THP.birdHp; if(q.tkh) q.tkh.hp=q.hp; q.bountyMul=(q.bountyMul||1)*THP.bountyX; }
-  for(const q of S.foes){ if(q.dead || !(q.def&&q.def.thpPil) || q.thpB) continue; q.thpB=1; q.bountyMul=(q.bountyMul||1)*THP.bountyX; }   
+  for(const q of S.foes){ if(q.dead || !(q.def&&q.def.tkh===1) || q.thpHp) continue; q.thpHp=1; q.hpMax=q.hpMax*THP.birdHp*THP.diffX; q.hp=q.hp*THP.birdHp*THP.diffX; if(q.tkh) q.tkh.hp=q.hp; q.bountyMul=(q.bountyMul||1)*THP.bountyX; }
+  for(const q of S.foes){ if(q.dead || !(q.def&&q.def.thpPil) || q.thpB) continue; q.thpB=1; q.hpMax=q.hpMax*THP.diffX; q.hp=q.hp*THP.diffX; q.bountyMul=(q.bountyMul||1)*THP.bountyX; }       
   const cg=thpGoal(K);   
   for(const q of S.foes){ if(q.dead || !(q.def&&q.def.thpPil)) continue; const m=thpNearMan(q);   
     if(m){ const dm=Math.hypot(m.x-q.x,m.y-q.y), stop=(q.def.rng||200)*0.7; if(dm>stop){ let ux=(m.x-q.x)/dm, uy=(m.y-q.y)/dm; const st9=rockSteer(q.x,q.y,m.x,m.y,ROCK_PAD_FOE); if(st9){ ux=st9.x; uy=st9.y; } q.x+=ux*THP.pilSpd*dt; q.y+=uy*THP.pilSpd*dt; tkhStamp(q,ux); } else tkhStamp(q,m.x-q.x); q.thpIn=thpInside(q.x,q.y,K)? 1 : 0; continue; }    
@@ -768837,10 +768839,11 @@ function thpStart(tier){ tier=(tier==='m'||tier==='h'||tier==='g')? tier : 'e'; 
 
 
 
+
 function thpRig(v){ v=v||{}; const K=thpOn()? thpK() : null;
   if(K){ if(v.seat!=null){ K.seat=v.seat|0; const rk=thpCorn(), s=thpSeat(K); if(rk){ rk.x=s[0]; rk.y=s[1]; } K.slide=null; } if(v.pass!=null) K.pass=+v.pass; if(v.g!=null) K.g=+v.g; if(v.tn!=null) K.tn=+v.tn; if(v.t!=null) K.t=+v.t; if(v.showSeats!=null) THP.showSeats=v.showSeats|0; if(v.showTags!=null) THP.showTags=v.showTags|0; if(v.march!=null) THP.march=v.march|0; if(v.noFlock!=null) K.noFlock=v.noFlock? 1 : 0; if(v.noPil!=null) K.noPil=v.noPil? 1 : 0; }   
   const rk=thpCorn(), open=(typeof tkhOpen==='function')? !!tkhOpen() : null; let shelf=null; try{ const el=document.getElementById('ro-tkhbook'); shelf=el? (el.innerHTML.indexOf('tkb')>=0? 'cornucopia' : 'book') : 'none'; }catch(e){}
-  return { cv:GVT_CV, on:THP.on, hold:!!K, open:open, shelf:shelf, lobby:(typeof RAID_CUR!=='undefined')? RAID_CUR : null, tier:K? K.tier : null, seat:K? K.seat : null, zone:K? thpZone(K) : null, foeSide:K? thpFoeSide(K) : null, passes:K? K.passes : null, pass:K? +K.pass.toFixed(2) : null, g:K? +K.g.toFixed(2) : null, tn:K? +K.tn.toFixed(2) : null, t:K? +K.t.toFixed(2) : null, st:K? K.st : null, over:K? K.over : null, win:K? K.win : null, sd:K? K.sd : null, slide:!!(K&&K.slide), armSide:K? K.armSide : null, armT:K? +K.armT.toFixed(2) : null, owner:K? K.owner : null, gobT:K? +K.gobT.toFixed(2) : null, gobBox:K? (K.gobBox||null) : null, opened:K? K.opened : null, tags:THP.showTags, menTracked:K? K.men.length : null, slams:K? (K.slams|0) : null, lastSlam:K? (K.lastSlam||null) : null, bossBars:K? S.foes.filter(q=>!q.dead&&q.thpBoss).map(q=>[q.type, Math.round(q.hpMax), Math.round(q.thpHp0||0)]) : null, cap:THP.cap, peck:TKH.peck, jakePeck:(FDEF.jake&&FDEF.jake.peck)||null, birdHp:(function(){ try{ const b=S.foes.find(q=>!q.dead&&q.def&&q.def.tkh===1&&q.thpHp); return b? Math.round(b.hpMax) : null; }catch(e){ return null; } })(), corn:rk? [Math.round(rk.x),Math.round(rk.y)] : null,
+  return { cv:GVT_CV, on:THP.on, hold:!!K, open:open, shelf:shelf, lobby:(typeof RAID_CUR!=='undefined')? RAID_CUR : null, tier:K? K.tier : null, seat:K? K.seat : null, zone:K? thpZone(K) : null, foeSide:K? thpFoeSide(K) : null, passes:K? K.passes : null, pass:K? +K.pass.toFixed(2) : null, g:K? +K.g.toFixed(2) : null, tn:K? +K.tn.toFixed(2) : null, t:K? +K.t.toFixed(2) : null, st:K? K.st : null, over:K? K.over : null, win:K? K.win : null, sd:K? K.sd : null, slide:!!(K&&K.slide), armSide:K? K.armSide : null, armT:K? +K.armT.toFixed(2) : null, owner:K? K.owner : null, gobT:K? +K.gobT.toFixed(2) : null, gobBox:K? (K.gobBox||null) : null, diffX:THP.diffX, spawnX:THP.spawnX, flockN:['e','m','h','g'].map(k=>{ const T=THP.tiers[k]; return [thpN(T.flock), thpN(T.hens), thpN(T.jakes), thpN(T.cap), thpN(T.guard)]; }), opened:K? K.opened : null, tags:THP.showTags, menTracked:K? K.men.length : null, slams:K? (K.slams|0) : null, lastSlam:K? (K.lastSlam||null) : null, bossBars:K? S.foes.filter(q=>!q.dead&&q.thpBoss).map(q=>[q.type, Math.round(q.hpMax), Math.round(q.thpHp0||0)]) : null, cap:THP.cap, peck:TKH.peck, jakePeck:(FDEF.jake&&FDEF.jake.peck)||null, birdHp:(function(){ try{ const b=S.foes.find(q=>!q.dead&&q.def&&q.def.tkh===1&&q.thpHp); return b? Math.round(b.hpMax) : null; }catch(e){ return null; } })(), corn:rk? [Math.round(rk.x),Math.round(rk.y)] : null,
     marching:K? S.units.filter(u=>!u.dead&&u.marching).length : null, inRing:K? S.units.filter(u=>thpStanding(u)&&thpInside(u.x,u.y,K)).length : null, pil:K? S.foes.filter(q=>!q.dead&&q.def&&q.def.thpPil).length : null, birds:K? S.foes.filter(q=>!q.dead&&q.def&&q.def.tkh===1).length : null, bosses:K? S.foes.filter(q=>!q.dead&&q.def&&q.def.tkh===2).map(q=>q.type) : null,
     ground:(S.cfg&&S.cfg.terrain)? S.cfg.terrain.ground : null, rocks:(S.cfg&&S.cfg.terrain&&S.cfg.terrain.rocks)? S.cfg.terrain.rocks.length : null, plastic:S.plastic, led:Object.assign({}, META.turkey||{}), lv:(typeof parkLedger==='function')? (parkLedger('turkey').lv|0) : null, mode:S.mode, every:K? thpEvery(K) : null, goal:THP.goal }; }
 
@@ -981925,7 +981928,7 @@ let BFQ=null;
 
 
 
-let GVT_CV='29.75';
+let GVT_CV='29.76';
 let NX_CAP_MUL=4;
 
 
@@ -2658617,7 +2658620,7 @@ setTimeout(function(){ try{ if(window.GVT && !GVT.fcl) GVT.fcl=function(o){ o=o|
 
 
 const THP_ON=(function(){ try{ const q=/[?&]thp=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_thp','0'); else localStorage.removeItem('gvt_thp'); } return localStorage.getItem('gvt_thp')==='0'? 0 : 1; }catch(e){ return 1; } })();
-const THP={ on:THP_ON, r:130, every:30, everyG:30, tell:10, cap:16, arm:3, birdHp:4, peckX:3, bossHpX:3, slam:{ e:11, m:13, h:13, g:16 }, slamLv:{ e:10, m:20, h:30, g:60 }, slide:1.2,     pay:2, pilSpd:58, aggroRe:0.4, goal:100, bossPts:15, koPts:1, gobT:2.4, gobTop:82, bossShare:{ bigtom:0.8, cranhen:0.9, gobbler:1 },     pilStop:24, pilAfter:6, pilEvery:30, rotate:1, slamPush:0, pushOut:110, pushT:0.45, bountyX:1,     zoneL:480, zoneQ:310, march:1, slot:100, showSeats:0, showTags:0,       
+const THP={ on:THP_ON, r:130, every:30, everyG:30, tell:10, cap:16, arm:3, birdHp:4, peckX:3, bossHpX:3, slam:{ e:11, m:13, h:13, g:16 }, slamLv:{ e:10, m:20, h:30, g:60 }, slide:1.2,     pay:2, pilSpd:58, aggroRe:0.4, goal:100, bossPts:15, koPts:1, gobT:2.4, gobTop:82, diffX:0.75, spawnX:0.7,     bossShare:{ bigtom:0.8, cranhen:0.9, gobbler:1 },     pilStop:24, pilAfter:6, pilEvery:30, rotate:1, slamPush:0, pushOut:110, pushT:0.45, bountyX:1,     zoneL:480, zoneQ:310, march:1, slot:100, showSeats:0, showTags:0,       
   seats:[[620,300],[860,190],[980,300],[860,400],[380,400],[320,300],[380,190]], side:[0,1,1,1,-1,-1,-1],   
   tiers:{ e:{ n:1, flockEvery:6, flock:9, hens:0, jakes:0, cap:18, pil:2, blun:1, pilCap:8, guard:0 }, m:{ n:2, flockEvery:5, flock:9, hens:3, jakes:0, cap:24, pil:4, blun:2, pilCap:12, guard:0 }, h:{ n:3, flockEvery:4.5, flock:9, hens:3, jakes:3, cap:30, pil:6, blun:3, pilCap:16, guard:4 }, g:{ n:4, flockEvery:4, flock:12, hens:3, jakes:6, cap:36, pil:8, blun:4, pilCap:20, guard:4 } },   
   bosses:['bigtom','cranhen','gobbler'] };
@@ -2658625,6 +2658628,8 @@ const THP_TIER_OF={ 1:'e', 2:'m', 3:'h', 4:'g' };
 
 
 const THP_PIC_KEYS=[];
+
+
 
 
 
@@ -2658769,6 +2658774,7 @@ RAID_INFO.turkey={ k:'turkey', plc:'turkey', enc:9100, name:'TURKEY HUNT', wm:'T
     const K=f.tkh; if(!K.st || K.st==='run'){ K.st='in'; f.tkhAir=1; K.laps=0; K.dropT=TKH.dropEvery; } const c=thpCentre(thpK()), dx=c[0]-f.x, dy=(c[1]-12)-f.y, d=Math.hypot(dx,dy);
     if(d<14){ K.thpSlam=1; thpSlam(f); K.st='in'; return; } const mv=Math.min(d, TKH.fly*1.3*dt); f.x+=dx/d*mv; f.y+=dy/d*mv; f.vx=dx/d*TKH.fly*1.3; tkhStamp(f,dx); };
   const tkhFlush0=tkhFlush; tkhFlush=function(f,K9){ const r=tkhFlush0.apply(this,arguments); try{ if(thpOn() && f && f.tkh && f.tkh.st==='fly' && f.def && f.def.tkh===1){ const m=thpNearMan(f); if(m){ const a=tkhRnd(f.tkh.i*19+(f.tkh.k|0),7)*6.283; f.tkh.wx=m.x+Math.cos(a)*28; f.tkh.wy=m.y+Math.sin(a)*20; } } }catch(e){} return r; };   
+  const tanHit6=tanHit; tanHit=function(u,fx,fy,src,fire9){ const x=thpFoeX(src); if(x===1) return tanHit6.apply(this,arguments); const had=Object.prototype.hasOwnProperty.call(src,'pipN'), p0=src.pipN; src.pipN=((p0>0)? p0 : 1)*x; try{ return tanHit6.apply(this,arguments); } finally{ if(had) src.pipN=p0; else delete src.pipN; } };   
   const tkhTick0=tkhTick; tkhTick=function(dt){ tkhTick0(dt); thpTick(dt); };
   const tkhDrawUnder0=tkhDrawUnder; tkhDrawUnder=function(){ tkhDrawUnder0(); if(!thpOn()) return; const K=thpK(); thpDrawLeaves(K); thpDrawZone(K); thpDrawRing(K); if(THP.showSeats) thpDrawSeats(); };
   const tkhDrawClock0=tkhDrawClock; tkhDrawClock=function(){ if(!thpOn()) return tkhDrawClock0(); thpDrawHud(); };
