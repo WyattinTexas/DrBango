@@ -222,7 +222,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
   const Q = new URLSearchParams(location.search);
   const AUTO = Q.get('auto') === '1', RIG = Q.get('rig') === '1' || AUTO;
   const POPMODE = Q.get('pop') === 'tray' ? 'tray' : 'card';
-  const ENDV = (n => (n >= 1 && n <= 5) ? n : 0)(Math.floor(+Q.get('end') || 0));   // ROUND 7: ?end=1..5, one of the five end screens (no dial = round 6's card)
+  const ENDV = Q.get('end') == null ? 1 : (n => (n >= 1 && n <= 5) ? n : 0)(Math.floor(+Q.get('end') || 0));   // ROUND 8 (Isaac 16:10): THE TITLE SCREEN is the end screen; ?end=0 = round 6's card, ?end=2..5 the others
   const PICK = [Q.get('p1') === '1' ? 1 : 0, Q.get('p2') === '1' ? 1 : 0];
   let SPEED = Math.max(0.25, Math.min(8, +(Q.get('speed') || 1)));
   let seed = ((+Q.get('seed')) || 20261104) >>> 0;
@@ -984,6 +984,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
   }
   function autoTick() {
     if (!AUTO) return;
+    if (S.mode === 'intro') { A.hand = null; return; }   // round 8: the demo finger waits for the opener
     if (S.mode === 'pick') {
       const p = S.pick; if (!p || p.chosen >= 0) { A.hand = null; return; }
       const i = PICK[p.n - 1], el = $('choices').children[i]; if (S.wall - p.t0 > 1.0) A.hand = { el, fx: 0.55, fy: 0.5 };
@@ -1018,7 +1019,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     S.timers = S.timers.filter(tm => !tm.done);
     autoTick();
     const frozen = S.mode === 'pick' && POPMODE === 'card';
-    if (!frozen && S.mode !== 'boot') {
+    if (!frozen && S.mode !== 'boot' && S.mode !== 'intro') {   // round 8: the fight waits under the opener
       const sdt = dt * S.slow; S.t += sdt;
       if (S.mode === 'play' || S.mode === 'pick') { director(sdt); S.tags += TRICKLE * sdt; }
       if (S.sarge.downT > 0) S.sarge.downT = Math.max(0, S.sarge.downT - sdt);
@@ -1031,6 +1032,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     }
     S.purseBump = Math.max(0, S.purseBump - dt * 4);
     S.elimShow += ((S.stage >= 2 ? ELIM_GOAL : S.elim) - S.elimShow) * Math.min(1, dt * 9);
+    if (OP.on) tickOpener();
     tickAttack(dt * (S.mode === 'pick' && POPMODE === 'card' ? 0 : 1));
     tickFireworks(dt);
     tickPick();
@@ -1180,7 +1182,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
   function fadeUp(el, e, at, d, dy) { const p = seg(e, at, d || 0.32); el.style.opacity = p.toFixed(3); el.style.transform = 'translateY(' + ((dy == null ? 14 : dy) * (1 - eOut(p))).toFixed(1) + 'px)'; }
   function popIn(el, e, at, d, k0) { const p = seg(e, at, d || 0.36); el.style.opacity = Math.min(1, p * 2).toFixed(3); el.style.transform = 'scale(' + ((k0 == null ? 0.82 : k0) + (1 - (k0 == null ? 0.82 : k0)) * easeBack(p)).toFixed(3) + ')'; }
   function evMap(bx, by) { const r = $('hud').getBoundingClientRect(); return [r.left + r.width / 2 + (bx - 196.5) * EV.s, innerHeight / 2 + (by - 380) * EV.s]; }   // a point of the box on the glass
-  function evFit() { if (!EV.on) return; const r = $('hud').getBoundingClientRect(); EV.s = Math.min(r.width / 393, innerHeight / 760); $('endV').style.transform = 'translate(-50%,-50%) scale(' + EV.s.toFixed(4) + ')'; if (EV.V.fit) EV.V.fit(); }
+  function evFit() { if (!EV.on && !OP.on) return; const r = $('hud').getBoundingClientRect(); EV.s = Math.min(r.width / 393, innerHeight / 760); $('endV').style.transform = 'translate(-50%,-50%) scale(' + EV.s.toFixed(4) + ')'; const V = OP.on ? EVV[2] : EV.V; if (V && V.fit) V.fit(); }
   let STRIP = null;   // the title's two marching rows: one picture each, shared by every soldier in the row
   const stripURL = k => { if (!STRIP) { STRIP = {}; for (const j of ['g', 't']) { try { STRIP[j] = URL.createObjectURL(new Blob([ART.strip[j]], { type: 'image/svg+xml' })); } catch (e) { STRIP[j] = svgURI(ART.strip[j]); } } } return STRIP[k]; };
   // the game's drawTag, word for word for the plate (its steel, its rim, its notch, its shine, its hole), at hero size: the stamped words in place of its two cut lines
@@ -1237,14 +1239,14 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     2: {   // 2 · THE FACE-OFF: the screen split in two, GREEN above and TAN below, the two armies on parade across the line (green marching right, tan left, as on the title), VS on the line, PLAY NOW
       dim: false,
       back: () => '<div class="v2p v2g"></div><div class="v2p v2t"></div><div class="v2p v2glow"></div><div class="v2p v2seam"></div><div class="v2p v2flash"></div>',
-      box: () => {
+      box: opener => {   // round 8: opener = the playable's opening (no VICTORY, no button: the fight comes next)
         const sk = squadKeys(), line = x => 410 - 0.1527 * x;   // the seam on the box: (0, 410) to (393, 350)
         const G = [[sk[0], 60, 116], [sk[1], 150, 110], [sk[2], 240, 120], [sk[3], 333, 146]].map(([k, x, hh]) => figHTML(k, x, line(x) - 36, hh, 'v2m v2mg')).join('');
         const T = [['tanrifle', 62, 118], ['tanmg', 152, 112], ['tanbazooka', 244, 122], ['tanflame', 334, 120]].map(([k, x, hh]) => figHTML(k, x, line(x) + 48 + 0.9 * hh, hh, 'v2m v2mt')).join('');
-        return '<div class="evC v2vic" style="top:28px"><span class="evVic">VICTORY!</span></div><div class="evC" style="top:66px"><div class="v2w v2wG">GREEN</div></div>' + G
+        return (opener ? '' : '<div class="evC v2vic" style="top:28px"><span class="evVic">VICTORY!</span></div>') + '<div class="evC v2wGw" style="top:66px"><div class="v2w v2wG">GREEN</div></div>' + G
           + '<div class="v2vs" style="left:156.5px;top:340px">VS</div>' + T
-          + '<div class="evC" style="top:582px"><div class="v2w v2wT">TAN</div></div>'
-          + '<div class="evC" style="top:662px"><button class="evBtn" id="evBtn" type="button">PLAY NOW</button></div>';
+          + '<div class="evC v2wTw" style="top:582px"><div class="v2w v2wT">TAN</div></div>'
+          + (opener ? '' : '<div class="evC" style="top:662px"><button class="evBtn" id="evBtn" type="button">PLAY NOW</button></div>');
       },
       fit() {   // the split follows the box's seam on the glass, edge to edge
         const [x0, y0] = evMap(0, 410), [x1, y1] = evMap(393, 350), W = innerWidth, H = innerHeight, k = (y1 - y0) / (x1 - x0), yL = y0 - k * x0, yR = y0 + k * (W - x0);
@@ -1254,7 +1256,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
         const band = hh => poly([[0, yL - hh], [W, yR - hh], [W, yR + hh], [0, yL + hh]]);
         set('.v2seam', band(2.6 * EV.s)); set('.v2glow', band(10 * EV.s));
       },
-      tick(e) {
+      tick(e, opener) {
         const a = eOut(seg(e, 0, 0.4)); qb('.v2g').style.transform = 'translateY(' + (-100 * (1 - a)).toFixed(2) + '%)'; qb('.v2t').style.transform = 'translateY(' + (100 * (1 - a)).toFixed(2) + '%)';
         const sm = seg(e, 0.36, 0.12); qb('.v2seam').style.opacity = sm.toFixed(3); qb('.v2glow').style.opacity = (sm * (0.55 + 0.25 * Math.sin(e * 3))).toFixed(3);
         qb('.v2flash').style.opacity = (e > 0.38 ? 0.5 * (1 - seg(e, 0.38, 0.3)) : 0).toFixed(3);
@@ -1262,8 +1264,8 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
         vsE.style.transform = 'scale(' + (2.4 - 1.4 * eOut(vs) + (e > 0.66 ? 0.04 * Math.sin((e - 0.66) * 4) : 0)).toFixed(3) + ') rotate(' + (-12 * (1 - eOut(vs))).toFixed(1) + 'deg)';
         qva('.v2mg').forEach((m, i) => { const p = eOut(seg(e, 0.5 + i * 0.08, 0.36)); m.style.opacity = Math.min(1, p * 2).toFixed(2); m.style.transform = 'translateX(' + (-260 * (1 - p)).toFixed(1) + 'px)'; });
         qva('.v2mt').forEach((m, i) => { const p = eOut(seg(e, 0.5 + i * 0.08, 0.36)); m.style.opacity = Math.min(1, p * 2).toFixed(2); m.style.transform = 'translateX(' + (260 * (1 - p)).toFixed(1) + 'px)'; });
-        fadeUp(qv('.v2wG'), e, 0.62, 0.3, -30); fadeUp(qv('.v2wT'), e, 0.7, 0.3, 30); fadeUp(qv('.v2vic'), e, 0.8, 0.3, -14);
-        btnPop($('evBtn'), e, 1.05);
+        fadeUp(qv('.v2wG'), e, 0.62, 0.3, -30); fadeUp(qv('.v2wT'), e, 0.7, 0.3, 30);
+        if (!opener) { fadeUp(qv('.v2vic'), e, 0.8, 0.3, -14); btnPop($('evBtn'), e, 1.05); }
       },
     },
     3: {   // 3 · YOUR SQUAD: the men who won it, as this player built them (the jet pack or the big bazooka, the blue or the red saber), on a stand with their names, the light on them, PLAY GREEN VS TAN
@@ -1335,6 +1337,48 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
       },
     },
   };
+  // ---------------- ROUND 8 (Isaac 16:10: "Let's try turning option 2 into a quick opener for the playable and option 1 as the end screen") ----------------
+  // THE FACE-OFF opens the playable: the halves slam together over the field, VS, the two armies, GREEN and TAN; then the halves split apart and the fight is on.
+  // The fight is FROZEN under it (it runs before play: Wyatt 10/22, nothing covers the fight while it runs); about 2.25 s; a tap opens it at once. ?opener=0 = none.
+  const OPENER = Q.get('opener') !== '0';
+  const OP = { on: false, t0: 0, openAt: 1.7, fade: false, done: false };
+  const OPEN_D = 0.55;
+  const HUDS = ['plate', 'row', 'tray'];
+  function showOpener() {
+    OP.on = true; OP.t0 = S.wall; OP.openAt = 1.7; OP.fade = false; S.mode = 'intro'; S.stats.opener = { on: 0 };
+    $('endBack').innerHTML = EVV[2].back(); $('endV').innerHTML = EVV[2].box(true);
+    $('endBack').classList.add('on'); $('endV').classList.add('on');
+    for (const id of HUDS) $(id).style.opacity = '0';
+    evFit(); EVV[2].tick(0, true);
+    document.addEventListener('pointerdown', opTap, true);
+  }
+  function opTap() {   // a tap opens it now: the split if it has formed, a quick fade if it has not
+    if (!OP.on) return; const t = S.wall - OP.t0; if (t >= OP.openAt) return;
+    OP.fade = t < 1.1; OP.openAt = t; S.stats.opener.tap = +t.toFixed(2);
+  }
+  function tickOpener() {
+    const e = S.wall - OP.t0;
+    if (e < OP.openAt) { EVV[2].tick(RM ? 9 : e, true); return; }
+    const p = seg(e, OP.openAt, OP.fade ? 0.25 : OPEN_D), a = p * p;   // the halves accelerate away
+    if (OP.fade) { $('endBack').style.opacity = $('endV').style.opacity = (1 - p).toFixed(3); }
+    else {
+      qb('.v2g').style.transform = 'translateY(' + (-100 * a).toFixed(2) + '%)'; qb('.v2t').style.transform = 'translateY(' + (100 * a).toFixed(2) + '%)';
+      for (const sel of ['.v2seam', '.v2glow', '.v2flash']) qb(sel).style.opacity = (1 - Math.min(1, p * 3)).toFixed(3);
+      const up = 'translateY(' + (-900 * a).toFixed(1) + 'px)', dn = 'translateY(' + (900 * a).toFixed(1) + 'px)';
+      qva('.v2mg').forEach(m => { m.style.transform = up; }); qv('.v2wGw').style.transform = up;
+      qva('.v2mt').forEach(m => { m.style.transform = dn; }); qv('.v2wTw').style.transform = dn;
+      const v = qv('.v2vs'); v.style.opacity = (1 - p).toFixed(3); v.style.transform = 'scale(' + (1 + 1.2 * p).toFixed(3) + ')';
+    }
+    const h = seg(e, OP.openAt + (OP.fade ? 0.05 : 0.22), OP.fade ? 0.4 : 0.33).toFixed(3); for (const id of HUDS) $(id).style.opacity = h;   // the troops come up once the halves are mostly away
+    if (p >= 1 && e >= OP.openAt + 0.55) endOpener();
+  }
+  function endOpener() {
+    OP.on = false; OP.done = true; S.stats.opener.on = +(S.wall - OP.t0).toFixed(2);
+    document.removeEventListener('pointerdown', opTap, true);
+    $('endBack').innerHTML = ''; $('endV').innerHTML = ''; $('endBack').classList.remove('on'); $('endV').classList.remove('on'); $('endBack').style.opacity = $('endV').style.opacity = '';
+    for (const id of HUDS) $(id).style.opacity = '';
+    S.mode = 'play'; if (AUTO) A.next = S.wall + 1.0;   // the demo finger's clock starts with the fight (as it did from boot before the opener)
+  }
   function showEndV() {   // the win + 3 s: the chosen end screen, built from this game (his squad, his picks)
     const V = EVV[EV.n]; EV.V = V; EV.on = true; EV.typed = 0;
     $('endBack').innerHTML = V.back(); $('endV').innerHTML = V.box();
@@ -1357,7 +1401,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     buildTray(); layout();
     // frame one is the live field: their first men are already on their way down the path
     for (const f of [0.50, 0.545, 0.59]) { const u = mkUnit('t', 'tanrifle', P.len * f, rr(-13, 13)); S.f.push(u); }
-    S.mode = 'play'; syncHUD(0);
+    S.mode = 'play'; if (OPENER) showOpener(); syncHUD(0);   // round 8: THE FACE-OFF opens the playable
     $('playNow').addEventListener('pointerdown', e => { e.preventDefault(); cta('plate'); });
     $('endBtn').addEventListener('pointerdown', e => { e.preventDefault(); if (S.endKind === 'lose') restart(); else cta('end'); });
     document.addEventListener('pointerdown', audioOn, { passive: true });
@@ -1372,12 +1416,13 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     state() { const alive = a => a.filter(u => !u.dead); return { mode: S.mode, t: +S.t.toFixed(2), wall: +S.wall.toFixed(2), tags: Math.floor(S.tags), elim: S.elim, stage: S.stage, jet: S.jet, big: S.big, saber: S.saber,
       g: alive(S.g).map(u => u.type + (u.jet ? '+jet' : '') + (u.big ? '+big' : '') + (u.saber ? '+' + u.saber : '')), f: alive(S.f).length, box: +BOX.hp.toFixed(1), boxDead: BOX.dead, pick: S.pick ? { n: S.pick.n, chosen: S.pick.chosen } : null, cta: S.cta, stats: S.stats, len: +P.len.toFixed(0), entry: ENTRY,
       turrets: S.f.filter(u => u.fix && !u.dead).map(u => ({ seat: u.fixSeat, hp: +u.hp.toFixed(1), pop: +(u.pop || 0).toFixed(2), x: Math.round(u.x), y: Math.round(u.y) })), seats: TSEAT.map(t => [Math.round(t.x), Math.round(t.y)]),
+      opener: OP.on ? +(S.wall - OP.t0).toFixed(2) : (OP.done ? 'done' : 'off'), openerStats: S.stats.opener || null,
       endV: EV.n, evOn: EV.on, evT: EV.on ? +(S.wall - S.endOn).toFixed(2) : null, fxDrawn: fxDirty, fw: S.fw.length,
       endKind: S.endKind, leaks: S.stats.leaks, hits: S.stats.hits, firstHit: S.stats.firstHit, defeatAt: S.stats.defeat, lastPlay: +S.lastPlay.toFixed(2), redT: +S.redT.toFixed(2),
       map: MAPQ === 'game' ? 'game' : 'original', endAt: S.stats.endAt, dimAt: S.stats.dimAt, dim: +(getComputedStyle(document.getElementById('endDim')).opacity), icon: (ART.icon || '').length, mortars: S.f.filter(u => u.type === 'tanmort').length, shells: S.rk.filter(r => r.lob).length,
       tide: S.tide.st, tiders: S.f.filter(f => f.tide && !f.dead).length,
       sarge: (S.sarge.unit && !S.sarge.unit.dead) ? { saber: S.sarge.unit.saber || null, st: S.sarge.unit.sb ? S.sarge.unit.sb.st : null, tkCd: +(S.sarge.unit.tkCd || 0).toFixed(2), x: Math.round(S.sarge.unit.x), y: Math.round(S.sarge.unit.y) } : null, tkReady: tkReady() }; },
-    tk: () => tkCast(), restart, ev: EV, evv: EVV,
+    tk: () => tkCast(), restart, ev: EV, evv: EVV, op: OP,
   };
   loadArt().then(start);
 })();
