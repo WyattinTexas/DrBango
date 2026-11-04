@@ -95,7 +95,11 @@ html.land #pop.tray{ left:auto; right:6px; width:calc(var(--side) - 12px); }
 #hand svg{ width:100%; height:100%; display:block; filter:drop-shadow(2px 4px 2px rgba(0,0,0,.28)); }
 
 /* THE END: PLAY NOW over the live field, the fireworks above the fallen box */
-#end{ position:absolute; left:0; right:0; bottom:calc(env(safe-area-inset-bottom,0px) + 54px); display:none; flex-direction:column; align-items:center; gap:12px; pointer-events:auto; transform-origin:50% 70%; }
+#end{ position:absolute; left:0; right:0; top:50%; display:none; flex-direction:column; align-items:center; gap:12px; pointer-events:auto; transform-origin:50% 50%; transform:translateY(-50%); }   /* ROUND 6: centred in the middle */
+/* ROUND 6 (Isaac 15:04): the red border when the player is hit: solid red at the screen's edges, fading away toward the centre; it flashes on every hit */
+#hurt{ position:fixed; left:0; top:0; width:100vw; height:100vh; height:100dvh; pointer-events:none; opacity:0;
+  background:radial-gradient(ellipse closest-side at 50% 50%, rgba(214,26,26,0) 52%, rgba(214,26,26,0.45) 76%, rgba(200,14,14,0.85) 92%, rgba(190,10,10,1) 100%); }
+#endWord.lose{ color:#ffd0c8; }
 /* ROUND 5 (Isaac 14:45): 3 s after the end card pops up, a gray overlay comes over the whole battlefield so the end card is the focus */
 #endDim{ position:fixed; left:0; top:0; width:100vw; height:100vh; height:100dvh; background:rgba(26,29,26,0.64); opacity:0; pointer-events:none; }
 #end.on{ display:flex; }
@@ -108,6 +112,7 @@ html.land #pop.tray{ left:auto; right:6px; width:calc(var(--side) - 12px); }
 <body>
 <canvas id="cv"></canvas>
 <div id="endDim"></div>
+<div id="hurt"></div>
 <div id="hud">
   <div id="plate"><img id="icon" alt=""><button id="playNow" class="ol" type="button">PLAY NOW</button></div>
   <div id="row">
@@ -367,8 +372,8 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
   const S = { t: 0, wall: 0, mode: 'boot', tags: 100, tagShow: 100, purseBump: 0, elim: 0, elimShow: 0, stage: 0, jet: false, big: false, saber: null,
     g: [], f: [], fx: [], fl: [], rk: [], decals: [], q: [], timers: [], shake: 0, slow: 1, pick: null, pendingPick: -1,
     sarge: { unit: null, downT: 0 }, spawn: { t: 5.5, wave: 0 }, firstBuy: -1, lastAct: 0, pressK: null, pressUntil: 0,
-    flagT: -1, fw: [], fwOn: false, fwNext: 0, fwN: 0, endOn: 0, cta: null, sargeSaberSeen: false, finalWave: false, lastSfx: 0, tur: [0, 0], tkSeen: false, tide: { st: 'armed', armT: 0, t: 0, n: 0 },
-    stats: { buys: { rifleman: 0, mgunner: 0, bazooka: 0, sarge: 0 }, kills: 0, elims: 0, deaths: 0, firstBuy: null, firstKill: null, open1: null, pick1: null, open2: null, pick2: null, boxDown: null, cta: null, picks: [], errs: 0, turrets: [], turretKills: 0, casts: [], blocks: 0, reflects: 0, slams: 0, pops: 0, tide: null, tideEnd: null } };
+    flagT: -1, fw: [], fwOn: false, fwNext: 0, fwN: 0, endOn: 0, cta: null, sargeSaberSeen: false, finalWave: false, lastSfx: 0, tur: [0, 0], tkSeen: false, tide: { st: 'armed', armT: 0, t: 0, n: 0 }, atk: { first: null, last: -9, next: 0 }, redT: 0, lastPlay: -1e9, endKind: 'win',
+    stats: { buys: { rifleman: 0, mgunner: 0, bazooka: 0, sarge: 0 }, kills: 0, elims: 0, deaths: 0, firstBuy: null, firstKill: null, open1: null, pick1: null, open2: null, pick2: null, boxDown: null, cta: null, picks: [], errs: 0, turrets: [], turretKills: 0, casts: [], blocks: 0, reflects: 0, slams: 0, pops: 0, tide: null, tideEnd: null, leaks: 0, hits: 0, firstHit: null, defeat: null } };
 
   // ---------------- THE SOUNDS (a small synth, the game's palette; only after a real touch) ----------------
   let AC = null, MST = null;
@@ -383,6 +388,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     blip: () => tone(1250, 1850, 0.07, 'sine', 0.045), snap: () => tone(280, 620, 0.06, 'triangle', 0.06), nope: () => tone(220, 160, 0.12, 'square', 0.03),
     chime: () => { tone(660, 660, 0.14, 'sine', 0.07); tone(990, 990, 0.2, 'sine', 0.07, 0.11); }, pick: () => { tone(784, 784, 0.1, 'square', 0.04); tone(1175, 1175, 0.22, 'square', 0.04, 0.09); },
     saber: () => { tone(160, 85, 0.22, 'sawtooth', 0.035); tone(2400, 900, 0.12, 'sine', 0.015); }, whoosh: () => noise(0.35, 0.08, 1800), flame: () => noise(0.3, 0.06, 1400),
+    thud: () => { tone(90, 45, 0.28, 'sine', 0.09); noise(0.18, 0.12, 380); },
     thunk: () => { tone(150, 55, 0.2, 'sine', 0.07); noise(0.22, 0.09, 520); }, horn: () => { tone(196, 196, 0.22, 'sawtooth', 0.035); tone(247, 247, 0.4, 'sawtooth', 0.035, 0.2); }, power: () => { tone(220, 880, 0.28, 'sawtooth', 0.03); tone(1760, 440, 0.32, 'sine', 0.025); },
     jingle: () => [523, 659, 784, 1047, 784, 1047].forEach((f, i) => tone(f, f, 0.16, 'square', 0.035, i * 0.13)), pop: () => { noise(0.22, 0.12, 2200); tone(1400, 500, 0.12, 'sine', 0.02); },
   };
@@ -426,11 +432,12 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     const fill = Math.round(clamp(S.elimShow / ELIM_GOAL, 0, 1) * 1000) / 10; if (fill !== lastFill) { lastFill = fill; $('elimFill').style.width = fill + '%'; }
     const bt = max ? 'MAX' : 'ELIMINATIONS ' + Math.min(ELIM_GOAL, S.elim) + '/' + ELIM_GOAL; if (bt !== lastBar) { lastBar = bt; $('elimTxt').textContent = bt; }
     if (S.endOn) {
-      const o = clamp(1 - (S.wall - S.endOn) / 0.4, 0, 1).toFixed(2); $('tray').style.opacity = o; $('row').style.opacity = o; $('plate').style.opacity = o;
-      const e = $('end'), a = clamp((S.wall - S.endOn) / 0.42, 0, 1); e.style.opacity = Math.min(1, a * 2.5).toFixed(2); e.style.transform = 'scale(' + (0.6 + 0.4 * easeBack(a)).toFixed(3) + ')';   // it POPS up
+      const o = clamp(1 - (S.wall - S.endOn) / 0.4, 0, 1).toFixed(2); $('tray').style.opacity = o; $('row').style.opacity = o; if (S.endKind === 'win') $('plate').style.opacity = o;   // the defeat keeps the store's door
+      const e = $('end'), a = clamp((S.wall - S.endOn) / 0.42, 0, 1); e.style.opacity = Math.min(1, a * 2.5).toFixed(2); e.style.transform = 'translateY(-50%) scale(' + (0.6 + 0.4 * easeBack(a)).toFixed(3) + ')';   // it POPS up, centred
       const b = $('endBtn'); b.style.transform = 'scale(' + (1 + 0.045 * Math.sin(S.wall * 5)).toFixed(3) + ')';
     }
-    if (S.dimOn) $('endDim').style.opacity = clamp((S.wall - S.dimOn) / 0.5, 0, 1).toFixed(2);
+    if (S.dimOn) $('endDim').style.opacity = clamp((S.wall - S.dimOn) / 0.4, 0, 1).toFixed(2);
+    { const ro = (S.redT * (0.55 + 0.45 * S.redT)).toFixed(3); if (ro !== S.redO) { S.redO = ro; $('hurt').style.opacity = ro; } }
     syncHand(dt);
   }
 
@@ -440,7 +447,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     S.pressK = k; S.pressUntil = S.wall + 0.13;
     if (k === 'sarge' && S.sarge.unit && S.sarge.unit.saber) { if (!tkCast()) SFX.nope(); return true; }   // the power button
     if (!canBuy(k)) { if (S.mode === 'play') { SFX.nope(); const c = CARDS.find(c => c.k === k); if (c) { c.el.animate && c.el.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-4px)' }, { transform: 'translateX(4px)' }, { transform: 'translateX(0)' }], { duration: 180 }); } } return false; }
-    S.tags -= COST[k]; S.stats.buys[k]++; S.lastAct = S.t; if (S.firstBuy < 0) { S.firstBuy = S.t; S.stats.firstBuy = +S.t.toFixed(2); }
+    S.tags -= COST[k]; S.stats.buys[k]++; S.lastAct = S.t; S.lastPlay = S.t; if (S.firstBuy < 0) { S.firstBuy = S.t; S.stats.firstBuy = +S.t.toFixed(2); }
     const u = mkUnit('g', k, ENTRY + rr(0, 12), rr(-15, 15));
     if (k === 'rifleman' && S.jet) { u.jet = true; u.alt = 6; restat(u); }
     if (k === 'bazooka' && S.big) { u.big = true; restat(u); }
@@ -499,15 +506,15 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
       // he keeps closing until the fight is at HIS distance (a loose crowd), then plants
       const dd = tgt === BOX ? (u.saber ? (BOX.x - BW * 0.45) - u.x - 14 : Math.hypot(BOX.fx - u.x, BOX.fy - bodyY(u)) - 34) : Math.hypot(tgt.x - u.x, bodyY(tgt) - bodyY(u));
       u.moving = false;
-      if (S.mode !== 'win' && dd > u.st.rng * u.rj && u.type !== 'mgunner') { const dir = u.side === 'g' ? 1 : -1; if (!blocked(u)) { const ns = u.s + dir * u.st.spd * 0.8 * dt; if ((dir > 0 && ns <= cap) || (dir < 0 && ns >= cap)) { u.s = ns; u.moving = true; } } }
+      if (S.mode !== 'win' && S.mode !== 'lose' && dd > u.st.rng * u.rj && u.type !== 'mgunner') { const dir = u.side === 'g' ? 1 : -1; if (!blocked(u)) { const ns = u.s + dir * u.st.spd * 0.8 * dt; if ((dir > 0 && ns <= cap) || (dir < 0 && ns >= cap)) { u.s = ns; u.moving = true; } } }
     } else {
       u.cd = Math.min(u.cd, u.st.cd * 0.45);
-      if (S.mode === 'win') { u.moving = false; place(u); return; }
+      if (S.mode === 'win' || S.mode === 'lose') { u.moving = false; place(u); return; }
       const dir = u.side === 'g' ? 1 : -1;
       const surge = (u.side === 'g' && S.tide.st === 'done') ? 1.35 : 1;   // the tide has turned: the green line charges
       if (!blocked(u)) { u.s += dir * u.st.spd * surge * dt; u.moving = true; } else u.moving = false;
-      u.s = u.side === 'g' ? Math.min(u.s, cap) : Math.max(u.s, cap);
-      if ((u.side === 'g' && u.s >= cap - 0.5) || (u.side === 't' && u.s <= cap + 0.5)) u.moving = false;
+      if (u.side === 'g') { u.s = Math.min(u.s, cap); if (u.s >= cap - 0.5) u.moving = false; }
+      else if (u.s <= 1) { leak(u); return; }   // ROUND 6: a tan at the end of the road on the player's side walks off the screen (and it is a hit)
       const i = u.pi | 0, dx = P.x[Math.min(P.n - 1, i + 2)] - P.x[Math.max(0, i - 2)]; if (Math.abs(dx) > 0.6) u.face = Math.sign(dx) * dir;
     }
     place(u);
@@ -539,7 +546,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     u.hurtT = Math.max(0, u.hurtT - dt); u.swingT = Math.max(0, u.swingT - dt); sb.cut = Math.max(0, sb.cut - dt);
     if (u.tkCd > 0) u.tkCd = Math.max(0, u.tkCd - dt);
     if (u.tkWall > 0) { u.tkWall -= dt; if (u.tkWall <= 0) forcePop(u); }
-    if (S.mode === 'win') { if (sb.st === 'dash' || sb.st === 'slam') { if (sabLerp(u, sb, dt)) sabRejoin(u); } else if (sb.st === 'back') { if (sabLerp(u, sb, dt)) { u.free = null; sb.st = 'line'; place(u); } } u.moving = false; return; }
+    if (S.mode === 'win' || S.mode === 'lose') { if (sb.st === 'dash' || sb.st === 'slam') { if (sabLerp(u, sb, dt)) sabRejoin(u); } else if (sb.st === 'back') { if (sabLerp(u, sb, dt)) { u.free = null; sb.st = 'line'; place(u); } } u.moving = false; return; }
     if (!RM && (sb.st === 'dash' || sb.st === 'slam')) { sb.gh = (sb.gh || 0) - dt; if (sb.gh <= 0) { sb.gh = 0.035; S.fx.push({ k: 'ghost', art: artOf(u), x: u.x, y: u.y, face: u.face, t: 0, dur: 0.24, col: SABER_HEX[u.saber] }); } }
     if (sb.st === 'line') {
       const f = sabFoes(u, SAB.hunt)[0];
@@ -651,6 +658,30 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     S.stats.elims++; if (S.stage >= 2 || S.elim >= ELIM_GOAL) return;
     S.elim++; if (S.elim >= ELIM_GOAL && S.pendingPick < 0) S.pendingPick = S.t + 0.55;
   }
+  // ROUND 6 (Isaac 15:04): THE LOSS CONDITION. A tan who reaches the end of the road walks off the screen: a HIT (the red border flashes, the screen shakes, a thud), and
+  // while the tan keep coming through (one off the screen in the last 1.5 s, or one on the last stretch of road) the hits come every second ("hit, hit, hit, hit").
+  // From the first red flash, 15 s without a unit played = the player is not playing: DEFEAT, and PLAY AGAIN starts the playable over.
+  function leak(u) {
+    u.dead = true; u.fallT = 99; u.hp = 0; S.stats.leaks++; S.atk.last = S.t;
+    if (S.atk.first == null) { S.atk.first = S.t; S.stats.firstHit = +S.t.toFixed(2); }
+    if (S.t >= S.atk.next) hitPlayer();
+  }
+  function hitPlayer() { S.redT = 1; S.shake = Math.max(S.shake, 0.45); S.stats.hits++; S.atk.next = S.t + 1.0; SFX.thud(); }
+  function tickAttack(dt) {
+    S.redT = Math.max(0, S.redT - dt * 1.7);
+    if (S.mode !== 'play' && !(S.mode === 'pick' && POPMODE === 'tray')) return;
+    if (S.atk.first == null) return;
+    const near = S.f.some(f => !f.dead && !f.fix && f.s < ENTRY + 10);
+    if ((near || S.t - S.atk.last < 1.5) && S.t >= S.atk.next) hitPlayer();
+    if (S.mode === 'play' && S.t - Math.max(S.atk.first, S.lastPlay) >= 15) defeat();
+  }
+  function defeat() {
+    if (S.mode === 'lose' || S.mode === 'win') return; S.mode = 'lose'; S.endKind = 'lose'; S.stats.defeat = +S.t.toFixed(2);
+    if (S.pick) { $('pop').className = ''; $('tray').classList.remove('hide'); $('row').style.visibility = ''; S.pick = null; }
+    $('endWord').textContent = 'DEFEAT'; $('endWord').className = 'ol lose'; $('endBtn').textContent = 'PLAY AGAIN';
+    S.endOn = S.wall; S.dimOn = S.wall; S.stats.endAt = 0; $('end').classList.add('on'); SFX.nope();
+  }
+  function restart() { S.stats.restart = true; try { location.reload(); } catch (e) {} }
   function hitBox(dmg, by, x, y) {
     if (BOX.dead) return; BOX.hp = Math.max(0, BOX.hp - dmg); BOX.flash = 1; BOX.jolt = Math.min(1, BOX.jolt + 0.5);
     S.fx.push({ k: 'ring', x, y, r: 3, R: 13, t: 0, dur: 0.22, col: 'rgba(255,244,214,0.95)', w: 2 });
@@ -791,8 +822,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     S.timers.push({ at: S.wall + 1.5, fn: () => { S.fwOn = true; S.fwNext = 0; } });
     // ROUND 5 (Isaac 14:45: "Let's have the victory, with the icon, the Play Now thing, pop up 3 seconds after winning and then 3 seconds after that, let's have a gray
     // overlay come over the background so that the Final Victory - Play Now screen is really focused on"): the card at the win + 3 s, the overlay at the win + 6 s
-    S.timers.push({ at: S.wall + 3.0, fn: () => { S.endOn = S.wall; S.stats.endAt = +(S.wall - BOX.deadAt).toFixed(2); $('end').classList.add('on'); } });
-    S.timers.push({ at: S.wall + 6.0, fn: () => { S.dimOn = S.wall; S.stats.dimAt = +(S.wall - BOX.deadAt).toFixed(2); } });
+    S.timers.push({ at: S.wall + 3.0, fn: () => { S.endOn = S.wall; S.dimOn = S.wall; S.stats.endAt = S.stats.dimAt = +(S.wall - BOX.deadAt).toFixed(2); $('end').classList.add('on'); } });   // round 6: the overlay WITH the card
   }
   const FW_COL = ['#FFD24A', '#8EE07A', '#FFFFFF', '#FF6B6B', '#6BC1FF', '#FFA94D'];
   function tickFireworks(dt) {
@@ -825,7 +855,8 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
   function bestCard() { if (canBuy('sarge') && (S.saber || S.t > 12)) return 'sarge'; for (const k of ['bazooka', 'mgunner', 'rifleman']) if (canBuy(k)) return k; return null; }
   function handGoal() {
     if (AUTO) return A.hand;
-    if (S.mode === 'win') return S.endOn && S.wall - S.endOn > 3.6 ? { el: $('endBtn'), fx: 0.6, fy: 0.6 } : null;
+    if (S.mode === 'win') return S.endOn && S.wall - S.endOn > 1.6 ? { el: $('endBtn'), fx: 0.6, fy: 0.6 } : null;
+    if (S.mode === 'lose') return S.wall - S.endOn > 1.2 ? { el: $('endBtn'), fx: 0.6, fy: 0.6 } : null;
     if (S.mode === 'pick') return (S.pick && S.pick.chosen < 0 && S.wall - S.pick.t0 > 2.6) ? { el: $('choices').children[0], fx: 0.55, fy: 0.5 } : null;
     if (S.mode !== 'play') return null;
     if (S.firstBuy < 0) return S.t > 0.5 ? cardGoal('rifleman') : null;
@@ -873,7 +904,8 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
       if (S.wall - p.t0 > 1.65) { audioOn(); pickChoice(i); A.next = S.wall + 1.0; }
       return;
     }
-    if (S.mode === 'win') { A.hand = null; if (S.endOn && !S.cta) { if (S.wall - S.endOn > 3.9) A.hand = { el: $('endBtn'), fx: 0.6, fy: 0.6 }; if (S.wall - S.endOn > 4.7) cta('end'); } return; }
+    if (S.mode === 'win') { A.hand = null; if (S.endOn && !S.cta) { if (S.wall - S.endOn > 1.9) A.hand = { el: $('endBtn'), fx: 0.6, fy: 0.6 }; if (S.wall - S.endOn > 2.7) cta('end'); } return; }
+    if (S.mode === 'lose') { A.hand = null; return; }
     if (S.mode !== 'play') return;
     if (A.k) { A.hand = cardGoal(A.k); if (S.wall - A.kT > 0.42) { tapCard(A.k); A.k = null; A.next = S.wall + rr(0.45, 1.0); } return; }
     if (S.wall < A.next) { if (S.wall > A.next - 0.2) A.hand = null; return; }
@@ -913,6 +945,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     }
     S.purseBump = Math.max(0, S.purseBump - dt * 4);
     S.elimShow += ((S.stage >= 2 ? ELIM_GOAL : S.elim) - S.elimShow) * Math.min(1, dt * 9);
+    tickAttack(dt * (S.mode === 'pick' && POPMODE === 'card' ? 0 : 1));
     tickFireworks(dt);
     tickPick();
   }
@@ -1051,7 +1084,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     for (const f of [0.50, 0.545, 0.59]) { const u = mkUnit('t', 'tanrifle', P.len * f, rr(-13, 13)); S.f.push(u); }
     S.mode = 'play'; syncHUD(0);
     $('playNow').addEventListener('pointerdown', e => { e.preventDefault(); cta('plate'); });
-    $('endBtn').addEventListener('pointerdown', e => { e.preventDefault(); cta('end'); });
+    $('endBtn').addEventListener('pointerdown', e => { e.preventDefault(); if (S.endKind === 'lose') restart(); else cta('end'); });
     document.addEventListener('pointerdown', audioOn, { passive: true });
     window.addEventListener('resize', () => { try { layout(); } catch (e) {} });
     requestAnimationFrame(frame);
@@ -1064,10 +1097,11 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     state() { const alive = a => a.filter(u => !u.dead); return { mode: S.mode, t: +S.t.toFixed(2), wall: +S.wall.toFixed(2), tags: Math.floor(S.tags), elim: S.elim, stage: S.stage, jet: S.jet, big: S.big, saber: S.saber,
       g: alive(S.g).map(u => u.type + (u.jet ? '+jet' : '') + (u.big ? '+big' : '') + (u.saber ? '+' + u.saber : '')), f: alive(S.f).length, box: +BOX.hp.toFixed(1), boxDead: BOX.dead, pick: S.pick ? { n: S.pick.n, chosen: S.pick.chosen } : null, cta: S.cta, stats: S.stats, len: +P.len.toFixed(0), entry: ENTRY,
       turrets: S.f.filter(u => u.fix && !u.dead).map(u => ({ seat: u.fixSeat, hp: +u.hp.toFixed(1), pop: +(u.pop || 0).toFixed(2), x: Math.round(u.x), y: Math.round(u.y) })), seats: TSEAT.map(t => [Math.round(t.x), Math.round(t.y)]),
+      endKind: S.endKind, leaks: S.stats.leaks, hits: S.stats.hits, firstHit: S.stats.firstHit, defeatAt: S.stats.defeat, lastPlay: +S.lastPlay.toFixed(2), redT: +S.redT.toFixed(2),
       map: MAPQ === 'game' ? 'game' : 'original', endAt: S.stats.endAt, dimAt: S.stats.dimAt, dim: +(getComputedStyle(document.getElementById('endDim')).opacity), icon: (ART.icon || '').length, mortars: S.f.filter(u => u.type === 'tanmort').length, shells: S.rk.filter(r => r.lob).length,
       tide: S.tide.st, tiders: S.f.filter(f => f.tide && !f.dead).length,
       sarge: (S.sarge.unit && !S.sarge.unit.dead) ? { saber: S.sarge.unit.saber || null, st: S.sarge.unit.sb ? S.sarge.unit.sb.st : null, tkCd: +(S.sarge.unit.tkCd || 0).toFixed(2), x: Math.round(S.sarge.unit.x), y: Math.round(S.sarge.unit.y) } : null, tkReady: tkReady() }; },
-    tk: () => tkCast(),
+    tk: () => tkCast(), restart,
   };
   loadArt().then(start);
 })();
