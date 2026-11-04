@@ -770102,6 +770102,72 @@ function obbRead(o){ o=o||{}; try{ if(o.heavy) Object.assign(OBB.heavy, o.heavy)
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function bvxFight(){ const R=S.raid; return !!(R && R.k==='bbs' && R.cfg===S.cfg && S.mode==='play'); }
+function bvxVoice(k, at){ const ac=audio(); if(!ac) return null; const buf=BVXB[k]; if(!buf) return null;
+  const t0=(at==null)? ac.currentTime+0.005 : at, s=ac.createBufferSource(), g=ac.createGain(); s.buffer=buf; g.gain.value=BVX.g[k]; s.connect(g); g.connect(ac.destination); s.start(t0); BVX.n[k]++;
+  return { k:k, s:s, g:g, t0:t0, end:t0+buf.duration, ac:ac }; }
+function bvxHush(v, now){ try{ v.g.gain.cancelScheduledValues(now); v.g.gain.setValueAtTime(BVX.g[v.k], now); v.g.gain.linearRampToValueAtTime(0, now+0.08); v.s.stop(now+0.1); v.end=now+0.08; }catch(e){} }
+
+
+
+
+
+
+
+
+
+
+
+
+function bvxHalfSay(){ if(!soundOn) return 0; const ac=audio(); if(!ac || !BVXB.hf) return 0; const now=ac.currentTime, v=BVX.v; if(v && v.ac===ac && now<v.end) bvxHush(v, now); const nv=bvxVoice('hf'); if(nv){ BVX.v=nv; return 1; } return 0; }
+function bvxHalfTick(){ if(!BVX.on) return; const R=S.raid; if(!R || R.k!=='bbs') return; const F=BVX.f; if(F.raid!==R){ F.raid=R; F.half=0; F.fr=null; }   
+  if(F.half) return; let b=null; for(const f of S.foes){ if(f.type==='bbshow' && !f.dead){ b=f; break; } } if(!b || !(b.hpMax>0)) return;
+  if((b.bbsRide|0) || (b.bbs && (b.bbs.st==='mount' || b.bbs.st==='ride'))){ F.half=2; return; }   
+  const fr=b.hp/b.hpMax; if(F.fr==null){ if(fr<=0.5) F.half=2; }   
+  else if(F.fr>0.5 && fr<=0.5){ F.half=1; bvxHalfSay(); }       
+  F.fr=fr; }
+
+
+
+
+
+function bvxRead(o){ o=o||{}; try{ if(o.reset){ BVX.f.raid=null; BVX.f.half=0; BVX.f.fr=null; BVX.lastL=null; BVX.v=null; BVX.hv=null; for(const k in BVX.n) BVX.n[k]=0; } if(o.bed!=null){ BVX.bed=o.bed? 1 : 0; locSync(); } if(o.laugh) SFX.bblaugh(); if(o.hiss) SFX.rattle(); if(o.half) bvxHalfSay(); }catch(e){ BVX.err++; }
+  const D=k=>BVXB[k]? +BVXB[k].duration.toFixed(3) : null;
+  return { on:BVX.on, ready:BVXB.n, dur:{ l1:D('l1'), l2:D('l2'), hf:D('hf'), hs:D('hs') }, g:Object.assign({}, BVX.g), n:Object.assign({}, BVX.n), lastL:BVX.lastL, half:BVX.f.half, fr:(BVX.f.fr==null)? null : +BVX.f.fr.toFixed(4), fight:bvxFight(),
+    bed:BVX.bed, bedVol:(LOC_TRACKS.bbsfight||{}).vol||null, parkVol:(LOC_TRACKS.outlaw||{}).vol||null, loc:locNow(), locId:LOC.id, wraps:{ laugh:SFX.bblaugh!==BVX.laugh0, rattle:SFX.rattle!==BVX.rattle0 }, fail:BVX.fail, err:BVX.err }; }
+
+
+
+
+
+
+
+
+
+
+
+
 function derOn(){ return !!(DER && DER.on); }
 function derRing(){ try{ const b=COOP&&COOP.bd; return b? (evRingOf(b)||0) : 0; }catch(e){ DER.err++; return 0; } }
 function derBefore(){ try{ const b=COOP&&COOP.bd, r=derRing(); return !!(b && !b.rung && r>0 && evNow()<r-DER.slack); }catch(e){ DER.err++; return false; } }
@@ -982366,7 +982432,7 @@ let BFQ=null;
 
 
 
-let GVT_CV='30.00';
+let GVT_CV='30.01';
 let NX_CAP_MUL=4;
 
 
@@ -2660715,6 +2660781,72 @@ try{ OBB.was={ cone:PLAY.cone.slice(), other:PLAY.other.slice(), fa:PH2.fa.dmg.s
 
 
 setTimeout(function(){ try{ if(window.GVT && !GVT.obb) GVT.obb=function(o){ return obbRead(o); }; }catch(e){} }, 0);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const BVX={ on:(function(){ try{ const q=/[?&]bvx=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_bvx','0'); else localStorage.removeItem('gvt_bvx'); } return localStorage.getItem('gvt_bvx')==='0'? 0 : 1; }catch(e){ return 1; } })(),
+  bed:1, bedVol:0.10,                                   
+  g:{ l1:0.75, l2:0.42, hf:0.48, hs:0.41 },             
+  hissGap:1.2, n:{ l1:0, l2:0, hf:0, hs:0, held:0, synth:0 }, lastL:null, v:null, hv:null, f:{ raid:null, half:0, fr:null }, laugh0:SFX.bblaugh, rattle0:SFX.rattle, fail:0, err:0 };
+const BVX_SND={ l1:'@m/f44353fa919e.mp3', l2:'@m/43ec33d92253.mp3', hf:'@m/790230cbd708.mp3', hs:'@m/567936f8f8f7.mp3' };
+const BVXB={ n:0 };
+(function(){ try{ if(!BVX.on) return;
+  const OAC=window.OfflineAudioContext||window.webkitOfflineAudioContext; if(!OAC) return;
+  Object.keys(BVX_SND).forEach(k=>{
+    try{ odvBytes(BVX_SND[k], a=>{ const oc=new OAC(1,1,44100);
+      oc.decodeAudioData(a.buffer, buf=>{ let out=buf; try{   
+        const n=buf.length, d=buf.getChannelData(0); let i0=0, i1=n; while(i0<n && Math.abs(d[i0])<0.00316) i0++; while(i1>i0 && Math.abs(d[i1-1])<0.00316) i1--;   
+        if(i0>=n) out=null; else if(i0>0 || i1<n){ const nb=oc.createBuffer(1, i1-i0, buf.sampleRate); nb.getChannelData(0).set(d.subarray(i0,i1)); out=nb; }
+      }catch(e){ out=buf; }
+      if(out){ BVXB[k]=out; BVXB.n++; } else BVX.fail++; }, ()=>{ BVX.fail++; }); }, ()=>{ BVX.fail++; }); }catch(e){ BVX.fail++; } });
+}catch(e){} })();
+
+
+
+
+
+
+SFX.bblaugh=function(at){ if(!(BVX.on && BVXB.l1 && BVXB.l2)){ BVX.n.synth++; return BVX.laugh0.apply(this, arguments); }   
+  if(!soundOn) return; const ac=audio(); if(!ac) return; try{ BBS7.sounds.laugh++; }catch(e){}
+  try{ const now=(at==null)? ac.currentTime : at, v=BVX.v; if(v && v.ac===ac && now<v.end-0.05){ BVX.n.held++; return; }   
+    const k=(BVX.lastL==='l1')? 'l2' : (BVX.lastL==='l2')? 'l1' : ((Math.floor(now*991)&1)? 'l2' : 'l1');   
+    const nv=bvxVoice(k, at); if(nv){ BVX.v=nv; BVX.lastL=k; } }catch(e){ BVX.err++; } };
+
+SFX.rattle=function(){ if(!(BVX.on && BVXB.hs && bvxFight())) return BVX.rattle0.apply(this, arguments);
+  if(!soundOn) return; const ac=audio(); if(!ac) return;
+  try{ const now=ac.currentTime, v=BVX.hv; if(v && v.ac===ac && now<v.end){ if(now<v.t0+BVX.hissGap){ BVX.n.held++; return; } bvxHush(v, now); }   
+    const nv=bvxVoice('hs'); if(nv) BVX.hv=nv; }catch(e){ BVX.err++; } };
+
+
+
+
+
+
+
+
+{ const t0=bbsTick; bbsTick=function(dt){ const r=t0.apply(this, arguments); try{ bvxHalfTick(); }catch(e){ BVX.err++; } return r; }; }
+
+try{ if(BVX.on && LOC_TRACKS.outlaw && !LOC_TRACKS.bbsfight) LOC_TRACKS.bbsfight=Object.assign({}, LOC_TRACKS.outlaw, { vol:BVX.bedVol }); }catch(e){}
+{ const n0=locNow; locNow=function(){ try{ if(BVX.on && BVX.bed && LOC_TRACKS.bbsfight && bvxFight()) return 'bbsfight'; }catch(e){ BVX.err++; } return n0.apply(this, arguments); }; }
+
+
+
+
+
+setTimeout(function(){ try{ if(window.GVT && !GVT.bvx) GVT.bvx=bvxRead; }catch(e){} }, 0);
 
 
 
