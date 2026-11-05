@@ -198916,7 +198916,7 @@ function owAdopt(seat, mo, n, t9, wx, wy, cpu9){
       if(type==='mgunner' && S.units.some(v=>v.trk && !v.dead && v.seat===seat && Math.hypot(v.trk.tx-x,v.trk.ty-y)<90)) continue;   
       u=applyDeploy(seat,type,x,y,true); if(!u) continue;
       if(u.dropT) u.dropT=0; u.rmT=S.t; owStamp(u,seat,rid);
-      if(type==='sarge'){ const w9=roomSeatWord(seat); if(w9) roomDressUnit(u,w9); }   
+      if(type==='sarge'){ const w9=roomSeatMem(seat); if(w9) roomDressUnit(u,w9); }   
     }
     owPin(u,x,y,h,fl,t9);
   }
@@ -199059,7 +199059,7 @@ function roomAdoptSeat(seat, rows, n, t9){
     if(type==='mgunner' && S.units.some(v=>v.trk && !v.dead && v.seat===seat && Math.hypot(v.trk.tx-x,v.trk.ty-y)<90)) continue;   
     const u=applyDeploy(seat,type,x,y,true);
     if(u){ if(u.dropT) u.dropT=0; u.rmT=S.t;   
-      if(type==='sarge'){ const w9=roomSeatWord(seat); if(w9) roomDressUnit(u,w9); }   
+      if(type==='sarge'){ const w9=roomSeatMem(seat); if(w9) roomDressUnit(u,w9); }   
       if(u.hpMax) u.hp=Math.max(1,Math.min(u.hpMax,u.hpMax*h/9));
       u.pinX=x; u.pinY=y; u.pinT=(typeof t9==='number' && isFinite(t9))? t9 : null;   
       if(wp9!=null) roomSteer(u,wp9); }   
@@ -199309,7 +199309,7 @@ function roomApply(cm){
 
 
 function roomSeatRemember(seat, cm){ const st=S.bf && S.bf.seats[seat]; if(!st || !st.human) return; st.sgW={ um:cm.um, mo:Array.isArray(cm.mo)? cm.mo.slice() : null, sw:(cm.sw && typeof cm.sw==='object')? cm.sw : null }; st.sdW=(Array.isArray(cm.mo) && cm.mo.indexOf('sd1')>=0)? 1 : 0; }
-function roomSeatWord(seat){ const st=S.bf && S.bf.seats[seat], w=st && st.sgW; return (w && w.sw)? { t:'sarge', um:w.um, mo:w.mo, sw:w.sw } : null; }
+function roomSeatMem(seat){ const st=S.bf && S.bf.seats[seat], w=st && st.sgW; return (w && w.sw)? { t:'sarge', um:w.um, mo:w.mo, sw:w.sw } : null; }
 function roomSeatSW(u){ if(!u || u.type!=='sarge' || !S.bf || !roomBattle() || bfHumanU(u)) return null; const st=S.bf.seats[u.seat], w=st && st.human && st.sgW; return (w && w.sw && typeof w.sw==='object')? w : null; }
 
 
@@ -757531,7 +757531,7 @@ function lgsRig(o){ o=o||{}; if(o.pud!==undefined){ LGS.pud=o.pud? 1 : 0; if(o.s
 
 
 
-function snpOn(){ return SNP.on===1 && cavesOn(); }
+function snapperOn(){ return SNP.on===1 && cavesOn(); }
 function snpLive(){ let n=0; for(const f of S.foes) if(f.def && f.def.snp && !f.dead) n++; return n; }
 function snpPack(x,y,ang,src){   
   const tier=cavesTier(), n=Math.max(0,Math.min(CAVES_SNAP_N[tier]||3, CAVES_SNAP_CAP-snpLive())), out=[];
@@ -1203027,7 +1203027,7 @@ let BFQ=null;
 
 
 
-let GVT_CV='30.36';
+let GVT_CV='30.37';
 let NX_CAP_MUL=4;
 
 
@@ -2662831,7 +2662831,7 @@ try{ const F=SGP_FREEZE['*']; if(F && F.indexOf('snpfig')<0) F.push('snpfig'); }
 { const cave0=updateFoeCave; updateFoeCave=function(f,dt){ if(f && f.def && f.def.snp){ try{ return snpStep(f,dt); }catch(e){ SNP.err++; return; } } return cave0(f,dt); }; }
 { const raid0=cvxRaidOn; cvxRaidOn=function(f){ if(f && f.def && f.def.snp) return false; return raid0(f); }; }
 { const hy0=updateFoeHyeti; updateFoeHyeti=function(f,dt){ const n0=f.hyN|0, L0=S.shots.length, r=hy0(f,dt); if(SNP.on===1 && (f.hyN|0)===n0+1 && f.hyN>=HY_THROWS && cavesOn()){ for(let i=S.shots.length-1;i>=L0;i--){ const sh=S.shots[i]; if(sh && sh.fish && sh.src===f){ if(sh.dfAt==null) sh.mother=1; break; } } } return r; }; }
-{ const land0=hyLand; hyLand=function(sh){ if(sh && sh.mother && sh.dfAt==null && snpOn()){ let r, ok=false; try{ r=snpMotherLand(sh, land0); ok=true; }catch(e){ SNP.err++; } if(ok) return r; } return land0(sh); }; }
+{ const land0=hyLand; hyLand=function(sh){ if(sh && sh.mother && sh.dfAt==null && snapperOn()){ let r, ok=false; try{ r=snpMotherLand(sh, land0); ok=true; }catch(e){ SNP.err++; } if(ok) return r; } return land0(sh); }; }
 { const fish0=hyFishPath; hyFishPath=function(x,y,a,s){ if(SNP.big>0 || (s===0.7 && SNP.on===1 && snpMotherAt(x,y))) s=s*CAVES_SNAP_BIG; return fish0(x,y,a,s); }; }
 { const held0=drawHyFish; drawHyFish=function(f,flip){ SNP.big=(SNP.on===1 && f && (f.hyN|0)===HY_THROWS-1 && cavesOn())? 1 : 0; try{ return held0(f,flip); } finally{ SNP.big=0; } }; }
 setTimeout(function(){ try{ if(window.GVT) GVT.snp=snpRig; }catch(e){} },0);
