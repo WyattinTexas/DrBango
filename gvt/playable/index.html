@@ -374,6 +374,11 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     const n = xs.length, nx = new Float32Array(n), ny = new Float32Array(n);
     for (let i = 0; i < n; i++) { const a = Math.max(0, i - 1), b = Math.min(n - 1, i + 1); const tx = xs[b] - xs[a], ty = ys[b] - ys[a], m = Math.hypot(tx, ty) || 1; nx[i] = -ty / m; ny[i] = tx / m; }
     P = { x: Float32Array.from(xs), y: Float32Array.from(ys), nx, ny, n, len: (n - 1) * STEP };
+    // ROUND 14 (Isaac 21:45: "make sure that the soldiers are always facing in the direction they're moving ... the character model turns the appropriate way at exactly the
+    // halfway point on that curve"): the way a green man faces at each point of the road = the way the road runs there; it flips where the road turns back on itself,
+    // the apex of each bend = its halfway point (the heading straight up or down)
+    P.tf = new Int8Array(n); for (let i = 0, last = 1; i < n; i++) { const d = xs[Math.min(n - 1, i + 1)] - xs[Math.max(0, i - 1)]; last = d > 0 ? 1 : d < 0 ? -1 : last; P.tf[i] = last; }
+    P.apex = []; for (let i = 1; i < n; i++) if (P.tf[i] !== P.tf[i - 1]) P.apex.push(i);
     ENTRY = 0; for (let i = 0; i < n; i++) { if (xs[i] >= 24) { ENTRY = i * STEP; break; } }
     BOX.x = 0.865 * 400; BOX.y = y1 + 6; BOX.fx = BOX.x - BW * 0.42; BOX.fy = BOX.y - BH * 0.42; BOX.s = P.len;
     { let i = P.n - 1; while (i > 0 && P.x[i] >= 0.41 * 400) i--; BOX_S = (i + 1) * 2; }   // ROUND 12 (Isaac's circle): the box is fought only from the last stretch, from x 0.41 of the column to the box
@@ -531,7 +536,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     if (S.endOn) {
       const o = clamp(1 - (S.wall - S.endOn) / 0.4, 0, 1).toFixed(2); $('tray').style.opacity = o; $('row').style.opacity = o; if (S.endKind === 'win') $('plate').style.opacity = o;   // the defeat keeps the store's door
       const e = $('end'), a = clamp((S.wall - S.endOn) / 0.42, 0, 1); e.style.opacity = Math.min(1, a * 2.5).toFixed(2); e.style.transform = 'translateY(-50%) scale(' + (0.6 + 0.4 * easeBack(a)).toFixed(3) + ')';   // it POPS up, centred
-      const b = $('endBtn'); b.style.transform = 'scale(' + ((1 + 0.045 * Math.sin(S.wall * 5)) * tapEmph(S.wall - S.endOn)).toFixed(3) + ')';
+      const b = $('endBtn'), still = S.endKind !== 'lose' && !(EV.tapAt != null && S.wall - S.endOn > EV.tapAt + 0.85); b.style.transform = 'scale(' + ((still ? 1 : 1 + 0.045 * Math.sin(S.wall * 5)) * tapEmph(S.wall - S.endOn)).toFixed(3) + ')';   // round 14: still until the click
       if (EV.on) EV.V.tick(RM ? 9 : S.wall - S.endOn);
     }
     if (S.dimOn) $('endDim').style.opacity = clamp((S.wall - S.dimOn) / 0.4, 0, 1).toFixed(2);
@@ -598,24 +603,24 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
       if (tg) { u.face = tg.x >= u.x ? 1 : -1; u.cd -= dt; if (u.cd <= 0) { fire(u, tg); u.cd = u.st.cd * rr(0.9, 1.12); } }
       place(u); return;
     }
-    if (u.jet) { u.alt += (JET_ALT + u.altJ - u.alt) * Math.min(1, dt * 3.2); if (Math.abs(u.lane) < 26 && !u.wide) { u.wide = 1; u.lane = (u.lane < 0 ? -1 : 1) * rr(20, 40); } if (!RM) { u.puffT -= dt; if (u.puffT <= 0) { u.puffT = 0.08; S.fx.push({ k: 'puff', x: u.x - u.face * 6 + rr(-2, 2), y: u.y - u.alt - 6, t: 0, dur: 0.32, R: 5.5, col: '#F2A93B', a: 0.75 }); } } }
+    if (u.jet) { u.alt += (JET_ALT + u.altJ - u.alt) * Math.min(1, dt * 3.2); if (Math.abs(u.lane) < 26 && !u.wide) { u.wide = 1; u.laneTo = (u.lane < 0 ? -1 : 1) * rr(20, 40); } if (u.laneTo != null && !P.apex.some(a => Math.abs(a - (u.pi | 0)) < 22)) u.lane += (u.laneTo - u.lane) * Math.min(1, dt * 3);   /* round 14: he drifts out to his wide lane (no jump sideways), never while rounding a bend (so he turns at its halfway point) */ if (!RM) { u.puffT -= dt; if (u.puffT <= 0) { u.puffT = 0.08; S.fx.push({ k: 'puff', x: u.x - u.face * 6 + rr(-2, 2), y: u.y - u.alt - 6, t: 0, dur: 0.32, R: 5.5, col: '#F2A93B', a: 0.75 }); } } }
     if (u.jet && !u.orb && u.s >= Math.max(BOX_S, P.len - 260)) { const cx = BOX.fx - 76, cy = BOX.y + 78; u.orb = { a: Math.atan2((u.y - cy) / 0.45, u.x - cx), R: rr(40, 80), w: (u.id % 2 ? 1 : -1) * rr(0.75, 1.15), blend: 0 }; }
     if (u.orb) { u.orb.blend = Math.min(1, u.orb.blend + dt / 0.8); u.orb.a += u.orb.w * dt * (S.mode === 'win' ? 0.4 : 1); u.moving = true; }
     const fight = S.mode === 'play' || (S.mode === 'pick' && POPMODE === 'tray');
     const tgt = fight ? findTarget(u) : null;
     const cap = u.side === 'g' ? (u.saber ? P.len - 8 : P.len - (u.st.air ? 118 : 66) - u.capJ * (u.st.air ? 1 : 0.4)) : ENTRY - 6;
     if (u.orb) {   // on his loop: he fires at whatever is in reach (the box most of all) and keeps flying
-      if (tgt) { u.face = (tgt === BOX ? BOX.fx : tgt.x) >= u.x ? 1 : -1; u.cd -= dt; if (u.cd <= 0) { fire(u, tgt); u.cd = u.st.cd * rr(0.9, 1.12); } }
-      else u.face = Math.cos(u.orb.a) * u.orb.w < 0 ? 1 : -1;
+      if (tgt) { u.cd -= dt; if (u.cd <= 0) { fire(u, tgt); u.cd = u.st.cd * rr(0.9, 1.12); } }
+      { const vx = -Math.sin(u.orb.a) * u.orb.w; if (Math.abs(vx) > 0.08) u.face = vx > 0 ? 1 : -1; }   // round 14: on his loop he faces the way he flies
       place(u); return;
     }
     if (tgt) {
-      u.face = (tgt === BOX ? BOX.fx : tgt.x) >= u.x ? 1 : -1;
-      u.cd -= dt; if (u.cd <= 0) { fire(u, tgt); u.cd = u.st.cd * rr(0.9, 1.12); }
+      u.cd -= dt; if (u.cd <= 0) { u.face = u.moving ? u.face : ((tgt === BOX ? BOX.fx : tgt.x) >= u.x ? 1 : -1); fire(u, tgt); u.cd = u.st.cd * rr(0.9, 1.12); }
       // he keeps closing until the fight is at HIS distance (a loose crowd), then plants
       const dd = tgt === BOX ? (u.saber ? (BOX.x - BW * 0.45) - u.x - 14 : Math.hypot(BOX.fx - u.x, BOX.fy - bodyY(u)) - 34) : Math.hypot(tgt.x - u.x, bodyY(tgt) - bodyY(u));
       u.moving = false;
       if (S.mode !== 'win' && S.mode !== 'lose' && dd > u.st.rng * u.rj && u.type !== 'mgunner') { const dir = u.side === 'g' ? 1 : -1; if (!blocked(u)) { const ns = u.s + dir * u.st.spd * 0.8 * dt; if ((dir > 0 && ns <= cap) || (dir < 0 && ns >= cap)) { u.s = ns; u.moving = true; } } }
+      if (u.moving) faceTravel(u, u.side === 'g' ? 1 : -1); else u.face = (tgt === BOX ? BOX.fx : tgt.x) >= u.x ? 1 : -1;   // round 14: walking = the way he walks; planted = at his target
     } else {
       u.cd = Math.min(u.cd, u.st.cd * 0.45);
       if (S.mode === 'win' || S.mode === 'lose') { u.moving = false; place(u); return; }
@@ -624,13 +629,23 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
       if (!blocked(u)) { u.s += dir * u.st.spd * surge * dt; u.moving = true; } else u.moving = false;
       if (u.side === 'g') { u.s = Math.min(u.s, cap); if (u.s >= cap - 0.5) u.moving = false; }
       else if (u.s <= 1) { leak(u); return; }   // ROUND 6: a tan at the end of the road on the player's side walks off the screen (and it is a hit)
-      const i = u.pi | 0, dx = P.x[Math.min(P.n - 1, i + 2)] - P.x[Math.max(0, i - 2)]; if (Math.abs(dx) > 0.6) u.face = Math.sign(dx) * dir;
+      faceTravel(u, dir);   // round 14 (was: a dead zone that turned him a little after the apex)
     }
     place(u);
   }
   // ---- THE SABER (the game's two-step) and THE CRYSTAL'S POWER ----
   function sabFoes(u, R) { const out = []; for (const e of S.f) { if (e.dead) continue; const d = Math.hypot(e.x - u.x, e.y - u.y); if (d <= R && inFront(u, e, R + 20)) out.push([d, e]); } out.sort((a, b) => a[0] - b[0]); return out.map(p => p[1]); }   // round 12: the road's law for his hunt, his next and his slam
-  function lineFace(u, dir) { const i = u.pi | 0, dx = P.x[Math.min(P.n - 1, i + 2)] - P.x[Math.max(0, i - 2)]; if (Math.abs(dx) > 0.6) u.face = Math.sign(dx) * dir; }
+  function faceTravel(u, dir) {   // round 14: the way he travels on HIS OWN line (the road at his lane), so he turns exactly at the halfway point of the bend he walks
+    const i = clamp(u.pi | 0, 1, P.n - 2), ln = u.lane || 0, d = (P.x[i + 1] + P.nx[i + 1] * ln) - (P.x[i - 1] + P.nx[i - 1] * ln);
+    if (Math.abs(d) > 1e-4) u.face = (d > 0 ? 1 : -1) * dir;
+  }
+  function lineFace(u, dir) { faceTravel(u, dir); }
+  function faceMotion(u) {   // round 14, the airtight rule: whoever is moving faces the way he actually moved this step (no moonwalk, ever); so a man turns exactly where his own line turns back
+    if (u.dead || u.fix) { u.mx = u.x; return; }
+    if (u.moving && u.mx != null) { const d = u.x - u.mx; u.macc = (u.macc || 0) * 0.85 + d; if (Math.abs(u.macc) > 0.5 && (u.macc > 0 ? 1 : -1) !== u.face) { u.face = u.macc > 0 ? 1 : -1; u.macc = 0; } }   // a clear turn back, not a flicker
+    else u.macc = 0;
+    u.mx = u.x;
+  }
   function sabDash(u, f) {
     const sb = u.sb, dx = f.x - u.x, dy = f.y - u.y, d = Math.hypot(dx, dy) || 1, stop = Math.max(0, d - 18);
     sb.st = 'dash'; sb.tgt = f; sb.t = 0; sb.fx = u.x; sb.fy = u.y; sb.tx = u.x + dx / d * stop; sb.ty = u.y + dy / d * stop; sb.dur = Math.max(0.07, stop / SAB.dashV);
@@ -639,7 +654,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
   function sabRejoin(u) {   // nobody left in reach: back onto his road at its nearest point (never the walk home), then on with the line
     const sb = u.sb, n = nearestS(u.x, u.y), i = n.i, lane = clamp((u.x - P.x[i]) * P.nx[i] + (u.y - P.y[i]) * P.ny[i], -14, 14);
     u.s = Math.min(P.len - 8, n.s); u.lane = lane; const tx = P.x[i] + P.nx[i] * lane, ty = P.y[i] + P.ny[i] * lane;
-    sb.st = 'back'; sb.t = 0; sb.fx = u.x; sb.fy = u.y; sb.tx = tx; sb.ty = ty; sb.dur = Math.max(0.05, Math.hypot(tx - u.x, ty - u.y) / (SAB.dashV * 0.7)); sb.tgt = null;
+    sb.st = 'back'; sb.t = 0; sb.fx = u.x; sb.fy = u.y; sb.tx = tx; sb.ty = ty; if (Math.abs(tx - u.x) > 2) u.face = tx > u.x ? 1 : -1;   // round 14: facing the way he goes back sb.dur = Math.max(0.05, Math.hypot(tx - u.x, ty - u.y) / (SAB.dashV * 0.7)); sb.tgt = null;
     if (!u.free) u.free = { x: u.x, y: u.y };
   }
   function sabAtBox(u) { return !BOX.dead && Math.abs((BOX.x - BW * 0.45) - u.x) <= 46 && Math.abs(BOX.y - u.y) <= 52; }
@@ -772,10 +787,12 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
   // ROUND 6 (Isaac 15:04): THE LOSS CONDITION. A tan who reaches the end of the road walks off the screen: a HIT (the red border flashes, the screen shakes, a thud), and
   // while the tan keep coming through (one off the screen in the last 1.5 s, or one on the last stretch of road) the hits come every second ("hit, hit, hit, hit").
   // From the first red flash, 15 s without a unit played = the player is not playing: DEFEAT, and PLAY AGAIN starts the playable over.
+  const LOSE_LEAKS = 10;   // ROUND 14 (Isaac 21:45: "change it from 15 seconds after the first soldier to just 10 soldiers going off screen total. That way we give the player a little more time to come back to the screen.")
   function leak(u) {
     u.dead = true; u.fallT = 99; u.hp = 0; S.stats.leaks++; S.atk.last = S.t;
     if (S.atk.first == null) { S.atk.first = S.t; S.stats.firstHit = +S.t.toFixed(2); }
     if (S.t >= S.atk.next) hitPlayer();
+    if (S.stats.leaks >= LOSE_LEAKS) defeat();   // the tenth one off the screen: DEFEAT
   }
   function hitPlayer() { S.redT = 1; S.shake = Math.max(S.shake, 0.45); S.stats.hits++; S.atk.next = S.t + 1.0; SFX.thud(); }
   function tickAttack(dt) {
@@ -784,7 +801,6 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     if (S.atk.first == null) return;
     const near = S.f.some(f => !f.dead && !f.fix && f.s < ENTRY + 10);
     if ((near || S.t - S.atk.last < 1.5) && S.t >= S.atk.next) hitPlayer();
-    if (S.mode === 'play' && S.t - Math.max(S.atk.first, S.lastPlay) >= 15) defeat();
   }
   function defeat() {
     if (S.mode === 'lose' || S.mode === 'win') return; S.mode = 'lose'; S.endKind = 'lose'; S.stats.defeat = +S.t.toFixed(2);
@@ -1051,7 +1067,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
       const sdt = dt * S.slow; S.t += sdt;
       if (S.mode === 'play' || S.mode === 'pick') { director(sdt); S.tags += TRICKLE * sdt; }
       if (S.sarge.downT > 0) S.sarge.downT = Math.max(0, S.sarge.downT - sdt);
-      for (const u of S.g) tickUnit(u, sdt); for (const u of S.f) tickUnit(u, sdt);
+      for (const u of S.g) { tickUnit(u, sdt); faceMotion(u); } for (const u of S.f) { tickUnit(u, sdt); faceMotion(u); }   // round 14: a moving man faces the way he moves
       tickRockets(sdt); tickFx(sdt);
       S.g = S.g.filter(u => !u.dead || u.fallT < 1.7); S.f = S.f.filter(u => !u.dead || u.fallT < 1.7);
       if (S.mode === 'play' && S.pendingPick >= 0 && S.t >= S.pendingPick) { S.pendingPick = -1; openPick(S.stage + 1); }
@@ -1312,28 +1328,31 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     const vb = ART.vb[k]; if (!vb) return ''; const w = h * vb[2] / vb[3];
     return '<div class="fw ' + (cls || '') + '" style="left:' + (x - w / 2).toFixed(1) + 'px;top:' + (y - 0.9 * h).toFixed(1) + 'px;width:' + w.toFixed(1) + 'px;height:' + h + 'px"><img src="' + artURI(k) + '" alt=""></div>';
   }
-  function btnPop(b, e, at) { const p = seg(e, at, 0.42); b.style.opacity = Math.min(1, p * 2.5).toFixed(2); let pl = e > at + 0.6 ? 1 + 0.035 * Math.sin((e - at - 0.6) * 5) : 1;
+  function btnPop(b, e, at) { const p = seg(e, at, 0.42); b.style.opacity = Math.min(1, p * 2.5).toFixed(2); const go = EV.tapAt != null ? EV.tapAt + 0.85 : 1e9; let pl = e > go ? 1 + 0.035 * Math.sin((e - go) * 5) : 1;   // round 14: STILL until the Hand of Truth clicks, then pulsing
     pl *= tapEmph(e);   // round 11: the finger's one big tap
     b.style.transform = 'scale(' + ((0.6 + 0.4 * easeBack(p)) * pl).toFixed(3) + ')';
-    const sh = b.querySelector('.bshine'); if (sh) { const c = e - at - 1.0, k = c > 0 ? (c % 1.8) / 0.55 : 9; sh.style.transform = 'translateX(' + (k <= 1 ? -160 + 560 * k : -160).toFixed(0) + '%) skewX(-18deg)'; }   // and it keeps flashing: a shine every 1.8 s
+    const sh = b.querySelector('.bshine'); if (sh) { const c = e - go, k = c > 0 ? (c % 1.8) / 0.55 : 9; sh.style.transform = 'translateX(' + (k <= 1 ? -160 + 560 * k : -160).toFixed(0) + '%) skewX(-18deg)'; }   // and it keeps flashing: a shine every 1.8 s
   }
-  function tapEmph(e) { if (EV.tapAt == null) return 1; const d = e - EV.tapAt; if (d < 0) return 1; if (d < 0.1) return 1 - 1.2 * d; if (d < 0.6) { const q = (d - 0.1) / 0.5; return 0.88 + 0.12 * q + 0.4 * Math.sin(q * Math.PI) * (1 - q); } return 1; }   // squash, then a big spring
+  function tapEmph(e) { if (EV.tapAt == null) return 1; const d = e - EV.tapAt; if (d < 0) return 1; if (d < 0.13) return 1 - 0.92 * d; if (d < 0.78) { const q = (d - 0.13) / 0.65; return 0.88 + 0.12 * q + 0.4 * Math.sin(q * Math.PI) * (1 - q); } return 1; }   // round 14: the push 30 % slower (0.1 -> 0.13 s down, 0.5 -> 0.65 s spring)   // squash, then a big spring
   // ROUND 11 (Isaac 20:58: "Let's have the play now button for the finger. It's just going to come and click on the play now button once and then leave the screen.
   // The play now button will keep flashing but we just want one big emphasis on that with the finger."): the finger glides in from off the screen, taps PLAY NOW ONCE
   // (the big emphasis: the button squashes and springs, a gold ring and sparks burst from it, a chime), and glides away off the screen. A real player's finger is a hint:
   // its tap opens nothing (the store door opens only on the player's own tap); the demo finger's tap is the demo's own (the films).
-  const HS = { IN0: 2.5, IN1: 3.15, TAP: 3.15, TAPD: 0.34, OUT0: 3.75, OUT1: 4.35 };   // ROUND 13 (Isaac 21:40: "Delay the finger click on the end screen by 1 second"): the whole visit a second later (in 2.5, the tap at 3.3, away by 4.35)
+  // ROUND 14 (Isaac 21:45: "make sure the hand is bigger. This is the Hand of Truth ... it needs to be a nice big smooth push. Slow the button push down by 30% and then make
+  // sure that the button is still until the hand clicks it. After the Hand of Truth clicks it, it starts pulsing."): THE HAND OF TRUTH: twice the glove, a smooth glide in and
+  // out, the push 30 % slower (0.34 -> 0.44 s; the button's squash and spring too), PLAY NOW STILL until the click, then pulsing (and its shine)
+  const HS = { IN0: 2.5, IN1: 3.15, TAP: 3.15, TAPD: 0.44, OUT0: 3.95, OUT1: 4.65, K: 2.0 };   // ROUND 13 (Isaac 21:40: "Delay the finger click on the end screen by 1 second"): the whole visit a second later (in 2.5, the tap at 3.3, away by 4.35)
   function endHand() {
     const el = $('hand'), b = endBtnEl(); if (!b) return;
     const e = S.wall - S.endOn; if (e < HS.IN0 || e > HS.OUT1) { if (el.style.display !== 'none') el.style.display = 'none'; return; }
-    const r = b.getBoundingClientRect(), hr = $('hud').getBoundingClientRect(), tx = r.left - hr.left + r.width * 0.6, ty = r.top - hr.top + r.height * 0.6, ox = hr.width + 70, oy = hr.height + 90;
+    const r = b.getBoundingClientRect(), hr = $('hud').getBoundingClientRect(), tx = r.left - hr.left + r.width * 0.6, ty = r.top - hr.top + r.height * 0.6, ox = hr.width + 120, oy = hr.height + 160;
     let x, y, press = 0;
-    if (e < HS.IN1) { const k = eOut((e - HS.IN0) / (HS.IN1 - HS.IN0)); x = ox + (tx - ox) * k; y = oy + (ty - oy) * k; }
+    if (e < HS.IN1) { const k = eIO((e - HS.IN0) / (HS.IN1 - HS.IN0)); x = ox + (tx - ox) * k; y = oy + (ty - oy) * k; }
     else if (e < HS.OUT0) { x = tx; y = ty; const p = (e - HS.TAP) / HS.TAPD; if (p >= 0 && p <= 1) press = Math.sin(p * Math.PI); }   // the tap itself fires on the game's clock (tick), whatever the frame rate
-    else { const k = Math.pow((e - HS.OUT0) / (HS.OUT1 - HS.OUT0), 2); x = tx + (ox - tx) * k; y = ty + (oy - ty) * k; }
+    else { const k = eIO((e - HS.OUT0) / (HS.OUT1 - HS.OUT0)); x = tx + (ox - tx) * k; y = ty + (oy - ty) * k; }
     el.style.display = 'block'; el.style.opacity = '1';
-    el.style.left = (x - 62 * 0.354) + 'px'; el.style.top = (y - 78 * 0.133 + 5 - press * 6) + 'px';
-    el.style.transform = 'rotate(-24deg) scale(' + (1 - press * 0.14).toFixed(3) + ')';
+    el.style.left = (x - 62 * 0.354) + 'px'; el.style.top = (y - 78 * 0.133 + 5 + press * 7) + 'px';   // the push goes INTO the button
+    el.style.transform = 'rotate(-24deg) scale(' + (HS.K * (1 - press * 0.12)).toFixed(3) + ')';   // the Hand of Truth: twice the glove, scaled about its fingertip
   }
   function endTap(e) {
     EV.tapAt = e; S.stats.endTap = +e.toFixed(2);
@@ -1580,7 +1599,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     requestAnimationFrame(frame);
   }
   window.PUP = {
-    get S() { return S; }, L, BOX, buy: tapCard, pick: pickChoice, cta,
+    get S() { return S; }, get P() { return P; }, L, BOX, buy: tapCard, pick: pickChoice, cta,
     manual(on) { MANUAL = !!on; if (!on) { last = 0; requestAnimationFrame(frame); } },
     advance(dt, n) { for (let i = 0; i < (n || 1); i++) tick(dt); render(dt); },
     speed(x) { SPEED = x; },
