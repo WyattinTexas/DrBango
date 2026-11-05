@@ -134,6 +134,7 @@ html.wide .choice{ width:200px; padding:6px 4px 8px; } html.wide .choice .cArt{ 
 html.wide .choice .cName{ font-size:19px; } html.wide .choice .cLine{ font-size:13px; }
 
 /* ROUND 19 (Isaac 11/5 10:06): the difficulty tab top right (R18-Q3's REC); a phone held upright: TURN YOUR PHONE SIDEWAYS (the fight waits) */
+html.wide #pop{ z-index:40; }   /* round 20 (Isaac 10:33): no arrow over the JETPACK card (the bar's badge showed through) */
 #diffL{ position:fixed; z-index:60; top:calc(env(safe-area-inset-top,0px) + 8px); right:calc(env(safe-area-inset-right,0px) + 8px); margin:0; }
 #turn{ position:fixed; inset:0; z-index:200; display:none; flex-direction:column; align-items:center; justify-content:center; gap:20px; background:radial-gradient(circle at 50% 40%, #2c3b26 0%, #121a10 78%); color:#fff; font-family:var(--f); font-weight:800; }
 html.portrait #turn{ display:flex; }
@@ -306,7 +307,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
       mortars: [{ x: 746, y: 104, at: 5 }, { x: 232, y: 236, at: 15 }],
       towers: [{ x: 636, y: 46, at: 2 }, { x: 636, y: 199, at: 8 }, { x: 636, y: 374, at: 14 }], respawn: 12 },
     2: { n: 2, name: 'THE DRAWBRIDGE', W: 868, view: 868, troops: ['rifleman', 'mgunner', 'bazooka', 'grenadier', 'flame', 'mortar', 'medic', 'sarge'],   // round 19: the eight (R18-Q1's REC)
-      cannon: { x: 446, y: 132, guard: [474, 150] },   // round 19: THE CANNON, theirs at the start, dug in by the road
+      cannon: { x: 446, y: 132, guard: [474, 150], late: 380 },   // round 19: THE CANNON, theirs at the start, dug in by the road · round 20: late = the last curve before it (x)
       moat: 560, mw: 40, gates: [196], gw: 46, wall: 636, keep: [798, 236], court: [648, 52, 900, 356], boxHP: 160, drawbridge: { y: 196, hp: 30, bank: 548 }, towerK: 0.6,
       runs: [[40, 136], [256, 368]], towersArt: [[636, 40, 24, 0], [636, 156, 20, 1], [636, 236, 20, 1], [636, 368, 24, 0]],
       road: [[-60, 150], [40, 150], [130, 104], [228, 118], [300, 192], [380, 236], [452, 222], [520, 200], [550, 196], [612, 196], [640, 196], [700, 198], [748, 204]],
@@ -511,7 +512,8 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     for (const u of (typeof S !== 'undefined' ? S.f : [])) if (u.fixSeat != null) u.fix = { x: TSEAT[u.fixSeat].x, y: TSEAT[u.fixSeat].y };
   }
   function sAtX(X) { for (let i = 0; i < P.n; i++) if (P.x[i] >= X) return i * 2; return P.len; }   // round 18: the road's place at a column (every road here runs west to east)
-  function entryS() { return LV.camera ? Math.max(ENTRY, Math.min(P.len - 40, sAtX(CAM.x + 24))) : ENTRY; }   // where our men arrive: the screen's left edge
+  function entryS() { if (LV.cannon && LV.drawbridge && !DB.up) return Math.max(ENTRY, sAtX(LV.cannon.late));   // round 20 (Isaac 10:33): after the drawbridge, they arrive on the last curve before the cannon
+    return LV.camera ? Math.max(ENTRY, Math.min(P.len - 40, sAtX(CAM.x + 24))) : ENTRY; }   // where our men arrive: the screen's left edge
   function tanS() { if (!LV.camera) return P.len - 6; const e = sAtX(CAM.x + LV.view + 30); return e >= P.len - 6 ? P.len - 6 : e; }   // where theirs arrive: the keep, or the screen's right edge (3)
   function leakS() { return LV.camera ? Math.max(1, sAtX(CAM.x - 8)) : 1; }   // a tan past the screen's left edge is off the screen (the loss's count)
   function nearestS(x, y) { let bi = 0, bd = 1e9; for (let i = 0; i < P.n; i += 2) { const d = Math.hypot(P.x[i] - x, P.y[i] - y); if (d < bd) { bd = d; bi = i; } } return { i: bi, s: bi * 2, d: bd }; }
@@ -674,7 +676,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     $('purse').style.transform = S.purseBump > 0 ? 'scale(' + (1 + 0.14 * Math.sin(S.purseBump * Math.PI)).toFixed(3) + ')' : '';
     const max = S.stage >= 2; if (max !== lastMax) { lastMax = max; $('elimTrack').classList.toggle('max', max); }
     const fill = Math.round(clamp(S.elimShow / ELIM_GOAL, 0, 1) * 1000) / 10; if (fill !== lastFill) { lastFill = fill; $('elimFill').style.width = fill + '%'; }
-    const bt = max ? 'MAX' : 'ELIMINATIONS ' + Math.min(ELIM_GOAL, S.elim) + '/' + ELIM_GOAL; if (bt !== lastBar) { lastBar = bt; $('elimTxt').textContent = bt; }
+    const bt = max ? 'MAXIMUM LEVEL' : 'ELIMINATIONS ' + Math.min(ELIM_GOAL, S.elim) + '/' + ELIM_GOAL;   /* round 20 (Isaac 10:33): MAXIMUM LEVEL */ if (bt !== lastBar) { lastBar = bt; $('elimTxt').textContent = bt; }
     if (S.endOn) {
       const o = clamp(1 - (S.wall - S.endOn) / 0.4, 0, 1).toFixed(2); $('tray').style.opacity = o; $('row').style.opacity = o; if (S.endKind === 'win') $('plate').style.opacity = o;   // the defeat keeps the store's door
       const e = $('end'), a = clamp((S.wall - S.endOn) / 0.42, 0, 1); e.style.opacity = Math.min(1, a * 2.5).toFixed(2); e.style.transform = 'translateY(-50%) scale(' + (0.6 + 0.4 * easeBack(a)).toFixed(3) + ')';   // it POPS up, centred
@@ -1875,6 +1877,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     ctx.fillStyle = '#6E9DC4';
     for (let i = 0; i < 16; i++) { const y = -20 + ((i * 61.8 + t * 24) % span), x = x0 + w * (0.25 + 0.5 * ((i * 0.618) % 1)) + 2 * Math.sin(t * 1.1 + i * 2.4); if (under(y)) continue; ctx.globalAlpha = 0.6; ctx.beginPath(); ctx.ellipse(x, y, w * 0.19, 3.3, 0, 0, 7); ctx.fill(); }
     ctx.fillStyle = '#E4F5FF'; for (let i = 0; i < 7; i++) { const y = -20 + ((i * 97.3 + t * 30) % span), x = x0 + w * (0.28 + 0.44 * ((i * 0.381) % 1)); if (under(y)) continue; ctx.globalAlpha = 0.75 * (0.5 + 0.5 * Math.sin(t * 3 + i)); ctx.beginPath(); ctx.ellipse(x, y, 2.7, 1.3, 0, 0, 7); ctx.fill(); }
+    drawDuck(x0, w, t, spans);   // round 20 (Isaac 10:33): the rubber duck
     ctx.fillStyle = '#EDEADF'; for (const by of spans) for (let j = 0; j < 5; j++) { const q = ((t / (1.2 + 0.1 * j) + j * 0.37) % 1), y = by + LV.gw / 2 + 5 + q * 24, r = (2.6 + 1.2 * ((j * 0.73) % 1)) * (1 - 0.45 * q); ctx.globalAlpha = 0.6 * (1 - q); ctx.beginPath(); ctx.ellipse(x0 + w * (0.15 + 0.7 * ((j * 0.61) % 1)), y, r * 1.25, r * 0.62, 0, 0, 7); ctx.fill(); }
     ctx.globalAlpha = 1;
   }
@@ -1993,12 +1996,12 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     S.slow = 0.08; S.timers.push({ at: S.wall + 0.12, fn: () => { S.slow = 0.45; } }); S.timers.push({ at: S.wall + 0.42, fn: () => { S.slow = 1; } });   // the hit-stop, then the world catches up
     CN.holdTo = S.t + 1.8; DB.hp = 0; dbFall(); if (CN.crew && !CN.crew.dead) CN.crew.cd = 2.4;
   }
-  function paintNest(g, x, y) {   // the gun's sandbag nest: a ring of the game's sandbag ink round its west side (it faced our road)
-    for (let i = 0; i < 8; i++) { const an = Math.PI * (0.62 + i * 0.105), bx = x + Math.cos(an) * 34, by = y + 10 + Math.sin(an) * 22;
+  function paintNest(g, x, y) {   // the gun's sandbag nest · round 20 (Isaac 10:33: "move the sandbags up so that they're centered around the cannon"): a ring round the gun's middle, open to the east where it fires
+    const cy = y - 16; g.fillStyle = 'rgba(60,44,24,0.28)'; g.beginPath(); g.ellipse(x, cy + 6, 40, 22, 0, 0, 7); g.fill();
+    for (let i = 0; i < 12; i++) { const an = Math.PI * (0.27 + i * 0.13), bx = x + Math.cos(an) * 46, by = cy + Math.sin(an) * 30;
       g.fillStyle = 'rgba(0,0,0,0.22)'; g.beginPath(); g.ellipse(bx + 2, by + 3, 10, 5.5, an + Math.PI / 2, 0, 7); g.fill();
       g.fillStyle = '#C4AE80'; g.strokeStyle = '#6E5B3A'; g.lineWidth = 1.6; g.beginPath(); g.ellipse(bx, by, 10, 5.5, an + Math.PI / 2, 0, 7); g.fill(); g.stroke();
       g.strokeStyle = 'rgba(110,91,58,0.6)'; g.lineWidth = 1; g.beginPath(); g.moveTo(bx - Math.cos(an + Math.PI / 2) * 6, by - Math.sin(an + Math.PI / 2) * 3.3); g.lineTo(bx + Math.cos(an + Math.PI / 2) * 6, by + Math.sin(an + Math.PI / 2) * 3.3); g.stroke(); }
-    g.fillStyle = 'rgba(60,44,24,0.28)'; g.beginPath(); g.ellipse(x, y + 4, 30, 10, 0, 0, 7); g.fill();
   }
   function drawEmptyCannon() {   // the gun with nobody at it (after its crew falls, before ours climbs in)
     if (!cannonOn() || (CN.st !== 'empty' && CN.st !== 'mount')) return; const c = LV.cannon, H = UH * 1.25, img = spr('mcannon_e', H * L.k * L.dpr), vb = ART.vb.mcannon_e; if (!img) return;
@@ -2027,6 +2030,25 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     box.innerHTML = DIFF_IDS.map(id => '<button class="dtab d-' + id + '" type="button" role="radio" data-diff="' + id + '">' + DIFF_NAME[id] + '</button>').join('');
     for (const b of box.querySelectorAll('.dtab')) b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); setDiff(b.dataset.diff); SFX.snap(); });
     document.body.appendChild(box); syncDiff();
+  }
+
+
+  // ======== ROUND 20 · THE RUBBER DUCK (Isaac 11/5 10:33: "Let's also add a rubber ducky to the river.") ========
+  // The game's own duck (drawCrossDuck, the campaign river's bath toy), word for word at 1.25 (the game draws him at 1.9 on a river half as wide again): he sails
+  // down the moat with the current, bobs and rocks, and slips under each bridge (clipped by its planks, as the game layers him under the popsicle bridge).
+  const DUCK = { v: 21, s: 1.25 };
+  function drawDuck(x0, w, t, spans) {
+    const span = L.H + 120, y = -60 + ((t * DUCK.v + 140) % span), x = x0 + w * 0.5 + Math.sin(t * 0.7) * w * 0.12, s = DUCK.s, RMd = RM;
+    ctx.save(); ctx.beginPath(); ctx.rect(x0 - 40, -200, w + 80, L.H + 400);
+    for (const by of spans) ctx.rect(x0 - 40, by - LV.gw / 2, w + 80, LV.gw);   // the bridges cut out (evenodd): he passes under the planks
+    ctx.clip('evenodd');
+    ctx.globalAlpha = 0.45; ctx.fillStyle = '#EDEADF'; ctx.beginPath(); ctx.ellipse(x, y + 7 * s / 1.9, 25 * s / 1.9, 6 * s / 1.9, 0, 0, 7); ctx.fill(); ctx.globalAlpha = 1;   // the wake
+    ctx.translate(x, y + (RMd ? 0 : Math.sin(t * 1.6) * 1.6)); ctx.rotate(RMd ? 0 : Math.sin(t * 1.3) * 0.08); ctx.scale(s, s);
+    ctx.fillStyle = '#F2C531'; ctx.beginPath(); ctx.ellipse(0, 0, 13, 9, 0, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(8, -9, 6.5, 0, 7); ctx.fill();
+    ctx.fillStyle = '#E07B2E'; ctx.beginPath(); ctx.moveTo(13.5, -10); ctx.lineTo(20, -8); ctx.lineTo(13.5, -6.5); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#2b2117'; ctx.beginPath(); ctx.arc(9.5, -11, 1.3, 0, 7); ctx.fill();
+    ctx.restore(); S.duckY = y;
   }
 
   // ---------------- BOOT ----------------
@@ -2063,6 +2085,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
       opener: OP.on ? +(S.wall - OP.t0).toFixed(2) : (OP.done ? 'done' : 'off'), openerStats: S.stats.opener || null,
       boxS: BOX_S, plen: +P.len.toFixed(0), endTap: S.stats.endTap == null ? null : S.stats.endTap, endV: EV.n, evOn: EV.on, evT: EV.on ? +(S.wall - S.endOn).toFixed(2) : null, fxDrawn: fxDirty, fw: S.fw.length,
       endKind: S.endKind, leaks: S.stats.leaks, hits: S.stats.hits, firstHit: S.stats.firstHit, defeatAt: S.stats.defeat, lastPlay: +S.lastPlay.toFixed(2), redT: +S.redT.toFixed(2),
+      duck: S.duckY != null ? +S.duckY.toFixed(1) : null, maxTxt: document.getElementById('elimTxt').textContent,
       cannon: LV.cannon ? { st: CN.st, free: S.stats.cannonFreeAt || null, mount: S.stats.cannonMount || null, manned: S.stats.cannonManned || null, fired: S.stats.cannonFired || null, hit: S.stats.cannonHit || null } : null, portrait: !!L.portrait, diff: DIFF,
       v: LVN, lv: LV.name, cam: +CAM.x.toFixed(1), troops: LV.troops, db: LV.drawbridge ? { up: DB.up, hp: +DB.hp.toFixed(1), max: DB.max, at: S.stats.dbDown || null } : null, map: MAP === 'lawn' ? 'original' : MAP, mapL: MAP_LETTER[MAP] || null, diff: DIFF, dk: DIFF_K[DIFF], boxMax: +BOX.max.toFixed(1), tabs: TABS ? Array.from(document.querySelectorAll('#mapTabs .mtab')).map(b => b.dataset.map + (b.classList.contains('on') ? '*' : '')).join(',') : null, endAt: S.stats.endAt, dimAt: S.stats.dimAt, dim: +(getComputedStyle(document.getElementById('endDim')).opacity), icon: (ART.icon || '').length, mortars: S.f.filter(u => u.type === 'tanmort').length, shells: S.rk.filter(r => r.lob).length,
       tide: S.tide.st, tiders: S.f.filter(f => f.tide && !f.dead).length,
