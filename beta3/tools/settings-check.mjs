@@ -52,6 +52,27 @@
 // beat holding its slowed duration (1.2 s, then 4.2 s from the drain) before
 // the farewell (SHOTS: night-orange-earned · night-blue-earned ·
 // night-green-earned · night-fade · night-fade-drained).
+// v0.127.0 (THE BOSS BLACKOUT, card ss-2026-10-29-scripted-tutorial/03): §1
+// pins the blackout on paper (it interposes in f5GuideNext after the fade,
+// before the step; the volley IS blackoutAttack, whose targeting and
+// wordDamage's blackout law stay byte-kept; the dials; the shipped ink prompt
+// quiet under the script; the hand asking for the black tile; fight 2's taste
+// standing down, its fallback on the bosses' rule; no seeded draws; the word,
+// the refill and three lines in all five tongues, the zero said in words) and
+// §5b walks it on the replayed night: after the fade the beast throws the
+// bosses' OWN volley — the scripted letters blacked, P (cell 2) and M (cell
+// 15), the same two for everyone, each keeping its letter on the dark face
+// with a flat 0 (the shipped prompt quiet, the live hint spoken) — then the
+// lesson HOLDS (the two black tiles lifted into the light at their own seats,
+// "Some bosses can black out a few of your letters." and the rule on the row
+// the ink left alone, the hand on the M, then resting on the P), a tap inside
+// its floor refused and the untapped beat holding its slowed duration (4.4 s)
+// before it lets go; PEN is walked through the black P (a tap on the other
+// black tile refused; CAST says 2), and THE ZERO holds: 2 damage, the clean
+// word's 5 — the P's 3 points void, wordDamage's own law — "+0", "That black
+// tile added nothing: 2 damage, not 5."; then the farewell on the authored
+// board, the M still dark (SHOTS: night-ink-volley · night-ink ·
+// night-ink-lesson · night-ink-zero).
 // Self-launching: serves beta3 on :8899 if nothing does; headless Chromium on
 // :9501 (/tmp/cdp-settings wiped first) — Playwright's own Chromium when it
 // is installed (a headless GOOGLE Chrome hijacks AppleScript's session with
@@ -114,8 +135,9 @@ ok('…and stands behind the whole one-sheet guard family', ['this.busy()', 'thi
 // v0.126.0 THE TILE ECONOMY: the two new held lessons ride the script's own door
 const nextSrc = (gameSrc.match(/\n  f5GuideNext\(\) \{[\s\S]*?\n  \}\n/) || [''])[0];
 ok('THE TILE ECONOMY (v0.126.0): the how-it-was-earned beat and the use-it-or-lose-it pause interpose in f5GuideNext exactly as the scry gate does (before the step, once each), so THE POINT and the farewell follow as shipped',
-  /if \(g\.idx \+ 1 === g\.scryAt && !g\.scried\) \{ this\.f5GuideScry\(\); return; \}[\s\S]*?if \(nk && !\(g\.earned && g\.earned\[nk\]\) && this\.f5GuideEarn\(nk\)\) return;\s*if \(g\.idx \+ 1 >= g\.words\.length && !g\.faded && this\.f5GuideFade\(\)\) return;\s*g\.idx\+\+;/.test(nextSrc));
-const econAll = (gameSrc.match(/\n  f5GuideEarn\(kind\) \{[\s\S]*?\n  \/\/ ---------- board ----------/) || [''])[0];
+  /if \(g\.idx \+ 1 === g\.scryAt && !g\.scried\) \{ this\.f5GuideScry\(\); return; \}[\s\S]*?if \(nk && !\(g\.earned && g\.earned\[nk\]\) && this\.f5GuideEarn\(nk\)\) return;\s*if \(g\.idx \+ 1 >= g\.words\.length && !g\.faded && this\.f5GuideFade\(\)\) return;\s*(\/\*[\s\S]*?\*\/\s*)?if \(g\.idx \+ 1 >= g\.words\.length && !g\.inked && this\.f5GuideInk\(\)\) return;\s*g\.idx\+\+;/.test(nextSrc));
+// card 02's own beats run from f5GuideEarn up to card 03's F5-INK block (v0.127.0 seats the blackout after them)
+const econAll = (gameSrc.match(/\n  f5GuideEarn\(kind\) \{[\s\S]*?\n  (?=\/\* ---- F5-INK|\/\/ ---------- board ----------)/) || [''])[0];
 ok('…its dials are declared and wired: the earned beat dwells 4400 · the fade stands 1200, then dwells 4200 from the drain · both floors the showcase\'s 900, the fade\'s armed at the drain',
   ['const SS_F5_EARN_SHOW_MS = 4400;', 'const SS_F5_FADE_AT_MS = 1200;', 'const SS_F5_FADE_SHOW_MS = 4200;'].every((t) => gameSrc.includes(t))
   && econAll.includes("const dwell = this.time.delayedCall(SS_F5_EARN_SHOW_MS, () => release('dwell'));")
@@ -125,7 +147,7 @@ ok('…its dials are declared and wired: the earned beat dwells 4400 · the fade
   && /f5GuideFadeDrain\(g\) \{[\s\S]*?const dwell = this\.time\.delayedCall\(SS_F5_FADE_SHOW_MS/.test(econAll));
 ok('…a forged tile\'s and the dew\'s arrival stay quiet while the script stands (THE POINT says what it does, after the earned beat says how)',
   gameSrc.includes('if (this.f5Night && (tier === 1 || tier === 2) && !this.f5GuideLocked()) {') && gameSrc.includes('if (this.f5Night && !this.f5GuideLocked()) this.time.delayedCall(520,'));
-const econSrc = (gameSrc.match(/\n  f5GuideEarn\(kind\) \{[\s\S]*?\n  \/\/ ---------- board ----------/) || [''])[0];
+const econSrc = (gameSrc.match(/\n  f5GuideEarn\(kind\) \{[\s\S]*?\n  (?=\/\* ---- F5-INK|\/\/ ---------- board ----------)/) || [''])[0];
 const econCode = econSrc.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');   // the code alone (its comments SAY "never rng()")
 ok('…the new beats draw nothing from the seeded stream (their cosmetics on Math.random — the house law) and are reached only from the script (two call sites, both in f5GuideNext)',
   econCode.length > 2000 && !/\brng\(\)/.test(econCode) && /Math\.random\(\)/.test(econCode) && (gameSrc.match(/this\.f5GuideEarn\(|this\.f5GuideFade\(\)/g) || []).length === 2
@@ -136,7 +158,42 @@ ok('…every lesson line authored in all five tongues (es/fr/pt/de drafts) with 
   ['en', 'es', 'fr', 'pt', 'de'].every((t) => ECON.every((k) => typeof P5[t][k] === 'string' && P5[t][k].length > 4))
   && ['es', 'fr', 'pt', 'de'].every((t) => ['orangeHow', 'blueHow'].every((k) => P5[t][k].includes('{w}') && P5[t][k].includes('{n}')) && P5[t].earnCount.includes('{n}')),
   ECON.filter((k) => !['en', 'es', 'fr', 'pt', 'de'].every((t) => P5[t] && P5[t][k])).join(',') || 'all 9 × 5');
-const buildV = (gameSrc.match(/const BUILD = 'STARSPELL v([\d.]+)'/) || [])[1];
+// v0.127.0 THE BOSS BLACKOUT: the bosses' own volley, held, then walked
+const inkAll = (gameSrc.match(/\n  \/\* ---- F5-INK \(card ss-2026-10-29-scripted-tutorial\/03\)[\s\S]*?\n  \/\/ ---------- board ----------/) || [''])[0];
+const inkCode = inkAll.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+ok('THE BOSS BLACKOUT (v0.127.0): the beat interposes in f5GuideNext right after the use-it-or-lose-it pause and before the step, once — its lift adds the black tile\'s word, which the step walks',
+  /if \(g\.idx \+ 1 >= g\.words\.length && !g\.faded && this\.f5GuideFade\(\)\) return;\s*(\/\*[\s\S]*?\*\/\s*)?if \(g\.idx \+ 1 >= g\.words\.length && !g\.inked && this\.f5GuideInk\(\)\) return;\s*g\.idx\+\+;/.test(nextSrc)
+  && inkCode.includes('g.words.push(ink.word.slice()); g.ink = g.words.length - 1;') && inkCode.includes('this.f5Queue.push(...ink.refill);'));
+ok('…the volley IS the bosses\' own (blackoutAttack — real speed, real targets, real blackTile), and the live law it teaches stays byte-kept: an inked letter spells but pays nothing; two a volley unless the beast says more; the best plain letters first, the lowest cell on a tie',
+  inkCode.includes('this.blackoutAttack(() => {') && gameSrc.includes('if (s.blk) continue;                     // blackout: the letter spells, but pays NOTHING')
+  && gameSrc.includes('const n = Math.min(this.beast.fx.ink || 2, Math.max(0, 6 - dark));')
+  && gameSrc.includes('.sort((a, b) => (a.s.tier > 0) - (b.s.tier > 0) || this.inkWorth(b.s) - this.inkWorth(a.s) || a.i - b.i)'));
+ok('…its dials declared and wired: the lesson rises 1500 after the volley and dwells 4400 (the showcase\'s 900 floor), the hand moves between the black tiles at 1400; THE ZERO dwells the showcase\'s 3600 on the same floor',
+  ['const SS_F5_INK_AT_MS = 1500;', 'const SS_F5_INK_SHOW_MS = 4400;', 'const SS_F5_INK_TOUR_MS = 1400;'].every((t) => gameSrc.includes(t))
+  && inkAll.includes('this.time.delayedCall(SS_F5_INK_AT_MS, () => this.f5GuideInkHold(g));')
+  && inkAll.includes("const dwell = this.time.delayedCall(SS_F5_INK_SHOW_MS, () => release('dwell'));")
+  && inkAll.includes('tour.slice(1).forEach((i, k) => this.time.delayedCall(SS_F5_INK_TOUR_MS * (k + 1), () => {')
+  && inkAll.includes('const dwell = this.time.delayedCall(SS_F5_SHOW_MS, release);')
+  && (inkAll.match(/this\.time\.delayedCall\(SS_F5_SHOW_FLOOR_MS, \(\) => \{/g) || []).length === 2);
+ok('…the shipped ink prompt stays quiet while the script stands (the lesson says it), and on the black tile\'s word the hand asks for the BLACK tile itself',
+  gameSrc.includes("if (this.f5Night && !this.f5GuideLocked()) this.time.delayedCall(560, () => { if (this.scene.isActive()) ssF5Prompt(this, 'ink', l.x(0), l.y(374)); });")
+  && gameSrc.includes('if (g && g.idx === g.ink && !this.sel.length) for (let i = 0; i < 16; i++) { const s = this.board[i]; if (s && s.c.active && s.blk && s.ch === need) return i; }')
+  && gameSrc.includes("if (g.beat === 'ink') return g.pose ? 'pose' : 'wait';"));
+const tasteSrc = (gameSrc.match(/if \(this\.f5Night && this\.run\.fightIdx === 1 && !this\.f5InkTaught\) \{[\s\S]*?\n      \}\n/) || [''])[0];
+ok('…fight 2\'s random ink taste stands down behind the lesson (f5GuideInk marks f5InkTaught) and its fallback inks by the bosses\' rule — no Math.random left in it',
+  inkCode.includes('this.f5InkTaught = true;') && tasteSrc.includes('open.sort((a, b) => this.inkWorth(this.board[b]) - this.inkWorth(this.board[a]) || a - b)[0]')
+  && !/Math\.random/.test(tasteSrc));
+ok('…the new beats draw nothing from the seeded stream and are reached only from the script (f5GuideInk from f5GuideNext; THE ZERO armed in f5GuideCast, shown from f5GuideShow)',
+  inkCode.length > 3000 && !/\brng\(\)/.test(inkCode) && (gameSrc.match(/this\.f5GuideInk\(\)/g) || []).length === 1 && /this\.f5GuideInk\(\)/.test(nextSrc)
+  && (gameSrc.match(/this\.f5InkArm\(/g) || []).length === 1 && (gameSrc.match(/this\.f5InkShow\(/g) || []).length === 1
+  && gameSrc.includes('if (sh.ink) { this.f5InkShow(g); return; }'));
+const INK = eval('(' + gameSrc.match(/const SS_F5_INK = (\{[\s\S]*?\n\});/)[1] + ')');
+const INKL = ['inkWho', 'inkRule', 'inkHit'];
+ok('…every tongue carries the black tile\'s word (three letters: LEN_MULT 1.0, so the ink costs exactly its letter) and its authored refill, and all three lines (es/fr/pt/de drafts, {d} {p} kept) — the zero said in WORDS, never a bare 0 (the house serif draws it as an "o")',
+  ['en', 'es', 'fr', 'pt', 'de'].every((t) => INK[t] && INK[t].word.length === 3 && INK[t].refill.length === 3
+    && INKL.every((k) => typeof P5[t][k] === 'string' && P5[t][k].length > 8 && !/\b0\b/.test(P5[t][k])) && P5[t].inkHit.includes('{d}') && P5[t].inkHit.includes('{p}')),
+  ['en', 'es', 'fr', 'pt', 'de'].map((t) => t + ' ' + (INK[t] ? INK[t].word.join('').toUpperCase() : '?')).join(' · '));
+const buildV =(gameSrc.match(/const BUILD = 'STARSPELL v([\d.]+)'/) || [])[1];
 const html = readFileSync('index.html', 'utf8');
 ok('the release ritual held (BUILD ' + buildV + ' on every ?v= stamp)', !!buildV
   && (html.match(/\?v=[\d.]+/g) || []).length >= 12 && !html.match(new RegExp('\\?v=(?!' + buildV.replace(/\./g, '\\.') + ')[\\d.]+')));
@@ -392,6 +449,8 @@ const NIGHT = `JSON.stringify((() => { const b = ${B}, g = window.__f5guide || {
     board: b.board.map((s) => (s ? s.ch + (s.tier ? '*' : '') : '_')).join(' '),
     strike: window.__f5strike || {}, mend: window.__f5mend || {}, scry: window.__f5scry || {},
     earn: window.__f5earn || {}, fade: window.__f5fade || {}, pr: window.__f5prompt || {},
+    ink: window.__f5ink || {}, ssink: window.__ssink || null, blk: b.board.map((s, i) => (s && s.blk ? i : -1)).filter((i) => i >= 0).join(','),
+    castT: b.castT.text, inkTaught: !!b.f5InkTaught, pose: b.f5G && b.f5G.pose ? { x: b.f5G.pose.x, y: b.f5G.pose.y, flip: !!b.f5G.pose.flip } : null,
     hpShown: Math.round(b.hpShown.v), hpHold: b.hpHold | 0, quickck: localStorage.getItem('beta3.quickck') } })())`;
 const gs = () => evj(NIGHT);
 // v0.126.0 THE TILE ECONOMY: what a held lesson DRAWS — the veil, the container
@@ -410,6 +469,27 @@ const LESSON = (tag) => evj(`JSON.stringify((() => { const b = ${B}, l = b.L;
     veilLive: !!(veil && veil.input && veil.input.enabled), cause: causeT ? causeT.text : null, causeIn: cb ? cb.left >= 0 && cb.right <= l.W : null,
     frames, faces, handDepth: h ? h.depth : null };
 })())`);
+// v0.127.0 THE BOSS BLACKOUT: what the lesson DRAWS — the veil, the two black
+// tiles' twins (at their own seats, above it), the lines' container (its row,
+// its frames, whether it covers a black tile), the hand's depth
+const INKLESSON = () => evj(`JSON.stringify((() => { const b = ${B}, l = b.L, U = l.u(1);
+  const veil = b.children.list.find((o) => o.active && o.type === 'Image' && o.depth === 900 && o.texture && o.texture.key === 'veil');
+  const c = b.children.list.find((o) => o.active && o.getData && o.getData('f5ink'));
+  const twins = b.children.list.filter((o) => o.active && o.getData && o.getData('f5inktile') != null);
+  const frames = c ? c.list.filter((o) => o.f5W).map((f) => ({ s: f.list.find((t) => t.type === 'Text').text, a: +f.alpha.toFixed(2) })) : [];
+  const fb = c ? c.getBounds() : null;
+  const over = fb ? twins.some((t) => Phaser.Geom.Rectangle.Overlaps(fb, t.getBounds())) : null;
+  const h = b.ftueHand;
+  return { c: !!c, depth: c ? c.depth : null, cy: c ? Math.round((c.y - l.y(0)) / U) : null, row1: Math.round((b.slotPos(4).y - l.y(0)) / U), frames, over,
+    inView: fb ? fb.left >= 0 && fb.right <= l.W : null, veil: !!veil, veilA: veil ? +veil.alpha.toFixed(2) : null, veilLive: !!(veil && veil.input && veil.input.enabled),
+    twins: twins.map((t) => { const i = t.getData('f5inktile'), p = b.slotPos(i), s = b.board[i];
+      return { i, d: t.depth, seat: Math.abs(t.x - p.x) < 1 && Math.abs(t.y - p.y) < 1, face: t.list[0].texture.key, size: Math.abs(t.list[0].displayWidth - b.tileSize) < 1,
+        ch: s ? s.ch : null, blk: !!(s && s.blk) }; }).sort((x, y) => x.i - y.i),
+    handDepth: h ? h.depth : null };
+})())`);
+// the hand's pose on a board cell, the walk's own geometry (tip beside the tile, a tenth of a tile up)
+const poseOn = (s, i, flip) => evj(`JSON.stringify((() => { const b = ${B}, p = b.slotPos(${i}), ts = b.tileSize, q = ${JSON.stringify(s.pose)};
+  return !!q && Math.abs(q.x - (p.x + (${flip} ? -1 : 1) * ts * 0.36)) < 1 && Math.abs(q.y - (p.y - ts * 0.10)) < 1 && q.flip === ${flip}; })())`);
 const waitFor = async (pred, cap = 30000) => {
   const t = Date.now(); let i = 0;
   while (Date.now() - t < cap) { await poke(i++); try { const s = await gs(); if (pred(s)) return s; } catch (e) { } await sleep(250); }
@@ -427,7 +507,7 @@ const walk = async (max = 40) => {
   return 'stuck';
 };
 const letGo = async () => { await sleep(400); await tapAt(195, 500); };   // a real tap on the lesson's veil, past its floor
-await ev(`(window.__f5guide = null, window.__f5strike = null, window.__f5mend = null, window.__f5scry = null, window.__f5earn = null, window.__f5fade = null, window.__f5prompt = null, 1)`);
+await ev(`(window.__f5guide = null, window.__f5strike = null, window.__f5mend = null, window.__f5scry = null, window.__f5earn = null, window.__f5fade = null, window.__f5prompt = null, window.__f5ink = null, window.__ssink = null, 1)`);
 ok('a fresh replay by real taps: the gear, TUTORIAL, the rise, the night\'s fight', await openSheet()
   && await tapUntil(`(${H}.setC && ${H}.setC.tutZone) || ${H}.setB`, `!${H}.setC && (${H}.ascending || game.scene.isActive('battle'))`, 3)
   && await until(PICK, 40000));
@@ -600,9 +680,95 @@ ok('…untapped, it HOLDS its slowed duration — ' + fadeAt + ' ms before the d
   !!f4 && f4.fade.released === 'dwell' && f4.fade.holdMs >= fadeMs * 0.95 && f4.fade.liftedAt - f4.fade.drainAt >= fadeMs * 0.95
   && f4.fade.drainAt - f4.fade.shownAt >= fadeAt * 0.95, f4 ? JSON.stringify({ released: f4.fade.released, holdMs: f4.fade.holdMs,
     wallFromDrain: f4.fade.liftedAt - f4.fade.drainAt, wallToDrain: f4.fade.drainAt - f4.fade.shownAt }) : 'never');
+/* v0.127.0 THE BOSS BLACKOUT — the bosses' own volley, the lesson held, the black tile's word, THE ZERO */
+const inkAtMs = await ev('SS_F5_INK_AT_MS'), inkMs = await ev('SS_F5_INK_SHOW_MS'), tourMs = await ev('SS_F5_INK_TOUR_MS');
+const k0 = await waitFor((s) => s.beat === 'ink' && (s.ink.armed | 0) >= 1, 20000);
+ok('THE BOSS BLACKOUT (v0.127.0): the colours spent, the fight does not let go — the beast throws the bosses\' volley, the hand backed off to wait it out (the lock holds)',
+  !!k0 && k0.ft === 'ink' && k0.idx === 5 && k0.hand && !k0.gone && k0.pt === 'wait' && k0.ink.word === 'pen',
+  k0 ? JSON.stringify({ ft: k0.ft, idx: k0.idx, pt: k0.pt, word: k0.ink.word }) : 'never');
+await sleep(450);
+await shot('night-ink-volley');
+const k1 = await waitFor((s) => !!s.ink.volley && s.blk === '2,15', 8000);
+const inked = k1 ? await evj(`JSON.stringify([2, 15].map((i) => { const b = ${B}, s = b.board[i];
+  return { ch: s.ch, blk: !!s.blk, tier: s.tier, face: s.img.texture.key, chip0: s.val.texture.key === ssGlyphVal(b, 0, SS_BLK_VINK), ink: s.letter.texture.key === ssGlyph(b, s.ch, SS_BLK_INK) }; }))`) : [];
+ok('…the scripted letters are BLACKED, the same two for every player — P (cell 2) and M (cell 15), the two the bosses\' rule picks on this board (its best plain letters, 3 points each); real blackTile: each keeps its letter in the pale ink on the dark face, its chip a flat 0',
+  !!k1 && !!k1.ssink && k1.ssink.n === 2 && k1.ssink.tiles.join(',') === '2,15' && k1.ink.volley.tiles.join(',') === '2,15'
+  && inked.map((t) => t.ch).join('') === 'pm' && inked.every((t) => t.blk && t.tier === 0 && t.face === 'tileblk' && t.chip0 && t.ink),
+  JSON.stringify({ volley: k1 && k1.ink.volley, blk: k1 && k1.blk, inked }));
+ok('…the shipped ink prompt stayed quiet under the script (the lesson says it), and the live "inked · worth nothing" spoke over the first one',
+  !!k1 && !(k1.pr.ink | 0) && await ev(`${B}.run.inkShown === true`) === true, JSON.stringify({ ink: k1 && k1.pr.ink }));
+const k2 = await waitFor((s) => (s.ink.shown | 0) >= 1, inkAtMs + 9000);
+const tTapK = Date.now();
+await tapAt(195, 500);   // too soon: inside the lesson's floor
+await sleep(450);   // the pop-in (the rule line rises 700 ms in)
+const vk1 = await INKLESSON();
+const k2b = await gs();
+ok('THE LESSON holds once the ink has pooled: the light veil, the two black tiles lifted into the light where they stand (twins at their own seats, the dark face at the board\'s size, above the veil), "Some bosses can black out a few of your letters." on the row the ink left alone (row 1), covering neither black tile',
+  !!k2 && vk1.c && vk1.depth === 950 && vk1.veil && vk1.veilA >= 0.3 && vk1.veilLive && vk1.twins.length === 2
+  && vk1.twins.map((t) => t.i + t.ch).join(' ') === '2p 15m' && vk1.twins.every((t) => t.d === 905 && t.seat && t.face === 'tileblk' && t.size && t.blk)
+  && vk1.cy === vk1.row1 && k2b.ink.row === 1 && vk1.over === false && vk1.inView && vk1.frames.length === 2
+  && vk1.frames[0].s === 'Some bosses can black out a few of your letters.' && vk1.frames[0].a >= 0.99 && vk1.handDepth === 960,
+  JSON.stringify({ vk1, row: k2b.ink.row }));
+ok('…the hand points at the black tiles in turn — first the M (cell 15, from its left)', /^pose:/.test(k2b.pt) && (k2b.ink.tour || []).join(',') === '15,2'
+  && await poseOn(k2b, 15, true) === true, JSON.stringify({ pt: k2b.pt, tour: k2b.ink.tour, pose: k2b.pose }));
+await shot('night-ink');
+const k3 = await waitFor((s) => (s.ink.toured | 0) >= 1, tourMs + 6000);
+await sleep(600);
+const vk2 = await INKLESSON();
+const k3b = await gs();
+const floorK = await ev('SS_F5_SHOW_FLOOR_MS');
+ok('…then rests on the P (cell 2), PEN\'s first tap, with the rule beneath: "You can still use them in words, but they score no points." — a tap inside its floor refused, the lesson holding',
+  !!k3 && k3b.beat === 'ink' && !k3b.ink.released && await poseOn(k3b, 2, true) === true
+  && vk2.frames.map((f) => f.s).join('|') === 'Some bosses can black out a few of your letters.|You can still use them in words, but they score no points.'
+  && vk2.frames.every((f) => f.a >= 0.99) && tTapK - k2b.ink.shownAt < floorK,
+  JSON.stringify({ beat: k3b.beat, released: k3b.ink.released, pose: k3b.pose, frames: vk2.frames, tapAfterRise: tTapK - k2b.ink.shownAt }));
+await shot('night-ink-lesson');
+const k4 = await waitFor((s) => (s.ink.lifted | 0) >= 1, inkMs + 6000);
+ok('…untapped, it HOLDS its slowed duration (' + inkMs + ' ms of game-loop time, §1 pins it to its dial) and lets go by its own dwell',
+  !!k4 && k4.ink.released === 'dwell' && k4.ink.holdMs >= inkMs * 0.95 && k4.ink.liftedAt - k4.ink.shownAt >= inkMs * 0.95,
+  k4 ? JSON.stringify({ released: k4.ink.released, holdMs: k4.ink.holdMs, wall: k4.ink.liftedAt - k4.ink.shownAt }) : 'never');
+const k5 = await waitFor((s) => s.beat === 'word' && s.idx === 6 && s.state === 'pick' && s.pt === 'slot:2', 10000);
+ok('THE BLACK TILE\'S WORD: the lift adds PEN to the script, the finger on the BLACK P (cell 2) — the black tile first',
+  !!k5 && k5.word === 'pen' && k5.hand && !k5.gone, k5 ? JSON.stringify({ word: k5.word, pt: k5.pt, idx: k5.idx }) : 'never');
+const ref0 = await ev(`(window.__f5guide || {}).refused | 0`);
+await tap(`${B}.board[15].c`);
+await sleep(500);
+ok('…a real tap on the OTHER black tile is refused (the road is the P)', await ev(`(window.__f5guide || {}).refused | 0`) === ref0 + 1
+  && await ev(`${B}.sel.length === 0`) === true);
+for (let i = 0; i < 8; i++) {
+  await poke(i);
+  const pt = await ev(`window.__ssftue ? window.__ssftue.point : null`);
+  if (pt === 'cast') break;
+  if (pt && pt.startsWith('slot:')) { await tap(`${B}.board[${+pt.slice(5)}].c`); await sleep(420); } else await sleep(300);
+}
+const k6 = await gs();
+ok('…PEN woven by real taps on the finger\'s road (P · E · N = cells 2 · 9 · 6), and CAST tells the truth before it flies: 2',
+  k6.sel === '2,9,6' && k6.pt === 'cast' && k6.castT === 'CAST 2', JSON.stringify({ sel: k6.sel, pt: k6.pt, castT: k6.castT }));
+await tap(`${B}.castB`);
+let z1 = await waitFor((s) => !!s.ink.zero, 20000);
+await sleep(700); z1 = await gs();
+const vz = await evj(`JSON.stringify((() => { const b = ${B}; const c = b.children.list.find((o) => o.active && o.getData && o.getData('f5inkshow'));
+  if (!c) return { c: false };
+  const faces = []; const scan = (ls) => ls.forEach((o) => { if (o.type === 'Image' && o.texture && /^tile/.test(o.texture.key)) faces.push(o.texture.key); if (o.list && !o.f5W) scan(o.list); });
+  scan(c.list);
+  return { c: true, depth: c.depth, num: (c.list.find((o) => o.type === 'Text') || {}).text || null, faces,
+    frames: c.list.filter((o) => o.f5W).map((f) => f.list.find((t) => t.type === 'Text').text) } })())`);
+ok('THE ZERO holds the fight: PEN hit 2 where the clean word hits 5 — the black P\'s 3 points void, wordDamage\'s own blackout law (the letter spelled, it paid nothing) — VULPES 12 → 10',
+  !!z1 && z1.ink.zero.word === 'pen' && z1.ink.zero.ch === 'p' && z1.ink.zero.dmg === 2 && z1.ink.zero.plain === 5 && z1.hp === 10 && z1.state === 'anim' && !!z1.show && z1.show.ink === 1,
+  z1 ? JSON.stringify({ zero: z1.ink.zero, hp: z1.hp, state: z1.state }) : 'never');
+ok('…"+0" beside the black tile in the ink\'s own pale voice, "That black tile added nothing: 2 damage, not 5.", the hand on the number',
+  vz.c && vz.depth === 950 && vz.num === '+0' && vz.faces.join() === 'tileblk' && vz.frames.join('|') === 'That black tile added nothing: 2 damage, not 5.' && /^pose:/.test(z1.pt),
+  JSON.stringify({ vz, pt: z1.pt }));
+await shot('night-ink-zero');
+await letGo();
+ok('…a real tap past its floor lets it go', !!(await waitFor((s) => s.released >= 4, 6000)));
 const n13 = await waitFor((s) => s.ended >= 1 && s.gone && s.state === 'pick', 20000);
-ok('THE FAREWELL: the hand retires for good (the script done) — VULPES 12, the player 48, the first fight the player\'s',
-  !!n13 && !n13.f5G && n13.ft === 'done' && n13.hp === 12 && n13.php === 48 && n13.words === 6, n13 ? JSON.stringify({ f5G: n13.f5G, ft: n13.ft, hp: n13.hp, php: n13.php, words: n13.words }) : 'never');
+ok('THE FAREWELL: the hand retires for good (the script done) — VULPES 10, the player 48, the fuse at 4, the first fight the player\'s after seven words',
+  !!n13 && !n13.f5G && n13.ft === 'done' && n13.hp === 10 && n13.php === 48 && n13.words === 7 && n13.cnt === 4,
+  n13 ? JSON.stringify({ f5G: n13.f5G, ft: n13.ft, hp: n13.hp, php: n13.php, words: n13.words, cnt: n13.cnt }) : 'never');
+ok('…on the board the script authored for everyone (S O H R · A L N I · G O T E · D E A M — NIGHT and LIGHT stand in it), the M still black: the real curse, there to route around; fight 2\'s taste stood down',
+  !!n13 && n13.board === 's o h r a l n i g o t e d e a m' && n13.blk === '15' && n13.inkTaught,
+  n13 ? JSON.stringify({ board: n13.board, blk: n13.blk, taught: n13.inkTaught }) : 'never');
 ok('…and the whole night wrote no pocket (beta3.quickck absent)', !!n13 && n13.quickck === null);
 
 /* ================= §5c THE REPLAY KEEPS NO POCKET ================= */

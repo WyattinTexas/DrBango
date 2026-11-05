@@ -2,6 +2,67 @@
 
 Sixty-two scripts, all dev-only — nothing here ships to the browser.
 
+## THE BOSS BLACKOUT (v0.127.0): settings-check §1 + §5b
+
+Skylar (10/29), point 9 of the nine: "The beast should put the black tile on
+a couple of your letters and explain that that's what some bosses can do.
+They can black out some of your letters sometimes. You could still use the
+letters, you just don't get any points for using those letters." Ground
+truth first: `blackoutAttack` — the void bosses (STRIX, DRACO, the deep
+climb's) ink letters as their strike charges, two a volley unless the beast
+says more (`fx.ink`), the highest-worth PLAIN letters first and the lowest
+cell on a tie; `blackTile` keeps the letter (dark face, pale ink, a flat 0
+chip) until it is spent or scried; `wordDamage` lets an inked letter SPELL
+(it still counts toward the word's length) but skips its points. One new
+held lesson in the night (game.js `F5-INK`), interposing in `f5GuideNext`
+right after the fade, before the step:
+
+- **THE VOLLEY** (`f5GuideInk`): the beast throws the bosses' OWN volley —
+  `blackoutAttack` unmodified, at real speed — on the board the rig makes the
+  same for everyone, so the same two letters go dark for every player (en
+  P·M at cells 2·15, es C·M, fr P·C, pt N·C, de M·L). The shipped ink prompt
+  stays quiet while the script stands; the live "inked · worth nothing"
+  speaks as it always does.
+- **THE LESSON** (`f5GuideInkHold` → `f5GuideInkLift`), 1.5 s after the last
+  bolt: the light veil, the two black tiles lifted into the light where they
+  stand (twins at their own seats, above the veil), "Some bosses can black
+  out a few of your letters." and, 700 ms on, "You can still use them in
+  words, but they score no points." on a row the ink left alone; the hand
+  on the other black tile, then (1.4 s) resting on the one the next word
+  starts on; 4.4 s, or a tap past 0.9 s. Its lift adds the black tile's word
+  (`SS_F5_INK`: en PEN · es MAR · fr PIN · pt CÉU · de MAI — three letters,
+  LEN_MULT 1.0, so the ink costs exactly its letter) and its authored refill.
+- **THE ZERO** (`f5InkArm` from `f5GuideCast`, `f5InkShow` from
+  `f5GuideShow`): the hand walks the word through the black tile (it asks
+  for the BLACK one), CAST says the true 2, and the fight holds on the black
+  tile, "+0" and "That black tile added nothing: 2 damage, not 5." (pt 2,
+  not 4); 3.6 s or a tap past 0.9 s → the farewell, on the authored board
+  with the other black tile still dark.
+
+The zero is said in WORDS on purpose: the house serif's old-style 0 reads as
+an "o" ("scored o points"); "+0" keeps the big number a number. Fight 2's
+random ink taste (F5-CARD-05) stands down once the lesson has run (it was its
+stand-in); its fallback now inks by the bosses' rule, not `Math.random`.
+
+**settings-check.mjs** (177 → 198 checks, ~10 min): §1 pins the
+interposition (after the fade, before the step), the volley being
+`blackoutAttack` with the live law byte-kept (`if (s.blk) continue`, the
+`fx.ink || 2` count, the targeting sort), the three dials wired, the quiet
+prompt and the black-tile preference, the taste's stand-down and its
+no-`Math.random` fallback, no seeded draws, and the word, refill and three
+lines in all five tongues (no bare 0 in any); card 02's own pins now read
+only card 02's code. §5b walks it on the replayed night by real DPR-3 taps:
+the volley (cells 2·15 blacked by real `blackTile` — the dark face, the pale
+ink, the flat 0 chip; the prompt quiet, the live hint spoken), the lesson
+(twins at their seats at 905, the lines on row 1 covering neither black
+tile, the hand on the M then the P, a tap inside the floor refused, the
+untapped hold ≥ 4.4 s on both clocks), PEN through the black P (a tap on the
+other black tile refused; `CAST 2`), THE ZERO (2 against the clean 5 —
+VULPES 12 → 10 — "+0", the line, the hand), and the farewell (VULPES 10, the
+fuse at 4, seven words, the authored board `s o h r a l n i g o t e d e a m`
+with the M still black, the taste stood down, no pocket). `SHOTS=` adds
+night-ink-volley · night-ink · night-ink-lesson · night-ink-zero.
+
 ## THE TILE ECONOMY (v0.126.0): settings-check §1 + §5b · firstnight-live-check §C
 
 Skylar (10/29), points 5 and 8 of the nine: "It needs to explain how you get

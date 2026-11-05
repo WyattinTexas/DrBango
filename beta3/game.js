@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.126.0';
+const BUILD = 'STARSPELL v0.127.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -2135,6 +2135,38 @@ const SS_F5_MEND_SHOW_MS = 4200;     // the mend's dwell, from the rise (two lin
 const SS_F5_EARN_SHOW_MS = 4400;     // the how-it-was-earned beat's dwell (two lines to read)
 const SS_F5_FADE_AT_MS = 1200;       // the use-it-or-lose-it beat: the colours stand this long, then drain
 const SS_F5_FADE_SHOW_MS = 4200;     // …and its dwell, from the drain (a tap past the floor lets go)
+/* F5-INK (card ss-2026-10-29-scripted-tutorial/03): THE BOSS BLACKOUT's
+   dials. Skylar (10/29): "The beast should put the black tile on a couple
+   of your letters and explain that that's what some bosses can do. They can
+   black out some of your letters sometimes. You could still use the
+   letters, you just don't get any points for using those letters." The
+   volley is the bosses' own (blackoutAttack, at real speed); the lesson
+   rises once its ink has pooled and the shipped "inked · worth nothing"
+   has had its say, HOLDS on the black tiles lifted into the light, then the
+   hand walks a word through one of them and THE ZERO shows what it paid.
+   The floors and the zero's dwell are the showcase's own. */
+const SS_F5_INK_AT_MS = 1500;        // from the volley's last bolt: the ink pools, the live hint floats, then the lesson rises
+const SS_F5_INK_SHOW_MS = 4400;      // the lesson's dwell, from its rise (two lines to read)
+const SS_F5_INK_TOUR_MS = 1400;      // the hand rests on the other black tile this long, then moves onto the word's
+/* F5-INK: the black tile's word, per tongue. The board the mend's refill
+   leaves is the same for every player (the rig), so the bosses' own volley
+   — two tiles, the highest-worth plain letters, the lowest cell on a tie —
+   inks the same two cells for everyone: en P·M (cells 2, 15), es C·M (2,
+   11), fr P·C (0, 2), pt N·C (15, 2), de M·L (2, 1). The word STARTS on one
+   of them (the tile the lesson points at is its first tap) and is three
+   letters, so at LEN_MULT 1.0 the ink costs EXACTLY that letter's points:
+   en PEN 2, not 5 · es MAR 2, not 5 · fr PIN 2, not 5 · pt CÉU 2, not 4 ·
+   de MAI 2, not 5. `refill` is the cast's authored refill (the rig's own
+   law: the board the hand finally leaves is the same for everyone — en
+   NIGHT/LIGHT, es LUNAS, fr LUNES, pt LUAS, de STERNE stand in it, beside
+   the other black tile, which stays dark until it is spent or scried). */
+const SS_F5_INK = {
+  en: { word: ['p', 'e', 'n'], refill: ['h', 'n', 'o'] },
+  es: { word: ['m', 'a', 'r'], refill: ['l', 'u', 'a'] },
+  fr: { word: ['p', 'i', 'n'], refill: ['l', 'n', 'i'] },
+  pt: { word: ['c', 'e', 'u'], refill: ['l', 'u', 'a'] },
+  de: { word: ['m', 'a', 'i'], refill: ['n', 't', 'a'] },
+};
 /* ---- F5-CARD-05: THE TEACHING SCRIPTS — Skylar's verdict-1 notes, with
    verdict 5 (WORDS ARE FINE) paying the copy. Ground truth held against the
    shipping code: the special tiles ARE orange (+6, tier 1), blue (×1.5,
@@ -2175,6 +2207,14 @@ const SS_F5_PROMPTS = {
        (the COLOUR goes; the letter stays on the board, plain) */
     fadeRule: 'If you don\'t use a colored tile on your turn…',
     fadeLoss: '…its color disappears. The letter stays, plain.',
+    /* F5-INK (card ss-2026-10-29-scripted-tutorial/03): the boss blackout —
+       Skylar's words, kept exactly true (blackoutAttack: void bosses ink
+       letters; wordDamage: an inked letter still spells, its points are
+       0). {d} the hit, {p} the same word with the ink washed off. The zero
+       is said in WORDS: the house serif's old-style 0 reads as an "o" */
+    inkWho: 'Some bosses can black out a few of your letters.',
+    inkRule: 'You can still use them in words, but they score no points.',
+    inkHit: 'That black tile added nothing: {d} damage, not {p}.',
   },
   /* FIRST NIGHT, LIVE: the ×4 translation the table was built for — DRAFTS
      in the shipped tongues' own vocabulary (es ficha/bestia · fr tuile/bête ·
@@ -2204,6 +2244,9 @@ const SS_F5_PROMPTS = {
     greenRule: 'Cada vez que la bestia te golpea, ganas una ficha verde.',
     fadeRule: 'Si no usas una ficha de color en tu turno…',
     fadeLoss: '…su color desaparece. La letra queda, sencilla.',
+    inkWho: 'Algunos jefes pueden ennegrecer algunas de tus letras.',
+    inkRule: 'Aún puedes usarlas en palabras, pero no dan puntos.',
+    inkHit: 'Esa ficha negra no sumó nada: {d} de daño, no {p}.',
   },
   fr: {
     tile1: 'Une tuile orange rapporte +6 de plus.',
@@ -2228,6 +2271,9 @@ const SS_F5_PROMPTS = {
     greenRule: 'Chaque coup de la bête te donne une tuile verte.',
     fadeRule: 'Si tu n\'utilises pas une tuile colorée à ton tour…',
     fadeLoss: '…sa couleur disparaît. La lettre reste, toute simple.',
+    inkWho: 'Certains boss peuvent noircir quelques-unes de tes lettres.',
+    inkRule: 'Tu peux encore les utiliser, mais elles ne valent rien.',
+    inkHit: 'Cette tuile noire n\'a rien ajouté : {d} dégâts, pas {p}.',
   },
   pt: {
     tile1: 'Uma peça laranja paga +6 extra.',
@@ -2252,6 +2298,9 @@ const SS_F5_PROMPTS = {
     greenRule: 'Cada golpe da fera em você rende uma peça verde.',
     fadeRule: 'Se você não usar uma peça colorida no seu turno…',
     fadeLoss: '…a cor dela some. A letra fica, simples.',
+    inkWho: 'Alguns chefes podem escurecer algumas das suas letras.',
+    inkRule: 'Você ainda pode usá-las, mas elas não valem pontos.',
+    inkHit: 'Essa peça preta não somou nada: {d} de dano, não {p}.',
   },
   de: {
     tile1: 'Ein oranger Stein zahlt +6 extra.',
@@ -2276,6 +2325,9 @@ const SS_F5_PROMPTS = {
     greenRule: 'Jeder Treffer der Bestie bringt dir einen grünen Stein.',
     fadeRule: 'Nutzt du einen bunten Stein nicht in deinem Zug…',
     fadeLoss: '…verblasst seine Farbe. Der Buchstabe bleibt, schlicht.',
+    inkWho: 'Manche Bosse können ein paar deiner Buchstaben schwärzen.',
+    inkRule: 'Du kannst sie noch benutzen, aber sie bringen keine Punkte.',
+    inkHit: 'Der schwarze Stein gab nichts: {d} Schaden, nicht {p}.',
   },
 };
 /* the one prompt frame (F5-FIX1-03 pulled it out of ssF5Prompt so the scry
@@ -10702,6 +10754,7 @@ class Battle extends Phaser.Scene {
     if (this.ftueGone || this.state === 'end') return null;
     const g = this.f5G;   /* F5-GUIDED: the script's own seats come first */
     if (g) {
+      if (g.beat === 'ink') return g.pose ? 'pose' : 'wait';   /* F5-INK: the hand waits out the bosses' volley, then rests on the black tile */
       if (g.beat === 'earn' || g.beat === 'fade') return g.pose ? 'pose' : 'wait';   /* F5-EARN · F5-FADE: the tile economy's held lessons point like the showcase */
       if (g.beat === 'show' || g.beat === 'reveal' || g.beat === 'strike') return g.pose ? 'pose' : 'wait';   /* F5-SCRYGATE: the reveal points like the showcase — F5-GREEN: the strike too */
       if (g.beat === 'cast') return 'wait';
@@ -10722,6 +10775,8 @@ class Battle extends Phaser.Scene {
         const s = this.board[i];
         if (s && s.c.active && !s.blk && s.tier === pref && s.ch === need && this.sel.indexOf(i) < 0) return i;
       }
+      /* F5-INK: the blackout's word asks for the BLACK tile itself — its first letter is the one the lesson pointed at */
+      if (g && g.idx === g.ink && !this.sel.length) for (let i = 0; i < 16; i++) { const s = this.board[i]; if (s && s.c.active && s.blk && s.ch === need) return i; }
       for (let i = 0; i < 16; i++) {
         const s = this.board[i];
         if (s && s.c.active && !s.blk && s.ch === need && this.sel.indexOf(i) < 0) return i;
@@ -10888,6 +10943,7 @@ class Battle extends Phaser.Scene {
     }
     this.f5GuideBeat('cast');
     DIAG('f5 guide: cast ' + word + ' for ' + dmg + (g.show ? ' (plain ' + g.show.plain + ', ' + (kind === 3 ? 'green ♥' + g.show.heal : kind === 2 ? 'blue ×' + SS_F5_BLUE_MULT : 'orange +' + g.show.extra) + ')' : ''));
+    if (g.ink != null && g.idx === g.ink) this.f5InkArm(word, tiles, dmg);   /* F5-INK: the black tile's word arms THE ZERO */
   }
   // the refill of a guided cast has been dealt: once it has settled and the
   // board is the player's again, the next beat
@@ -10916,6 +10972,10 @@ class Battle extends Phaser.Scene {
     const nk = g.idx + 1 === g.orange ? 1 : g.idx + 1 === g.blue ? 2 : g.idx + 1 === g.green ? 3 : 0;
     if (nk && !(g.earned && g.earned[nk]) && this.f5GuideEarn(nk)) return;
     if (g.idx + 1 >= g.words.length && !g.faded && this.f5GuideFade()) return;
+    /* F5-INK: the tile economy taught, THE BOSS BLACKOUT (once): the bosses'
+       volley, then its lesson — whose lift adds the black tile's word to the
+       script, so the step below walks it (then THE ZERO, then the farewell) */
+    if (g.idx + 1 >= g.words.length && !g.inked && this.f5GuideInk()) return;
     g.idx++;
     if (g.idx >= g.words.length) { this.f5GuideEnd(true); return; }   /* F5-BLUE: the script is spent — the hand lets go, happily */
     this.ftueWord = g.words[g.idx];
@@ -10946,6 +11006,7 @@ class Battle extends Phaser.Scene {
     if (!g || !g.show || !g.cont || g.beat !== 'cast' || !this.sys.isActive()) return;
     const l = this.L, sh = g.show;
     if (sh.tier === 3) { this.f5MendShow(g); return; }   /* F5-GREEN: THE MEND — the heal shown coming back on the player's bar */
+    if (sh.ink) { this.f5InkShow(g); return; }   /* F5-INK: THE ZERO — what the black tile paid */
     /* F5-BLUE: the showcase speaks for the orange (tier 1, "+6") and the blue
        (tier 2, "×1.5") alike — the tile as it stood, the number in the tile's
        own voice, the hit line; the blue adds the one line that keeps the two
@@ -11533,6 +11594,206 @@ class Battle extends Phaser.Scene {
     DIAG('f5 fade: lifted (' + why + ', ' + b.holdMs + ' ms from the drain)');
     this.f5GuideNext();   // the words are spent — the farewell, exactly as shipped
   }
+  /* ---- F5-INK (card ss-2026-10-29-scripted-tutorial/03): THE BOSS
+     BLACKOUT. Skylar (10/29): "The beast should put the black tile on a
+     couple of your letters and explain that that's what some bosses can
+     do. They can black out some of your letters sometimes. You could still
+     use the letters, you just don't get any points for using those
+     letters." Ground truth (blackoutAttack, blackTile, wordDamage): the
+     void bosses (STRIX, DRACO, the deep climb's) ink letters as their
+     strike charges — two a volley unless the beast says more, the
+     highest-worth PLAIN letters first, the lowest cell on a tie; an inked
+     tile keeps its letter and still spells (it still counts toward the
+     word's length), but its points are void — the dark face, the flat 0
+     chip — until it is spent or scried away. The colours taught and spent,
+     the beast throws the bosses' OWN volley (blackoutAttack, at real speed:
+     the shudder, the violet flash, "the void drinks your letters", the ink
+     bolts) on the board the rig made the same for everyone, so the same
+     two letters go dark for every player; once the ink has pooled and the
+     live "inked · worth nothing" has spoken, the fight HOLDS: the light
+     veil, the two black tiles lifted into the light where they stand (each
+     one's twin at its own seat, a violet breath behind it), "Some bosses
+     can black out a few of your letters." on a row the ink left alone, the
+     rule a breath later ("…but they score no points."), the hand on each
+     black tile in turn, resting on the one the next word starts on. The
+     dwell, or a tap past the floor, lets go: the black tile's word
+     (SS_F5_INK) joins the script, the hand walks it — the black tile first
+     — and THE ZERO holds on what that tile paid ("+0", "That black tile
+     added nothing: 2 damage, not 5."), then the farewell. The other black
+     tile stays dark on the board the hand leaves: the real curse, to route
+     around. */
+  f5GuideInk() {
+    const g = this.f5G, ink = SS_F5_INK[PACK.lang];
+    if (!ink || this.state !== 'pick' || !this.beast || this.beast.hpNow <= 0 || !this.sys.isActive()) return false;   // no room — the farewell, as before
+    this.f5InkTaught = true;   // the night teaches the ink here — fight 2's taste stands down
+    g.pose = null;
+    this.f5GuideBeat('ink');   // the lock holds; the hand backs off while the beast throws
+    const b = window.__f5ink = window.__f5ink || {};
+    b.armed = (b.armed | 0) + 1; b.armedAt = Date.now(); b.word = ink.word.join('');
+    DIAG('f5 ink: the bosses\' volley');
+    this.blackoutAttack(() => {
+      const v = window.__ssink || {};
+      b.volley = { n: v.n, tiles: (v.tiles || []).slice() }; b.inkedAt = Date.now();
+      this.time.delayedCall(SS_F5_INK_AT_MS, () => this.f5GuideInkHold(g));
+    });
+    return true;
+  }
+  f5GuideInkHold(g) {
+    if (this.f5G !== g || g.beat !== 'ink' || !this.sys.isActive()) return;
+    const l = this.L, ts = this.tileSize, ink = SS_F5_INK[PACK.lang];
+    const cells = [];   // the board's truth: what the volley inked
+    for (let i = 0; i < 16; i++) { const s = this.board[i]; if (s && s.blk && s.c.active) cells.push(i); }
+    if (!cells.length) { g.inked = true; DIAG('f5 ink: nothing inked — the hand lets go'); this.f5GuideNext(); return; }
+    const P = SS_F5_PROMPTS[PACK.lang] || SS_F5_PROMPTS.en, say = (key) => P[key] || SS_F5_PROMPTS.en[key];
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setDepth(900).setInteractive();
+    this.tweens.add({ targets: veil, alpha: SS_F5_SHOW_VEIL, duration: 260 });
+    // the black tiles, lifted into the light where they stand: each one's twin
+    // at its own seat above the veil (the board's own faces, at its own size),
+    // a violet breath behind it — the volley's colour
+    const extra = [];
+    cells.forEach((i) => {
+      const s = this.board[i], p = this.slotPos(i);
+      const glow = this.add.image(p.x, p.y, 'dot').setScale(ts / 9).setTint(0x8a76e8).setBlendMode('ADD').setAlpha(0.2).setDepth(904);
+      const twin = this.add.container(p.x, p.y, [
+        this.add.image(0, 0, 'tileblk').setDisplaySize(ts, ts),
+        this.add.image(0, -l.u(2), ssGlyph(this, s.ch, SS_BLK_INK)).setDisplaySize(l.u(64), l.u(48)),
+        this.add.image(l.u(24), l.u(21), ssGlyphVal(this, 0, SS_BLK_VINK)).setDisplaySize(l.u(30), l.u(20)),
+      ]).setDepth(905);
+      twin.setData('f5inktile', i);
+      this.tweens.add({ targets: glow, alpha: 0.5, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      extra.push(glow, twin);
+    });
+    // the two lines on a row the ink left alone (the middle rows first) — the
+    // block is one row tall, so it never covers a black tile
+    const rows = cells.map((i) => i >> 2);
+    const row = [1, 2, 0, 3].find((r) => !rows.includes(r));
+    const line = ssF5Frame(this, say('inkWho'));
+    const rl = ssF5Frame(this, say('inkRule')).setAlpha(0);
+    const H = line.f5H + l.u(8) + rl.f5H;
+    line.setPosition(0, -H / 2 + line.f5H / 2);
+    rl.setPosition(0, H / 2 - rl.f5H / 2);
+    const c = this.add.container(l.x(0), row == null ? l.y(468) : this.slotPos(row * 4).y).setDepth(950).setAlpha(0).setScale(0.92);
+    c.setData('f5ink', cells.length);
+    c.add([line, rl]);
+    this.tweens.add({ targets: c, alpha: 1, scale: 1, duration: 220, ease: 'Back.easeOut' });
+    this.tweens.add({ targets: rl, alpha: 1, duration: 260, delay: 700 });
+    // the hand points at each black tile in turn and comes to rest on the one
+    // the word starts on — each from the side away from its neighbour when two
+    // stand side by side (the glove never hides the other)
+    const at = cells.find((i) => this.board[i].ch === ink.word[0]);
+    const pt = at != null ? at : cells[0];
+    const poseOn = (i) => {
+      const p = this.slotPos(i), o = cells.find((j) => j !== i && (j >> 2) === (i >> 2) && Math.abs(j - i) === 1);
+      const flip = o != null ? o > i : i % 4 >= 2;
+      return { x: p.x + (flip ? -1 : 1) * ts * 0.36, y: p.y - ts * 0.10, flip, dip: 7 };
+    };
+    const tour = cells.filter((i) => i !== pt).concat(pt);
+    g.pose = poseOn(tour[0]);
+    g.poseN = (g.poseN | 0) + 1;
+    const h = this.ftueHand;
+    g.heldDepth = h && h.active ? h.depth : null;
+    if (h && h.active) h.setDepth(960);
+    this.ftueAt = null; this.ftueRepoint();
+    tour.slice(1).forEach((i, k) => this.time.delayedCall(SS_F5_INK_TOUR_MS * (k + 1), () => {
+      if (this.f5G !== g || g.beat !== 'ink' || !g.showObjs) return;
+      g.pose = poseOn(i); g.poseN = (g.poseN | 0) + 1;
+      this.ftueAt = null; this.ftueRepoint();
+      const bt = window.__f5ink; if (bt) bt.toured = (bt.toured | 0) + 1;
+    }));
+    g.showObjs = { veil, c, extra }; g.shownAt = this.time.now; g.inkAt = at;
+    const b = window.__f5ink = window.__f5ink || {};
+    b.shown = (b.shown | 0) + 1; b.shownAt = Date.now(); b.cells = cells.slice(); b.letters = cells.map((i) => this.board[i].ch).join(' ');
+    b.at = at == null ? null : at; b.row = row == null ? null : row; b.tour = tour.slice(); b.toured = 0;
+    b.who = say('inkWho'); b.rule = say('inkRule'); b.released = null; b.holdMs = 0;
+    SFX.tick();
+    DIAG('f5 ink: the lesson — ' + b.letters + ' (the word starts at ' + at + ')');
+    const release = (why) => { if (g.tapFn) { this.input.off('pointerdown', g.tapFn); g.tapFn = null; } this.f5GuideInkLift(why); };
+    const dwell = this.time.delayedCall(SS_F5_INK_SHOW_MS, () => release('dwell'));
+    this.time.delayedCall(SS_F5_SHOW_FLOOR_MS, () => {
+      if (this.f5G !== g || g.beat !== 'ink' || !g.showObjs) return;
+      g.tapFn = () => { dwell.remove(false); release('tap'); };   // taps accelerate, past the floor
+      this.input.once('pointerdown', g.tapFn);
+    });
+  }
+  f5GuideInkLift(why) {
+    const g = this.f5G; if (!g || g.beat !== 'ink' || !g.showObjs) return;
+    const b = window.__f5ink = window.__f5ink || {};
+    b.released = why; b.holdMs = Math.round(this.time.now - g.shownAt); b.lifted = (b.lifted | 0) + 1; b.liftedAt = Date.now();
+    const { veil, c, extra } = g.showObjs;
+    veil.disableInteractive();   // the board is the player's again at once — the hand asks for the black tile
+    for (const o of [c, ...extra]) {
+      if (!o || !o.active) continue;
+      this.tweens.killTweensOf(o);
+      this.tweens.add({ targets: o, alpha: 0, duration: 260, onComplete: () => { if (o.active) o.destroy(); } });   // the twins melt back into the very tiles they covered
+    }
+    this.tweens.add({ targets: veil, alpha: 0, duration: 300, onComplete: () => { if (veil.active) veil.destroy(); } });
+    g.showObjs = null; g.pose = null; g.inked = true;
+    const h = this.ftueHand; if (h && h.active && g.heldDepth != null) h.setDepth(g.heldDepth);
+    g.heldDepth = null;
+    // the black tile's word joins the script, its refill authored with it
+    // (the board the hand finally leaves stays the same for every player)
+    const ink = SS_F5_INK[PACK.lang];
+    if (ink && g.inkAt != null) {
+      g.words.push(ink.word.slice()); g.ink = g.words.length - 1;
+      if (this.f5Queue) this.f5Queue.push(...ink.refill);
+      const gb = window.__f5guide; if (gb) { gb.words.push(ink.word.join('')); gb.ink = g.ink; gb.inkCell = g.inkAt; }
+    }
+    DIAG('f5 ink: lifted (' + why + ')');
+    this.f5GuideNext();   // the black tile's word (then THE ZERO), or the farewell
+  }
+  // THE ZERO's arming (from f5GuideCast): the same tiles with the ink washed
+  // off are the hit the word would have been — the showcase's own grammar
+  f5InkArm(word, tiles, dmg) {
+    const g = this.f5G, bt = tiles.find((s) => s.blk);
+    if (!bt) return;   // spelled around the ink after all — nothing to show
+    const plain = this.wordDamage(tiles.map((s) => (s.blk ? Object.assign({}, s, { blk: false }) : s)));
+    g.show = { word, dmg, plain, extra: dmg - plain, ch: bt.ch, tier: 0, ink: 1 };
+    if (window.__f5guide) window.__f5guide.show = Object.assign({}, g.show);
+    DIAG('f5 ink: cast ' + word + ' for ' + dmg + ' (the clean word ' + plain + ')');
+  }
+  // THE ZERO — from f5GuideShow, when the beast's bar has drained: the black
+  // tile as it flew, the 0 it paid in the ink's own pale voice, the hit
+  // against the clean word's; the hand on the number
+  f5InkShow(g) {
+    const l = this.L, sh = g.show;
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setDepth(900).setInteractive();
+    this.tweens.add({ targets: veil, alpha: SS_F5_SHOW_VEIL, duration: 260 });
+    const c = this.add.container(l.x(0), l.y(468)).setDepth(950).setAlpha(0).setScale(0.92);   // the hit number's own seat
+    c.setData('f5inkshow', 1);
+    const ts = l.u(46), k = 46 / 78;
+    const glow = this.add.image(-l.u(62), 0, 'dot').setScale(ts / 9).setAlpha(0.3).setTint(0x8a76e8).setBlendMode('ADD');
+    const tile = this.add.container(-l.u(62), 0, [
+      this.add.image(0, 0, 'tileblk').setDisplaySize(ts, ts),
+      this.add.image(0, -l.u(2 * k), ssGlyph(this, sh.ch, SS_BLK_INK)).setDisplaySize(l.u(64 * k), l.u(48 * k)),
+      this.add.image(l.u(24 * k), l.u(21 * k), ssGlyphVal(this, 0, SS_BLK_VINK)).setDisplaySize(l.u(30 * k), l.u(20 * k)),
+    ]);
+    // what it added, in the orange's "+6" grammar — the sign keeps the house
+    // serif's old-style 0 a number, never an "o"
+    const zero = ssTxt(this, -l.u(30), 0, '+0', l.u(38), SS_BLK_INK).setOrigin(0, 0.5).setShadow(0, 0, '#2a2350', l.u(10), true, true);
+    const P = SS_F5_PROMPTS[PACK.lang] || SS_F5_PROMPTS.en;
+    const line = ssF5Frame(this, (P.inkHit || SS_F5_PROMPTS.en.inkHit).replace('{d}', sh.dmg).replace('{p}', sh.plain)).setPosition(0, l.u(52));
+    c.add([glow, tile, zero, line]);
+    this.tweens.add({ targets: c, alpha: 1, scale: 1, duration: 220, ease: 'Back.easeOut' });
+    this.tweens.add({ targets: glow, alpha: 0.55, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    // the hand points at the number (above the veil for the beat)
+    g.pose = { x: c.x + zero.x + zero.width + l.u(8), y: c.y + l.u(8), flip: false, dip: 7 };
+    g.poseN = (g.poseN | 0) + 1;
+    const h = this.ftueHand; if (h && h.active) h.setDepth(960);
+    g.showObjs = { veil, c }; g.shownAt = this.time.now;
+    this.f5GuideBeat('show');
+    const b = window.__f5guide; if (b) { b.shown++; b.shownAt = Date.now(); b.showTier = 'ink'; }
+    const z = window.__f5ink = window.__f5ink || {};
+    z.zero = { word: sh.word, ch: sh.ch, dmg: sh.dmg, plain: sh.plain, line: line.list.find((t) => t.type === 'Text').text, shownAt: Date.now() };
+    SFX.unchime();
+    DIAG('f5 ink: THE ZERO — ' + sh.dmg + ', the clean word ' + sh.plain);
+    const release = () => { if (g.tapFn) { this.input.off('pointerdown', g.tapFn); g.tapFn = null; } this.f5GuideRelease(); };
+    const dwell = this.time.delayedCall(SS_F5_SHOW_MS, release);
+    this.time.delayedCall(SS_F5_SHOW_FLOOR_MS, () => {
+      if (this.f5G !== g || g.beat !== 'show') return;
+      g.tapFn = () => { dwell.remove(false); release(); };   // taps accelerate, past the floor
+      this.input.once('pointerdown', g.tapFn);
+    });
+  }
 
   // ---------- board ----------
   boardVowels() { return this.board.filter((s) => s && VOWELS.includes(s.ch[0])).length; }
@@ -11880,8 +12141,10 @@ class Battle extends Phaser.Scene {
     const l = this.L;
     s.blk = true;
     /* F5-CARD-05: the first inked tile explains itself (rides BOTH the
-       scripted fight-2 taste and DRACO's real volley — whichever first) */
-    if (this.f5Night) this.time.delayedCall(560, () => { if (this.scene.isActive()) ssF5Prompt(this, 'ink', l.x(0), l.y(374)); });   /* F5-GUIDED: one lesson seat, under the pill */
+       scripted fight-2 taste and DRACO's real volley — whichever first).
+       F5-INK: while the hand's script stands, the blackout's own lesson says
+       it (card 02's law for the arrivals) */
+    if (this.f5Night && !this.f5GuideLocked()) this.time.delayedCall(560, () => { if (this.scene.isActive()) ssF5Prompt(this, 'ink', l.x(0), l.y(374)); });   /* F5-GUIDED: one lesson seat, under the pill */
     // blackout wins: a gilded or forged letter is simply dark now
     s.tier = 0;
     if (s.glow) {
@@ -13579,13 +13842,18 @@ class Battle extends Phaser.Scene {
          the prompt rides blackTile. FOR SKYLAR: only bosses own the blackout
          in the shipping game; this scripted taste is the generous read of
          "a script where a beast uses their special" — say the word to move
-         it later (or leave it to DRACO's real volley alone). */
+         it later (or leave it to DRACO's real volley alone).
+         F5-INK (card ss-2026-10-29-scripted-tutorial/03): the night's script
+         now TEACHES the blackout (f5GuideInk marks f5InkTaught), so this
+         taste stands down behind it; it remains only for a night whose
+         script never reached that lesson — and inks the BEST letter by the
+         bosses' own rule, the same for everyone (it rolled Math.random). */
       if (this.f5Night && this.run.fightIdx === 1 && !this.f5InkTaught) {
         this.f5InkTaught = true;
         this.time.delayedCall(900, () => {
           if (this.state === 'end' || !this.scene.isActive()) return;
           const open = this.board.map((s, i) => s && !s.blk && s.tier === 0 && s.c.active ? i : -1).filter((i) => i >= 0);
-          if (open.length) this.blackTile(open[Math.floor(Math.random() * open.length)]);
+          if (open.length) this.blackTile(open.sort((a, b) => this.inkWorth(this.board[b]) - this.inkWorth(this.board[a]) || a - b)[0]);
         });
       }
       done();
