@@ -990959,6 +990959,17 @@ function hkgRead(n){ const g=function(f){ try{ return f(); }catch(e){ return nul
 
 
 
+
+
+
+
+
+
+
+
+
+
+
 function kysOn(){ try{ const R=S.raid; return !!(KYS.on && R && R.k==='ice' && R.cfg===S.cfg && KYS_TIERS[R.t] && !S.bf); }catch(e){ return false; } }
 function kysT(T){ try{ const v=+T[S.raid.t]; return isFinite(v)? v : +T.h; }catch(e){ return +T.h; } }
 
@@ -991070,7 +991081,7 @@ function kysCourt(f,r){ const o=[]; for(const g of S.foes){ if(g===f || g.dead |
 function kysCrysOk(f,c,m,w){   
   if(c==='red') return !!m; if(c==='blue') return !!w; if(!m) return false;
   if(c==='green') return !(f.cloakT>0); if(c==='orange') return f.hp<f.hpMax; if(c==='teal') return !!kysManAt(f.x,f.y,TK_TEAL_SEEK); if(c==='silver') return true; return false; }
-function kysBusy(f){ return !!(f.kyTk || f.kyWave || f.kySwing>0 || f.cloakT>0 || f.kysLg || (f.kysChanTo!=null && S.t<f.kysChanTo) || (f.kysOverTo!=null && S.t<f.kysOverTo)); }
+function kysBusy(f){ return !!(f.kkWind>0 || f.kkFl || f.kyTk || f.kyWave || f.kySwing>0 || f.cloakT>0 || f.kysLg || (f.kysChanTo!=null && S.t<f.kysChanTo) || (f.kysOverTo!=null && S.t<f.kysOverTo)); }
 function kysCast(f,c,m,w){ const hex=tkHexOf(c);
   if(c==='red'){ kysKingRed(f,m); KYS.n.kRed++; }
   else if(c==='blue'){ kysKingBlue(f); KYS.n.kBlue++; }
@@ -991095,10 +991106,46 @@ function kysKingPost(f,dt){
   kysCrysTick(f,dt);
   if(f.plWind>0 || f.plT>0) return; f.kysPow+=dt;   
   if(f.kysPow<kysT(KYS_KING_FLOOR) || kysBusy(f)) return;   
+  if(KYS.part.khop && kysT(KYS_KING_HOP)>0 && f.kkT!=null && f.kkT<1.2) return;   
   const list=(KYS.part.crys && kysT(KYS_KING_CRYS))? KYS_CRYS : ['red','blue'], m=kysRedMan(f), w=kysBlueMan(f); let pick=-1;
   for(let j=0;j<list.length;j++){ const i=((f.kysNext|0)+j)%list.length; if(kysCrysOk(f,list[i],m,w)){ pick=i; break; } }   
   if(pick<0){ if(!f.kysWait){ f.kysWait=1; KYS.n.kWaited++; } return; }   
   kysCast(f,list[pick],m,w); f.kysNext=(pick+1)%list.length; f.kysPow=0; f.kysWait=0; }
+function kysKRoll(f,n){ let salt='0'; try{ salt=(S.coop && COOP && COOP.code)? String(COOP.code) : String(Math.round(((S.raid && S.raid.t0)||0)*1000)); }catch(e){ salt='0'; } return rxRoll('kyk:'+rxDoorKey()+':'+salt+':'+(n|0)); }
+function kysKFloor(x,y){ const fl=KYS_KH.floor*TK_M, rx=x-T.x, ry=y-T.y, rd=Math.hypot(rx,ry)||1; return (rd<fl)? { x:T.x+rx/rd*fl, y:T.y+ry/rd*fl } : { x:x, y:y }; }
+function kysKHopTo(f){ const K=KYS_KH, u=kysManAt(f.x,f.y,K.hunt), len=(K.min+kysKRoll(f,f.kkN|0)*(K.max-K.min))*TK_M; let x, y;   
+  if(u){ const dx=u.x-f.x, dy=u.y-f.y, d=Math.hypot(dx,dy)||1, L=Math.min(len, d-K.short);
+    if(L>=2*TK_M){ x=f.x+dx/d*L; y=f.y+dy/d*L; }   
+    else { const a=Math.atan2(f.y-u.y,f.x-u.x)+((f.kkN|0)%2? 1 : -1)*Math.min(2.6, len/K.short); x=u.x+Math.cos(a)*K.short; y=u.y+Math.sin(a)*K.short; } }   
+  else { const dx=T.x-f.x, dy=T.y-f.y, d=Math.hypot(dx,dy)||1; x=f.x+dx/d*len; y=f.y+dy/d*len; }
+  const p=kysKFloor(Math.max(60,Math.min(W-60,x)), Math.max(84,Math.min(WORLD_H-104,y))), L2=Math.hypot(p.x-f.x,p.y-f.y); return (L2>=TK_M)? { x:p.x, y:p.y, len:L2, u:u } : null; }
+function kysOnto(f,u){ const dx=u.x-f.x, dy=u.y-f.y, d=Math.hypot(dx,dy)||1, p=kysKFloor(u.x-dx/d*30, u.y-dy/d*30); return { x:p.x, y:p.y, len:Math.hypot(p.x-f.x,p.y-f.y) }; }
+function kysNextMan(f,r,hit){ let best=null,bd=r; for(const u of S.units){ if(u.dead || u.jetT>0 || u.dropT>0 || u.falling || u.cloakT>0 || hit.indexOf(u)>=0) continue; if(S.drag && S.drag.unit===u) continue; const d=Math.hypot(u.x-f.x,u.y-f.y); if(d<bd){ bd=d; best=u; } } return best; }
+function kysKingStrike(f,u){ const ang=Math.atan2(u.y-f.y,u.x-f.x); S.fx.push({k:'arc',x:f.x,y:f.y-26,R:52,a0:ang-1.15,a1:ang+1.15,t:0,dur:0.34}); bfSfx(SFX.swish, f.x, f.y); knock(u,f.x,f.y); KYS.n.kkStrikes++; }
+function kysKingLaunch(f){ const K=KYS_KH, P=kysKHopTo(f); if(!P){ f.kkT=1; return; } f.kkN=(f.kkN|0)+1;
+  const every=kysT(KYS_KING_BOUNCE)|0, u=P.u, two=!!(u && S.units.some(o=>o!==u && !o.dead && !(o.jetT>0) && !(o.dropT>0) && !o.falling && Math.hypot(o.x-u.x,o.y-u.y)<=K.bR)), chain=(every>0 && f.kkN%every===0 && two)? { left:K.bN, hit:[] } : null;   
+  const tg=chain? kysOnto(f,u) : P, fr=Math.max(0,Math.min(1,tg.len/(K.max*TK_M)));
+  f.kkFl={ x0:f.x, y0:f.y, x1:tg.x, y1:tg.y, t:0, dur:K.t0+K.tM*fr, h:K.h0+K.hM*fr, chain:chain, u:chain? u : null };
+  KYS.n.kkHops++; if(chain) KYS.n.kkBounces++;
+  if(KYS.kkh.length<120) KYS.kkh.push({ n:f.kkN, tier:(S.raid && S.raid.t)||'', t:+(S.t-((S.raid && S.raid.t0)||0)).toFixed(2), x0:Math.round(f.x), y0:Math.round(f.y), x1:Math.round(tg.x), y1:Math.round(tg.y), len:Math.round(tg.len), bounce:chain? 1 : 0, man:u? Math.round(Math.hypot(u.x-tg.x,u.y-tg.y)) : -1 });
+  bfSfx(SFX.jet, f.x, f.y); }
+function kysKingLand(f,F){ const KR=KYS_KH.ring;
+  SFX.stomp(); S.shake=Math.max(S.shake||0, 0.4); S.fx.push({k:'snowsplash',x:f.x,y:f.y,R:KR+24,t:0,dur:0.6}); S.fx.push({k:'ring',x:f.x,y:f.y-8,r:8,R:KR+16,t:0,dur:0.32,col:KYS_INK.ice});
+  if(F.chain){ const u=F.u; if(u && !u.dead && Math.hypot(u.x-f.x,u.y-f.y)<=72){ kysKingStrike(f,u); F.chain.hit.push(u); } F.chain.left--;   
+    if(F.chain.left>0){ const nx=kysNextMan(f,KYS_KH.bR,F.chain.hit); if(nx){ const tg=kysOnto(f,nx); f.kkFl={ x0:f.x, y0:f.y, x1:tg.x, y1:tg.y, t:0, dur:KYS_KH.bT, h:KYS_KH.bH, chain:F.chain, u:nx }; KYS.n.kkBounceHops++; bfSfx(SFX.jet, f.x, f.y); } }   
+    return; }
+  let ko=0; for(const u of S.units){ if(u.dead || u.jetT>0 || u.dropT>0 || u.falling) continue; if(S.drag && S.drag.unit===u) continue; if(Math.hypot(u.x-f.x,u.y-f.y)<=KR+((u.def && u.def.w)||54)*0.3){ knock(u,f.x,f.y); ko++; } }   
+  KYS.n.kkLandKO+=ko; }
+function kysKingHopTick(f,dt){   
+  if(!KYS.part.khop || !(kysT(KYS_KING_HOP)>0)) return false;
+  if(f.kkT==null){ f.kkT=KYS_KH.first; f.kkN=0; }
+  f.kkT-=dt;   
+  if(f.kkFl){ const F=f.kkFl; F.t+=dt; f.shot=0; const k=Math.min(1,F.t/F.dur); f.x=F.x0+(F.x1-F.x0)*k; f.y=F.y0+(F.y1-F.y0)*k; f.airB=F.h*4*k*(1-k); if(k>=1){ f.airB=0; f.kkFl=null; kysKingLand(f,F); } return true; }
+  if(f.kkWind>0){ f.kkWind-=dt; f.shot=0; if(f.kkWind<=0) kysKingLaunch(f); return true; }
+  if(f.kkT>0 || kysBusy(f)) return false;   
+  if(!kysKHopTo(f)){ f.kkT=1; return false; }
+  f.kkWind=KYS_KH.wind; f.kkT=kysT(KYS_KING_HOP); KYS.n.kkTells++; tkTellFx(f.x,f.y,KYS_INK.ice); S.fx.push({k:'ring',x:f.x,y:f.y-40,r:8,R:60,t:0,dur:0.45,col:'#FFFFFF'}); return true; }
+
 
 
 
@@ -991111,15 +991158,16 @@ function kysRows(){ if(typeof BLB_RULES==='undefined' || !Array.isArray(BLB_RULE
     ['KYS_HOP_CD', ()=>KYS_HOP_CD, "SERGEANT SNOWMAN'S HOP: ONE EVERY S (KYS)", 'ice'], ['KYS_HOP_MIN', ()=>KYS_HOP_MIN, "SERGEANT SNOWMAN'S HOP: THE DIE'S SHORTEST, M (KYS)", 'ice'],
     ['KYS_HOP_MAX', ()=>KYS_HOP_MAX, "SERGEANT SNOWMAN'S HOP: THE DIE'S LONGEST, M (KYS)", 'ice'], ['KYS_HOP_FLOOR', ()=>KYS_HOP_FLOOR, "SERGEANT SNOWMAN'S HOP: NEVER NEARER YOUR TOY BOX THAN M (KYS)", 'ice'],
     ['KYS_HOP_SIDE', ()=>KYS_HOP_SIDE, "SERGEANT SNOWMAN'S HOP: AT THE LINE HE HOPS ALONG IT, 1 YES 0 NO (KYS; Isaac 11/5)", 'ice'], ['KYS_KING_FLOOR', ()=>KYS_KING_FLOOR, "KING YETI: A POWER ON YOUR MEN EVERY S, HIS CRYSTALS BY TURNS (KYS; Isaac 11/5: at least every 7.5)", 'ice'],
-    ['KYS_KING_CRYS', ()=>KYS_KING_CRYS, "KING YETI: THE HERO'S CRYSTALS BUT PURPLE, 1 YES 0 RED AND BLUE ONLY (KYS; Isaac 11/5)", 'ice'], ['KYS_ORANGE_HEAL', ()=>KYS_ORANGE_HEAL, "KING YETI: HIS ORANGE CHANNEL MENDS THIS SHARE OF EACH BAR (KYS)", 'ice'] ];
+    ['KYS_KING_CRYS', ()=>KYS_KING_CRYS, "KING YETI: THE HERO'S CRYSTALS BUT PURPLE, 1 YES 0 RED AND BLUE ONLY (KYS; Isaac 11/5)", 'ice'], ['KYS_ORANGE_HEAL', ()=>KYS_ORANGE_HEAL, "KING YETI: HIS ORANGE CHANNEL MENDS THIS SHARE OF EACH BAR (KYS)", 'ice'],
+    ['KYS_KING_HOP', ()=>KYS_KING_HOP, "KING YETI: A HOP EVERY S, 0 HE WALKS (KYS; Isaac 11/5)", 'ice'], ['KYS_KING_BOUNCE', ()=>KYS_KING_BOUNCE, "KING YETI: EVERY NTH HOP BOUNCES MAN TO MAN, 0 NEVER (KYS; Isaac 11/5)", 'ice'] ];
   for(const r of R){ if(!BLB_RULES.some(x=>x[0]===r[0])) BLB_RULES.push(r); n++; }
   blbShip();   
   if(typeof blbCellSet==='function' && BLB.booted && BLB.over){ for(const r of R){ const o=BLB.over[r[0]]; if(o) for(const t of Object.keys(o)) blbCellSet(r[0], t, o[t]); } }   
   KYS.rows=n; return n; }
 
-function kysRead(o){ o=o||{}; if(o.on!=null) KYS.on=o.on? 1 : 0; for(const k of ['snow','hop','bars','side','king','crys']) if(o[k]!=null) KYS.part[k]=o[k]? 1 : 0; if(o.zero){ for(const k in KYS.n) KYS.n[k]=0; KYS.hops.length=0; KYS.bars.length=0; KYS.kpow.length=0; KYS.err=0; KYS.e=''; }
+function kysRead(o){ o=o||{}; if(o.on!=null) KYS.on=o.on? 1 : 0; for(const k of ['snow','hop','bars','side','king','crys','khop']) if(o[k]!=null) KYS.part[k]=o[k]? 1 : 0; if(o.zero){ for(const k in KYS.n) KYS.n[k]=0; KYS.hops.length=0; KYS.bars.length=0; KYS.kpow.length=0; KYS.kkh.length=0; KYS.err=0; KYS.e=''; }
   return { cv:GVT_CV, on:KYS.on|0, live:kysOn()? 1 : 0, part:Object.assign({},KYS.part), n:Object.assign({},KYS.n), err:KYS.err, e:KYS.e, wrapped:KYS.wrapped|0, leapWrapped:KYS.leapWrapped|0, kingWrapped:KYS.kingWrapped|0, rows:KYS.rows|0,
-    coldX:Object.assign({},KYS_COLDX), snowX:Object.assign({},KYS_SNOWX), hop:{ first:Object.assign({},KYS_HOP_FIRST), big:Object.assign({},KYS_HOP_BIG), cd:Object.assign({},KYS_HOP_CD), min:Object.assign({},KYS_HOP_MIN), max:Object.assign({},KYS_HOP_MAX), floor:Object.assign({},KYS_HOP_FLOOR), side:Object.assign({},KYS_HOP_SIDE), look:Object.assign({},KYS_HOP_LOOK) }, king:{ floor:Object.assign({},KYS_KING_FLOOR), crys:Object.assign({},KYS_KING_CRYS), heal:Object.assign({},KYS_ORANGE_HEAL), list:KYS_CRYS.slice() }, kpow:KYS.kpow.slice(),
+    coldX:Object.assign({},KYS_COLDX), snowX:Object.assign({},KYS_SNOWX), hop:{ first:Object.assign({},KYS_HOP_FIRST), big:Object.assign({},KYS_HOP_BIG), cd:Object.assign({},KYS_HOP_CD), min:Object.assign({},KYS_HOP_MIN), max:Object.assign({},KYS_HOP_MAX), floor:Object.assign({},KYS_HOP_FLOOR), side:Object.assign({},KYS_HOP_SIDE), look:Object.assign({},KYS_HOP_LOOK) }, king:{ floor:Object.assign({},KYS_KING_FLOOR), crys:Object.assign({},KYS_KING_CRYS), heal:Object.assign({},KYS_ORANGE_HEAL), list:KYS_CRYS.slice(), hop:Object.assign({},KYS_KING_HOP), bounce:Object.assign({},KYS_KING_BOUNCE), kh:Object.assign({},KYS_KH) }, kpow:KYS.kpow.slice(), kkh:KYS.kkh.slice(),
     pile:{ rows:KYS_PILE.rows.slice(), r:KYS_PILE.r, dx:KYS_PILE.dx, dy:KYS_PILE.dy }, ball:Object.assign({},KYS_BALL), last:KYS.last, bars:KYS.bars.slice(-8), hops:KYS.hops.slice(),
     posts:(S.raid && S.raid.posts)? S.raid.posts.map(P=>({ x:P.x, y:P.y, o:P.o, home:P.kyfHome|0, pile:kysPileN(P) })) : null }; }
 
@@ -1203027,7 +1203075,7 @@ let BFQ=null;
 
 
 
-let GVT_CV='30.37';
+let GVT_CV='30.38';
 let NX_CAP_MUL=4;
 
 
@@ -3092015,6 +3092063,14 @@ if(typeof GVT!=='undefined' && GVT) GVT.hkg=hkgRead;
 
 
 
+
+
+
+
+
+
+
+
 const KYS_LIVE=1;
 const KYS_TIERS={ e:1, m:1, h:1, g:1 };
 const KYS_COLDX={ e:0.6, m:0.6, h:1, g:1 };
@@ -3092029,13 +3092085,16 @@ const KYS_HOP_SIDE={ e:1, m:1, h:1, g:1 };
 const KYS_KING_CRYS={ e:1, m:1, h:1, g:1 };
 const KYS_ORANGE_HEAL={ e:0.08, m:0.08, h:0.08, g:0.08 };
 const KYS_CRYS=['red','blue','green','orange','teal','silver'], KYS_SILVER_ADD=3*TK_M;
+const KYS_KING_HOP={ e:10, m:10, h:10, g:10 };
+const KYS_KING_BOUNCE={ e:3, m:3, h:3, g:3 };
+const KYS_KH={ first:2, wind:0.45, t0:0.55, tM:0.35, h0:60, hM:90, min:6, max:12, short:96, hunt:560, floor:10, bR:230, bN:3, bT:0.32, bH:56, ring:48 };
 const KYS_KING_FLOOR={ e:7.5, m:7.5, h:6, g:6 };
 const KYS_HOP_LOOK={ wind:0.6, t0:0.7, tM:0.55, h0:70, hM:120, r:48 };
 const KYS_PILE={ rows:[3,2,1], r:6, dx:-38, dy:15 };
 const KYS_BALL={ r:6, t0:0.14, tPx:1/3200, h0:8, hPx:0.08, wait:0.18, back:0.08, pop:0.07 };
 const KYS_INK={ snow:'#EEF4FA', lit:'#FFFFFF', shade:'#B9CEE4', rim:'#8EA3B9', shadow:'rgba(74,90,120,0.30)', ice:'#9CC0D8' };
 var KYS={ on:(function(){ try{ const q=/[?&]kys=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_kys','0'); else localStorage.removeItem('gvt_kys'); } return localStorage.getItem('gvt_kys')==='0'? 0 : KYS_LIVE; }catch(e){ return KYS_LIVE; } })(),
-  part:{ snow:1, hop:1, bars:1, side:1, king:1, crys:1 }, n:{ bursts:0, balls:0, cfgs:0, bars:0, bags:0, tells:0, hops:0, hopPx:0, floorWait:0, plantWait:0, landKO:0, sideHops:0, kTook:0, kRed:0, kBlue:0, kWaited:0, kGreen:0, kOrange:0, kTeal:0, kSilver:0, kLunge:0, kPop:0, kHeal:0, kSurged:0 }, hops:[], bars:[], kpow:[], last:null, wrapped:0, leapWrapped:0, kingWrapped:0, rows:0, err:0, e:'' };
+  part:{ snow:1, hop:1, bars:1, side:1, king:1, crys:1, khop:1 }, n:{ bursts:0, balls:0, cfgs:0, bars:0, bags:0, tells:0, hops:0, hopPx:0, floorWait:0, plantWait:0, landKO:0, sideHops:0, kTook:0, kRed:0, kBlue:0, kWaited:0, kGreen:0, kOrange:0, kTeal:0, kSilver:0, kLunge:0, kPop:0, kHeal:0, kSurged:0, kkTells:0, kkHops:0, kkBounces:0, kkBounceHops:0, kkStrikes:0, kkLandKO:0 }, hops:[], bars:[], kpow:[], kkh:[], last:null, wrapped:0, leapWrapped:0, kingWrapped:0, rows:0, err:0, e:'' };
 
 
 
@@ -3092088,7 +3092147,7 @@ if(typeof raidCfg==='function'){ const rc0=raidCfg; raidCfg=function(tier,rk){ c
 
 
 if(typeof foeLeapTick==='function'){ const flt0=foeLeapTick; foeLeapTick=function(f,dt){ const L=kysLeap(f); if(L){ try{ kysHopTick(f,dt,L); }catch(e){ KYS.err++; KYS.e+='hop:'+String(e).slice(0,80)+' '; } return; } return flt0.apply(this, arguments); }; KYS.leapWrapped=1; }
-if(typeof airMv==='function'){ const am0=airMv; airMv=function(f,dt){ if(kysLeap(f) && ((f.plWind||0)>0 || (f.plT||0)>0)){ f.airB=0; return 0; } if(f.type==='kingyeti' && (f.kysLg || (f.kysChanTo!=null && S.t<f.kysChanTo))){ f.airB=0; return 0; } return am0.apply(this, arguments); }; }
+if(typeof airMv==='function'){ const am0=airMv; airMv=function(f,dt){ if(kysLeap(f) && ((f.plWind||0)>0 || (f.plT||0)>0)){ f.airB=0; return 0; } if(f.type==='kingyeti' && (f.kysLg || f.kkWind>0 || f.kkFl || (f.kysChanTo!=null && S.t<f.kysChanTo))){ f.airB=0; return 0; } return am0.apply(this, arguments); }; }
 
 
 
@@ -3092176,11 +3092235,48 @@ if(typeof airMv==='function'){ const am0=airMv; airMv=function(f,dt){ if(kysLeap
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 { const df0=drawFoe; drawFoe=function(f){ if(f && f.kysVanTo!=null && f.cloakT>0){ const a0=cx.globalAlpha; cx.globalAlpha=a0*0.3; try{ return df0.apply(this, arguments); } finally{ cx.globalAlpha=a0; } } return df0.apply(this, arguments); }; }
 { const fr0=frng; frng=function(f){ const r=fr0.apply(this, arguments); return (f && f.kysSurgeTo>S.t)? r+KYS_SILVER_ADD : r; }; }
 if(typeof kingKitTick==='function'){ const kk0=kingKitTick; kingKitTick=function(f,dt){ if(!kysKingOn(f)) return kk0.apply(this, arguments);
+  let hop=false; try{ hop=kysKingHopTick(f,dt); }catch(e){ KYS.err++; KYS.e+='khop:'+String(e).slice(0,80)+' '; } if(hop) return;   
   try{ kysKingPre(f,dt); }catch(e){ KYS.err++; KYS.e+='kpre:'+String(e).slice(0,80)+' '; }
   const r=kk0.apply(this, arguments); try{ kysKingPost(f,dt); }catch(e){ KYS.err++; KYS.e+='kpost:'+String(e).slice(0,80)+' '; } return r; }; KYS.kingWrapped=1; }
+
 
 
 
