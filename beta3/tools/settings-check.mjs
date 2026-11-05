@@ -72,7 +72,10 @@
 // word's 5 — the P's 3 points void, wordDamage's own law — "+0", "That black
 // tile added nothing: 2 damage, not 5."; then the farewell on the authored
 // board, the M still dark (SHOTS: night-ink-volley · night-ink ·
-// night-ink-lesson · night-ink-zero).
+// night-ink-lesson · night-ink-zero). Probe taps meant to land INSIDE a floor
+// go through floorProbe (a tight poll; a late harness skips the tap rather
+// than letting the beat go), and every capture sleeps the game loop while its
+// frame is taken (the fade's capture now comes first, before its two timed taps).
 // Self-launching: serves beta3 on :8899 if nothing does; headless Chromium on
 // :9501 (/tmp/cdp-settings wiped first) — Playwright's own Chromium when it
 // is installed (a headless GOOGLE Chrome hijacks AppleScript's session with
@@ -267,11 +270,18 @@ const tapUntil = async (expr, cond, tries = 6) => {
 };
 const shot = async (name) => {
   if (!SHOTS) return;
+  // the game holds still while its frame is taken: a DPR-3 capture can outlast a
+  // beat's timed window (1.75 s on a loaded box, v0.127.0), and a probe timed
+  // around it would come late — the loop sleeps (every timer keeps its place;
+  // Phaser smooths the gap away on wake) and wakes once the frame is taken
+  let slept = false;
+  try { slept = await ev(`!!(window.game && game.loop && game.loop.running && (game.loop.sleep(), true))`); } catch (e) { }
   try {
     mkdirSync(SHOTS, { recursive: true });
-    const r = await send('Page.captureScreenshot', { format: 'png' });
+    const r = await send('Page.captureScreenshot', { format: 'png', optimizeForSpeed: true });
     writeFileSync(SHOTS + '/' + name + '.png', Buffer.from(r.data, 'base64'));
   } catch (e) { }
+  if (slept) { try { await ev(`(game.loop.wake(), true)`); } catch (e) { } }
 };
 const B = `game.scene.getScene('battle')`;
 const H = `game.scene.getScene('home')`;
@@ -490,6 +500,22 @@ const INKLESSON = () => evj(`JSON.stringify((() => { const b = ${B}, l = b.L, U 
 // the hand's pose on a board cell, the walk's own geometry (tip beside the tile, a tenth of a tile up)
 const poseOn = (s, i, flip) => evj(`JSON.stringify((() => { const b = ${B}, p = b.slotPos(${i}), ts = b.tileSize, q = ${JSON.stringify(s.pose)};
   return !!q && Math.abs(q.x - (p.x + (${flip} ? -1 : 1) * ts * 0.36)) < 1 && Math.abs(q.y - (p.y - ts * 0.10)) < 1 && q.flip === ${flip}; })())`);
+// a probe tap that must land INSIDE a beat's floor: the beacon's stamp caught by
+// a light, tight poll, the tap made only while the floor still stands (the
+// page's own clock) — a harness that comes late (a DPR-3 capture, a loaded
+// box) SKIPS the tap (one honest red) rather than letting the beat go and
+// shifting every beat after it: v0.127.0's first published-bytes run sent the
+// fade's probe 996 ms after the drain, past the 900 floor, and it released the
+// night 3 s early (8 reds from one late tap)
+const floorProbe = async (stamp, cap, room) => {
+  const t0 = Date.now();
+  while (Date.now() - t0 < cap) { if (await ev(`!!(${stamp})`)) break; await sleep(40); }
+  const late = await ev(`(${stamp}) ? Date.now() - (${stamp}) : null`);
+  const at = Date.now();
+  if (late == null || late > room) return { tapped: false, late, at };
+  await tapAt(195, 500);
+  return { tapped: true, late, at };
+};
 const waitFor = async (pred, cap = 30000) => {
   const t = Date.now(); let i = 0;
   while (Date.now() - t < cap) { await poke(i++); try { const s = await gs(); if (pred(s)) return s; } catch (e) { } await sleep(250); }
@@ -646,24 +672,29 @@ await letGo();
 /* v0.126.0 THE TILE ECONOMY — use it or lose it: the words spent, the hand holds the night once more before it lets go */
 const fadeAt = await ev('SS_F5_FADE_AT_MS'), fadeMs = await ev('SS_F5_FADE_SHOW_MS'), floorMs = await ev('SS_F5_SHOW_FLOOR_MS');
 let f1 = await waitFor((s) => s.beat === 'fade' && (s.fade.shown | 0) >= 1, 20000);
+// the capture FIRST, the game asleep while its frame is taken (the colours
+// standing, the drain still SS_F5_FADE_AT_MS of game time away) — so it can
+// never carry the two timed taps below past their windows (it did, taken
+// between them, on a loaded box: v0.127.0)
+await shot('night-fade');
 const vf1 = await LESSON('f5fade');   // read at once: the colours drain SS_F5_FADE_AT_MS in
 f1 = await gs();
 const tTap1 = Date.now();
-await tapAt(195, 500);   // too soon: before the drain (and its floor) a tap is nothing
-await shot('night-fade');
+const tapped1 = await ev(`!(window.__f5fade && window.__f5fade.drainAt)`);   // still before the drain?
+if (tapped1) await tapAt(195, 500);   // too soon: before the drain (and its floor) a tap is nothing
 ok('USE IT OR LOSE IT (v0.126.0): after the mend, before the farewell, the fight HOLDS on the night\'s three colored tiles as the player used them (the orange S, the blue H, the green D) and the rule — Skylar\'s words, made exact',
   !!f1 && f1.ft === 'fade' && f1.hand && !f1.gone && f1.idx === 5 && f1.fade.tiles === 's1 h2 d3' && (f1.fade.drained | 0) === 0
   && vf1.c && vf1.tag === 3 && vf1.depth === 950 && vf1.faces.join() === 'tile1,tile2,tile3' && vf1.veil && vf1.veilLive && vf1.handDepth === 960 && /^pose:/.test(f1.pt)
   && vf1.frames.length === 2 && vf1.frames[0].s === 'If you don\'t use a colored tile on your turn…' && vf1.frames[0].a >= 0.99 && vf1.frames[1].a === 0,
   JSON.stringify({ ft: f1 && f1.ft, idx: f1 && f1.idx, fade: f1 && f1.fade, vf1 }));
-await waitFor((s) => !!s.fade.drainAt, 8000);   // the drain begins
-const tTap2 = Date.now();
-await tapAt(195, 500);   // still too soon: inside the drain's floor
+// the drain begins — still too soon: a tap inside the drain's floor
+const p2 = await floorProbe(`window.__f5fade && window.__f5fade.drainAt`, 8000, floorMs - 300);
+const tTap2 = p2.at;
 const f2 = await waitFor((s) => (s.fade.drained | 0) === 3, 6000);
 const f2b = await gs();
 ok('…the colours DRAIN in the light; a real tap before the drain and another inside its floor were both refused (the beat holds)',
-  !!f2 && f2b.beat === 'fade' && !f2b.fade.released && f2b.fade.drainAt > tTap1 && tTap2 - f2b.fade.drainAt < floorMs,
-  f2 ? JSON.stringify({ beat: f2b.beat, released: f2b.fade.released, tap1BeforeDrain: f2b.fade.drainAt - tTap1, tap2AfterDrain: tTap2 - f2b.fade.drainAt }) : 'never');
+  !!f2 && tapped1 && p2.tapped && f2b.beat === 'fade' && !f2b.fade.released && f2b.fade.drainAt > tTap1 && tTap2 - f2b.fade.drainAt < floorMs,
+  f2 ? JSON.stringify({ beat: f2b.beat, released: f2b.fade.released, tapped: [tapped1, p2.tapped], tap1BeforeDrain: f2b.fade.drainAt - tTap1, tap2AfterDrain: tTap2 - f2b.fade.drainAt, probeLate: p2.late }) : 'never');
 await sleep(900);   // the loss line rises 600 ms after the drain
 const vf2 = await LESSON('f5fade');
 const f3 = await gs();
@@ -697,9 +728,8 @@ ok('…the scripted letters are BLACKED, the same two for every player — P (ce
   JSON.stringify({ volley: k1 && k1.ink.volley, blk: k1 && k1.blk, inked }));
 ok('…the shipped ink prompt stayed quiet under the script (the lesson says it), and the live "inked · worth nothing" spoke over the first one',
   !!k1 && !(k1.pr.ink | 0) && await ev(`${B}.run.inkShown === true`) === true, JSON.stringify({ ink: k1 && k1.pr.ink }));
-const k2 = await waitFor((s) => (s.ink.shown | 0) >= 1, inkAtMs + 9000);
-const tTapK = Date.now();
-await tapAt(195, 500);   // too soon: inside the lesson's floor
+const pK = await floorProbe(`window.__f5ink && window.__f5ink.shownAt`, inkAtMs + 9000, floorMs - 300);   // too soon: inside the lesson's floor
+const k2 = pK.late != null;
 await sleep(450);   // the pop-in (the rule line rises 700 ms in)
 const vk1 = await INKLESSON();
 const k2b = await gs();
@@ -720,8 +750,8 @@ const floorK = await ev('SS_F5_SHOW_FLOOR_MS');
 ok('…then rests on the P (cell 2), PEN\'s first tap, with the rule beneath: "You can still use them in words, but they score no points." — a tap inside its floor refused, the lesson holding',
   !!k3 && k3b.beat === 'ink' && !k3b.ink.released && await poseOn(k3b, 2, true) === true
   && vk2.frames.map((f) => f.s).join('|') === 'Some bosses can black out a few of your letters.|You can still use them in words, but they score no points.'
-  && vk2.frames.every((f) => f.a >= 0.99) && tTapK - k2b.ink.shownAt < floorK,
-  JSON.stringify({ beat: k3b.beat, released: k3b.ink.released, pose: k3b.pose, frames: vk2.frames, tapAfterRise: tTapK - k2b.ink.shownAt }));
+  && vk2.frames.every((f) => f.a >= 0.99) && pK.tapped && pK.at - k2b.ink.shownAt < floorK,
+  JSON.stringify({ beat: k3b.beat, released: k3b.ink.released, pose: k3b.pose, frames: vk2.frames, tapped: pK.tapped, tapAfterRise: pK.at - k2b.ink.shownAt }));
 await shot('night-ink-lesson');
 const k4 = await waitFor((s) => (s.ink.lifted | 0) >= 1, inkMs + 6000);
 ok('…untapped, it HOLDS its slowed duration (' + inkMs + ' ms of game-loop time, §1 pins it to its dial) and lets go by its own dwell',

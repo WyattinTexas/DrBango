@@ -63,6 +63,20 @@ fuse at 4, seven words, the authored board `s o h r a l n i g o t e d e a m`
 with the M still black, the taste stood down, no pocket). `SHOTS=` adds
 night-ink-volley · night-ink · night-ink-lesson · night-ink-zero.
 
+⚠ **Probe taps inside a floor are now guarded (`floorProbe`)**, after the
+first published-bytes run read 190/198 from ONE late tap: card 02's fade step
+took its DPR-3 `night-fade` capture between its two timed taps, the capture
+held the harness 1.75 s on a load-6 box, and the "too soon" tap landed 996 ms
+after the drain — past the 900 floor, where it rightly let the fade go, 3 s
+early, shifting every beat after it. Now: the beacon's stamp is caught by a
+light 40 ms poll and the tap is made only while the floor still stands (the
+page's own clock) — a late harness SKIPS the tap (one honest red, nothing
+disturbed); `shot()` sleeps the game loop for the capture (`game.loop.sleep()`
+/ `wake()` — timers keep their place; holds read longer on the wall clock,
+never shorter) and encodes for speed; and the `night-fade` capture is taken
+FIRST, the moment the fade is seen — the game asleep for it, so the colours
+still stand and the drain stays 1.2 s of game time away from both timed taps.
+
 ## THE TILE ECONOMY (v0.126.0): settings-check §1 + §5b · firstnight-live-check §C
 
 Skylar (10/29), points 5 and 8 of the nine: "It needs to explain how you get
