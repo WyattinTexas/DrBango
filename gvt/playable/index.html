@@ -107,6 +107,9 @@ html.land #pop.tray{ left:auto; right:6px; width:calc(var(--side) - 12px); }
 #endBtn{ font-size:38px; letter-spacing:1px; padding:12px 36px 10px; border-radius:20px; color:#3b2600; background:linear-gradient(180deg,#fff08a 0%,#ffd23f 45%,#f2a91a 100%);
   border:3px solid #6b4600; box-shadow:0 6px 0 #6b4600, 0 14px 26px rgba(0,0,0,.35); text-shadow:0 1px 0 rgba(255,255,255,.6); }
 #endWord{ font-size:30px; color:#fff; letter-spacing:1px; }
+/* ROUND 11 (Isaac 20:58): PLAY NOW keeps flashing: a shine sweeps across it (its place set by the game's clock) */
+.bshine{ position:absolute; top:-25%; bottom:-25%; left:0; width:30%; pointer-events:none; transform:translateX(-160%) skewX(-18deg);
+  background:linear-gradient(100deg, rgba(255,255,255,0) 0%, rgba(255,255,255,.75) 50%, rgba(255,255,255,0) 100%); }
 /* ROUND 10 (Isaac 20:42): THE MAP TABS across the top (five maps, the same playable); the store door sits under them */
 html.tabs{ --tabsH:46px; }
 #mapTabs{ position:fixed; left:0; right:0; top:0; z-index:60; display:none; gap:6px; padding:calc(env(safe-area-inset-top,0px) + 6px) 8px 6px; box-sizing:border-box;
@@ -128,7 +131,7 @@ html.tabs #mapTabs{ display:flex; }
 #endV > *{ position:absolute; }
 #endV .fw img{ display:block; width:100%; height:100%; filter:drop-shadow(0 4px 3px rgba(0,0,0,.35)); }
 .evC{ left:0; width:393px; display:flex; justify-content:center; pointer-events:none; }
-.evBtn{ pointer-events:auto; font-size:38px; letter-spacing:1px; padding:12px 34px 10px; border-radius:20px; color:#3b2600; background:linear-gradient(180deg,#fff08a 0%,#ffd23f 45%,#f2a91a 100%);
+.evBtn{ position:relative; overflow:hidden; pointer-events:auto; font-size:38px; letter-spacing:1px; padding:12px 34px 10px; border-radius:20px; color:#3b2600; background:linear-gradient(180deg,#fff08a 0%,#ffd23f 45%,#f2a91a 100%);
   border:3px solid #6b4600; box-shadow:0 6px 0 #6b4600, 0 14px 26px rgba(0,0,0,.35); text-shadow:0 1px 0 rgba(255,255,255,.6); white-space:nowrap; opacity:0; }
 .evVic{ display:block; font-family:var(--f); font-weight:800; font-size:30px; letter-spacing:.32em; padding-left:.32em; color:transparent;
   background-image:linear-gradient(180deg,#FFF8DC 0%,#F2DC90 55%,#D8B85A 100%); -webkit-background-clip:text; background-clip:text; -webkit-text-stroke:.8px rgba(96,74,22,.6); filter:drop-shadow(0 2px 0 rgba(0,0,0,.5)); }
@@ -480,6 +483,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     chime: () => { tone(660, 660, 0.14, 'sine', 0.07); tone(990, 990, 0.2, 'sine', 0.07, 0.11); }, pick: () => { tone(784, 784, 0.1, 'square', 0.04); tone(1175, 1175, 0.22, 'square', 0.04, 0.09); },
     saber: () => { tone(160, 85, 0.22, 'sawtooth', 0.035); tone(2400, 900, 0.12, 'sine', 0.015); }, whoosh: () => noise(0.35, 0.08, 1800), flame: () => noise(0.3, 0.06, 1400),
     comm: c => { const r = ((((c | 0) * 2654435761) >>> 0) % 1000) / 1000, f = 112 * (1 + 0.5 * (r - 0.35)); tone(f, f * 0.96, 0.05, 'square', 0.03); },   // round 7: the comm's typing blip (the game's COMM_HZ 112 and its jitter)
+    tap: () => { tone(660, 990, 0.09, 'triangle', 0.06); tone(990, 1480, 0.12, 'sine', 0.045, 0.05); },   // round 11: the finger's one tap on PLAY NOW
     thud: () => { tone(90, 45, 0.28, 'sine', 0.09); noise(0.18, 0.12, 380); },
     thunk: () => { tone(150, 55, 0.2, 'sine', 0.07); noise(0.22, 0.09, 520); }, horn: () => { tone(196, 196, 0.22, 'sawtooth', 0.035); tone(247, 247, 0.4, 'sawtooth', 0.035, 0.2); }, power: () => { tone(220, 880, 0.28, 'sawtooth', 0.03); tone(1760, 440, 0.32, 'sine', 0.025); },
     jingle: () => [523, 659, 784, 1047, 784, 1047].forEach((f, i) => tone(f, f, 0.16, 'square', 0.035, i * 0.13)), pop: () => { noise(0.22, 0.12, 2200); tone(1400, 500, 0.12, 'sine', 0.02); },
@@ -526,7 +530,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     if (S.endOn) {
       const o = clamp(1 - (S.wall - S.endOn) / 0.4, 0, 1).toFixed(2); $('tray').style.opacity = o; $('row').style.opacity = o; if (S.endKind === 'win') $('plate').style.opacity = o;   // the defeat keeps the store's door
       const e = $('end'), a = clamp((S.wall - S.endOn) / 0.42, 0, 1); e.style.opacity = Math.min(1, a * 2.5).toFixed(2); e.style.transform = 'translateY(-50%) scale(' + (0.6 + 0.4 * easeBack(a)).toFixed(3) + ')';   // it POPS up, centred
-      const b = $('endBtn'); b.style.transform = 'scale(' + (1 + 0.045 * Math.sin(S.wall * 5)).toFixed(3) + ')';
+      const b = $('endBtn'); b.style.transform = 'scale(' + ((1 + 0.045 * Math.sin(S.wall * 5)) * tapEmph(S.wall - S.endOn)).toFixed(3) + ')';
       if (EV.on) EV.V.tick(RM ? 9 : S.wall - S.endOn);
     }
     if (S.dimOn) $('endDim').style.opacity = clamp((S.wall - S.dimOn) / 0.4, 0, 1).toFixed(2);
@@ -925,7 +929,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
       S.fwNext -= dt;
       if (S.fwNext <= 0) {
         S.fwN++; S.fwNext = S.fwN % 6 === 0 ? 1.1 : 0.5;
-        const tx = rr(70, 340), ty = rr(L.H * 0.16, L.H * 0.42), sx = BOX.x + rr(-30, 30), sy = BOX.y - 40, fuse = rr(0.7, 0.95);
+        const z = fwZone(), tx = rr(z.x0, z.x1), ty = rr(z.y0, z.y1), sx = rr(L.xMin + 30, L.xMax - 30), sy = L.H + 40, fuse = rr(1.05, 1.35);   // round 11: from off the bottom of the screen, bursting behind the logo
         S.fw.push({ k: 'shell', x: sx, y: sy, vx: (tx - sx) / fuse, vy: (ty - sy) / fuse - 0.5 * 120 * fuse, t: 0, fuse, col: FW_COL[S.fwN % FW_COL.length] }); SFX.whoosh();
       }
     }
@@ -961,6 +965,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     return null;
   }
   function syncHand(dt) {
+    if (S.mode === 'win' && S.endOn) { if (!RM) endHand(); else $('hand').style.display = 'none'; return; }   // round 11: one tap on PLAY NOW, then away
     const g = handGoal(), el = $('hand');
     if (g && g.el) {
       const r = g.el.getBoundingClientRect(), hr = $('hud').getBoundingClientRect();
@@ -1000,7 +1005,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
       if (S.wall - p.t0 > 1.65) { audioOn(); pickChoice(i); A.next = S.wall + 1.0; }
       return;
     }
-    if (S.mode === 'win') { A.hand = null; if (S.endOn && !S.cta) { if (S.wall - S.endOn > 1.9) A.hand = { el: endBtnEl(), fx: 0.6, fy: 0.6 }; if (S.wall - S.endOn > 2.7) cta('end'); } return; }
+    if (S.mode === 'win') { A.hand = null; return; }   // round 11: the end screen's own finger (endHand) taps once; the demo's store door opens on that tap
     if (S.mode === 'lose') { A.hand = null; return; }
     if (S.mode !== 'play') return;
     if (A.k) { A.hand = cardGoal(A.k); if (S.wall - A.kT > 0.42) { tapCard(A.k); A.k = null; A.next = S.wall + rr(0.45, 1.0); } return; }
@@ -1149,8 +1154,10 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
   function drawFloats() { for (const f of S.fl) { const k = f.t / f.dur; ctx.globalAlpha = k < 0.75 ? 1 : 1 - (k - 0.75) / 0.25; txt(f.txt, f.x, f.y - k * 26, f.size, f.col); } ctx.globalAlpha = 1; }
   function drawFireworks(ctx) {   // round 7: drawn on the glass it is handed (#fxcv, over the gray)
     for (const p of S.fw) {
-      if (p.k === 'shell') { ctx.fillStyle = '#fff6d0'; ctx.globalAlpha = 1; ctx.beginPath(); ctx.arc(p.x, p.y, 2.2, 0, 7); ctx.fill(); ctx.fillStyle = 'rgba(255,220,150,0.5)'; ctx.beginPath(); ctx.arc(p.x - p.vx * 0.02, p.y - p.vy * 0.02, 1.6, 0, 7); ctx.fill(); }
+      if (p.k === 'shell') { ctx.strokeStyle = 'rgba(255,214,140,0.55)'; ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(p.x - p.vx * 0.06, p.y - p.vy * 0.06); ctx.lineTo(p.x, p.y); ctx.stroke(); ctx.lineCap = 'butt';   // round 11: the rising streak
+        ctx.fillStyle = '#fff6d0'; ctx.globalAlpha = 1; ctx.beginPath(); ctx.arc(p.x, p.y, 2.2, 0, 7); ctx.fill(); ctx.fillStyle = 'rgba(255,220,150,0.5)'; ctx.beginPath(); ctx.arc(p.x - p.vx * 0.02, p.y - p.vy * 0.02, 1.6, 0, 7); ctx.fill(); }
       else if (p.k === 'spark') { const k = p.t / p.dur; ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.9 * (1 - k * k); ctx.strokeStyle = p.col; ctx.lineCap = 'round'; ctx.lineWidth = 2.6 * (1 - k) + 0.9; ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - p.vx * 0.07, p.y - p.vy * 0.07); ctx.stroke(); ctx.fillStyle = '#fffbe8'; ctx.beginPath(); ctx.arc(p.x, p.y, 1.6 * (1 - k) + 0.5, 0, 7); ctx.fill(); ctx.globalCompositeOperation = 'source-over'; ctx.lineCap = 'butt'; }
+      else if (p.k === 'ring') { const k = p.t / p.dur; ctx.globalAlpha = 0.9 * (1 - k); ctx.strokeStyle = p.col; ctx.lineWidth = 7 * (1 - k) + 1.5; ctx.beginPath(); ctx.ellipse(p.x, p.y, p.R * (0.55 + 0.9 * eOut(k)), p.R * (0.55 + 0.9 * eOut(k)) * 0.45, 0, 0, 7); ctx.stroke(); }   // round 11: the tap's gold ring
       else if (p.k === 'bloom') { const k = p.t / p.dur; const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 40); g.addColorStop(0, 'rgba(255,255,240,0.9)'); g.addColorStop(1, 'rgba(255,255,240,0)'); ctx.globalAlpha = 1 - k; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, 40, 0, 7); ctx.fill(); }
     }
     ctx.globalAlpha = 1;
@@ -1290,7 +1297,43 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     const vb = ART.vb[k]; if (!vb) return ''; const w = h * vb[2] / vb[3];
     return '<div class="fw ' + (cls || '') + '" style="left:' + (x - w / 2).toFixed(1) + 'px;top:' + (y - 0.9 * h).toFixed(1) + 'px;width:' + w.toFixed(1) + 'px;height:' + h + 'px"><img src="' + artURI(k) + '" alt=""></div>';
   }
-  function btnPop(b, e, at) { const p = seg(e, at, 0.42); b.style.opacity = Math.min(1, p * 2.5).toFixed(2); const pl = e > at + 0.6 ? 1 + 0.035 * Math.sin((e - at - 0.6) * 5) : 1; b.style.transform = 'scale(' + ((0.6 + 0.4 * easeBack(p)) * pl).toFixed(3) + ')'; }
+  function btnPop(b, e, at) { const p = seg(e, at, 0.42); b.style.opacity = Math.min(1, p * 2.5).toFixed(2); let pl = e > at + 0.6 ? 1 + 0.035 * Math.sin((e - at - 0.6) * 5) : 1;
+    pl *= tapEmph(e);   // round 11: the finger's one big tap
+    b.style.transform = 'scale(' + ((0.6 + 0.4 * easeBack(p)) * pl).toFixed(3) + ')';
+    const sh = b.querySelector('.bshine'); if (sh) { const c = e - at - 1.0, k = c > 0 ? (c % 1.8) / 0.55 : 9; sh.style.transform = 'translateX(' + (k <= 1 ? -160 + 560 * k : -160).toFixed(0) + '%) skewX(-18deg)'; }   // and it keeps flashing: a shine every 1.8 s
+  }
+  function tapEmph(e) { if (EV.tapAt == null) return 1; const d = e - EV.tapAt; if (d < 0) return 1; if (d < 0.1) return 1 - 1.2 * d; if (d < 0.6) { const q = (d - 0.1) / 0.5; return 0.88 + 0.12 * q + 0.4 * Math.sin(q * Math.PI) * (1 - q); } return 1; }   // squash, then a big spring
+  // ROUND 11 (Isaac 20:58: "Let's have the play now button for the finger. It's just going to come and click on the play now button once and then leave the screen.
+  // The play now button will keep flashing but we just want one big emphasis on that with the finger."): the finger glides in from off the screen, taps PLAY NOW ONCE
+  // (the big emphasis: the button squashes and springs, a gold ring and sparks burst from it, a chime), and glides away off the screen. A real player's finger is a hint:
+  // its tap opens nothing (the store door opens only on the player's own tap); the demo finger's tap is the demo's own (the films).
+  const HS = { IN0: 1.5, IN1: 2.15, TAP: 2.15, TAPD: 0.34, OUT0: 2.75, OUT1: 3.35 };
+  function endHand() {
+    const el = $('hand'), b = endBtnEl(); if (!b) return;
+    const e = S.wall - S.endOn; if (e < HS.IN0 || e > HS.OUT1) { if (el.style.display !== 'none') el.style.display = 'none'; return; }
+    const r = b.getBoundingClientRect(), hr = $('hud').getBoundingClientRect(), tx = r.left - hr.left + r.width * 0.6, ty = r.top - hr.top + r.height * 0.6, ox = hr.width + 70, oy = hr.height + 90;
+    let x, y, press = 0;
+    if (e < HS.IN1) { const k = eOut((e - HS.IN0) / (HS.IN1 - HS.IN0)); x = ox + (tx - ox) * k; y = oy + (ty - oy) * k; }
+    else if (e < HS.OUT0) { x = tx; y = ty; const p = (e - HS.TAP) / HS.TAPD; if (p >= 0 && p <= 1) press = Math.sin(p * Math.PI); if (p >= 0.5 && EV.tapAt == null) endTap(e); }
+    else { const k = Math.pow((e - HS.OUT0) / (HS.OUT1 - HS.OUT0), 2); x = tx + (ox - tx) * k; y = ty + (oy - ty) * k; }
+    el.style.display = 'block'; el.style.opacity = '1';
+    el.style.left = (x - 62 * 0.354) + 'px'; el.style.top = (y - 78 * 0.133 + 5 - press * 6) + 'px';
+    el.style.transform = 'rotate(-24deg) scale(' + (1 - press * 0.14).toFixed(3) + ')';
+  }
+  function endTap(e) {
+    EV.tapAt = e; S.stats.endTap = +e.toFixed(2);
+    const b = endBtnEl(), r = b.getBoundingClientRect(), wx = (r.left + r.width / 2 - L.ox) / L.k, wy = (r.top + r.height / 2) / L.k, rw = r.width / L.k;
+    S.fw.push({ k: 'ring', x: wx, y: wy, t: 0, dur: 0.6, R: rw * 0.62, col: '#FFD24A' });
+    for (let i = 0; i < 18; i++) { const a = i / 18 * 6.283, v = rr(150, 240); S.fw.push({ k: 'spark', x: wx + Math.cos(a) * rw * 0.3, y: wy + Math.sin(a) * rw * 0.12, vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: 0, dur: 0.62, col: i % 2 ? '#FFD24A' : '#FFFFFF' }); }
+    SFX.tap();
+    if (AUTO && !S.cta) cta('end');
+  }
+  function fwZone() {   // round 11 (Isaac: "come from offscreen and then blow up behind the green versus tan logo"): the bursts land on the end screen's GREEN / VS / TAN (THE TITLE SCREEN's logo, by its place in the box), else the upper field as before
+    if (EV.n === 1) { const hr = $('hud').getBoundingClientRect(), s = Math.min(hr.width / 393, innerHeight / 760), cx = hr.left + hr.width / 2, cy = innerHeight / 2;
+      const X = bx => (cx + (bx - 196.5) * s - L.ox) / L.k, Y = by => (cy + (by - 380) * s) / L.k;
+      return { x0: X(62), x1: X(331), y0: Y(165), y1: Y(365) }; }
+    return { x0: 70, x1: 340, y0: L.H * 0.16, y1: L.H * 0.42 };
+  }
   function fadeUp(el, e, at, d, dy) { const p = seg(e, at, d || 0.32); el.style.opacity = p.toFixed(3); el.style.transform = 'translateY(' + ((dy == null ? 14 : dy) * (1 - eOut(p))).toFixed(1) + 'px)'; }
   function popIn(el, e, at, d, k0) { const p = seg(e, at, d || 0.36); el.style.opacity = Math.min(1, p * 2).toFixed(3); el.style.transform = 'scale(' + ((k0 == null ? 0.82 : k0) + (1 - (k0 == null ? 0.82 : k0)) * easeBack(p)).toFixed(3) + ')'; }
   function evMap(bx, by) { const r = $('hud').getBoundingClientRect(); return [r.left + r.width / 2 + (bx - 196.5) * EV.s, innerHeight / 2 + (by - 380) * EV.s]; }   // a point of the box on the glass
@@ -1496,6 +1539,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     $('endBack').innerHTML = V.back(); $('endV').innerHTML = V.box();
     $('endBack').classList.add('on'); $('endV').classList.add('on');
     $('evBtn').addEventListener('pointerdown', ev => { ev.preventDefault(); cta('end'); });
+    $('evBtn').insertAdjacentHTML('beforeend', '<i class="bshine"></i>');   // round 11: it keeps flashing
     evFit(); V.tick(RM ? 9 : 0);
   }
 
@@ -1529,12 +1573,12 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
       g: alive(S.g).map(u => u.type + (u.jet ? '+jet' : '') + (u.big ? '+big' : '') + (u.saber ? '+' + u.saber : '')), f: alive(S.f).length, box: +BOX.hp.toFixed(1), boxDead: BOX.dead, pick: S.pick ? { n: S.pick.n, chosen: S.pick.chosen } : null, cta: S.cta, stats: S.stats, len: +P.len.toFixed(0), entry: ENTRY,
       turrets: S.f.filter(u => u.fix && !u.dead).map(u => ({ seat: u.fixSeat, hp: +u.hp.toFixed(1), pop: +(u.pop || 0).toFixed(2), x: Math.round(u.x), y: Math.round(u.y) })), seats: TSEAT.map(t => [Math.round(t.x), Math.round(t.y)]),
       opener: OP.on ? +(S.wall - OP.t0).toFixed(2) : (OP.done ? 'done' : 'off'), openerStats: S.stats.opener || null,
-      endV: EV.n, evOn: EV.on, evT: EV.on ? +(S.wall - S.endOn).toFixed(2) : null, fxDrawn: fxDirty, fw: S.fw.length,
+      endTap: S.stats.endTap == null ? null : S.stats.endTap, endV: EV.n, evOn: EV.on, evT: EV.on ? +(S.wall - S.endOn).toFixed(2) : null, fxDrawn: fxDirty, fw: S.fw.length,
       endKind: S.endKind, leaks: S.stats.leaks, hits: S.stats.hits, firstHit: S.stats.firstHit, defeatAt: S.stats.defeat, lastPlay: +S.lastPlay.toFixed(2), redT: +S.redT.toFixed(2),
       map: MAP === 'lawn' ? 'original' : MAP, tabs: TABS ? Array.from(document.querySelectorAll('#mapTabs .mtab')).map(b => b.dataset.map + (b.classList.contains('on') ? '*' : '')).join(',') : null, endAt: S.stats.endAt, dimAt: S.stats.dimAt, dim: +(getComputedStyle(document.getElementById('endDim')).opacity), icon: (ART.icon || '').length, mortars: S.f.filter(u => u.type === 'tanmort').length, shells: S.rk.filter(r => r.lob).length,
       tide: S.tide.st, tiders: S.f.filter(f => f.tide && !f.dead).length,
       sarge: (S.sarge.unit && !S.sarge.unit.dead) ? { saber: S.sarge.unit.saber || null, st: S.sarge.unit.sb ? S.sarge.unit.sb.st : null, tkCd: +(S.sarge.unit.tkCd || 0).toFixed(2), x: Math.round(S.sarge.unit.x), y: Math.round(S.sarge.unit.y) } : null, tkReady: tkReady() }; },
-    tk: () => tkCast(), restart, ev: EV, evv: EVV, op: OP, setMap,
+    tk: () => tkCast(), restart, ev: EV, evv: EVV, op: OP, setMap, win: () => boxDown(), fwZone: () => fwZone(),   // win: the rigs' way to the end screen without a whole fight
   };
   loadArt().then(start);
 })();
