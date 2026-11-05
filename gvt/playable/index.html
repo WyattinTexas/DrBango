@@ -39,8 +39,9 @@ button{ font:inherit; color:inherit; border:0; margin:0; padding:0; background:n
 #tray{ position:absolute; left:8px; right:8px; bottom:calc(env(safe-area-inset-bottom,0px) + 10px); height:var(--trayH); display:grid; grid-template-columns:repeat(4,1fr); gap:6px; pointer-events:auto; }
 .card{ position:relative; border-radius:13px; background:linear-gradient(180deg,#2d3531 0%,#1c2220 100%); border:2px solid #3e4a42; box-shadow:0 3px 0 rgba(0,0,0,.38);
   display:flex; flex-direction:column; align-items:center; justify-content:space-between; padding:7px 2px 6px; box-sizing:border-box; overflow:hidden; }
-.card .nm{ font-size:14px; letter-spacing:.2px; white-space:nowrap; }
+.card .nm{ font-size:var(--nmFs,14px); letter-spacing:.2px; white-space:nowrap; }   /* round 26: smaller letters on a very narrow card only (layout sets --nmFs) */
 .card .art{ height:58px; width:auto; max-width:94%; display:block; object-fit:contain; filter:drop-shadow(0 2px 0 rgba(0,0,0,.25)); }
+html.tight .card .art{ flex:1 1 0; min-height:0; height:auto; max-height:58px; width:94%; max-width:none; }   /* round 26 (Isaac 13:35, AppLovin's test): on a short tray the drawing takes the room left, up to its 58, so the price stays whole */
 .card .pr{ font-size:23px; line-height:1; }
 .card .pr.sm{ font-size:15px; letter-spacing:.3px; padding-top:5px; }
 .card.no .art{ opacity:.45; } .card.no .pr{ color:#ff9b86; }
@@ -444,6 +445,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     L.k = colW / 400; L.ox = (vw - colW) / 2; L.H = vh / L.k; L.xMin = -L.ox / L.k; L.xMax = 400 + L.ox / L.k;
     const st = document.documentElement.style; st.setProperty('--ox', L.ox + 'px'); st.setProperty('--cw', colW + 'px'); st.setProperty('--side', Math.round(L.ox) + 'px');
     st.setProperty('--trayH', Math.round(land ? clamp((vh - 120) / 2, 84, 116) : clamp(colW * 0.295, 96, 128)) + 'px');
+    { const cardW = land ? (L.ox - 30) / 2 : (colW - 34) / 4, tH = parseFloat(st.getPropertyValue('--trayH')); st.setProperty('--nmFs', Math.min(14, Math.max(8, (cardW - 6) * 0.2137)).toFixed(2) + 'px'); document.documentElement.classList.toggle('tight', tH < 116); }   // round 26: a card's name fits its card (14 wherever a card is 71 or wider); a tray under 116 (the card's whole stack) lets its drawings give way
     cv.width = Math.round(vw * L.dpr); cv.height = Math.round(vh * L.dpr); fxcv.width = cv.width; fxcv.height = cv.height; fxDirty = false;
     const rowTop = (land ? vh : $('row').getBoundingClientRect().top) / L.k, plateTop = $('plate').getBoundingClientRect().top / L.k;
     const y3 = rowTop - (land ? 40 : 46), y1 = land ? 132 : Math.max(150, plateTop + 132);
