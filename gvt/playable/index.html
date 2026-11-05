@@ -337,7 +337,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
 
   // ---------------- THE FIELD: the whole screen, a winding path, their box at its end ----------------
   const L = { k: 1, ox: 0, dpr: 1, vw: 0, vh: 0, H: 800, xMin: 0, xMax: 400 };
-  let P = null, LAWN = null, ENTRY = 90, TSEAT = [], TALL = [];
+  let P = null, LAWN = null, ENTRY = 90, TSEAT = [], TALL = [], BOX_S = 1e9;
   // THE GAME'S LAWN (LAWN_PALE + LAWN_SUN, the campaign's pale lawn in the sun; the worn track = the runner's two strokes)
   const GL = { base: '#B4D2A6', stripe: '#C0DAB2', crease: '#C8E0BA', tuft: '#93B87E', tall: '#9CC08A', track: '#DCC894', halo: 'rgba(255,255,255,0.10)' };
   // ROUND 3 (Isaac 14:07: "a pretty sharp contrast between the path and the actual grass ... you could just use a real map from the game"): THE ROAD = the game's own runGroove,
@@ -376,6 +376,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     P = { x: Float32Array.from(xs), y: Float32Array.from(ys), nx, ny, n, len: (n - 1) * STEP };
     ENTRY = 0; for (let i = 0; i < n; i++) { if (xs[i] >= 24) { ENTRY = i * STEP; break; } }
     BOX.x = 0.865 * 400; BOX.y = y1 + 6; BOX.fx = BOX.x - BW * 0.42; BOX.fy = BOX.y - BH * 0.42; BOX.s = P.len;
+    { let i = P.n - 1; while (i > 0 && P.x[i] >= 0.41 * 400) i--; BOX_S = (i + 1) * 2; }   // ROUND 12 (Isaac's circle): the box is fought only from the last stretch, from x 0.41 of the column to the box
     // the two empty spaces where the road curves (Isaac): the lower bowl (the first turret, 5 s in) and the upper bowl (the second, 10 s later)
     TSEAT = [{ x: 0.42 * 400, y: y1 + 0.745 * (y3 - y1) }, { x: 0.53 * 400, y: y1 + 0.255 * (y3 - y1) }];
     for (const u of (typeof S !== 'undefined' ? S.f : [])) if (u.fixSeat != null) u.fix = { x: TSEAT[u.fixSeat].x, y: TSEAT[u.fixSeat].y };
@@ -467,7 +468,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     g: [], f: [], fx: [], fl: [], rk: [], decals: [], q: [], timers: [], shake: 0, slow: 1, pick: null, pendingPick: -1,
     sarge: { unit: null, downT: 0 }, spawn: { t: 5.5, wave: 0 }, firstBuy: -1, lastAct: 0, pressK: null, pressUntil: 0,
     flagT: -1, fw: [], fwOn: false, fwNext: 0, fwN: 0, endOn: 0, cta: null, sargeSaberSeen: false, finalWave: false, lastSfx: 0, tur: [0, 0], tkSeen: false, tide: { st: 'armed', armT: 0, t: 0, n: 0 }, atk: { first: null, last: -9, next: 0 }, redT: 0, lastPlay: -1e9, endKind: 'win',
-    stats: { buys: { rifleman: 0, mgunner: 0, bazooka: 0, sarge: 0 }, kills: 0, elims: 0, deaths: 0, firstBuy: null, firstKill: null, open1: null, pick1: null, open2: null, pick2: null, boxDown: null, cta: null, picks: [], errs: 0, turrets: [], turretKills: 0, casts: [], blocks: 0, reflects: 0, slams: 0, pops: 0, tide: null, tideEnd: null, leaks: 0, hits: 0, firstHit: null, defeat: null } };
+    stats: { buys: { rifleman: 0, mgunner: 0, bazooka: 0, sarge: 0 }, kills: 0, elims: 0, deaths: 0, firstBuy: null, firstKill: null, open1: null, pick1: null, open2: null, pick2: null, boxDown: null, cta: null, picks: [], errs: 0, turrets: [], turretKills: 0, casts: [], blocks: 0, reflects: 0, slams: 0, pops: 0, tide: null, tideEnd: null, shots: [], leaks: 0, hits: 0, firstHit: null, defeat: null } };
 
   // ---------------- THE SOUNDS (a small synth, the game's palette; only after a real touch) ----------------
   let AC = null, MST = null;
@@ -557,6 +558,17 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
 
   // ---------------- THE FIGHT ----------------
   function bodyY(u) { return u.y - u.alt - UH * 0.5; }
+  // ROUND 12 (Isaac 21:17, his arrows on the road: "the friendly troops are only engaging the enemies directly in front of them on the path, except for the mortars of course";
+  // "they can only engage the toy box from the circle indicated at the end of the path"): THE ROAD'S LAW. A man fights only what stands DIRECTLY IN FRONT of him on the road:
+  // ahead, in his own direction of march, within his reach along the road; never back down the road, never across the field to another stretch. The box only from the end of
+  // the road (BOX_S, Isaac's circle). The mortars, dug in off the road, are the exception both ways: they lob across the field, and a man may shoot back at one in reach.
+  // The tan line keeps the same law (a fair fight on the road).
+  function frontS(u) { return u.free ? nearestS(u.x, u.y).s : u.s; }
+  function inFront(u, e, reach) {
+    if (e.fix) return true;
+    const dir = u.side === 'g' ? 1 : -1, ds = (frontS(e) - frontS(u)) * dir;
+    return ds >= -10 && ds <= reach;
+  }
   function findTarget(u) {
     const st = u.st, foes = u.side === 'g' ? S.f : S.g; let best = null, bd = 1e9;
     for (const e of foes) {
@@ -564,10 +576,10 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
       if (u.side === 't' && e.alt > 8 && !u.d.air) continue;   // a tan gun, a tube, a flame or a mortar cannot reach a man in the air; a tan rifle can
       if (u.d.minRng && Math.hypot(e.x - u.x, e.y - u.y) < u.d.minRng) continue;   // the mortar's floor: nothing under it
       const d = Math.hypot(e.x - u.x, bodyY(e) - bodyY(u)); if (d > st.rng) continue;
-      if (!st.air && e.alt <= 8 && !e.fix && !e.free && !u.fix && !u.free && Math.abs(e.s - u.s) > st.rng * 1.7) continue;   // no shots across the bends: a man fights the men on his own stretch (a turret and a dashing Sarge stand off the road)
+      if (!u.fix && !inFront(u, e, st.rng + 12)) continue;   // the road's law (a mortar fires as it always has)
       if (d < bd) { bd = d; best = e; }
     }
-    if (!best && u.side === 'g' && !BOX.dead) { const d = Math.hypot(BOX.fx - u.x, BOX.fy - bodyY(u)); if (d <= st.rng + (st.air ? 56 : 34) && (st.air || u.s > P.len - 320)) return BOX; }
+    if (!best && u.side === 'g' && !BOX.dead && frontS(u) >= BOX_S) { const d = Math.hypot(BOX.fx - u.x, BOX.fy - bodyY(u)); if (d <= st.rng + (st.air ? 56 : 34)) return BOX; }   // the box: only from Isaac's circle
     return best;
   }
   function blocked(u) {
@@ -587,7 +599,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
       place(u); return;
     }
     if (u.jet) { u.alt += (JET_ALT + u.altJ - u.alt) * Math.min(1, dt * 3.2); if (Math.abs(u.lane) < 26 && !u.wide) { u.wide = 1; u.lane = (u.lane < 0 ? -1 : 1) * rr(20, 40); } if (!RM) { u.puffT -= dt; if (u.puffT <= 0) { u.puffT = 0.08; S.fx.push({ k: 'puff', x: u.x - u.face * 6 + rr(-2, 2), y: u.y - u.alt - 6, t: 0, dur: 0.32, R: 5.5, col: '#F2A93B', a: 0.75 }); } } }
-    if (u.jet && !u.orb && u.s >= P.len - 260) { const cx = BOX.fx - 76, cy = BOX.y + 78; u.orb = { a: Math.atan2((u.y - cy) / 0.45, u.x - cx), R: rr(40, 80), w: (u.id % 2 ? 1 : -1) * rr(0.75, 1.15), blend: 0 }; }
+    if (u.jet && !u.orb && u.s >= Math.max(BOX_S, P.len - 260)) { const cx = BOX.fx - 76, cy = BOX.y + 78; u.orb = { a: Math.atan2((u.y - cy) / 0.45, u.x - cx), R: rr(40, 80), w: (u.id % 2 ? 1 : -1) * rr(0.75, 1.15), blend: 0 }; }
     if (u.orb) { u.orb.blend = Math.min(1, u.orb.blend + dt / 0.8); u.orb.a += u.orb.w * dt * (S.mode === 'win' ? 0.4 : 1); u.moving = true; }
     const fight = S.mode === 'play' || (S.mode === 'pick' && POPMODE === 'tray');
     const tgt = fight ? findTarget(u) : null;
@@ -617,7 +629,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     place(u);
   }
   // ---- THE SABER (the game's two-step) and THE CRYSTAL'S POWER ----
-  function sabFoes(u, R) { const out = []; for (const e of S.f) { if (e.dead) continue; const d = Math.hypot(e.x - u.x, e.y - u.y); if (d <= R) out.push([d, e]); } out.sort((a, b) => a[0] - b[0]); return out.map(p => p[1]); }
+  function sabFoes(u, R) { const out = []; for (const e of S.f) { if (e.dead) continue; const d = Math.hypot(e.x - u.x, e.y - u.y); if (d <= R && inFront(u, e, R + 20)) out.push([d, e]); } out.sort((a, b) => a[0] - b[0]); return out.map(p => p[1]); }   // round 12: the road's law for his hunt, his next and his slam
   function lineFace(u, dir) { const i = u.pi | 0, dx = P.x[Math.min(P.n - 1, i + 2)] - P.x[Math.max(0, i - 2)]; if (Math.abs(dx) > 0.6) u.face = Math.sign(dx) * dir; }
   function sabDash(u, f) {
     const sb = u.sb, dx = f.x - u.x, dy = f.y - u.y, d = Math.hypot(dx, dy) || 1, stop = Math.max(0, d - 18);
@@ -632,6 +644,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
   }
   function sabAtBox(u) { return !BOX.dead && Math.abs((BOX.x - BW * 0.45) - u.x) <= 46 && Math.abs(BOX.y - u.y) <= 52; }
   function sabCut(u, f) {
+    if (!f && S.stats.shots.length < 600) S.stats.shots.push({ side: 'g', type: 'sarge', jet: false, fix: false, us: +frontS(u).toFixed(1), ts: -1, box: true, rng: 0, t: +S.t.toFixed(2), cut: 1 });   // round 12: his cuts at the box, in the log too
     u.swingT = 0.22; SFX.saber(); const hx = SABER_HEX[u.saber];
     S.fx.push({ k: 'slash', x: u.x + u.face * 10, y: bodyY(u) - 4, face: u.face, t: 0, dur: 0.22, col: hx });
     if (f && !f.dead) { hurt(f, u.st.dmg, u); S.fx.push({ k: 'spark', x: f.x, y: bodyY(f), t: 0, dur: 0.25, col: hx }); }
@@ -699,6 +712,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
   function muzzle(u) { return { x: u.x + u.face * UH * 0.38, y: u.y - u.alt - UH * 0.6 }; }
   function aimAt(tgt) { return tgt === BOX ? { x: BOX.fx + rr(-6, 10), y: BOX.fy + rr(-22, 14) } : { x: tgt.x + rr(-3, 3), y: bodyY(tgt) + rr(-6, 4) }; }
   function fire(u, tgt) {
+    if (S.stats.shots.length < 600) S.stats.shots.push({ side: u.side, type: u.type, jet: !!u.jet, fix: !!u.fix, us: +frontS(u).toFixed(1), ts: tgt === BOX ? -1 : (tgt.fix ? -2 : +frontS(tgt).toFixed(1)), box: tgt === BOX, rng: u.st.rng, t: +S.t.toFixed(2) });   // round 12: every shot, for the proofs
     const st = u.st, m = muzzle(u), a = aimAt(tgt), tr = u.d.tr;
     if (u.saber) {   // SARGE'S SABER: he carves through what stands in reach, up to three, and the box if he is at it
       u.swingT = 0.22; SFX.saber(); let n = 0;
@@ -1047,6 +1061,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     S.purseBump = Math.max(0, S.purseBump - dt * 4);
     S.elimShow += ((S.stage >= 2 ? ELIM_GOAL : S.elim) - S.elimShow) * Math.min(1, dt * 9);
     if (OP.on) tickOpener();
+    if (S.mode === 'win' && S.endOn && EV.tapAt == null && S.wall - S.endOn >= HS.TAP + HS.TAPD * 0.5) endTap(S.wall - S.endOn);   // round 11/12: the finger's ONE tap on the clock, never missed by a skipped frame
     tickAttack(dt * (S.mode === 'pick' && POPMODE === 'card' ? 0 : 1));
     tickFireworks(dt);
     tickPick();
@@ -1314,7 +1329,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     const r = b.getBoundingClientRect(), hr = $('hud').getBoundingClientRect(), tx = r.left - hr.left + r.width * 0.6, ty = r.top - hr.top + r.height * 0.6, ox = hr.width + 70, oy = hr.height + 90;
     let x, y, press = 0;
     if (e < HS.IN1) { const k = eOut((e - HS.IN0) / (HS.IN1 - HS.IN0)); x = ox + (tx - ox) * k; y = oy + (ty - oy) * k; }
-    else if (e < HS.OUT0) { x = tx; y = ty; const p = (e - HS.TAP) / HS.TAPD; if (p >= 0 && p <= 1) press = Math.sin(p * Math.PI); if (p >= 0.5 && EV.tapAt == null) endTap(e); }
+    else if (e < HS.OUT0) { x = tx; y = ty; const p = (e - HS.TAP) / HS.TAPD; if (p >= 0 && p <= 1) press = Math.sin(p * Math.PI); }   // the tap itself fires on the game's clock (tick), whatever the frame rate
     else { const k = Math.pow((e - HS.OUT0) / (HS.OUT1 - HS.OUT0), 2); x = tx + (ox - tx) * k; y = ty + (oy - ty) * k; }
     el.style.display = 'block'; el.style.opacity = '1';
     el.style.left = (x - 62 * 0.354) + 'px'; el.style.top = (y - 78 * 0.133 + 5 - press * 6) + 'px';
@@ -1573,7 +1588,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
       g: alive(S.g).map(u => u.type + (u.jet ? '+jet' : '') + (u.big ? '+big' : '') + (u.saber ? '+' + u.saber : '')), f: alive(S.f).length, box: +BOX.hp.toFixed(1), boxDead: BOX.dead, pick: S.pick ? { n: S.pick.n, chosen: S.pick.chosen } : null, cta: S.cta, stats: S.stats, len: +P.len.toFixed(0), entry: ENTRY,
       turrets: S.f.filter(u => u.fix && !u.dead).map(u => ({ seat: u.fixSeat, hp: +u.hp.toFixed(1), pop: +(u.pop || 0).toFixed(2), x: Math.round(u.x), y: Math.round(u.y) })), seats: TSEAT.map(t => [Math.round(t.x), Math.round(t.y)]),
       opener: OP.on ? +(S.wall - OP.t0).toFixed(2) : (OP.done ? 'done' : 'off'), openerStats: S.stats.opener || null,
-      endTap: S.stats.endTap == null ? null : S.stats.endTap, endV: EV.n, evOn: EV.on, evT: EV.on ? +(S.wall - S.endOn).toFixed(2) : null, fxDrawn: fxDirty, fw: S.fw.length,
+      boxS: BOX_S, plen: +P.len.toFixed(0), endTap: S.stats.endTap == null ? null : S.stats.endTap, endV: EV.n, evOn: EV.on, evT: EV.on ? +(S.wall - S.endOn).toFixed(2) : null, fxDrawn: fxDirty, fw: S.fw.length,
       endKind: S.endKind, leaks: S.stats.leaks, hits: S.stats.hits, firstHit: S.stats.firstHit, defeatAt: S.stats.defeat, lastPlay: +S.lastPlay.toFixed(2), redT: +S.redT.toFixed(2),
       map: MAP === 'lawn' ? 'original' : MAP, tabs: TABS ? Array.from(document.querySelectorAll('#mapTabs .mtab')).map(b => b.dataset.map + (b.classList.contains('on') ? '*' : '')).join(',') : null, endAt: S.stats.endAt, dimAt: S.stats.dimAt, dim: +(getComputedStyle(document.getElementById('endDim')).opacity), icon: (ART.icon || '').length, mortars: S.f.filter(u => u.type === 'tanmort').length, shells: S.rk.filter(r => r.lob).length,
       tide: S.tide.st, tiders: S.f.filter(f => f.tide && !f.dead).length,
