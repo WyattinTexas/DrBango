@@ -991149,7 +991149,107 @@ function kysRead(o){ o=o||{}; if(o.on!=null) KYS.on=o.on? 1 : 0; for(const k of 
   return { cv:GVT_CV, on:KYS.on|0, live:kysOn()? 1 : 0, part:Object.assign({},KYS.part), n:Object.assign({},KYS.n), err:KYS.err, e:KYS.e, wrapped:KYS.wrapped|0, leapWrapped:KYS.leapWrapped|0, rows:KYS.rows|0,
     coldX:Object.assign({},KYS_COLDX), snowX:Object.assign({},KYS_SNOWX), hop:{ first:Object.assign({},KYS_HOP_FIRST), big:Object.assign({},KYS_HOP_BIG), cd:Object.assign({},KYS_HOP_CD), min:Object.assign({},KYS_HOP_MIN), max:Object.assign({},KYS_HOP_MAX), floor:Object.assign({},KYS_HOP_FLOOR), look:Object.assign({},KYS_HOP_LOOK) },
     pile:{ rows:KYS_PILE.rows.slice(), r:KYS_PILE.r, dx:KYS_PILE.dx, dy:KYS_PILE.dy }, ball:Object.assign({},KYS_BALL), last:KYS.last, bars:KYS.bars.slice(-8), hops:KYS.hops.slice(),
-    posts:(S.raid && S.raid.posts)? S.raid.posts.map(P=>({ x:P.x, y:P.y, o:P.o, home:P.kyfHome|0, pile:kysPileN(P) })) : null }; }</script><script type="text/x-gvt-part">'use strict';
+    posts:(S.raid && S.raid.posts)? S.raid.posts.map(P=>({ x:P.x, y:P.y, o:P.o, home:P.kyfHome|0, pile:kysPileN(P) })) : null }; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function bbyOn(k){ return !!(BBY.on===1 && BBY.part[k] && !S.bf && bbsOn()); }
+function bbyErr(e){ BBY.err=String((e && e.message) || e).slice(0,160); }
+
+function bbyRides(src){ return !!(src && src.type==='bbshow' && !src.dead && (src.bbsRide || (src.bbs && src.bbs.st==='ride'))); }
+function bbyThru(u){ const n=u.bbyN|0, p=BBY.pen; u.bbyN=n+1; BBY.n.met++; const go=Math.floor(((n+1)*p+50)/100)>Math.floor((n*p+50)/100); if(go){ u.bbyT=(u.bbyT|0)+1; BBY.n.thru++; } return go; }
+function bbySaberMeets(u){ if(!u || u.type!=='sarge' || u.dead) return false; const sw=unitSargeStats(u); if(!sw || sw.w!=='lightsaber') return false; return (unarmedU(u,sw)? sw.block*UNARMED_BLOCK : sw.block)>0; }
+function bbyCmdMeets(u){ if(!u || u.type!=='sarge' || u.dead || u.cmdDash==='duel') return false; const sw=unitSargeStats(u); return !!sw && sw.w==='commander' && (u.cmdBlkN||0)<(sw.blk!=null? sw.blk : CMD.blk); }
+
+
+
+
+
+
+
+
+function bbyG(){ const g=BBY.g; return (g && g.cfg===S.cfg && S.raid && S.raid.k==='bbs')? g : null; }
+
+
+
+
+
+
+
+
+
+
+
+function bbyCam(g,dt){ try{ if(S.bf || !S.cCam || S.pan || !(W>VW/zoomZ())) return; const k=Math.min(1, dt*BBY.bye.rate), e=g.e, x=e? e.x : g.x, y=e? e.y : g.y;
+    S.cCam.x=clampCam(S.cCam.x+((x-VW*0.5)-S.cCam.x)*k); S.cCam.y=clampCamZ((S.cCam.y||0)+((y-436)-(S.cCam.y||0))*k); }catch(e){ bbyErr(e); } }
+function bbyRelease(g,why){ g.done=1; g.why=why; g.rel=+(S.t-g.t0).toFixed(2); BBY.n.released++; BBY.n.why=why;
+  try{ const e=g.e; if(e && e.t!=null) e.dur=Math.max(e.t+0.4, e.t/BBY.bye.fadeK); }catch(x){ bbyErr(x); }   
+  const P=g.pend; g.pend=null; if(P && S.mode==='play' && !S.vflag){ try{ BBY.old.startVictoryFlag.apply(null, P); }catch(x){ bbyErr(x); } } }
+function bbyTick(dt){ const g=bbyG(); if(!g || g.done) return;
+  if(!(BBY.on===1 && BBY.part.bye)){ bbyRelease(g,'off'); return; }
+  const now=S.t, age=now-g.t0, h=g.h; if(h && COMM.say===h && h.done && g.typedAt==null) g.typedAt=now;
+  const gone=!h || COMM.say!==h, mn=reducedMotion()? Math.min(BBY.bye.min, 1.6) : BBY.bye.min; let why=null;   
+  if(age>=BBY.bye.max) why='max';
+  else if(age>=mn){ if(gone) why=h? 'closed' : 'floor'; else if(g.typedAt!=null && now-g.typedAt>=BBY.bye.read) why='read'; }
+  if(why) bbyRelease(g,why); else if(BBY.bye.cam) bbyCam(g,dt); }
+function bbyStandDown(){ if(!(BBY.on===1 && BBY.part.bye)) return; const rd=S.raid; if(!rd || rd.k!=='bbs' || rd.cfg!==S.cfg || !rd.kingDown || S.bf) return; const B=rd.bbs; if(!B) return;
+  const w0=B.rideSeen|0; if(w0<S.wave){ for(let i=w0;i<S.wave;i++){ const w=S.cfg.waves[i]; if(w && w.bbsRide) BBY.n.calm++; } B.rideSeen=S.wave; }   
+  if(B.alert){ B.alert=null; BBY.n.alerts++; } B.rideDue=null; }
+
+
+function bbySnipeCfg(cfg){ const tier=cfg.bbsTier; let k=0;
+  if(BBY.snipe.tiers[tier] && BBY.snipe.n>0) for(const w of cfg.waves){ if(!w || !w.groups) continue; const gb=w.groups.find(g=>g && g.bba && g.t==='wbandit'); if(!gb || w.groups.some(g=>g && g.bbyEs)) continue;
+    w.groups.push(Object.assign({}, gb, { f:'solo', t:'wsniper', n:BBY.snipe.n, at:((typeof BBA_POSSE==='object')? BBA_POSSE.sniperAt : 1.5)+BBY.snipe.gap, pin:1, bba:1, sharp:1, bbyEs:1 })); k++; }   
+  cfg.bby={ tier:tier, snipe:k }; BBY.n.cfgs++; BBY.n.snipers+=k; return cfg; }
+
+
+
+
+
+
+
+function bbyRead(o){ o=o||{}; try{ if(o.on!=null) BBY.on=o.on? 1 : 0; if(o.part) Object.assign(BBY.part, o.part); if(o.pen!=null) BBY.pen=+o.pen; if(o.bye) Object.assign(BBY.bye, o.bye); if(o.reset){ for(const k in BBY.n) BBY.n[k]=(k==='why')? null : 0; } }catch(e){ bbyErr(e); }
+  const g=bbyG(), x2=v=>(v==null)? null : +(+v).toFixed(2);
+  return { cv:GVT_CV, on:BBY.on, live:BBY_LIVE, part:Object.assign({}, BBY.part), pen:BBY.pen, bye:Object.assign({}, BBY.bye), snipe:JSON.parse(JSON.stringify(BBY.snipe)), n:Object.assign({}, BBY.n), err:BBY.err, rd:BBY_RD? 1 : 0,
+    g:g? { age:x2(S.t-g.t0), mine:g.h? 1 : 0, typed:(g.typedAt==null)? null : x2(g.typedAt-g.t0), held:g.pend? 1 : 0, done:g.done, why:g.why, rel:g.rel, fx:g.e? { t:x2(g.e.t), dur:x2(g.e.dur) } : null } : null,
+    cfg:(S.cfg && S.cfg.bby)? Object.assign({}, S.cfg.bby) : null, es:S.foes.filter(f=>f && f.type==='wsniper' && !f.dead && f.bbyEs).map(f=>({ id:f.id, lk:f.bbyLk|0, es:f.playEs|0 })),
+    sched:Array.from({ length:20 }, (_, n)=>Math.floor(((n+1)*BBY.pen+50)/100)>Math.floor((n*BBY.pen+50)/100)? 1 : 0),
+    wraps:{ tanHit:tanHit!==BBY.old.tanHit, saberBlocks:saberBlocks!==BBY.old.saberBlocks, cmdAbsorbs:cmdAbsorbs!==BBY.old.cmdAbsorbs, bbsThrown:bbsThrown!==BBY.old.bbsThrown, startVictoryFlag:startVictoryFlag!==BBY.old.startVictoryFlag } }; }</script><script type="text/x-gvt-part">'use strict';
 
 
 
@@ -1202247,7 +1202347,7 @@ let BFQ=null;
 
 
 
-let GVT_CV='30.14';
+let GVT_CV='30.15';
 let NX_CAP_MUL=4;
 
 
@@ -3094295,7 +3094395,108 @@ try{ kysRows(); }catch(e){ KYS.err++; KYS.e+='lab:'+String(e).slice(0,80)+' '; }
 
 
 
-setTimeout(()=>{ try{ if(typeof GVT==='object' && GVT) GVT.kys=kysRead; }catch(e){} }, 0);</script><script>(function(){var ps=document.querySelectorAll('script[type="text/x-gvt-part"]');for(var i=0;i<ps.length;i++){var p=ps[i],s=document.createElement('script');s.text=p.text;p.parentNode.replaceChild(s,p);if(s.parentNode)s.parentNode.removeChild(s);}})();</script>
+setTimeout(()=>{ try{ if(typeof GVT==='object' && GVT) GVT.kys=kysRead; }catch(e){} }, 0);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const BBY_LIVE=1;
+const BBY={ on:(function(){ try{ const q=/[?&]bby=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_bby','0'); else localStorage.removeItem('gvt_bby'); } return localStorage.getItem('gvt_bby')==='0'? 0 : BBY_LIVE; }catch(e){ return BBY_LIVE; } })(),
+  part:{ pen:1, bye:1, snipe:1 },   
+  pen:20,   
+  bye:{ read:3.0, min:2.5, max:9, cam:1, rate:3.2, fadeK:0.8 },   
+  snipe:{ n:1, tiers:{ m:1, h:1 }, gap:0.8, every:1 },   
+  n:{ met:0, thru:0, saber:0, cmd:0, byes:0, mine:0, held:0, released:0, why:null, refused:0, calm:0, alerts:0, cfgs:0, snipers:0, tagged:0, esLocks:0 }, g:null, err:null, old:{} };
+let BBY_RD=null;
+const BBY_CEL='Ha... ha. Best fight I ever lost, Sarge.';
+
+
+
+
+
+
+
+{ const th0=tanHit; tanHit=function(u,fx,fy,src,fire9){
+    if(!(src && !fire9 && u && !u.dead && bbyRides(src) && bbyOn('pen'))) return th0.apply(this, arguments);
+    const was=BBY_RD; BBY_RD={ u:src, f:u, thru:0 };
+    try{ return th0.apply(this, arguments); } finally{ BBY_RD=was; } };
+  BBY.old.tanHit=th0; }
+{ const sb0=saberBlocks; saberBlocks=function(u){ try{ const R=BBY_RD; if(R && R.f===u){ if(R.thru) return false; if(bbySaberMeets(u) && bbyThru(u)){ R.thru=1; BBY.n.saber++; return false; } } }catch(e){ bbyErr(e); } return sb0.apply(this, arguments); }; BBY.old.saberBlocks=sb0; }
+{ const ca0=cmdAbsorbs; cmdAbsorbs=function(u){ try{ const R=BBY_RD; if(R && R.f===u){ if(R.thru) return false; if(bbyCmdMeets(u) && bbyThru(u)){ R.thru=1; BBY.n.cmd++; return false; } } }catch(e){ bbyErr(e); } return ca0.apply(this, arguments); }; BBY.old.cmdAbsorbs=ca0; }
+
+
+{ const th1=bbsThrown; bbsThrown=function(f){ const r=th1.apply(this, arguments);
+    try{ if(r && BBY.on===1 && BBY.part.bye && S.mode==='play' && S.raid && S.raid.k==='bbs'){
+        const L=(typeof BBS7==='object' && BBS7 && BBS7.said)||[], last=L[L.length-1], h=COMM.say, mine=!!(h && last && last.who==='BUFFALO BILL' && last.key===BBY_CEL);   
+        let e=null; for(let i=S.fx.length-1;i>=0;i--){ if(S.fx[i] && S.fx[i].k==='bbsthrow'){ e=S.fx[i]; break; } }
+        if(e){ e.bbyDur=e.dur; e.dur=Math.max(e.dur, BBY.bye.max+2); }   
+        BBY.g={ cfg:S.cfg, t0:S.t, x:f.x, y:f.y, h:mine? h : null, e:e, typedAt:null, pend:null, done:0, why:null, rel:null }; BBY.n.byes++; if(mine) BBY.n.mine++; } }catch(e){ bbyErr(e); }
+    return r; }; BBY.old.bbsThrown=th1; }
+{ const sv0=startVictoryFlag; startVictoryFlag=function(x,dir,old,hex,done,foeWin){
+    try{ const g=bbyG(); if(g && !g.done && !foeWin && S.mode==='play' && !S.vflag && BBY.on===1 && BBY.part.bye){ if(!g.pend){ g.pend=Array.prototype.slice.call(arguments); BBY.n.held++; } else if(done && !g.pend[4]) g.pend[4]=done; return; } }catch(e){ bbyErr(e); }
+    return sv0.apply(this, arguments); }; BBY.old.startVictoryFlag=sv0; }
+{ const cs1=commSayAs; commSayAs=function(spk,key,opts){ try{ const g=bbyG(); if(g && !g.done && g.h && COMM.say===g.h && !(spk && spk.name==='BUFFALO BILL')){ BBY.n.refused++; return false; } }catch(e){ bbyErr(e); } return cs1.apply(this, arguments); }; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+{ const t2=bbsTick; bbsTick=function(dt){ try{ bbyStandDown(); }catch(e){ bbyErr(e); } const r=t2.apply(this, arguments); try{ bbyTick(dt); }catch(e){ bbyErr(e); } return r; }; }
+
+
+
+
+
+{ const c0=bbsCfg; bbsCfg=function(tier){ const cfg=c0.apply(this, arguments); try{ if(BBY.on===1 && BBY.part.snipe && cfg && cfg.bbs && cfg.bba && !cfg.bby) bbySnipeCfg(cfg); }catch(e){ bbyErr(e); } return cfg; }; }
+{ const sg0=spawnGroup; spawnGroup=function(g){ let i0=-1; try{ if(g && g.bbyEs && g.t==='wsniper') i0=idc; }catch(e){}
+    const r=sg0.apply(this, arguments);
+    try{ if(i0>=0) for(const f of S.foes){ if(f && f.id>=i0 && f.type==='wsniper' && !f.bbyEs){ f.bbyEs=1; BBY.n.tagged++; } } }catch(e){ bbyErr(e); } return r; }; }
+{ const p0=playTick; playTick=function(dt){ try{ if(BBY.on===1 && BBY.part.snipe && bbsOn() && typeof PLAY==='object' && PLAY.on) for(const f of S.foes){ if(f && f.bbyEs && f.type==='wsniper' && !f.dead && f.lrBmT>0 && !f.playLkOn){ f.bbyLk=(f.bbyLk|0)+1; const es=((f.bbyLk-1)%Math.max(1, BBY.snipe.every|0))===0; f.playLk=(PLAY.es.first|0)-(es? 1 : 0); if(es) BBY.n.esLocks++; } } }catch(e){ bbyErr(e); }
+    return p0.apply(this, arguments); }; }
+
+
+
+
+
+
+
+
+{ const r0=bbsRig; bbsRig=function(o){ const r=r0.apply(this, arguments); try{ if(r && typeof r==='object') r.bby=bbyRead(); }catch(e){} return r; }; }
+setTimeout(function(){ try{ if(window.GVT && !GVT.bby) GVT.bby=function(o){ return bbyRead(o); }; }catch(e){} }, 0);</script><script>(function(){var ps=document.querySelectorAll('script[type="text/x-gvt-part"]');for(var i=0;i<ps.length;i++){var p=ps[i],s=document.createElement('script');s.text=p.text;p.parentNode.replaceChild(s,p);if(s.parentNode)s.parentNode.removeChild(s);}})();</script>
 <svg id="bcnDefs" width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute;left:0;top:0;width:0;height:0;overflow:hidden;pointer-events:none"><defs><filter id="bcnS" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="9" flood-color="rgb(255,210,74)" flood-opacity="0.7"/></filter><filter id="bcnCS" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="5.952" flood-color="rgb(255,210,74)" flood-opacity="0.7"/></filter><filter id="bcnT" x="-70%" y="-70%" width="240%" height="240%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="10" flood-color="rgb(255,210,74)" flood-opacity="0.95"/><feDropShadow dx="0" dy="0" stdDeviation="24" flood-color="rgb(255,210,74)" flood-opacity="0.55"/></filter><filter id="bcnH0" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="rgb(255,210,74)" flood-opacity="0.55"/></filter><filter id="bcnW0" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="rgb(255,210,74)" flood-opacity="0.55"/></filter><filter id="bcnC0" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="3.968" flood-color="rgb(255,210,74)" flood-opacity="0.55"/></filter><filter id="bcnH1" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="6.5" flood-color="rgb(255,210,74)" flood-opacity="0.57"/></filter><filter id="bcnW1" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="6.5" flood-color="rgb(255,210,74)" flood-opacity="0.57"/></filter><filter id="bcnC1" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="4.299" flood-color="rgb(255,210,74)" flood-opacity="0.57"/></filter><filter id="bcnH2" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="7" flood-color="rgb(255,210,74)" flood-opacity="0.59"/></filter><filter id="bcnW2" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="7" flood-color="rgb(255,210,74)" flood-opacity="0.59"/></filter><filter id="bcnC2" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="4.63" flood-color="rgb(255,210,74)" flood-opacity="0.59"/></filter><filter id="bcnH3" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="7.5" flood-color="rgb(255,211,74)" flood-opacity="0.61"/></filter><filter id="bcnW3" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="7.5" flood-color="rgb(255,211,74)" flood-opacity="0.61"/></filter><filter id="bcnC3" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="4.96" flood-color="rgb(255,211,74)" flood-opacity="0.61"/></filter><filter id="bcnH4" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="rgb(255,211,74)" flood-opacity="0.63"/></filter><filter id="bcnW4" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="rgb(255,211,74)" flood-opacity="0.63"/></filter><filter id="bcnC4" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="5.291" flood-color="rgb(255,211,74)" flood-opacity="0.63"/></filter><filter id="bcnH5" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="8.5" flood-color="rgb(255,211,74)" flood-opacity="0.65"/></filter><filter id="bcnW5" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="8.5" flood-color="rgb(255,211,74)" flood-opacity="0.65"/></filter><filter id="bcnC5" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="5.622" flood-color="rgb(255,211,74)" flood-opacity="0.65"/></filter><filter id="bcnH6" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="9" flood-color="rgb(255,211,74)" flood-opacity="0.67"/></filter><filter id="bcnW6" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="9" flood-color="rgb(255,211,74)" flood-opacity="0.67"/></filter><filter id="bcnC6" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="5.952" flood-color="rgb(255,211,74)" flood-opacity="0.67"/></filter><filter id="bcnH7" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="9.5" flood-color="rgb(255,211,74)" flood-opacity="0.69"/></filter><filter id="bcnW7" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="9.5" flood-color="rgb(255,211,74)" flood-opacity="0.69"/></filter><filter id="bcnC7" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="6.283" flood-color="rgb(255,211,74)" flood-opacity="0.69"/></filter><filter id="bcnH8" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="10" flood-color="rgb(255,212,74)" flood-opacity="0.71"/></filter><filter id="bcnW8" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="10" flood-color="rgb(255,212,74)" flood-opacity="0.71"/></filter><filter id="bcnC8" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="6.614" flood-color="rgb(255,212,74)" flood-opacity="0.71"/></filter><filter id="bcnH9" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="10.5" flood-color="rgb(255,212,74)" flood-opacity="0.73"/></filter><filter id="bcnW9" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="10.5" flood-color="rgb(255,212,74)" flood-opacity="0.73"/></filter><filter id="bcnC9" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="6.944" flood-color="rgb(255,212,74)" flood-opacity="0.73"/></filter><filter id="bcnH10" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="11" flood-color="rgb(255,212,74)" flood-opacity="0.75"/></filter><filter id="bcnW10" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="11" flood-color="rgb(255,212,74)" flood-opacity="0.75"/></filter><filter id="bcnC10" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="7.275" flood-color="rgb(255,212,74)" flood-opacity="0.75"/></filter><filter id="bcnH11" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="11.5" flood-color="rgb(255,212,74)" flood-opacity="0.77"/></filter><filter id="bcnW11" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="11.5" flood-color="rgb(255,212,74)" flood-opacity="0.77"/></filter><filter id="bcnC11" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="7.606" flood-color="rgb(255,212,74)" flood-opacity="0.77"/></filter><filter id="bcnH12" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="12" flood-color="rgb(255,212,74)" flood-opacity="0.79"/></filter><filter id="bcnW12" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="12" flood-color="rgb(255,212,74)" flood-opacity="0.79"/></filter><filter id="bcnC12" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="7.937" flood-color="rgb(255,212,74)" flood-opacity="0.79"/></filter><filter id="bcnH13" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="12.5" flood-color="rgb(255,213,74)" flood-opacity="0.81"/></filter><filter id="bcnW13" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="12.5" flood-color="rgb(255,213,74)" flood-opacity="0.81"/></filter><filter id="bcnC13" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="8.267" flood-color="rgb(255,213,74)" flood-opacity="0.81"/></filter><filter id="bcnH14" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="13" flood-color="rgb(255,213,74)" flood-opacity="0.83"/></filter><filter id="bcnW14" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="13" flood-color="rgb(255,213,74)" flood-opacity="0.83"/></filter><filter id="bcnC14" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="8.598" flood-color="rgb(255,213,74)" flood-opacity="0.83"/></filter><filter id="bcnH15" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="13.5" flood-color="rgb(255,213,74)" flood-opacity="0.85"/></filter><filter id="bcnW15" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="13.5" flood-color="rgb(255,213,74)" flood-opacity="0.85"/></filter><filter id="bcnC15" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="8.929" flood-color="rgb(255,213,74)" flood-opacity="0.85"/></filter><filter id="bcnH16" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="14" flood-color="rgb(255,213,74)" flood-opacity="0.87"/></filter><filter id="bcnW16" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="14" flood-color="rgb(255,213,74)" flood-opacity="0.87"/></filter><filter id="bcnC16" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="9.259" flood-color="rgb(255,213,74)" flood-opacity="0.87"/></filter><filter id="bcnH17" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="14.5" flood-color="rgb(255,213,74)" flood-opacity="0.89"/></filter><filter id="bcnW17" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="14.5" flood-color="rgb(255,213,74)" flood-opacity="0.89"/></filter><filter id="bcnC17" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="9.59" flood-color="rgb(255,213,74)" flood-opacity="0.89"/></filter><filter id="bcnH18" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="15" flood-color="rgb(255,214,74)" flood-opacity="0.91"/></filter><filter id="bcnW18" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="15" flood-color="rgb(255,214,74)" flood-opacity="0.91"/></filter><filter id="bcnC18" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="9.921" flood-color="rgb(255,214,74)" flood-opacity="0.91"/></filter><filter id="bcnH19" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="15.5" flood-color="rgb(255,214,74)" flood-opacity="0.93"/></filter><filter id="bcnW19" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="15.5" flood-color="rgb(255,214,74)" flood-opacity="0.93"/></filter><filter id="bcnC19" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="10.251" flood-color="rgb(255,214,74)" flood-opacity="0.93"/></filter><filter id="bcnH20" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="16" flood-color="rgb(255,214,74)" flood-opacity="0.95"/></filter><filter id="bcnW20" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="16" flood-color="rgb(255,214,74)" flood-opacity="0.95"/></filter><filter id="bcnC20" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="10.582" flood-color="rgb(255,214,74)" flood-opacity="0.95"/></filter><filter id="bcnB0" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="rgb(255,210,74)" flood-opacity="0.4"/></filter><filter id="bcnB1" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="4.5" flood-color="rgb(255,210,74)" flood-opacity="0.423"/></filter><filter id="bcnB2" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="5" flood-color="rgb(255,210,74)" flood-opacity="0.446"/></filter><filter id="bcnB3" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="5.5" flood-color="rgb(255,210,74)" flood-opacity="0.469"/></filter><filter id="bcnB4" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="rgb(255,211,74)" flood-opacity="0.492"/></filter><filter id="bcnB5" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="6.5" flood-color="rgb(255,211,74)" flood-opacity="0.515"/></filter><filter id="bcnB6" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="7" flood-color="rgb(255,211,74)" flood-opacity="0.537"/></filter><filter id="bcnB7" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="7.5" flood-color="rgb(255,211,74)" flood-opacity="0.56"/></filter><filter id="bcnB8" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="rgb(255,211,74)" flood-opacity="0.583"/></filter><filter id="bcnB9" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="8.5" flood-color="rgb(255,212,74)" flood-opacity="0.606"/></filter><filter id="bcnB10" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="9" flood-color="rgb(255,212,74)" flood-opacity="0.629"/></filter><filter id="bcnB11" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="9.5" flood-color="rgb(255,212,74)" flood-opacity="0.652"/></filter><filter id="bcnB12" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="10" flood-color="rgb(255,212,74)" flood-opacity="0.675"/></filter><filter id="bcnB13" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="10.5" flood-color="rgb(255,212,74)" flood-opacity="0.698"/></filter><filter id="bcnB14" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="11" flood-color="rgb(255,212,74)" flood-opacity="0.721"/></filter><filter id="bcnB15" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="11.5" flood-color="rgb(255,212,74)" flood-opacity="0.744"/></filter><filter id="bcnB16" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="12" flood-color="rgb(255,213,74)" flood-opacity="0.767"/></filter><filter id="bcnB17" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="12.5" flood-color="rgb(255,213,74)" flood-opacity="0.79"/></filter><filter id="bcnB18" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="13" flood-color="rgb(255,213,74)" flood-opacity="0.812"/></filter><filter id="bcnB19" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="13.5" flood-color="rgb(255,213,74)" flood-opacity="0.835"/></filter><filter id="bcnB20" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="14" flood-color="rgb(255,213,74)" flood-opacity="0.858"/></filter><filter id="bcnB21" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="14.5" flood-color="rgb(255,214,74)" flood-opacity="0.881"/></filter><filter id="bcnB22" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="15" flood-color="rgb(255,214,74)" flood-opacity="0.904"/></filter><filter id="bcnB23" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="15.5" flood-color="rgb(255,214,74)" flood-opacity="0.927"/></filter><filter id="bcnB24" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="16" flood-color="rgb(255,214,74)" flood-opacity="0.95"/></filter></defs></svg>
 <script> try{ if(typeof olrOn==='function' && olrOn()) document.documentElement.classList.add('olrmen'); }catch(e){} </script>
 </body>
