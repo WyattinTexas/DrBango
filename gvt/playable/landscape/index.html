@@ -39,12 +39,14 @@ button{ font:inherit; color:inherit; border:0; margin:0; padding:0; background:n
 #tray{ position:absolute; left:8px; right:8px; bottom:calc(env(safe-area-inset-bottom,0px) + 10px); height:var(--trayH); display:grid; grid-template-columns:repeat(4,1fr); gap:6px; pointer-events:auto; }
 .card{ position:relative; border-radius:13px; background:linear-gradient(180deg,#2d3531 0%,#1c2220 100%); border:2px solid #3e4a42; box-shadow:0 3px 0 rgba(0,0,0,.38);
   display:flex; flex-direction:column; align-items:center; justify-content:space-between; padding:7px 2px 6px; box-sizing:border-box; overflow:hidden; }
-.card .nm{ font-size:14px; letter-spacing:.2px; white-space:nowrap; }
+.card .nm{ font-size:var(--nmFs,14px); letter-spacing:.2px; white-space:nowrap; }   /* round 26: smaller letters on a very narrow card only (layout sets --nmFs) */
 .card .art{ height:58px; width:auto; max-width:94%; display:block; object-fit:contain; filter:drop-shadow(0 2px 0 rgba(0,0,0,.25)); }
+html.tight .card .art{ flex:1 1 0; min-height:0; height:auto; max-height:58px; width:94%; max-width:none; }   /* round 26 (Isaac 13:35, AppLovin's test): on a short tray the drawing takes the room left, up to its 58, so the price stays whole */
 .card .pr{ font-size:23px; line-height:1; }
 .card .pr.sm{ font-size:15px; letter-spacing:.3px; padding-top:5px; }
 .card.no .art{ opacity:.45; } .card.no .pr{ color:#ff9b86; }
 .card.busy .art{ opacity:.5; }
+.card.busy.no .art{ opacity:.45; }   /* round 27: Sarge on the field = a troop you can't afford, exactly */
 .card.press{ transform:scale(.93); }
 .card .chip{ position:absolute; top:30px; right:5px; width:18px; height:18px; border-radius:50%; background:radial-gradient(circle at 35% 30%,#fff3a0,#ffc82e 60%,#d58c0b); border:1.5px solid #3a2506; display:none; }
 .card .chip svg{ width:14px; height:14px; margin:0 0 0 0; display:block; position:relative; left:0.5px; top:0.5px; }
@@ -519,7 +521,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
   function sAtX(X) { for (let i = 0; i < P.n; i++) if (P.x[i] >= X) return i * 2; return P.len; }   // round 18: the road's place at a column (every road here runs west to east)
   function entryS() { if (LV.cannon && LV.drawbridge && !DB.up) return Math.max(ENTRY, sAtX(LV.cannon.late));   // round 20 (Isaac 10:33): after the drawbridge, they arrive on the last curve before the cannon
     return LV.camera ? Math.max(ENTRY, Math.min(P.len - 40, sAtX(CAM.x + 24))) : ENTRY; }   // where our men arrive: the screen's left edge
-  function tanS() { if (!LV.camera) return P.len - 6; const e = sAtX(CAM.x + LV.view + 30); return e >= P.len - 6 ? P.len - 6 : e; }   // where theirs arrive: the keep, or the screen's right edge (3)
+  function tanS() { if (LV.drawbridge && DB.up) return sAtX(LV.drawbridge.bank - 14); if (!LV.camera) return P.len - 6; const e = sAtX(CAM.x + LV.view + 30); return e >= P.len - 6 ? P.len - 6 : e; }   // where theirs arrive: the keep, or the screen's right edge (3)
   function leakS() { return LV.camera ? Math.max(1, sAtX(CAM.x - 8)) : 1; }   // a tan past the screen's left edge is off the screen (the loss's count)
   function nearestS(x, y) { let bi = 0, bd = 1e9; for (let i = 0; i < P.n; i += 2) { const d = Math.hypot(P.x[i] - x, P.y[i] - y); if (d < bd) { bd = d; bi = i; } } return { i: bi, s: bi * 2, d: bd }; }
   function place(u) {
@@ -549,6 +551,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     L.k = colW / 400; L.ox = (vw - colW) / 2; L.H = vh / L.k; L.xMin = -L.ox / L.k; L.xMax = 400 + L.ox / L.k;
     const st = document.documentElement.style; st.setProperty('--ox', L.ox + 'px'); st.setProperty('--cw', colW + 'px'); st.setProperty('--side', Math.round(L.ox) + 'px');
     st.setProperty('--trayH', Math.round(land ? clamp((vh - 120) / 2, 84, 116) : clamp(colW * 0.295, 96, 128)) + 'px');
+    { const cardW = land ? (L.ox - 30) / 2 : (colW - 34) / 4, tH = parseFloat(st.getPropertyValue('--trayH')); st.setProperty('--nmFs', Math.min(14, Math.max(8, (cardW - 6) * 0.2137)).toFixed(2) + 'px'); document.documentElement.classList.toggle('tight', tH < 116); }   // round 26: a card's name fits its card (14 wherever a card is 71 or wider); a tray under 116 (the card's whole stack) lets its drawings give way
     cv.width = Math.round(vw * L.dpr); cv.height = Math.round(vh * L.dpr); fxcv.width = cv.width; fxcv.height = cv.height; fxDirty = false;
     const rowTop = (land ? vh : $('row').getBoundingClientRect().top) / L.k, plateTop = $('plate').getBoundingClientRect().top / L.k;
     const y3 = rowTop - (land ? 40 : 46), y1 = land ? 132 : Math.max(150, plateTop + 132);
@@ -663,8 +666,8 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
       let nm = c.nm, glow = '';
       if (c.k === 'sarge') {
         const su = S.sarge.unit;
-        if (su && su.saber) { const tk = TK[su.saber], left = su.tkCd || 0; nm = tk.name; cls += ' power'; if (left <= 0 && S.mode === 'play') { txt = 'TAP!'; cls += ' ready'; glow = SABER_HEX[su.saber]; } else { txt = left > 0 ? String(Math.ceil(left)) : '...'; sm = left <= 0; } }
-        else if (su) { txt = 'ON FIELD'; sm = true; cls += ' busy'; } else if (S.sarge.downT > 0) { txt = 'BACK IN ' + Math.ceil(S.sarge.downT); sm = true; cls += ' busy'; } else txt = 'FREE'; }
+        if (su && su.saber) { const tk = TK[su.saber], left = su.tkCd || 0; nm = tk.name; cls += ' power'; if (left <= 0 && S.mode === 'play') { txt = 'TAP!'; cls += ' ready'; glow = SABER_HEX[su.saber]; } else { txt = left > 0 ? String(Math.ceil(left)) : '...'; sm = left <= 0; cls += ' no'; } }
+        else if (su) { txt = 'ON FIELD'; sm = true; cls += ' busy no'; } else if (S.sarge.downT > 0) { txt = 'BACK IN ' + Math.ceil(S.sarge.downT); sm = true; cls += ' busy no'; } else txt = 'FREE'; }   // round 27 (Isaac 14:07): Sarge you can't play wears a troop's can't-play dress
       else { txt = String(COST[c.k]); if (Math.floor(S.tags) < COST[c.k]) cls += ' no'; }
       if ((c.k === 'rifleman' && S.jet) || (c.k === 'bazooka' && S.big) || (c.k === 'sarge' && S.saber)) cls += ' up';
       if (S.pressK === c.k && S.wall < S.pressUntil) cls += ' press';
@@ -979,7 +982,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     S.redT = Math.max(0, S.redT - dt * 1.7);
     if (S.mode !== 'play' && !(S.mode === 'pick' && POPMODE === 'tray')) return;
     if (S.atk.first == null) return;
-    const near = S.f.some(f => !f.dead && !f.fix && f.s < leakS() + 12);
+    const near = S.f.some(f => !f.dead && !f.fix && f.s < (LV.camera ? leakS() + 12 : ENTRY + 10));   /* round 27 (Isaac 14:07: "The red marks show up late"): the hits as the portrait's, from where the road comes onto the screen */
     if ((near || S.t - S.atk.last < 1.5) && S.t >= S.atk.next) hitPlayer();
   }
   function defeat() {
@@ -1045,8 +1048,8 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     S.q = S.q.filter(q => !q.done);
     if (BOX.dead) return;
     const marching = S.f.filter(f => !f.dead && !f.fix).length;
-    if (LV.drawbridge && DB.up) return;   // round 18 (2): the gate is shut: nobody marches out until the drawbridge falls (the walls and the mortars fight on)
-    if (S.tide.st === 'armed' && S.stage >= 1 && S.mode === 'play') {
+    const shut = LV.drawbridge && DB.up;   /* round 27 (Isaac 14:07): the gate shut no longer stops their groups (out by the bank at the gate); the counter push still waits for the drawbridge */
+    if (!shut && S.tide.st === 'armed' && S.stage >= 1 && S.mode === 'play') {
       let front = 0; for (const u of S.g) if (!u.dead && !u.free && !u.orb && !u.st.air) front = Math.max(front, u.s / P.len);
       if ((marching === 0 && front >= 0.4) || (marching <= 1 && S.t - S.tide.armT > 14)) { tideFire(); return; }
     }
@@ -1056,7 +1059,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     }
     const sp = S.spawn; sp.t -= dt; if (sp.t > 0) return;
     const tans = S.f.filter(f => !f.dead).length, greens = S.g.filter(u => !u.dead).length;
-    if (tans >= greens + 6 || tans >= 22) { sp.t = 1.4; return; }   // round 18: more happening
+    if ((tans >= greens + 6 || tans >= 22) && marching >= 3) { sp.t = 1.4; return; }   // round 18: more happening · round 27: at least three of theirs always on the march (the castle's posts no longer use up the count)
     const w = ++sp.wave, t = S.t; let grp;
     if (S.tide.st === 'done') grp = ['tanrifle', w % 2 ? 'tanmg' : 'tanrifle'];   // the tide has turned: small groups till the box falls
     else if (t < 22) grp = ['tanrifle', 'tanrifle', w % 2 ? null : 'tanrifle'];
@@ -1071,6 +1074,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     const s0 = tanS(), u = mkUnit('t', k, s0, rr(-14, 14)); S.f.push(u);   // round 18: from the keep (3: from the screen's right edge, while the keep is out of sight)
     if (tide) { u.tide = 1; u.max = u.hp = u.d.hp * TIDE_HP * DIFF_K[DIFF]; }   // round 17: the counter push at the dial's toughness too
     if (s0 >= P.len - 6) S.fx.push({ k: 'puff', x: BOX.fx - 6, y: BOX.y - 6, t: 0, dur: 0.4, R: 11, col: '#efe8de' });
+    else if (LV.drawbridge && DB.up) { place(u); S.fx.push({ k: 'puff', x: u.x, y: u.y - 6, t: 0, dur: 0.45, R: 12, col: '#efe8de' }); }   /* round 27: out by the bank at the gate */
   }
 
   // ---------------- THE UPGRADES: the pop-up (the fight frozen behind it) ----------------
@@ -1266,7 +1270,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
       for (const u of S.g) { tickUnit(u, sdt); faceMotion(u); } for (const u of S.f) { tickUnit(u, sdt); faceMotion(u); }   // round 14: a moving man faces the way he moves
       tickRockets(sdt); tickFx(sdt); tickCam(sdt); cannonTick(sdt);
       S.g = S.g.filter(u => !u.dead || u.fallT < 1.7); S.f = S.f.filter(u => !u.dead || u.fallT < 1.7);
-      if (S.mode === 'play' && S.pendingPick >= 0 && S.t >= S.pendingPick && !cannonBusy()) { S.pendingPick = -1; openPick(S.stage + 1); }
+      if (S.mode === 'play' && S.pendingPick >= 0 && S.t >= S.pendingPick && !cannonBusy() && !(S.stage === 0 && LV.drawbridge && DB.up)) { S.pendingPick = -1; openPick(S.stage + 1); }   /* round 27: with their men coming all along, the first card still waits for the drawbridge (round 19's order) */
       S.shake = Math.max(0, S.shake - sdt * 2.4);
       if (S.flagT >= 0) S.flagT += sdt;
     }
@@ -1967,7 +1971,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     if (!cannonOn()) return; const c = LV.cannon;
     for (const u of S.g.concat(S.f)) if (u.recoil) u.recoil = Math.max(0, u.recoil - dt / 0.38);
     if (CN.st === 'tan' && !S.f.some(f => f.cannon && !f.dead)) { CN.st = 'empty'; CN.face = -1; S.stats.cannonFreeAt = +S.t.toFixed(2); }
-    if (CN.st === 'empty' && S.mode === 'play' && !S.f.some(f => !f.dead && Math.hypot(f.x - c.x, f.y - c.y) < 120)) {   // the gun is free once nobody of theirs stands near it
+    if (CN.st === 'empty' && S.mode === 'play' && !S.f.some(f => !f.dead && (f.fix || f.cannon || f.guard) && Math.hypot(f.x - c.x, f.y - c.y) < 120)) {   /* round 27: its own defenders, not the men marching by */   // the gun is free once nobody of theirs stands near it
       let best = null, bd = 1e9;
       for (const u of S.g) { if (u.dead || u.saber || u.type === 'sarge' || u.type === 'medic' || u.type === 'mortar' || u.st.air || u.free || u.orb || u.mount || u.fix) continue; const d = Math.hypot(u.x - c.x, u.y - c.y); if (d < 175 && d < bd) { bd = d; best = u; } }
       if (best) { CN.st = 'mount'; CN.crew = best; best.mount = { t: 0, fx: best.x, fy: best.y, tx: c.x - 4, ty: c.y + 1, dur: Math.max(0.35, bd / 150) }; best.free = { x: best.x, y: best.y }; S.stats.cannonMount = S.stats.cannonMount || +S.t.toFixed(2); }
