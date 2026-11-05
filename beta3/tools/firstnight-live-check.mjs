@@ -78,7 +78,9 @@ for (const lang of ['en', 'es', 'fr', 'pt', 'de']) {
   const B = "game.scene.getScene('battle')";
   await until(p, `${B} && !!${B}.f5G`);
   const r = await p.evaluate(`(() => { const b = ${B}, l = b.L, P = SS_F5_PROMPTS[PACK.lang];
-    const fill = (s) => s.replace('{x}','6').replace('{d}','16').replace('{p}','10').replace('{m}','1.5').replace('{a}','8').replace('{b}','50').replace('{c}','42').replace('{h}','6');
+    /* v0.126.0: the tile economy's how lines carry the script's longest word ({w}) and its letters ({n}) */
+    const W = b.f5G.words.reduce((a, w) => (w.length > a.length ? w : a), []).join('').toUpperCase();
+    const fill = (s) => s.replace('{x}','6').replace('{d}','16').replace('{p}','10').replace('{m}','1.5').replace('{a}','8').replace('{b}','50').replace('{c}','42').replace('{h}','6').replace('{w}', W).replace('{n}','7');
     const out = []; for (const k of Object.keys(SS_F5_PROMPTS.en)) { const c = ssF5Frame(b, fill((P && P[k]) || SS_F5_PROMPTS.en[k])); out.push([k, Math.round(c.f5W), !!(P && P[k])]); c.destroy(); }
     return { lang: PACK.lang, W: Math.round(l.W), words: b.f5G.words.map(w=>w.join('')).join(' '), out } })()`);
   const over = r.out.filter(([, w]) => w > r.W - 8);

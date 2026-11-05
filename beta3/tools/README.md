@@ -2,6 +2,69 @@
 
 Sixty-two scripts, all dev-only — nothing here ships to the browser.
 
+## THE TILE ECONOMY (v0.126.0): settings-check §1 + §5b · firstnight-live-check §C
+
+Skylar (10/29), points 5 and 8 of the nine: "It needs to explain how you get
+the orange and blue tiles." · "After all that, it should pause real quick and
+explain that if you don't use one of the colored tiles on your turn, they
+disappear." Ground truth first (the live rules, read before a word of copy):
+`tryCast` forges by LETTERS — 5 or 6 → the ORANGE (tier 1, +6 on its letter),
+7 or more → the BLUE (tier 2, the whole word ×1.5), the forged tile landing
+with the next refill; the GREEN (the dew) is no word's doing — every blow the
+beast LANDS greens one plain tile (`dewTile`, DEW_CHANCE 1.0); and
+`expireSpecials` (USE IT OR LOSE IT): after a cast's impact and before its
+refill, every colored tile still standing loses its colour, the letter stays
+— each reward lives for exactly ONE cast (a SCRY sweeps the whole board). Two
+new held lessons in the night (game.js `F5-EARN` / `F5-FADE`), both
+interposing in `f5GuideNext` the way the scry gate does, so every shipped beat
+after them runs exactly as before:
+
+- **HOW EACH TILE WAS EARNED** (`f5GuideEarn` → `f5GuideEarnLift`): the
+  moment a tile lands under the hand, and BEFORE its POINT says what it does,
+  the fight holds on the light veil — the tile as it landed, the cause in its
+  own colour ("5 letters" · "7 letters" · the blow's "−8"), the how line tied
+  to the action just taken ("MOONS had 5 letters, so it earned this ORANGE
+  tile." · "TONIGHT had 7 letters, so it earned this BLUE tile." · "The beast
+  hit you, so you earned this GREEN tile.") and, 700 ms on, the rule ("Words
+  of 5 or 6 letters earn an orange tile." · "5 or 6 letters earn orange. 7 or
+  more earn blue." · "Every time the beast hits you, you get a green tile.");
+  the hand on the tile; 4.4 s, or a tap past 0.9 s. The tile's own arrival
+  prompt (tile1/2/3) stays quiet while the script stands — its POINT says it
+  after: how, then what.
+- **USE IT OR LOSE IT** (`f5GuideFade` → `f5GuideFadeDrain` →
+  `f5GuideFadeLift`): the words spent and the green mended, the hand holds
+  once more on the night's three colored tiles as the player used them (en
+  S · H · D) — "If you don't use a colored tile on your turn…" — and at 1.2 s
+  their colours DRAIN in expireSpecials' own goodbye (plain faces, the chips
+  falling 7 → 1 · 4 · ♥6 → 2) as "…its color disappears. The letter stays,
+  plain." rises; 4.2 s from the drain, or a tap past 0.9 s from it → the
+  farewell.
+
+**settings-check.mjs** (161 → 177 checks, ~9 min): §1 pins the interpositions
+(beside the scry gate's, before the step), the three dials, the quiet
+arrivals, no seeded draw in the new code (comments stripped — they SAY
+"never rng()"), and all nine lines in all five tongues with their
+placeholders; §5b walks the new beats on the replayed night by real DPR-3
+taps — each earned beat asserted at its moment (THE POINT not yet reached,
+the arrival prompt unsaid, the container at 950 tagged by tier with its
+cause, its two lines risen, the veil live, the hand at 960), the orange let
+go by a real tap AIMED AT A BOARD TILE (the tile is never taken), the blue by
+a tap, the green left to its own dwell; then each POINT says its line once;
+the fade held on S · H · D, a tap before the drain and one inside its floor
+both refused, the replicas' plain faces and fallen chips, both lines, and the
+untapped hold timed (≥ 1.2 s to the drain, ≥ 4.2 s from it — scene and wall
+clock). `SHOTS=` adds night-orange-earned · night-blue-earned ·
+night-green-earned · night-fade · night-fade-drained.
+
+**firstnight-live-check.mjs** §C fills `{w}`/`{n}` too (the script's longest
+word, 7), so the five tongues' new lines are measured as they will read.
+
+⚠ `first5-check` (through `firstnight-stage.sh`) is the FIRST5 sandbox's suite
+and encodes its v0.15.0 night — after this card the live night carries five
+held beats it has never heard of (its pose numbering, its arrival-time
+prompt reads and its walk timings all predate them). It stays the sandbox's
+own; settings-check §5b is the live night's authority now.
+
 ## THE FIRST NIGHT, LIVE (v0.125.0): firstnight-stage.sh · firstnight-live-check.mjs · veteran-twin-check.mjs · settings-check §5b–§5c
 
 Skylar (10/29): "We want the tutorial for STARSPELL to be more scripted. Right

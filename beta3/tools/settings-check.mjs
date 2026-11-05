@@ -35,6 +35,23 @@
 // keeps no pocket: no beta3.quickck through the night, the fell or the pick,
 // and a COLD reboot wakes on the meadow (no resume, nothing owed) — and the
 // veteran's meadow wears no lit-sky mark though the replay lit VULPES.
+// v0.126.0 (THE TILE ECONOMY, card ss-2026-10-29-scripted-tutorial/02): §1
+// pins the two new held lessons on paper (they interpose in f5GuideNext the
+// way the scry gate does; the dials; the arrivals quiet under the script; no
+// seeded draws; all nine lines in all five tongues) and §5b walks them on the
+// replayed night: HOW EACH TILE WAS EARNED, held the moment it lands and
+// before its POINT — the orange ("5 letters", "MOONS had 5 letters, so it
+// earned this ORANGE tile.", released by a real tap AIMED AT A BOARD TILE,
+// which never takes the tile), the blue ("7 letters", TONIGHT, released by a
+// tap), the green (the blow's "−8", "The beast hit you, so you earned this
+// GREEN tile.", left untapped to let go by its own dwell) — each POINT then
+// saying what its tile does, once; and USE IT OR LOSE IT after the mend: the
+// night's three colored tiles held (S · H · D), a tap before the drain and
+// one inside its floor both refused, the colours DRAINING to plain faces and
+// fallen chips (7 → 1 · 4 · ♥6 → 2) with the loss said, and the untapped
+// beat holding its slowed duration (1.2 s, then 4.2 s from the drain) before
+// the farewell (SHOTS: night-orange-earned · night-blue-earned ·
+// night-green-earned · night-fade · night-fade-drained).
 // Self-launching: serves beta3 on :8899 if nothing does; headless Chromium on
 // :9501 (/tmp/cdp-settings wiped first) — Playwright's own Chromium when it
 // is installed (a headless GOOGLE Chrome hijacks AppleScript's session with
@@ -94,6 +111,31 @@ ok('…and the hand dies with the scene (a ‹-abandoned replay leaves no stale 
 ok('…writes nothing to the first-open flag', !!replaySrc && !/prof\.ftue|ssFtueDone|SS\.save/.test(replaySrc));
 ok('…and stands behind the whole one-sheet guard family', ['this.busy()', 'this.setC', 'this.langC', 'this.dailyC', 'this.mapC',
   'this.confirmC', 'this.signC', 'this.streakC', 'this.riteC'].every((t) => replaySrc.includes(t)));
+// v0.126.0 THE TILE ECONOMY: the two new held lessons ride the script's own door
+const nextSrc = (gameSrc.match(/\n  f5GuideNext\(\) \{[\s\S]*?\n  \}\n/) || [''])[0];
+ok('THE TILE ECONOMY (v0.126.0): the how-it-was-earned beat and the use-it-or-lose-it pause interpose in f5GuideNext exactly as the scry gate does (before the step, once each), so THE POINT and the farewell follow as shipped',
+  /if \(g\.idx \+ 1 === g\.scryAt && !g\.scried\) \{ this\.f5GuideScry\(\); return; \}[\s\S]*?if \(nk && !\(g\.earned && g\.earned\[nk\]\) && this\.f5GuideEarn\(nk\)\) return;\s*if \(g\.idx \+ 1 >= g\.words\.length && !g\.faded && this\.f5GuideFade\(\)\) return;\s*g\.idx\+\+;/.test(nextSrc));
+const econAll = (gameSrc.match(/\n  f5GuideEarn\(kind\) \{[\s\S]*?\n  \/\/ ---------- board ----------/) || [''])[0];
+ok('…its dials are declared and wired: the earned beat dwells 4400 · the fade stands 1200, then dwells 4200 from the drain · both floors the showcase\'s 900, the fade\'s armed at the drain',
+  ['const SS_F5_EARN_SHOW_MS = 4400;', 'const SS_F5_FADE_AT_MS = 1200;', 'const SS_F5_FADE_SHOW_MS = 4200;'].every((t) => gameSrc.includes(t))
+  && econAll.includes("const dwell = this.time.delayedCall(SS_F5_EARN_SHOW_MS, () => release('dwell'));")
+  && econAll.includes('this.time.delayedCall(SS_F5_FADE_AT_MS, () => this.f5GuideFadeDrain(g));')
+  && econAll.includes("const dwell = this.time.delayedCall(SS_F5_FADE_SHOW_MS, () => release('dwell'));")
+  && (econAll.match(/this\.time\.delayedCall\(SS_F5_SHOW_FLOOR_MS, \(\) => \{/g) || []).length === 2
+  && /f5GuideFadeDrain\(g\) \{[\s\S]*?const dwell = this\.time\.delayedCall\(SS_F5_FADE_SHOW_MS/.test(econAll));
+ok('…a forged tile\'s and the dew\'s arrival stay quiet while the script stands (THE POINT says what it does, after the earned beat says how)',
+  gameSrc.includes('if (this.f5Night && (tier === 1 || tier === 2) && !this.f5GuideLocked()) {') && gameSrc.includes('if (this.f5Night && !this.f5GuideLocked()) this.time.delayedCall(520,'));
+const econSrc = (gameSrc.match(/\n  f5GuideEarn\(kind\) \{[\s\S]*?\n  \/\/ ---------- board ----------/) || [''])[0];
+const econCode = econSrc.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');   // the code alone (its comments SAY "never rng()")
+ok('…the new beats draw nothing from the seeded stream (their cosmetics on Math.random — the house law) and are reached only from the script (two call sites, both in f5GuideNext)',
+  econCode.length > 2000 && !/\brng\(\)/.test(econCode) && /Math\.random\(\)/.test(econCode) && (gameSrc.match(/this\.f5GuideEarn\(|this\.f5GuideFade\(\)/g) || []).length === 2
+  && /this\.f5GuideEarn\(nk\)/.test(nextSrc) && /this\.f5GuideFade\(\)/.test(nextSrc));
+const P5 = eval('(' + gameSrc.match(/const SS_F5_PROMPTS = (\{[\s\S]*?\n\});/)[1] + ')');
+const ECON = ['earnCount', 'orangeHow', 'orangeRule', 'blueHow', 'blueRule', 'greenHow', 'greenRule', 'fadeRule', 'fadeLoss'];
+ok('…every lesson line authored in all five tongues (es/fr/pt/de drafts) with the en placeholders kept ({w} {n} on the how lines, {n} on the count)',
+  ['en', 'es', 'fr', 'pt', 'de'].every((t) => ECON.every((k) => typeof P5[t][k] === 'string' && P5[t][k].length > 4))
+  && ['es', 'fr', 'pt', 'de'].every((t) => ['orangeHow', 'blueHow'].every((k) => P5[t][k].includes('{w}') && P5[t][k].includes('{n}')) && P5[t].earnCount.includes('{n}')),
+  ECON.filter((k) => !['en', 'es', 'fr', 'pt', 'de'].every((t) => P5[t] && P5[t][k])).join(',') || 'all 9 × 5');
 const buildV = (gameSrc.match(/const BUILD = 'STARSPELL v([\d.]+)'/) || [])[1];
 const html = readFileSync('index.html', 'utf8');
 ok('the release ritual held (BUILD ' + buildV + ' on every ?v= stamp)', !!buildV
@@ -349,8 +391,25 @@ const NIGHT = `JSON.stringify((() => { const b = ${B}, g = window.__f5guide || {
     gone: !!b.ftueGone, hand: !!(b.ftueHand && b.ftueHand.active), f5G: !!b.f5G, pill: b.strikeT.text, alarm: !!b.strikeAlarm,
     board: b.board.map((s) => (s ? s.ch + (s.tier ? '*' : '') : '_')).join(' '),
     strike: window.__f5strike || {}, mend: window.__f5mend || {}, scry: window.__f5scry || {},
+    earn: window.__f5earn || {}, fade: window.__f5fade || {}, pr: window.__f5prompt || {},
     hpShown: Math.round(b.hpShown.v), hpHold: b.hpHold | 0, quickck: localStorage.getItem('beta3.quickck') } })())`;
 const gs = () => evj(NIGHT);
+// v0.126.0 THE TILE ECONOMY: what a held lesson DRAWS — the veil, the container
+// (tagged f5earn / f5fade at the showcase's 950), its big cause text, its
+// one-line frames (text + alpha, in order), the tile faces inside, the hand
+const LESSON = (tag) => evj(`JSON.stringify((() => { const b = ${B}, l = b.L;
+  const veil = b.children.list.find((o) => o.active && o.type === 'Image' && o.depth === 900 && o.texture && o.texture.key === 'veil');
+  const c = b.children.list.find((o) => o.active && o.getData && o.getData('${tag}'));
+  if (!c) return { c: false, veil: !!veil };
+  const frames = c.list.filter((o) => o.f5W).map((f) => ({ s: f.list.find((t) => t.type === 'Text').text, a: +f.alpha.toFixed(2) }));
+  const causeT = c.list.find((o) => o.type === 'Text');
+  const faces = []; const scan = (ls) => ls.forEach((o) => { if (o.type === 'Image' && o.texture && /^tile\\d$/.test(o.texture.key)) faces.push(o.texture.key); if (o.list && !o.f5W) scan(o.list); });
+  scan(c.list);
+  const cb = causeT ? causeT.getBounds() : null, h = b.ftueHand;
+  return { c: true, tag: c.getData('${tag}'), depth: c.depth, a: +c.alpha.toFixed(2), veil: !!veil, veilA: veil ? +veil.alpha.toFixed(2) : null,
+    veilLive: !!(veil && veil.input && veil.input.enabled), cause: causeT ? causeT.text : null, causeIn: cb ? cb.left >= 0 && cb.right <= l.W : null,
+    frames, faces, handDepth: h ? h.depth : null };
+})())`);
 const waitFor = async (pred, cap = 30000) => {
   const t = Date.now(); let i = 0;
   while (Date.now() - t < cap) { await poke(i++); try { const s = await gs(); if (pred(s)) return s; } catch (e) { } await sleep(250); }
@@ -368,7 +427,7 @@ const walk = async (max = 40) => {
   return 'stuck';
 };
 const letGo = async () => { await sleep(400); await tapAt(195, 500); };   // a real tap on the lesson's veil, past its floor
-await ev(`(window.__f5guide = null, window.__f5strike = null, window.__f5mend = null, window.__f5scry = null, 1)`);
+await ev(`(window.__f5guide = null, window.__f5strike = null, window.__f5mend = null, window.__f5scry = null, window.__f5earn = null, window.__f5fade = null, window.__f5prompt = null, 1)`);
 ok('a fresh replay by real taps: the gear, TUTORIAL, the rise, the night\'s fight', await openSheet()
   && await tapUntil(`(${H}.setC && ${H}.setC.tutZone) || ${H}.setB`, `!${H}.setC && (${H}.ascending || game.scene.isActive('battle'))`, 3)
   && await until(PICK, 40000));
@@ -384,6 +443,24 @@ const n1 = await waitFor((s) => s.beat === 'word' && s.idx === 1 && s.state === 
 ok('…the hand STAYS (no free-typing gap): word two is MOONS, the finger on its M', !!n1 && n1.word === 'moons' && n1.hand && !n1.gone,
   n1 ? n1.word + ' ' + n1.pt : 'never');
 ok('MOONS, by real taps', await walk() === 'cast');
+/* v0.126.0 THE TILE ECONOMY — how the ORANGE was earned, held before THE POINT */
+let e1 = await waitFor((s) => s.beat === 'earn' && !!s.earn[1], 25000);
+await sleep(1000); e1 = await gs();   // the pop-in, and the rule line rising 700 ms in
+const v1 = await LESSON('f5earn');
+ok('HOW THE ORANGE WAS EARNED (v0.126.0): the moment MOONS\'s refill lands it the fight HOLDS, before THE POINT — the tile as it landed (the S at cell 0, tier 1), "5 letters" in its own colour, the how line tied to the word just cast, then the rule',
+  !!e1 && e1.idx === 1 && e1.ft === 'earn' && e1.oc === null && e1.earn[1].at === 0 && e1.earn[1].ch === 's' && e1.earn[1].tier === 1
+  && e1.earn[1].word === 'MOONS' && e1.earn[1].letters === 5 && v1.c && v1.tag === 1 && v1.depth === 950 && v1.cause === '5 letters' && v1.causeIn
+  && v1.faces.join() === 'tile1' && v1.frames.map((f) => f.s).join('|') === 'MOONS had 5 letters, so it earned this ORANGE tile.|Words of 5 or 6 letters earn an orange tile.'
+  && v1.frames.every((f) => f.a >= 0.99), JSON.stringify({ idx: e1 && e1.idx, ft: e1 && e1.ft, earn: e1 && e1.earn[1], v1 }));
+ok('…the light veil holds the board, the hand rests on the tile above it, and the orange\'s "+6" line waits for THE POINT (its arrival stayed quiet)',
+  v1.veil && v1.veilA >= 0.3 && v1.veilLive && v1.handDepth === 960 && /^pose:/.test(e1.pt) && !(e1.pr.tile1 | 0),
+  JSON.stringify({ veilA: v1.veilA, live: v1.veilLive, hand: v1.handDepth, pt: e1.pt, tile1: e1.pr.tile1 }));
+await shot('night-orange-earned');
+await tap(`${B}.board[5].c`);   // past the floor: a real tap AIMED AT A BOARD TILE
+const e1b = await waitFor((s) => (s.earn.lifted | 0) >= 1 && s.beat === 'point', 8000);
+ok('…a real tap past its floor lets it go without touching the board (the tile under the veil never taken) — THE POINT follows as shipped and says the +6 there, once',
+  !!e1b && e1b.earn[1].released === 'tap' && e1b.earn[1].holdMs >= 900 && e1b.sel === '' && (e1b.pr.tile1 | 0) === 1 && e1b.idx === 2,
+  e1b ? JSON.stringify({ released: e1b.earn[1].released, holdMs: e1b.earn[1].holdMs, sel: e1b.sel, tile1: e1b.pr.tile1, idx: e1b.idx }) : 'never');
 let n2 = await waitFor((s) => s.beat === 'point' && s.idx === 2, 25000);
 await sleep(700); n2 = await gs();
 ok('THE ORANGE: MOONS forged it onto cell 0, the hand resting on it, its +6 said — the word SKY, VULPES 70',
@@ -412,6 +489,21 @@ await sleep(1500); await tapAt(195, 500);   // past the reveal's 1.4 s floor
 ok('…the gate lifts and the hand stays: word four is TONIGHT', !!(await waitFor((s) => (s.scry.lifted | 0) >= 1, 8000))
   && !!(await waitFor((s) => s.beat === 'word' && s.idx === 3 && s.state === 'pick' && s.word === 'tonight', 15000)));
 ok('TONIGHT, by real taps (seven letters — the forge of a BLUE)', await walk() === 'cast');
+/* v0.126.0 THE TILE ECONOMY — how the BLUE was earned, held before its POINT */
+let e2 = await waitFor((s) => s.beat === 'earn' && !!s.earn[2], 25000);
+await sleep(1000); e2 = await gs();
+const v2 = await LESSON('f5earn');
+ok('HOW THE BLUE WAS EARNED (v0.126.0): TONIGHT\'s refill lands the blue (the H at cell 1, tier 2) and the fight HOLDS before its POINT — "7 letters" in blue, the how line tied to TONIGHT, then the orange/blue rule in one breath; the hand on the tile, the ×1.5 line still unsaid',
+  !!e2 && e2.idx === 3 && e2.ft === 'earn' && e2.bc === null && e2.earn[2].at === 1 && e2.earn[2].ch === 'h' && e2.earn[2].tier === 2
+  && e2.earn[2].word === 'TONIGHT' && e2.earn[2].letters === 7 && v2.c && v2.tag === 2 && v2.depth === 950 && v2.cause === '7 letters' && v2.causeIn
+  && v2.faces.join() === 'tile2' && v2.frames.map((f) => f.s).join('|') === 'TONIGHT had 7 letters, so it earned this BLUE tile.|5 or 6 letters earn orange. 7 or more earn blue.'
+  && v2.frames.every((f) => f.a >= 0.99) && v2.veil && v2.handDepth === 960 && /^pose:/.test(e2.pt) && !(e2.pr.tile2 | 0),
+  JSON.stringify({ idx: e2 && e2.idx, ft: e2 && e2.ft, earn: e2 && e2.earn[2], v2, tile2: e2 && e2.pr.tile2 }));
+await shot('night-blue-earned');
+await letGo();
+const e2b = await waitFor((s) => (s.earn.lifted | 0) >= 2 && s.beat === 'point' && s.idx === 4, 8000);
+ok('…a real tap past its floor lets it go — the blue\'s POINT follows and says the ×1.5 there, once',
+  !!e2b && e2b.earn[2].released === 'tap' && (e2b.pr.tile2 | 0) === 1, e2b ? JSON.stringify({ released: e2b.earn[2].released, tile2: e2b.pr.tile2 }) : 'never');
 let n6 = await waitFor((s) => s.beat === 'point' && s.idx === 4, 25000);
 await sleep(700); n6 = await gs();
 ok('THE BLUE: TONIGHT forged it onto cell 1 as the fuse burned 2 → 1 (the ember alarm), the hand on it — the word HALO, VULPES 33',
@@ -439,6 +531,22 @@ ok('…the number lands and the bar DRAINS 50 → 42 in the light, the hand onto
 await shot('night-strike-drain');
 await letGo();
 ok('…a real tap past its floor lifts it (the fuse re-armed at 6)', !!(await waitFor((s) => (s.strike.lifted | 0) >= 1 && s.cnt === 6, 8000)));
+/* v0.126.0 THE TILE ECONOMY — how the GREEN was earned (Skylar's point 7: "It's because he got attacked by the beast") */
+let e3 = await waitFor((s) => s.beat === 'earn' && !!s.earn[3], 20000);
+await sleep(1000); e3 = await gs();
+const v3 = await LESSON('f5earn');
+ok('HOW THE GREEN WAS EARNED (v0.126.0): the dew the blow left (the D at cell 1, tier 3) holds the fight before its POINT — the blow\'s "−8" in crimson beside it, "The beast hit you, so you earned this GREEN tile." then the rule; the hand on the tile, the heal line still unsaid',
+  !!e3 && e3.idx === 4 && e3.ft === 'earn' && e3.gc === null && e3.earn[3].at === 1 && e3.earn[3].ch === 'd' && e3.earn[3].tier === 3 && e3.earn[3].hit === 8
+  && v3.c && v3.tag === 3 && v3.cause === '−8' && v3.faces.join() === 'tile3'
+  && v3.frames.map((f) => f.s).join('|') === 'The beast hit you, so you earned this GREEN tile.|Every time the beast hits you, you get a green tile.'
+  && v3.frames.every((f) => f.a >= 0.99) && v3.veil && v3.handDepth === 960 && /^pose:/.test(e3.pt) && !(e3.pr.tile3 | 0),
+  JSON.stringify({ idx: e3 && e3.idx, ft: e3 && e3.ft, earn: e3 && e3.earn[3], v3, tile3: e3 && e3.pr.tile3 }));
+await shot('night-green-earned');
+const e3b = await waitFor((s) => (s.earn.lifted | 0) >= 3 && s.beat === 'point' && s.idx === 5, 9000);
+const earnMs = await ev('SS_F5_EARN_SHOW_MS');
+ok('…untapped, it lets go by its own dwell (' + earnMs + ' ms of game-loop time, §1 pins it to its dial) — the green\'s POINT follows and says the heal there, once',
+  !!e3b && e3b.earn[3].released === 'dwell' && e3b.earn[3].holdMs >= earnMs * 0.95 && (e3b.pr.tile3 | 0) === 1,
+  e3b ? JSON.stringify({ released: e3b.earn[3].released, holdMs: e3b.earn[3].holdMs, tile3: e3b.pr.tile3 }) : 'never');
 let n10 = await waitFor((s) => s.beat === 'point' && s.idx === 5, 20000);
 await sleep(700); n10 = await gs();
 ok('THE GREEN: the dew the blow earned, pinned on DAWN\'s D at cell 1, the hand on it — the player at 42',
@@ -455,6 +563,43 @@ await sleep(500); n12 = await gs();
 ok('…the bar RISES 42 → 48 in the light, the hand onto it', !!n12 && n12.hpShown === 48 && /^pose:/.test(n12.pt), JSON.stringify({ hpShown: n12.hpShown, pt: n12.pt }));
 await shot('night-heal');
 await letGo();
+/* v0.126.0 THE TILE ECONOMY — use it or lose it: the words spent, the hand holds the night once more before it lets go */
+const fadeAt = await ev('SS_F5_FADE_AT_MS'), fadeMs = await ev('SS_F5_FADE_SHOW_MS'), floorMs = await ev('SS_F5_SHOW_FLOOR_MS');
+let f1 = await waitFor((s) => s.beat === 'fade' && (s.fade.shown | 0) >= 1, 20000);
+const vf1 = await LESSON('f5fade');   // read at once: the colours drain SS_F5_FADE_AT_MS in
+f1 = await gs();
+const tTap1 = Date.now();
+await tapAt(195, 500);   // too soon: before the drain (and its floor) a tap is nothing
+await shot('night-fade');
+ok('USE IT OR LOSE IT (v0.126.0): after the mend, before the farewell, the fight HOLDS on the night\'s three colored tiles as the player used them (the orange S, the blue H, the green D) and the rule — Skylar\'s words, made exact',
+  !!f1 && f1.ft === 'fade' && f1.hand && !f1.gone && f1.idx === 5 && f1.fade.tiles === 's1 h2 d3' && (f1.fade.drained | 0) === 0
+  && vf1.c && vf1.tag === 3 && vf1.depth === 950 && vf1.faces.join() === 'tile1,tile2,tile3' && vf1.veil && vf1.veilLive && vf1.handDepth === 960 && /^pose:/.test(f1.pt)
+  && vf1.frames.length === 2 && vf1.frames[0].s === 'If you don\'t use a colored tile on your turn…' && vf1.frames[0].a >= 0.99 && vf1.frames[1].a === 0,
+  JSON.stringify({ ft: f1 && f1.ft, idx: f1 && f1.idx, fade: f1 && f1.fade, vf1 }));
+await waitFor((s) => !!s.fade.drainAt, 8000);   // the drain begins
+const tTap2 = Date.now();
+await tapAt(195, 500);   // still too soon: inside the drain's floor
+const f2 = await waitFor((s) => (s.fade.drained | 0) === 3, 6000);
+const f2b = await gs();
+ok('…the colours DRAIN in the light; a real tap before the drain and another inside its floor were both refused (the beat holds)',
+  !!f2 && f2b.beat === 'fade' && !f2b.fade.released && f2b.fade.drainAt > tTap1 && tTap2 - f2b.fade.drainAt < floorMs,
+  f2 ? JSON.stringify({ beat: f2b.beat, released: f2b.fade.released, tap1BeforeDrain: f2b.fade.drainAt - tTap1, tap2AfterDrain: tTap2 - f2b.fade.drainAt }) : 'never');
+await sleep(900);   // the loss line rises 600 ms after the drain
+const vf2 = await LESSON('f5fade');
+const f3 = await gs();
+ok('…each replica wears its plain face now, the chips fell to the letters\' own worth (S 7 → 1 · H 4 · D ♥6 → 2), and the loss is said: "…its color disappears. The letter stays, plain."',
+  vf2.c && vf2.faces.filter((k) => k === 'tile0').length === 3 && f3.fade.chips === '7→1 4→4 ♥6→2'
+  && vf2.frames.map((f) => f.s).join('|') === 'If you don\'t use a colored tile on your turn…|…its color disappears. The letter stays, plain.' && vf2.frames.every((f) => f.a >= 0.99),
+  JSON.stringify({ faces: vf2.faces, chips: f3.fade.chips, frames: vf2.frames }));
+await shot('night-fade-drained');
+const f4 = await waitFor((s) => (s.fade.lifted | 0) >= 1, fadeMs + 6000);
+// the dwell is game-loop time (§1 pins it to its dial): Phaser's smoothed frame
+// delta can run a few % off the raw clock on a loaded headless box (4127–4384 ms
+// measured for the 4200), so the clocks are held to 95% of the dial
+ok('…untapped, it HOLDS its slowed duration — ' + fadeAt + ' ms before the drain, then ' + fadeMs + ' ms from it — and lets go by its own dwell',
+  !!f4 && f4.fade.released === 'dwell' && f4.fade.holdMs >= fadeMs * 0.95 && f4.fade.liftedAt - f4.fade.drainAt >= fadeMs * 0.95
+  && f4.fade.drainAt - f4.fade.shownAt >= fadeAt * 0.95, f4 ? JSON.stringify({ released: f4.fade.released, holdMs: f4.fade.holdMs,
+    wallFromDrain: f4.fade.liftedAt - f4.fade.drainAt, wallToDrain: f4.fade.drainAt - f4.fade.shownAt }) : 'never');
 const n13 = await waitFor((s) => s.ended >= 1 && s.gone && s.state === 'pick', 20000);
 ok('THE FAREWELL: the hand retires for good (the script done) — VULPES 12, the player 48, the first fight the player\'s',
   !!n13 && !n13.f5G && n13.ft === 'done' && n13.hp === 12 && n13.php === 48 && n13.words === 6, n13 ? JSON.stringify({ f5G: n13.f5G, ft: n13.ft, hp: n13.hp, php: n13.php, words: n13.words }) : 'never');

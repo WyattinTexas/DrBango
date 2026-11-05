@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.125.0';
+const BUILD = 'STARSPELL v0.126.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -2122,6 +2122,19 @@ const SS_F5_MEND_LINGER_MS = 1800;   // the "♥ +6" stands readable before it f
 const SS_F5_MEND_FLY_MS = 780;       // its flight to the bar (the strike's own)
 const SS_F5_MEND_RISE_MS = 640;      // the player bar's rise
 const SS_F5_MEND_SHOW_MS = 4200;     // the mend's dwell, from the rise (two lines to read)
+/* F5-EARN · F5-FADE (card ss-2026-10-29-scripted-tutorial/02): THE TILE
+   ECONOMY's dials. Skylar (10/29): "It needs to explain how you get the
+   orange and blue tiles." · "After all that, it should pause real quick and
+   explain that if you don't use one of the colored tiles on your turn, they
+   disappear." Each tile's first arrival under the hand HOLDS on how it was
+   earned (the cause in the tile's own colour, the how line, the rule a
+   breath later) before THE POINT names what it does; when the script is
+   spent the night's three colored tiles stand once more and their colours
+   DRAIN in expireSpecials' own goodbye before the hand lets go. Floors are
+   the showcase's (SS_F5_SHOW_FLOOR_MS — the fade's counts from the drain). */
+const SS_F5_EARN_SHOW_MS = 4400;     // the how-it-was-earned beat's dwell (two lines to read)
+const SS_F5_FADE_AT_MS = 1200;       // the use-it-or-lose-it beat: the colours stand this long, then drain
+const SS_F5_FADE_SHOW_MS = 4200;     // …and its dwell, from the drain (a tap past the floor lets go)
 /* ---- F5-CARD-05: THE TEACHING SCRIPTS — Skylar's verdict-1 notes, with
    verdict 5 (WORDS ARE FINE) paying the copy. Ground truth held against the
    shipping code: the special tiles ARE orange (+6, tier 1), blue (×1.5,
@@ -2148,6 +2161,20 @@ const SS_F5_PROMPTS = {
     strikeBar: 'Your health fell {b} → {c}.',   /* F5-GREEN: under the YOU row once the bar has drained */
     greenHeal: 'That green tile healed you ♥{h} — {b} → {c}.',   /* F5-GREEN: {h} the heal, {b} → {c} the bar */
     greenVsRest: 'Orange and blue hurt the beast. Green heals YOU.',   /* F5-GREEN: the family told apart, one line */
+    /* F5-EARN (card ss-2026-10-29-scripted-tutorial/02): HOW each tile was
+       earned, said the moment it lands — {w} the word just cast, {n} its
+       letters (the forge rule counts letters, so a digraph tile counts two) */
+    earnCount: '{n} letters',
+    orangeHow: '{w} had {n} letters, so it earned this ORANGE tile.',
+    orangeRule: 'Words of 5 or 6 letters earn an orange tile.',
+    blueHow: '{w} had {n} letters, so it earned this BLUE tile.',
+    blueRule: '5 or 6 letters earn orange. 7 or more earn blue.',
+    greenHow: 'The beast hit you, so you earned this GREEN tile.',
+    greenRule: 'Every time the beast hits you, you get a green tile.',
+    /* F5-FADE: use it or lose it — Skylar's own words, made exactly true
+       (the COLOUR goes; the letter stays on the board, plain) */
+    fadeRule: 'If you don\'t use a colored tile on your turn…',
+    fadeLoss: '…its color disappears. The letter stays, plain.',
   },
   /* FIRST NIGHT, LIVE: the ×4 translation the table was built for — DRAFTS
      in the shipped tongues' own vocabulary (es ficha/bestia · fr tuile/bête ·
@@ -2168,6 +2195,15 @@ const SS_F5_PROMPTS = {
     strikeBar: 'Tu vida bajó {b} → {c}.',
     greenHeal: 'Esa ficha verde te curó ♥{h}: {b} → {c}.',
     greenVsRest: 'Naranja y azul hieren a la bestia. El verde TE cura.',
+    earnCount: '{n} letras',
+    orangeHow: '{w} tenía {n} letras, así que ganó esta ficha NARANJA.',
+    orangeRule: 'Las palabras de 5 o 6 letras ganan una ficha naranja.',
+    blueHow: '{w} tenía {n} letras, así que ganó esta ficha AZUL.',
+    blueRule: '5 o 6 letras ganan naranja. 7 o más ganan azul.',
+    greenHow: 'La bestia te golpeó, así que ganaste esta ficha VERDE.',
+    greenRule: 'Cada vez que la bestia te golpea, ganas una ficha verde.',
+    fadeRule: 'Si no usas una ficha de color en tu turno…',
+    fadeLoss: '…su color desaparece. La letra queda, sencilla.',
   },
   fr: {
     tile1: 'Une tuile orange rapporte +6 de plus.',
@@ -2183,6 +2219,15 @@ const SS_F5_PROMPTS = {
     strikeBar: 'Ta vie est tombée de {b} → {c}.',
     greenHeal: 'Cette tuile verte t\'a soigné de ♥{h} : {b} → {c}.',
     greenVsRest: 'L\'orange et le bleu blessent la bête. Le vert TE soigne.',
+    earnCount: '{n} lettres',
+    orangeHow: '{w} avait {n} lettres : il t\'a valu cette tuile ORANGE.',
+    orangeRule: 'Un mot de 5 ou 6 lettres vaut une tuile orange.',
+    blueHow: '{w} avait {n} lettres : il t\'a valu cette tuile BLEUE.',
+    blueRule: '5 ou 6 lettres : orange. 7 ou plus : bleu.',
+    greenHow: 'La bête t\'a frappé, d\'où cette tuile VERTE.',
+    greenRule: 'Chaque coup de la bête te donne une tuile verte.',
+    fadeRule: 'Si tu n\'utilises pas une tuile colorée à ton tour…',
+    fadeLoss: '…sa couleur disparaît. La lettre reste, toute simple.',
   },
   pt: {
     tile1: 'Uma peça laranja paga +6 extra.',
@@ -2198,6 +2243,15 @@ const SS_F5_PROMPTS = {
     strikeBar: 'Sua vida caiu {b} → {c}.',
     greenHeal: 'Essa peça verde curou você ♥{h}: {b} → {c}.',
     greenVsRest: 'Laranja e azul ferem a fera. O verde cura VOCÊ.',
+    earnCount: '{n} letras',
+    orangeHow: '{w} tinha {n} letras, então rendeu esta peça LARANJA.',
+    orangeRule: 'Palavras de 5 ou 6 letras rendem uma peça laranja.',
+    blueHow: '{w} tinha {n} letras, então rendeu esta peça AZUL.',
+    blueRule: '5 ou 6 letras rendem laranja. 7 ou mais rendem azul.',
+    greenHow: 'A fera atingiu você, então você ganhou esta peça VERDE.',
+    greenRule: 'Cada golpe da fera em você rende uma peça verde.',
+    fadeRule: 'Se você não usar uma peça colorida no seu turno…',
+    fadeLoss: '…a cor dela some. A letra fica, simples.',
   },
   de: {
     tile1: 'Ein oranger Stein zahlt +6 extra.',
@@ -2213,6 +2267,15 @@ const SS_F5_PROMPTS = {
     strikeBar: 'Dein Leben fiel {b} → {c}.',
     greenHeal: 'Der grüne Stein heilte dich ♥{h}: {b} → {c}.',
     greenVsRest: 'Orange und Blau treffen die Bestie. Grün heilt DICH.',
+    earnCount: '{n} Buchstaben',
+    orangeHow: '{w} hatte {n} Buchstaben: das brachte den ORANGEN Stein.',
+    orangeRule: 'Wörter mit 5 oder 6 Buchstaben bringen Orange.',
+    blueHow: '{w} hatte {n} Buchstaben: das brachte den BLAUEN Stein.',
+    blueRule: '5 oder 6 Buchstaben: Orange. 7 oder mehr: Blau.',
+    greenHow: 'Die Bestie traf dich: das brachte den GRÜNEN Stein.',
+    greenRule: 'Jeder Treffer der Bestie bringt dir einen grünen Stein.',
+    fadeRule: 'Nutzt du einen bunten Stein nicht in deinem Zug…',
+    fadeLoss: '…verblasst seine Farbe. Der Buchstabe bleibt, schlicht.',
   },
 };
 /* the one prompt frame (F5-FIX1-03 pulled it out of ssF5Prompt so the scry
@@ -10639,6 +10702,7 @@ class Battle extends Phaser.Scene {
     if (this.ftueGone || this.state === 'end') return null;
     const g = this.f5G;   /* F5-GUIDED: the script's own seats come first */
     if (g) {
+      if (g.beat === 'earn' || g.beat === 'fade') return g.pose ? 'pose' : 'wait';   /* F5-EARN · F5-FADE: the tile economy's held lessons point like the showcase */
       if (g.beat === 'show' || g.beat === 'reveal' || g.beat === 'strike') return g.pose ? 'pose' : 'wait';   /* F5-SCRYGATE: the reveal points like the showcase — F5-GREEN: the strike too */
       if (g.beat === 'cast') return 'wait';
       if (g.beat === 'scry') return 'scry';   /* F5-SCRYGATE: the one lit door */
@@ -10844,6 +10908,14 @@ class Battle extends Phaser.Scene {
        forge word — once (F5-BLUE: the lift resumes the script through
        f5GuideScried, which marks it so the gate never rises twice) */
     if (g.idx + 1 === g.scryAt && !g.scried) { this.f5GuideScry(); return; }
+    /* F5-EARN: before THE POINT names what the next word's tile DOES, the
+       beat that says how it was EARNED (once per tile — its lift comes back
+       here, and the point follows exactly as before). F5-FADE: the words
+       are spent — before the hand lets go, the use-it-or-lose-it pause
+       (once; its lift comes back here and the farewell follows) */
+    const nk = g.idx + 1 === g.orange ? 1 : g.idx + 1 === g.blue ? 2 : g.idx + 1 === g.green ? 3 : 0;
+    if (nk && !(g.earned && g.earned[nk]) && this.f5GuideEarn(nk)) return;
+    if (g.idx + 1 >= g.words.length && !g.faded && this.f5GuideFade()) return;
     g.idx++;
     if (g.idx >= g.words.length) { this.f5GuideEnd(true); return; }   /* F5-BLUE: the script is spent — the hand lets go, happily */
     this.ftueWord = g.words[g.idx];
@@ -11244,6 +11316,224 @@ class Battle extends Phaser.Scene {
     });
   }
 
+  /* ---- F5-EARN (card ss-2026-10-29-scripted-tutorial/02): HOW THE TILES
+     ARE EARNED. Skylar (10/29): "It needs to explain how you get the orange
+     and blue tiles." — and his point 7 asked it of the green too: "how you
+     got the green tile. It's because he got attacked by the beast." (no
+     line said so before this card). Ground truth (tryCast, dewTile): a cast
+     forges by LETTERS — 5 or 6 → the ORANGE (tier 1, +6 on its letter), 7
+     or more → the BLUE (tier 2, the whole word ×1.5) — the forged tile
+     riding `pending` into the NEXT refill's lowest emptied cell; the GREEN
+     (tier 3, the dew) is no word's doing: every blow the beast LANDS greens
+     one plain tile (DEW_CHANCE 1.0; the night pins which). Each tile's first
+     arrival under the hand HOLDS on its own short lesson BEFORE THE POINT
+     says what it does: the light veil, the tile as it landed, the cause in
+     the tile's own colour ("5 letters" · "7 letters" · the blow's "−8"),
+     the how line tied to the action just taken ("MOONS had 5 letters, so it
+     earned this ORANGE tile.") and, a breath later, the rule in one line;
+     the hand on the tile. The dwell, or a tap past the floor, lets go —
+     back through f5GuideNext, where THE POINT follows exactly as shipped.
+     The board stays the script's: the veil swallows taps, the lock the rest. */
+  f5GuideEarn(kind) {
+    const g = this.f5G, l = this.L, w = g.words[g.idx + 1];
+    let oi = -1;   // THE POINT's own search: the tile the next word starts on
+    for (let i = 0; i < 16; i++) { const s = this.board[i]; if (s && s.tier === kind && !s.blk && s.c.active && s.ch === w[0]) { oi = i; break; } }
+    if (oi < 0 || this.state !== 'pick' || !this.sys.isActive()) return false;   // nothing standing to explain — THE POINT decides, as before
+    const s = this.board[oi];
+    const P = SS_F5_PROMPTS[PACK.lang] || SS_F5_PROMPTS.en, say = (key) => P[key] || SS_F5_PROMPTS.en[key];
+    // the action just taken: the word that forged it (the lock made it the
+    // authored one) and its letters — for the dew, the blow that landed
+    const fw = g.words[g.idx], word = fw.join('').toUpperCase(), letters = fw.reduce((a, t) => a + t.length, 0);
+    const hit = kind === 3 && g.strike && g.strike.hit ? g.strike.hit : 0;
+    const cause = kind === 3 ? (hit ? '−' + hit : '') : say('earnCount').replace('{n}', letters);
+    const how = kind === 3 ? say('greenHow') : say(kind === 2 ? 'blueHow' : 'orangeHow').replace('{w}', word).replace('{n}', letters);
+    const rule = say(kind === 3 ? 'greenRule' : kind === 2 ? 'blueRule' : 'orangeRule');
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setDepth(900).setInteractive();
+    this.tweens.add({ targets: veil, alpha: SS_F5_SHOW_VEIL, duration: 260 });
+    const c = this.add.container(l.x(0), l.y(468)).setDepth(950).setAlpha(0).setScale(0.92);   // the showcase's own seat
+    c.setData('f5earn', kind);
+    // the thing itself: the tile, its letter and its chip, as it landed — at the showcase's tile seat
+    const ts = l.u(46), k = 46 / 78;
+    const glow = this.add.image(-l.u(62), 0, 'dot').setScale(ts / 9).setAlpha(0.3).setTint(SS_TIER_GLOW[kind]).setBlendMode('ADD');
+    const tile = this.add.container(-l.u(62), 0, [
+      this.add.image(0, 0, 'tile' + kind).setDisplaySize(ts, ts),
+      this.add.image(0, -l.u(2 * k), ssGlyph(this, s.ch, SS_TILE_INK[kind])).setDisplaySize(l.u(64 * k), l.u(48 * k)),
+      this.add.image(l.u(24 * k), l.u(21 * k), ssGlyphVal(this, this.tileChip(s.ch, kind), SS_TILE_VINK[kind])).setDisplaySize(l.u(30 * k), l.u(20 * k)),
+    ]);
+    const parts = [glow, tile];
+    if (cause) {
+      // the cause, in the tile's own voice (the blow's crimson for the dew); a
+      // long tongue's count shrinks to the frame rather than run off a phone
+      const ink = kind === 3 ? ['#ff9a8a', '#5a1010'] : kind === 2 ? ['#9fd8ff', '#1d4a66'] : ['#ffb457', '#7a3a08'];
+      const cT = ssTxt(this, -l.u(30), 0, cause, l.u(38), ink[0]).setOrigin(0, 0.5).setShadow(0, 0, ink[1], l.u(10), true, true);
+      const room = Math.min(l.W, l.u(390)) / 2 + l.u(20);
+      if (cT.width > room) cT.setFontSize(Math.floor(l.u(38) * room / cT.width) + 'px');
+      parts.push(cT);
+    }
+    const line = ssF5Frame(this, how).setPosition(0, l.u(52));
+    const rl = ssF5Frame(this, rule).setAlpha(0);
+    rl.setPosition(0, l.u(52) + line.f5H / 2 + l.u(8) + rl.f5H / 2);
+    c.add([...parts, line, rl]);
+    this.tweens.add({ targets: c, alpha: 1, scale: 1, duration: 220, ease: 'Back.easeOut' });
+    this.tweens.add({ targets: glow, alpha: 0.55, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    this.tweens.add({ targets: rl, alpha: 1, duration: 260, delay: 700 });
+    // the hand on the tile, from its left (above the veil for the beat)
+    g.pose = { x: c.x - l.u(62) - ts * 0.36, y: c.y - ts * 0.10, flip: true, dip: 7 };
+    g.poseN = (g.poseN | 0) + 1;
+    const h = this.ftueHand;
+    g.heldDepth = h && h.active ? h.depth : null;
+    if (h && h.active) h.setDepth(960);
+    g.showObjs = { veil, c }; g.shownAt = this.time.now;
+    this.f5GuideBeat('earn');
+    const b = window.__f5earn = window.__f5earn || {};
+    b[kind] = { at: oi, ch: s.ch, tier: s.tier, word: kind === 3 ? null : word, letters: kind === 3 ? null : letters, hit: kind === 3 ? hit : null,
+      cause, how, rule, idx: g.idx, shownAt: Date.now() };
+    b.n = (b.n | 0) + 1; b.last = kind;
+    if (kind === 3) SFX.dew(); else SFX.forge();
+    DIAG('f5 earn: the ' + (kind === 3 ? 'green (the blow, ' + hit + ')' : (kind === 2 ? 'blue' : 'orange') + ' (' + word + ', ' + letters + ' letters)') + ' at ' + oi);
+    const release = (why) => { if (g.tapFn) { this.input.off('pointerdown', g.tapFn); g.tapFn = null; } this.f5GuideEarnLift(kind, why); };
+    const dwell = this.time.delayedCall(SS_F5_EARN_SHOW_MS, () => release('dwell'));
+    this.time.delayedCall(SS_F5_SHOW_FLOOR_MS, () => {
+      if (this.f5G !== g || g.beat !== 'earn') return;
+      g.tapFn = () => { dwell.remove(false); release('tap'); };   // taps accelerate, past the floor
+      this.input.once('pointerdown', g.tapFn);
+    });
+    return true;
+  }
+  f5GuideEarnLift(kind, why) {
+    const g = this.f5G; if (!g || g.beat !== 'earn' || !g.showObjs) return;
+    const b = window.__f5earn = window.__f5earn || {}, e = b[kind] || (b[kind] = {});
+    e.released = why; e.holdMs = Math.round(this.time.now - g.shownAt); b.lifted = (b.lifted | 0) + 1;
+    const { veil, c } = g.showObjs;
+    veil.disableInteractive();   // the board is the player's again at once — THE POINT asks for a tap
+    this.tweens.add({ targets: c, alpha: 0, duration: 260, onComplete: () => { if (c.active) c.destroy(); } });
+    this.tweens.add({ targets: veil, alpha: 0, duration: 300, onComplete: () => { if (veil.active) veil.destroy(); } });
+    g.showObjs = null; g.pose = null;
+    (g.earned || (g.earned = {}))[kind] = 1;
+    const h = this.ftueHand; if (h && h.active && g.heldDepth != null) h.setDepth(g.heldDepth);   // where THE POINT found it before
+    g.heldDepth = null;
+    DIAG('f5 earn: lifted (' + why + ')');
+    this.f5GuideNext();   // THE POINT, exactly as shipped
+  }
+  /* ---- F5-FADE (card ss-2026-10-29-scripted-tutorial/02): USE IT OR LOSE
+     IT. Skylar (10/29): "After all that, it should pause real quick and
+     explain that if you don't use one of the colored tiles on your turn,
+     they disappear." Ground truth (expireSpecials, Wyatt's USE IT OR LOSE
+     IT): after a cast's impact and BEFORE its refill, every colored tile
+     still on the board loses its colour — the letter stays, plain, and the
+     orange's +6 / the blue's ×1.5 / the dew's ♥6 go with it; each reward is
+     live for exactly ONE cast (the beast's strike never wastes one; a SCRY
+     sweeps the whole board, colours and all). The script never lets one
+     lapse — every tile rides the very next word — so the lesson is SHOWN:
+     the words spent and the green mended, the fight HOLDS once more on the
+     night's three colored tiles as the player used them (the letter each
+     tile word started on: en S · H · D), the rule said plainly; then their
+     colours DRAIN in expireSpecials' own goodbye — the glow swells and dies,
+     the plain face crossfades in, the inks cool, the chips fall to the
+     letters' own worth (S 7 → 1, D ♥6 → 2) — and the loss is said beneath.
+     The dwell from the drain, or a tap past the floor, lets go: the farewell. */
+  f5GuideFade() {
+    const g = this.f5G, l = this.L;
+    const kinds = [1, 2, 3].filter((kd) => { const wi = kd === 1 ? g.orange : kd === 2 ? g.blue : g.green; return wi >= 0 && !!g.words[wi]; });
+    if (!kinds.length || this.state !== 'pick' || !this.sys.isActive()) return false;   // nothing to show — the farewell, as before
+    const P = SS_F5_PROMPTS[PACK.lang] || SS_F5_PROMPTS.en, say = (key) => P[key] || SS_F5_PROMPTS.en[key];
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setDepth(900).setInteractive();
+    this.tweens.add({ targets: veil, alpha: SS_F5_SHOW_VEIL, duration: 260 });
+    const c = this.add.container(l.x(0), l.y(468)).setDepth(950).setAlpha(0).setScale(0.92);   // the showcase's own seat
+    c.setData('f5fade', kinds.length);
+    const ts = l.u(46), k = 46 / 78;
+    const reps = kinds.map((kd, j) => {
+      const ch = g.words[kd === 1 ? g.orange : kd === 2 ? g.blue : g.green][0];   // the tile the player used: each tile word STARTS on it
+      const x = (j - (kinds.length - 1) / 2) * l.u(62);
+      const glow = this.add.image(x, 0, 'dot').setScale(ts / 9).setAlpha(0.35).setTint(SS_TIER_GLOW[kd]).setBlendMode('ADD');
+      const letter = this.add.image(0, -l.u(2 * k), ssGlyph(this, ch, SS_TILE_INK[kd])).setDisplaySize(l.u(64 * k), l.u(48 * k));
+      const chip = this.add.image(l.u(24 * k), l.u(21 * k), ssGlyphVal(this, this.tileChip(ch, kd), SS_TILE_VINK[kd])).setDisplaySize(l.u(30 * k), l.u(20 * k));
+      const face = this.add.image(0, 0, 'tile' + kd).setDisplaySize(ts, ts);
+      const t = this.add.container(x, 0, [face, letter, chip]);
+      return { kind: kd, ch, x, glow, face, letter, chip, t, before: this.tileChip(ch, kd), after: this.tileChip(ch, 0) };
+    });
+    const line = ssF5Frame(this, say('fadeRule')).setPosition(0, l.u(52));
+    const loss = ssF5Frame(this, say('fadeLoss')).setAlpha(0);
+    loss.setPosition(0, l.u(52) + line.f5H / 2 + l.u(8) + loss.f5H / 2);
+    c.add([...reps.map((r) => r.glow), ...reps.map((r) => r.t), line, loss]);
+    this.tweens.add({ targets: c, alpha: 1, scale: 1, duration: 220, ease: 'Back.easeOut' });
+    this.tweens.add({ targets: reps.map((r) => r.glow), alpha: 0.6, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    // the hand on the first of them, from its left (above the veil for the beat)
+    g.pose = { x: c.x + reps[0].x - ts * 0.36, y: c.y - ts * 0.10, flip: true, dip: 7 };
+    g.poseN = (g.poseN | 0) + 1;
+    const h = this.ftueHand;
+    g.heldDepth = h && h.active ? h.depth : null;
+    if (h && h.active) h.setDepth(960);
+    g.showObjs = { veil, c }; g.shownAt = this.time.now; g.fade = { reps, loss, c, drainAt: null };
+    this.f5GuideBeat('fade');
+    const b = window.__f5fade = window.__f5fade || {};
+    b.shown = (b.shown | 0) + 1; b.shownAt = Date.now(); b.tiles = reps.map((r) => r.ch + r.kind).join(' ');
+    b.rule = say('fadeRule'); b.loss = say('fadeLoss'); b.chips = reps.map((r) => r.before + '→' + r.after).join(' ');
+    b.drained = 0; b.released = null; b.holdMs = 0;
+    DIAG('f5 fade: use it or lose it — ' + b.tiles);
+    this.time.delayedCall(SS_F5_FADE_AT_MS, () => this.f5GuideFadeDrain(g));
+    return true;
+  }
+  // the colours go — expireSpecials' own goodbye, played on the three
+  // replicas (cosmetics only: Math.random, never rng()); then the dwell
+  f5GuideFadeDrain(g) {
+    if (this.f5G !== g || g.beat !== 'fade' || !g.fade || !this.sys.isActive()) return;
+    const l = this.L, f = g.fade, ts = l.u(46), k = 46 / 78;
+    f.drainAt = this.time.now;
+    this.tweens.killTweensOf(f.reps.map((r) => r.glow));
+    f.reps.forEach((r, j) => this.time.delayedCall(j * 160, () => {
+      if (this.f5G !== g || !r.t.active) return;
+      this.tweens.add({
+        targets: r.glow, alpha: 0.65, scaleX: r.glow.scaleX * 1.3, scaleY: r.glow.scaleY * 1.3, duration: 150, ease: 'Sine.easeOut',
+        onComplete: () => this.tweens.add({ targets: r.glow, alpha: 0, duration: 420 }),
+      });
+      const plain = this.add.image(0, 0, 'tile0').setDisplaySize(ts, ts).setAlpha(0);
+      r.t.addAt(plain, 1);
+      this.tweens.add({ targets: plain, alpha: 1, duration: 480, delay: 120, onComplete: () => { if (r.face.active) r.face.destroy(); } });
+      for (let m = 0; m < 3; m++) {
+        const mote = this.add.image(r.x + (Math.random() - 0.5) * l.u(34), (Math.random() - 0.5) * l.u(20), 'dot')
+          .setScale(0.5 + Math.random() * 0.4).setTint(SS_TIER_GLOW[r.kind]).setAlpha(0.5).setBlendMode('ADD');
+        f.c.add(mote);
+        this.tweens.add({ targets: mote, y: mote.y + l.u(16 + Math.random() * 10), alpha: 0, delay: m * 90, duration: 520, ease: 'Sine.easeIn', onComplete: () => mote.destroy() });
+      }
+      this.time.delayedCall(280, () => {
+        if (!r.t.active) return;
+        r.letter.setTexture(ssGlyph(this, r.ch, SS_TILE_INK[0])).setDisplaySize(l.u(64 * k), l.u(48 * k));
+        r.chip.setTexture(ssGlyphVal(this, r.after, SS_TILE_VINK[0])).setDisplaySize(l.u(30 * k), l.u(20 * k));
+        r.drained = true;
+        const b = window.__f5fade = window.__f5fade || {};
+        b.drained = f.reps.filter((x) => x.drained).length;
+      });
+    }));
+    SFX.fizzle();
+    this.tweens.add({ targets: f.loss, alpha: 1, duration: 260, delay: 600 });
+    const b = window.__f5fade = window.__f5fade || {};
+    b.drainAt = Date.now();
+    // the dwell from the drain; a tap past the floor lets go
+    const release = (why) => { if (g.tapFn) { this.input.off('pointerdown', g.tapFn); g.tapFn = null; } this.f5GuideFadeLift(why); };
+    const dwell = this.time.delayedCall(SS_F5_FADE_SHOW_MS, () => release('dwell'));
+    this.time.delayedCall(SS_F5_SHOW_FLOOR_MS, () => {
+      if (this.f5G !== g || g.beat !== 'fade') return;
+      g.tapFn = () => { dwell.remove(false); release('tap'); };   // taps accelerate, past the floor
+      this.input.once('pointerdown', g.tapFn);
+    });
+  }
+  f5GuideFadeLift(why) {
+    const g = this.f5G; if (!g || g.beat !== 'fade' || !g.showObjs) return;
+    const b = window.__f5fade = window.__f5fade || {};
+    b.released = why; b.holdMs = Math.round(this.time.now - (g.fade && g.fade.drainAt != null ? g.fade.drainAt : g.shownAt));
+    b.lifted = (b.lifted | 0) + 1; b.liftedAt = Date.now();
+    const { veil, c } = g.showObjs;
+    veil.disableInteractive();
+    this.tweens.add({ targets: c, alpha: 0, duration: 260, onComplete: () => { if (c.active) c.destroy(); } });
+    this.tweens.add({ targets: veil, alpha: 0, duration: 300, onComplete: () => { if (veil.active) veil.destroy(); } });
+    g.showObjs = null; g.pose = null; g.fade = null; g.faded = true;
+    const h = this.ftueHand; if (h && h.active && g.heldDepth != null) h.setDepth(g.heldDepth);
+    g.heldDepth = null;
+    DIAG('f5 fade: lifted (' + why + ', ' + b.holdMs + ' ms from the drain)');
+    this.f5GuideNext();   // the words are spent — the farewell, exactly as shipped
+  }
+
   // ---------- board ----------
   boardVowels() { return this.board.filter((s) => s && VOWELS.includes(s.ch[0])).length; }
   fillBoard(initial) {
@@ -11322,7 +11612,9 @@ class Battle extends Phaser.Scene {
     this.board[i] = { ch, tier, blk: cursed, c, img, letter, val, glow, leaf };
     /* F5-CARD-05: a special tile's FIRST arrival teaches itself — one
        prompt, above the board, once per run (ssF5Prompt dedupes). */
-    if (this.f5Night && (tier === 1 || tier === 2)) {
+    /* F5-EARN: while the hand's script stands, the script says it — the
+       earned beat first (how), then THE POINT's own call (what) */
+    if (this.f5Night && (tier === 1 || tier === 2) && !this.f5GuideLocked()) {
       this.time.delayedCall(460, () => { if (this.scene.isActive()) ssF5Prompt(this, 'tile' + tier, this.L.x(0), this.L.y(374)); });   /* F5-GUIDED: seated under the strikes pill (was 352, over it) */
     }
     this.tweens.add({ targets: c, y: p.y, duration: initial ? 550 : 420, ease: 'Bounce.easeOut', delay: initial ? i * 45 : Math.random() * 90 });
@@ -11417,7 +11709,7 @@ class Battle extends Phaser.Scene {
     s.tier = 3;
     SFX.dew();
     /* F5-CARD-05: the dew's first bloom explains itself */
-    if (this.f5Night) this.time.delayedCall(520, () => { if (this.scene.isActive()) ssF5Prompt(this, 'tile3', this.L.x(0), this.L.y(374)); });   /* F5-GUIDED: one lesson seat, under the pill */
+    if (this.f5Night && !this.f5GuideLocked()) this.time.delayedCall(520, () => { if (this.scene.isActive()) ssF5Prompt(this, 'tile3', this.L.x(0), this.L.y(374)); });   /* F5-GUIDED: one lesson seat, under the pill — F5-EARN: the script's own point says it while the hand stands */
     // the settle: green glass crossfades in under cooling inks, the chip
     // turns to ♥6, a soft glow blooms and three droplets sink onto the face
     const g = this.add.image(0, 0, 'tile3').setDisplaySize(this.tileSize, this.tileSize).setAlpha(0);
