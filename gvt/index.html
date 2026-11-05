@@ -990865,6 +990865,18 @@ function hkgRead(n){ const g=function(f){ try{ return f(); }catch(e){ return nul
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 function kysOn(){ try{ const R=S.raid; return !!(KYS.on && R && R.k==='ice' && R.cfg===S.cfg && KYS_TIERS[R.t] && !S.bf); }catch(e){ return false; } }
 function kysT(T){ try{ const v=+T[S.raid.t]; return isFinite(v)? v : +T.h; }catch(e){ return +T.h; } }
 
@@ -990883,9 +990895,17 @@ function kysScale(cfg,tier,rk){
 function kysLeap(f){ const L=f && f.def && f.def.leap; return (L && L.kys)? L : null; }
 function kysRoll(f,n){ let salt='0'; try{ salt=(S.coop && COOP && COOP.code)? String(COOP.code) : String(Math.round(((S.raid && S.raid.t0)||0)*1000)); }catch(e){ salt='0'; } return rxRoll('kys:'+rxDoorKey()+':'+salt+':'+(n|0)); }
 function kysWant(f){ const n=f.kysN|0; return (n===0? kysT(KYS_HOP_BIG) : kysT(KYS_HOP_MIN)+kysRoll(f,n)*(kysT(KYS_HOP_MAX)-kysT(KYS_HOP_MIN)))*TK_M; }
-function kysHopTo(f){ const dx=T.x-f.x, dy=T.y-f.y, d=Math.hypot(dx,dy)||1, room=d-kysT(KYS_HOP_FLOOR)*TK_M, want=kysWant(f), len=Math.min(want, room);
-  if(!(len>=TK_M)) return null;   
-  return { x:Math.max(60,Math.min(W-60,f.x+dx/d*len)), y:Math.max(84,Math.min(WORLD_H-104,f.y+dy/d*len)), len:len, want:want }; }
+function kysHopTo(f){ const dx=T.x-f.x, dy=T.y-f.y, d=Math.hypot(dx,dy)||1, fl=kysT(KYS_HOP_FLOOR)*TK_M, room=d-fl, want=kysWant(f), len=Math.min(want, room);
+  if(len>=TK_M) return { x:Math.max(60,Math.min(W-60,f.x+dx/d*len)), y:Math.max(84,Math.min(WORLD_H-104,f.y+dy/d*len)), len:len, want:want };   
+  return (KYS.part.side && kysT(KYS_HOP_SIDE))? kysHopSide(f,dx,dy,d,fl,want) : null; }
+function kysHopSide(f,dx,dy,d,fl,want){ const px=-dy/d, py=dx/d, dmin=fl, big=kysT(KYS_HOP_MAX)*TK_M; let wp=0, wn=0;   
+  for(const u of S.units){ if(u.dead || u.jetT>0 || u.dropT>0 || u.falling) continue; const ux=u.x-f.x, uy=u.y-f.y, p=ux*px+uy*py, w=1/(1+Math.hypot(ux,uy)/300); if(p>TK_M*0.5) wp+=w; else if(p<-TK_M*0.5) wn+=w; }   
+  const s0=(wp>wn+1e-6)? 1 : (wn>wp+1e-6)? -1 : (((T.y-f.y)*py)>=0? 1 : -1), lim=(p,v,lo,hi)=> v>1e-9? (hi-p)/v : v<-1e-9? (lo-p)/v : Infinity;   
+  for(const s of [s0,-s0]){ const ex=px*s, ey=py*s, top=Math.min(want, big, lim(f.x,ex,60,W-60), lim(f.y,ey,84,WORLD_H-104));   
+    for(const L of [top, top-140, top*0.5]){ if(!(L>=TK_M)) continue; let x=f.x+ex*L, y=f.y+ey*L; const rx=x-T.x, ry=y-T.y, rd=Math.hypot(rx,ry)||1; x=T.x+rx/rd*dmin; y=T.y+ry/rd*dmin;   
+      if(x<60 || x>W-60 || y<84 || y>WORLD_H-104) continue; if(S.raid && S.raid.posts && S.raid.posts.some(P=>Math.hypot(P.x-x,P.y-y)<70)) continue;   
+      const len=Math.hypot(x-f.x,y-f.y); if(len>=TK_M) return { x:x, y:y, len:len, want:want, side:s }; } }
+  return null; }
 function kysHopTick(f,dt,L){
   if(!kysOn() || !KYS.part.hop) return;
   if(f.kysT==null){ f.kysT=kysT(KYS_HOP_FIRST); f.kysN=0; f.plWind=0; f.plT=0; }
@@ -990900,7 +990920,8 @@ function kysHopTick(f,dt,L){
 function kysLaunch(f){ const P=kysHopTo(f); if(!P){ f.kysT=2.5; KYS.n.floorWait++; return; }   
   const fr=Math.max(0,Math.min(1,P.len/(30*TK_M))), Lk=KYS_HOP_LOOK;
   f.plX0=f.x; f.plY0=f.y; f.plX1=P.x; f.plY1=P.y; f.kysFl=Lk.t0+Lk.tM*fr; f.kysH=Lk.h0+Lk.hM*fr; f.plT=f.kysFl; f.kysN=(f.kysN|0)+1; KYS.n.hops++; KYS.n.hopPx+=Math.round(P.len);
-  if(KYS.hops.length<80) KYS.hops.push({ n:f.kysN, tier:(S.raid && S.raid.t)||'', t:+(S.t-((S.raid && S.raid.t0)||0)).toFixed(2), x0:Math.round(f.x), y0:Math.round(f.y), x1:Math.round(P.x), y1:Math.round(P.y), len:Math.round(P.len), want:Math.round(P.want), fl:+f.kysFl.toFixed(2) });
+  if(KYS.hops.length<80) KYS.hops.push({ n:f.kysN, tier:(S.raid && S.raid.t)||'', t:+(S.t-((S.raid && S.raid.t0)||0)).toFixed(2), x0:Math.round(f.x), y0:Math.round(f.y), x1:Math.round(P.x), y1:Math.round(P.y), len:Math.round(P.len), want:Math.round(P.want), fl:+f.kysFl.toFixed(2), side:P.side||0 });
+  if(P.side) KYS.n.sideHops++;
   bfSfx(SFX.jet, f.x, f.y); }
 function kysLand(f){ const Lk=KYS_HOP_LOOK, KR=+Lk.r||48; f.airB=0; f.plT=0; f.kysT=Math.max(1, kysT(KYS_HOP_CD)-Lk.wind-(f.kysFl||0));   
   SFX.stomp(); S.shake=Math.max(S.shake||0, 0.45);
@@ -990953,19 +990974,42 @@ function kysFxDraw(e,k){ try{ const t=Math.max(0,Math.min(1,k)), TAU=Math.PI*2;
     cx.globalAlpha=1; return; }
   }catch(e9){ KYS.err++; cx.globalAlpha=1; } }
 
+function kysKingOn(f){ return !!(KYS.part.king && f && f.type==='kingyeti' && f.boss && kysOn()); }
+function kysManAt(x,y,r){ let best=null,bd=r; for(const u of S.units){ if(u.dead || u.jetT>0 || u.dropT>0 || u.falling || u.cloakT>0) continue; if(S.drag && S.drag.unit===u) continue; const d=Math.hypot(u.x-x,u.y-y); if(d<bd){ bd=d; best=u; } } return best; }
+function kysRedMan(f){ return kyNearMan(f,KING_TK_SEEK); }
+function kysBlueMan(f){ return kysManAt(f.x-12,f.y-22,KING_PUSH_REACH); }
+function kysKingLog(f,kind,m){ if(KYS.kpow.length<160) KYS.kpow.push({ t:+(S.t-((S.raid && S.raid.t0)||0)).toFixed(2), tier:(S.raid && S.raid.t)||'', kind:kind, d:m? Math.round(Math.hypot(m.x-(kind==='blue'? f.x-12 : f.x), m.y-(kind==='blue'? f.y-22 : f.y))) : -1 }); }
+function kysKingRed(f,m){ f.kyTk={u:m,t:KING_TK_HOLD}; m.kyHeldT=0.25; tkTellFx(f.x,f.y); S.fx.push({k:'ring',x:m.x,y:m.y-24,r:5,R:26,t:0,dur:0.3,col:NEMESIS_SABER}); }
+function kysKingBlue(f){ f.kyWave={r:24,max:KING_PUSH_REACH,cx:f.x-12,cy:f.y-22,hit:{}}; S.fx.push({k:'ring',x:f.x,y:f.y-22,r:8,R:60,t:0,dur:0.3,col:'#7FB2E0'}); bfSfx(SFX.jet, f.x, f.y); }
+function kysKingPre(f,dt){ if(f.kyAbT==null || f.plWind>0 || f.plT>0 || f.kyAbT-dt>0) return;   
+  const ab=f.kyAbN|0; if(ab!==0 && ab!==2) return;   
+  f.kyAbT=KING_ROT*(f.kyx||1)+dt; f.kyAbN=(ab+1)%4; KYS.n.kTook++; }
+function kysKingPost(f,dt){
+  if(f.kysPow==null){ f.kysPow=kysT(KYS_KING_FLOOR)-3.2*(f.kyx||1); f.kysLast=2; }   
+  if(f.plWind>0 || f.plT>0) return; f.kysPow+=dt;   
+  if(f.kysPow<kysT(KYS_KING_FLOOR) || f.kyTk || f.kyWave || f.kySwing>0) return;   
+  const m=kysRedMan(f), w=kysBlueMan(f), pick=(f.kysLast===2)? (m? 1 : w? 2 : 0) : (w? 2 : m? 1 : 0);   
+  if(!pick){ if(!f.kysWait){ f.kysWait=1; KYS.n.kWaited++; } return; }   
+  if(pick===1){ kysKingRed(f,m); KYS.n.kRed++; kysKingLog(f,'red',m); } else { kysKingBlue(f); KYS.n.kBlue++; kysKingLog(f,'blue',w); }
+  f.kysPow=0; f.kysLast=pick; f.kysWait=0; }
+
+
+
+
 function kysRows(){ if(typeof BLB_RULES==='undefined' || !Array.isArray(BLB_RULES) || typeof blbShip!=='function' || typeof BLB!=='object' || !BLB) return 0; let n=0;
   const R=[ ['KYS_COLDX', ()=>KYS_COLDX, "SERGEANT COLD'S BAR: x (KYS; Isaac 11/4: 40 % off on EASY and MEDIUM)", 'ice'], ['KYS_SNOWX', ()=>KYS_SNOWX, "SERGEANT SNOWMAN'S BAR: x (KYS; Isaac 11/4: 10 % off on EASY and MEDIUM)", 'ice'],
     ['KYS_HOP_FIRST', ()=>KYS_HOP_FIRST, "SERGEANT SNOWMAN'S HOP: S ON THE CARPET BEFORE THE BIG ONE (KYS)", 'ice'], ['KYS_HOP_BIG', ()=>KYS_HOP_BIG, "SERGEANT SNOWMAN'S HOP: THE BIG ONE, M (KYS)", 'ice'],
     ['KYS_HOP_CD', ()=>KYS_HOP_CD, "SERGEANT SNOWMAN'S HOP: ONE EVERY S (KYS)", 'ice'], ['KYS_HOP_MIN', ()=>KYS_HOP_MIN, "SERGEANT SNOWMAN'S HOP: THE DIE'S SHORTEST, M (KYS)", 'ice'],
-    ['KYS_HOP_MAX', ()=>KYS_HOP_MAX, "SERGEANT SNOWMAN'S HOP: THE DIE'S LONGEST, M (KYS)", 'ice'], ['KYS_HOP_FLOOR', ()=>KYS_HOP_FLOOR, "SERGEANT SNOWMAN'S HOP: NEVER NEARER YOUR TOY BOX THAN M (KYS)", 'ice'] ];
+    ['KYS_HOP_MAX', ()=>KYS_HOP_MAX, "SERGEANT SNOWMAN'S HOP: THE DIE'S LONGEST, M (KYS)", 'ice'], ['KYS_HOP_FLOOR', ()=>KYS_HOP_FLOOR, "SERGEANT SNOWMAN'S HOP: NEVER NEARER YOUR TOY BOX THAN M (KYS)", 'ice'],
+    ['KYS_HOP_SIDE', ()=>KYS_HOP_SIDE, "SERGEANT SNOWMAN'S HOP: AT THE LINE HE HOPS ALONG IT, 1 YES 0 NO (KYS; Isaac 11/5)", 'ice'], ['KYS_KING_FLOOR', ()=>KYS_KING_FLOOR, "KING YETI: A POWER ON YOUR MEN EVERY S, RED AND BLUE BY TURNS (KYS; Isaac 11/5: at least every 7.5)", 'ice'] ];
   for(const r of R){ if(!BLB_RULES.some(x=>x[0]===r[0])) BLB_RULES.push(r); n++; }
   blbShip();   
   if(typeof blbCellSet==='function' && BLB.booted && BLB.over){ for(const r of R){ const o=BLB.over[r[0]]; if(o) for(const t of Object.keys(o)) blbCellSet(r[0], t, o[t]); } }   
   KYS.rows=n; return n; }
 
-function kysRead(o){ o=o||{}; if(o.on!=null) KYS.on=o.on? 1 : 0; for(const k of ['snow','hop','bars']) if(o[k]!=null) KYS.part[k]=o[k]? 1 : 0; if(o.zero){ for(const k in KYS.n) KYS.n[k]=0; KYS.hops.length=0; KYS.bars.length=0; KYS.err=0; KYS.e=''; }
-  return { cv:GVT_CV, on:KYS.on|0, live:kysOn()? 1 : 0, part:Object.assign({},KYS.part), n:Object.assign({},KYS.n), err:KYS.err, e:KYS.e, wrapped:KYS.wrapped|0, leapWrapped:KYS.leapWrapped|0, rows:KYS.rows|0,
-    coldX:Object.assign({},KYS_COLDX), snowX:Object.assign({},KYS_SNOWX), hop:{ first:Object.assign({},KYS_HOP_FIRST), big:Object.assign({},KYS_HOP_BIG), cd:Object.assign({},KYS_HOP_CD), min:Object.assign({},KYS_HOP_MIN), max:Object.assign({},KYS_HOP_MAX), floor:Object.assign({},KYS_HOP_FLOOR), look:Object.assign({},KYS_HOP_LOOK) },
+function kysRead(o){ o=o||{}; if(o.on!=null) KYS.on=o.on? 1 : 0; for(const k of ['snow','hop','bars','side','king']) if(o[k]!=null) KYS.part[k]=o[k]? 1 : 0; if(o.zero){ for(const k in KYS.n) KYS.n[k]=0; KYS.hops.length=0; KYS.bars.length=0; KYS.kpow.length=0; KYS.err=0; KYS.e=''; }
+  return { cv:GVT_CV, on:KYS.on|0, live:kysOn()? 1 : 0, part:Object.assign({},KYS.part), n:Object.assign({},KYS.n), err:KYS.err, e:KYS.e, wrapped:KYS.wrapped|0, leapWrapped:KYS.leapWrapped|0, kingWrapped:KYS.kingWrapped|0, rows:KYS.rows|0,
+    coldX:Object.assign({},KYS_COLDX), snowX:Object.assign({},KYS_SNOWX), hop:{ first:Object.assign({},KYS_HOP_FIRST), big:Object.assign({},KYS_HOP_BIG), cd:Object.assign({},KYS_HOP_CD), min:Object.assign({},KYS_HOP_MIN), max:Object.assign({},KYS_HOP_MAX), floor:Object.assign({},KYS_HOP_FLOOR), side:Object.assign({},KYS_HOP_SIDE), look:Object.assign({},KYS_HOP_LOOK) }, king:{ floor:Object.assign({},KYS_KING_FLOOR) }, kpow:KYS.kpow.slice(),
     pile:{ rows:KYS_PILE.rows.slice(), r:KYS_PILE.r, dx:KYS_PILE.dx, dy:KYS_PILE.dy }, ball:Object.assign({},KYS_BALL), last:KYS.last, bars:KYS.bars.slice(-8), hops:KYS.hops.slice(),
     posts:(S.raid && S.raid.posts)? S.raid.posts.map(P=>({ x:P.x, y:P.y, o:P.o, home:P.kyfHome|0, pile:kysPileN(P) })) : null }; }
 
@@ -1202465,7 +1202509,7 @@ let BFQ=null;
 
 
 
-let GVT_CV='30.27';
+let GVT_CV='30.28';
 let NX_CAP_MUL=4;
 
 
@@ -3091309,22 +3091353,34 @@ if(typeof GVT!=='undefined' && GVT) GVT.hkg=hkgRead;
 
 
 
+
+
+
+
+
+
+
+
+
+
 const KYS_LIVE=1;
 const KYS_TIERS={ e:1, m:1, h:1, g:1 };
 const KYS_COLDX={ e:0.6, m:0.6, h:1, g:1 };
 const KYS_SNOWX={ e:0.9, m:0.9, h:1, g:1 };
 const KYS_HOP_FIRST={ e:1, m:1, h:1, g:1 };
 const KYS_HOP_BIG={ e:30, m:30, h:30, g:30 };
-const KYS_HOP_CD={ e:15, m:15, h:15, g:15 };
+const KYS_HOP_CD={ e:7.5, m:7.5, h:7.5, g:7.5 };
 const KYS_HOP_MIN={ e:3, m:3, h:3, g:3 };
 const KYS_HOP_MAX={ e:30, m:30, h:30, g:30 };
 const KYS_HOP_FLOOR={ e:30, m:30, h:30, g:30 };
+const KYS_HOP_SIDE={ e:1, m:1, h:1, g:1 };
+const KYS_KING_FLOOR={ e:7.5, m:7.5, h:6, g:6 };
 const KYS_HOP_LOOK={ wind:0.6, t0:0.7, tM:0.55, h0:70, hM:120, r:48 };
 const KYS_PILE={ rows:[3,2,1], r:6, dx:-38, dy:15 };
 const KYS_BALL={ r:6, t0:0.14, tPx:1/3200, h0:8, hPx:0.08, wait:0.18, back:0.08, pop:0.07 };
 const KYS_INK={ snow:'#EEF4FA', lit:'#FFFFFF', shade:'#B9CEE4', rim:'#8EA3B9', shadow:'rgba(74,90,120,0.30)', ice:'#9CC0D8' };
 var KYS={ on:(function(){ try{ const q=/[?&]kys=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_kys','0'); else localStorage.removeItem('gvt_kys'); } return localStorage.getItem('gvt_kys')==='0'? 0 : KYS_LIVE; }catch(e){ return KYS_LIVE; } })(),
-  part:{ snow:1, hop:1, bars:1 }, n:{ bursts:0, balls:0, cfgs:0, bars:0, bags:0, tells:0, hops:0, hopPx:0, floorWait:0, plantWait:0, landKO:0 }, hops:[], bars:[], last:null, wrapped:0, leapWrapped:0, rows:0, err:0, e:'' };
+  part:{ snow:1, hop:1, bars:1, side:1, king:1 }, n:{ bursts:0, balls:0, cfgs:0, bars:0, bags:0, tells:0, hops:0, hopPx:0, floorWait:0, plantWait:0, landKO:0, sideHops:0, kTook:0, kRed:0, kBlue:0, kWaited:0 }, hops:[], bars:[], kpow:[], last:null, wrapped:0, leapWrapped:0, kingWrapped:0, rows:0, err:0, e:'' };
 
 
 
@@ -3091339,6 +3091395,15 @@ var KYS={ on:(function(){ try{ const q=/[?&]kys=([01])/.exec(location.search||''
 
 
 if(typeof raidCfg==='function'){ const rc0=raidCfg; raidCfg=function(tier,rk){ const cfg=rc0.apply(this, arguments); try{ kysScale(cfg,tier,rk); }catch(e){ KYS.err++; KYS.e+='cfg:'+String(e).slice(0,80)+' '; } return cfg; }; KYS.wrapped=1; }
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3091411,6 +3091476,29 @@ if(typeof airMv==='function'){ const am0=airMv; airMv=function(f,dt){ if(kysLeap
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+if(typeof kingKitTick==='function'){ const kk0=kingKitTick; kingKitTick=function(f,dt){ if(!kysKingOn(f)) return kk0.apply(this, arguments);
+  try{ kysKingPre(f,dt); }catch(e){ KYS.err++; KYS.e+='kpre:'+String(e).slice(0,80)+' '; }
+  const r=kk0.apply(this, arguments); try{ kysKingPost(f,dt); }catch(e){ KYS.err++; KYS.e+='kpost:'+String(e).slice(0,80)+' '; } return r; }; KYS.kingWrapped=1; }
 
 
 
