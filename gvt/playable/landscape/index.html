@@ -136,6 +136,11 @@ html.wide .choice .cName{ font-size:19px; } html.wide .choice .cLine{ font-size:
 /* ROUND 19 (Isaac 11/5 10:06): the difficulty tab top right (R18-Q3's REC); a phone held upright: TURN YOUR PHONE SIDEWAYS (the fight waits) */
 html.wide #pop{ z-index:40; }   /* round 20 (Isaac 10:33): no arrow over the JETPACK card (the bar's badge showed through) */
 #diffL{ position:fixed; z-index:60; top:calc(env(safe-area-inset-top,0px) + 8px); right:calc(env(safe-area-inset-right,0px) + 8px); margin:0; }
+/* ROUND 24 (Isaac 12:09 + 12:19): the map tabs A B C D, top left beside the PLAY NOW plate (the difficulty well's twin; the difficulty stays top right) */
+#mapL{ position:fixed; z-index:60; top:calc(env(safe-area-inset-top,0px) + 8px); left:calc(env(safe-area-inset-left,0px) + 88px); display:flex; align-items:center; gap:2px; height:34px; padding:0 3px; box-sizing:border-box; border-radius:11px; background:rgba(0,0,0,.38); border:2px solid rgba(255,255,255,.16); pointer-events:auto; }
+#mapL .ltab{ flex:none; width:40px; min-width:0; height:24px; padding:0; border:0; border-radius:8px; background:transparent; color:#eef3e6; font-family:var(--f); font-size:15px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:5px; cursor:pointer; pointer-events:auto; -webkit-tap-highlight-color:transparent; }
+#mapL .ltab i{ width:11px; height:11px; border-radius:3px; display:block; flex:none; box-shadow:inset 0 0 0 1.5px rgba(0,0,0,.35); }
+#mapL .ltab.on{ background:linear-gradient(180deg,#fff08a,#ffd23f 55%,#f2a91a); color:#3b2600; box-shadow:inset 0 0 0 1.5px #6b4600; }
 #turn{ position:fixed; inset:0; z-index:200; display:none; flex-direction:column; align-items:center; justify-content:center; gap:20px; background:radial-gradient(circle at 50% 40%, #2c3b26 0%, #121a10 78%); color:#fff; font-family:var(--f); font-weight:800; }
 html.portrait #turn{ display:flex; }
 #white{ position:fixed; inset:0; z-index:5; pointer-events:none; background:#fff; opacity:0; }
@@ -1417,11 +1422,11 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
   // ?tabs=0 hides the tabs (the ad's own file). Nothing else moves: the road, the men, the box, the mortars, the bar, the tray, the clock.
   // ROUND 17 (Isaac 11/5 07:45: "Get rid of the rug map option and then label all of them A, B, C, D instead of the map names"): FOUR maps, the tabs say A B C D
   // (each keeps its colour chip); ?map=a..d opens one (the old names still do; ?map=rug opens A).
-  const MAP_IDS = ['lawn', 'snow', 'desert', 'night'];
-  const MAP_LETTER = { lawn: 'A', snow: 'B', desert: 'C', night: 'D' };
-  const MAP_SWATCH = { lawn: '#8DC063', snow: '#E9EEF4', desert: '#E8C48C', night: '#1D2A4A' };
+  const MAP_IDS = ['lawn', 'snow', 'gold', 'night'];   /* round 24 (Isaac 12:09 + 12:19): A the lawn, B winter, C yellow grass, D night */
+  const MAP_LETTER = { lawn: 'A', snow: 'B', gold: 'C', night: 'D' };
+  const MAP_SWATCH = { lawn: '#8DC063', snow: '#E9EEF4', gold: '#E6DA86', night: '#1D2A4A' };
   const TABS = false;   // round 18: the landscape prototype carries no tabs
-  function mapOf(q) { q = String(q || '').toLowerCase(); return MAP_IDS.find(id => MAP_LETTER[id].toLowerCase() === q) || (MAP_IDS.indexOf(q) >= 0 || q === 'game' ? q : 'lawn'); }
+  function mapOf(q) { q = String(q || '').toLowerCase(); return MAP_IDS.find(id => MAP_LETTER[id].toLowerCase() === q) || (MAP_IDS.indexOf(q) >= 0 ? q : ({ winter: 'snow', yellow: 'gold', desert: 'gold' })[q] || 'lawn'); }   /* round 24 */
   let MAP = mapOf(Q.get('map'));
   function lawnCanvas() { const c = document.createElement('canvas'); c.width = cv.width; c.height = cv.height; return c; }
   function roadLine(g, w, col, dx, dy) { g.save(); g.translate(dx || 0, dy || 0); g.strokeStyle = col; g.lineWidth = w; g.lineCap = 'round'; g.lineJoin = 'round'; g.beginPath(); g.moveTo(P.x[0], P.y[0]); for (let i = 1; i < P.n; i++) g.lineTo(P.x[i], P.y[i]); g.stroke(); g.restore(); }
@@ -1488,7 +1493,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
   }
   function setMap(id, src) {   // a tab: the map changes at once, the fight runs on
     if (MAP_IDS.indexOf(id) < 0 || id === MAP) return; MAP = id; S.stats.maps = (S.stats.maps || []).concat([{ id, t: +S.t.toFixed(2), src: src || 'tab' }]);
-    paintLawn(); syncTabs();
+    paintCastle(); syncTabs();   /* round 24: the castle map in the tab's dress */
     try { const u = new URL(location.href); u.searchParams.set('map', MAP_LETTER[id].toLowerCase()); history.replaceState(null, '', u.toString()); } catch (e) {}
   }
   function setDiff(id, src) {   // round 17: the difficulty tab: the tan side's toughness changes at once, the fight runs on; every tan alive and the box keep their share
@@ -1507,7 +1512,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     syncTabs(); syncDiff();
   }
   function syncDiff() { for (const b of document.querySelectorAll('.dtab')) { const on = b.dataset.diff === DIFF; b.classList.toggle('on', on); b.setAttribute('aria-checked', on ? 'true' : 'false'); } }
-  function syncTabs() { if (!TABS) return; for (const b of $('mapTabs').querySelectorAll('.mtab')) { const on = b.dataset.map === MAP; b.classList.toggle('on', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); } }
+  function syncTabs() { for (const b of document.querySelectorAll('#mapL .ltab')) {   /* round 24: the landscape's map tabs */ const on = b.dataset.map === MAP; b.classList.toggle('on', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); } }
 
   // ---------------- ROUND 7 (Isaac 15:25): FIVE END SCREENS, more Green vs Tan, for him to pick one (?end=1..5; no dial = round 6's card, untouched) ----------------
   // His words: "We want somewhere in there it says Play Green versus Tan or Green versus Tan, then play now. Just come up with five variations."
@@ -1785,17 +1790,13 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
   function paintCastle() {
     TALL = []; const d = L.dpr, k = L.k, WW = LV.W + 2 * L.ox / k;
     const c = document.createElement('canvas'); c.width = Math.round(WW * k * d); c.height = cv.height; const g = c.getContext('2d');
-    g.fillStyle = '#8DC063'; g.fillRect(0, 0, c.width, c.height);
-    const band = Math.max(8, 46 * k * d); for (let i = 0, y = 0; y < c.height; i++, y += band) { g.fillStyle = i % 2 ? 'rgba(255,255,255,0.065)' : 'rgba(20,60,10,0.05)'; g.fillRect(0, y, c.width, band); }
-    let s9 = 99; const r9 = () => { s9 = (Math.imul(s9, 1103515245) + 12345) >>> 0; return s9 / 4294967296; };
-    const n = Math.round(c.width * c.height / (2400 * d * d)), lw = Math.max(1, 1.15 * k * d);
-    for (let i = 0; i < n; i++) { const x = r9() * c.width, y = r9() * c.height, s = (2 + r9() * 2.4) * k * d; g.strokeStyle = r9() < 0.8 ? 'rgba(58,108,36,0.5)' : 'rgba(214,240,160,0.55)'; g.lineWidth = lw; g.beginPath(); g.moveTo(x - s, y - s * 0.9); g.lineTo(x, y); g.lineTo(x + s * 0.8, y - s); g.stroke(); }
+    const r9 = paintGround(g, c, d, k);   /* round 24: the map's ground (A the lawn, B winter, C yellow grass, D the lawn under the night) */
     g.setTransform(d * k, 0, 0, d * k, d * L.ox, 0);
     const Y0 = -10, Y1 = L.H + 10, cz = LV.court;
-    pbm5Court(g, cz[0], cz[1], cz[2] + 40, cz[3]);
+    pbm5Court(g, cz[0], cz[1], cz[2] + 40, cz[3]); if (MAP === 'snow') snowCourt(g, cz);   /* round 24 */
     const line = (w, col) => { g.strokeStyle = col; g.lineWidth = w; g.lineCap = 'round'; g.lineJoin = 'round'; g.beginPath(); g.moveTo(P.x[0], P.y[0]); for (let i = 1; i < P.n; i++) g.lineTo(P.x[i], P.y[i]); g.stroke(); };
-    line(PW + 16, 'rgba(40,74,20,0.2)'); line(PW + 7, '#5A3424'); line(PW, '#8A5838'); line(PW * 0.6, 'rgba(168,118,76,0.42)');
-    for (let s = 5; s < P.len; s += 8) { const i = Math.floor(s / 2), off = (r9() * 2 - 1) * PW * 0.4, x = P.x[i] + P.nx[i] * off, y = P.y[i] + P.ny[i] * off; g.fillStyle = r9() < 0.55 ? 'rgba(66,38,22,0.5)' : 'rgba(196,156,112,0.5)'; g.beginPath(); g.ellipse(x, y, 1.2 + r9() * 1.3, 0.8 + r9() * 0.8, 0, 0, 7); g.fill(); }
+    if (MAP === 'snow') paintSnowRoad(g); else { line(PW + 16, MAP === 'gold' ? 'rgba(96,80,0,0.2)' : 'rgba(40,74,20,0.2)'); line(PW + 7, '#5A3424'); line(PW, '#8A5838'); line(PW * 0.6, 'rgba(168,118,76,0.42)'); }   /* round 24: winter's road = the trodden rut */
+    if (MAP !== 'snow') for (let s = 5; s < P.len; s += 8) { const i = Math.floor(s / 2), off = (r9() * 2 - 1) * PW * 0.4, x = P.x[i] + P.nx[i] * off, y = P.y[i] + P.ny[i] * off; g.fillStyle = r9() < 0.55 ? 'rgba(66,38,22,0.5)' : 'rgba(196,156,112,0.5)'; g.beginPath(); g.ellipse(x, y, 1.2 + r9() * 1.3, 0.8 + r9() * 0.8, 0, 0, 7); g.fill(); }
     // THE MOAT (the campaign river: the channel, the lighter core, the dark banks, the east glint; a dark lip of earth on each side)
     const x0 = LV.moat, x1 = x0 + LV.mw, col = '#4E7FA8';
     g.fillStyle = 'rgba(60,44,24,0.35)'; g.fillRect(x0 - 5, Y0, LV.mw + 10, Y1 - Y0);
@@ -1803,12 +1804,14 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     g.globalAlpha = 0.4; g.fillStyle = rvCore(col); g.fillRect(x0 + LV.mw / 3, Y0, LV.mw / 3, Y1 - Y0); g.globalAlpha = 1;
     g.fillStyle = rvDark(col); g.fillRect(x0, Y0, 3.5, Y1 - Y0); g.fillRect(x1 - 3.5, Y0, 3.5, Y1 - Y0);
     g.fillStyle = 'rgba(220,235,245,0.55)'; g.fillRect(x1 - 6, Y0, 1.5, Y1 - Y0);
+    if (MAP === 'snow') { g.fillStyle = 'rgba(183,194,209,0.85)'; g.fillRect(x0 - 7, Y0, 7, Y1 - Y0); g.fillRect(x1, Y0, 7, Y1 - Y0); g.fillStyle = 'rgba(250,252,255,0.9)'; g.fillRect(x0 - 9, Y0, 2.5, Y1 - Y0); g.fillRect(x1 + 6.5, Y0, 2.5, Y1 - Y0); g.fillStyle = 'rgba(232,242,250,0.5)'; g.fillRect(x0, Y0, 3, Y1 - Y0); g.fillRect(x1 - 3, Y0, 3, Y1 - Y0); }   /* round 24: the slush lip, the rime, the ice at the edges */
     if (!LV.drawbridge) for (const by of LV.gates) rvPlanks(g, x0, x1, by - LV.gw / 2, LV.gw);   // THE BRIDGES (iteration 2 draws its drawbridge live)
     // THE WALLS (pbm5Wall's runs: the west wall between its gates, the north and south walls to the field's east edge)
     const X = LV.wall, E = LV.W + 60; for (const [ya, yb] of LV.runs) pbm5Wall(g, X, ya, X, yb, 11); pbm5Wall(g, X + 22, 40, E, 40, 11); pbm5Wall(g, X + 22, 368, E, 368, 11);
     for (const [cx0, cy0, cr] of LV.crates) drawCrateStack(g, cx0, cy0, cr);
     if (LV.siege) pbmDrawLookout(g, LV.siege[0], LV.siege[1], 22);
     if (LV.cannon) paintNest(g, LV.cannon.x, LV.cannon.y);   // round 19: the gun's sandbag nest
+    if (MAP === 'night') paintNightOver(g, c);   /* round 24: the night over the whole map */
     LAWN = c;
   }
   // the game's painters, word for word on the canvas they are handed (the game draws on its global cx)
@@ -1828,7 +1831,9 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     for (let s = -wd / 2 + 14; s < L0 + wd / 2 - 6; s += 18) { g.beginPath(); g.moveTo(s, -wd / 2 + 2); g.lineTo(s, wd / 2 - 6); g.stroke(); }
     g.beginPath(); g.moveTo(-wd / 2 + 2, -1); g.lineTo(L0 + wd / 2 - 2, -1); g.stroke();
     g.fillStyle = '#C3BDB0'; for (let s = -wd / 2 + 6; s < L0 + wd / 2 - 10; s += 18) g.fillRect(s, -wd / 2 + 4, 9, 7);
-    g.strokeStyle = '#5A554C'; g.lineWidth = 2.5; pbmRR(g, -wd / 2, -wd / 2, L0 + wd, wd, 6); g.stroke(); g.restore();
+    g.strokeStyle = '#5A554C'; g.lineWidth = 2.5; pbmRR(g, -wd / 2, -wd / 2, L0 + wd, wd, 6); g.stroke();
+    if (MAP === 'snow') { g.fillStyle = 'rgba(248,251,255,0.84)'; pbmRR(g, -wd / 2 + 2.5, -wd / 2 + 2.5, L0 + wd - 5, wd - 9, 5); g.fill(); g.strokeStyle = 'rgba(120,132,150,0.55)'; g.lineWidth = 1.2; for (let s = -wd / 2 + 6; s < L0 + wd / 2 - 10; s += 18) g.strokeRect(s, -wd / 2 + 4, 9, 7); }   /* round 24: snow along the wall, the merlons' edges showing */
+    g.restore();
   }
   function pbm5Tower(g, x, y, r, small) {   // a round castle tower, crenellated; the corner towers fly tan's pennant
     g.save();
@@ -1838,6 +1843,8 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     g.fillStyle = '#5E594F'; g.beginPath(); g.arc(x, y, r * 0.66, 0, 7); g.fill();
     g.fillStyle = '#C6C0B3'; for (let i = 0; i < 12; i++) { const a = i * Math.PI / 6; g.save(); g.translate(x + Math.cos(a) * r * 0.82, y + Math.sin(a) * r * 0.82); g.rotate(a); g.fillRect(-r * 0.12, -r * 0.15, r * 0.25, r * 0.3); g.restore(); }
     g.strokeStyle = '#4F4A41'; g.lineWidth = 2.5; g.beginPath(); g.arc(x, y + 1, r, 0, 7); g.stroke();
+    if (MAP === 'snow') { g.fillStyle = 'rgba(246,250,255,0.9)'; g.beginPath(); g.arc(x, y, r * 0.62, 0, 7); g.fill(); g.fillStyle = '#F4F8FC'; for (let i = 0; i < 12; i++) { const a = i * Math.PI / 6; g.save(); g.translate(x + Math.cos(a) * r * 0.82, y + Math.sin(a) * r * 0.82); g.rotate(a); g.fillRect(-r * 0.12, -r * 0.15, r * 0.25, r * 0.14); g.restore(); } }   /* round 24: snow in the tower top and on its merlons */
+    if (MAP === 'night') { g.globalAlpha = NIGHT_A; g.fillStyle = NIGHT_INK; g.beginPath(); g.moveTo(x + r + 1.3, y + 1); g.arc(x, y + 1, r + 1.3, 0, 7); g.moveTo(x + r, y + 3); g.arc(x, y + 3, r, 0, 7); g.fill(); g.globalAlpha = 1; }   /* round 24: the night on the tower (one fill: the body once; its shadow and the flag left as they are) */
     if (!small) { g.strokeStyle = '#3B3226'; g.lineWidth = 3; g.beginPath(); g.moveTo(x, y); g.lineTo(x, y - r * 1.25); g.stroke();
       const wv = Math.sin((S.t || 0) * 5 + x) * 4; g.fillStyle = TANHEX; g.beginPath(); g.moveTo(x, y - r * 1.25); g.quadraticCurveTo(x + 16, y - r * 1.2 + wv, x + 30, y - r * 1.12); g.lineTo(x, y - r * 0.95); g.closePath(); g.fill(); }
     g.restore();
@@ -1847,7 +1854,9 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     g.save(); g.fillStyle = 'rgba(0,0,0,0.25)'; g.beginPath(); g.ellipse(x + 4, y + r * 0.55, r * 1.1, r * 0.42, 0, 0, 7); g.fill();
     const box = (bx, by, bw, bh, base9) => { g.fillStyle = base9 ? '#8a5a30' : '#A0703E'; g.strokeStyle = '#5a3a1e'; g.lineWidth = 3; g.fillRect(bx, by, bw, bh); g.strokeRect(bx, by, bw, bh);
       g.strokeStyle = '#6E4826'; g.lineWidth = 2; g.beginPath(); g.moveTo(bx, by); g.lineTo(bx + bw, by + bh); g.moveTo(bx + bw, by); g.lineTo(bx, by + bh); g.stroke(); };
-    box(x - r * 0.95, y - r * 0.5, r * 1.2, r * 0.95, true); box(x - r * 0.05, y - r * 0.35, r * 1.0, r * 0.8, true); box(x - r * 0.55, y - r * 1.15, r * 1.05, r * 0.8, false); g.restore();
+    box(x - r * 0.95, y - r * 0.5, r * 1.2, r * 0.95, true); box(x - r * 0.05, y - r * 0.35, r * 1.0, r * 0.8, true); box(x - r * 0.55, y - r * 1.15, r * 1.05, r * 0.8, false);
+    if (MAP === 'snow') { g.fillStyle = '#F8FBFF'; g.strokeStyle = 'rgba(140,160,190,0.7)'; g.lineWidth = 1.2; pbmRR(g, x - r * 0.62, y - r * 1.27, r * 1.19, r * 0.3, r * 0.14); g.fill(); g.stroke(); pbmRR(g, x - r * 1.0, y - r * 0.6, r * 0.5, r * 0.22, r * 0.1); g.fill(); g.stroke(); pbmRR(g, x + r * 0.48, y - r * 0.45, r * 0.52, r * 0.2, r * 0.1); g.fill(); g.stroke(); }   /* round 24: snow on the lids */
+    g.restore();
   }
   function pbmDrawLookout(g, x, y, r) {   // green's SIEGE TOWER (the game's lookout on wheels): the plank deck, four posts, the wheels, green's flag
     const s = r * 1.15; g.save();
@@ -1875,10 +1884,11 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
   function drawWater() {
     const x0 = LV.moat, w = LV.mw, t = RM ? 0 : S.wall, span = L.H + 40, spans = LV.drawbridge ? (DB.up ? [] : [LV.drawbridge.y]) : LV.gates, under = y => spans.some(by => y > by - LV.gw / 2 - 5 && y < by + LV.gw / 2 + 5);
     ctx.fillStyle = '#6E9DC4';
-    for (let i = 0; i < 16; i++) { const y = -20 + ((i * 61.8 + t * 24) % span), x = x0 + w * (0.25 + 0.5 * ((i * 0.618) % 1)) + 2 * Math.sin(t * 1.1 + i * 2.4); if (under(y)) continue; ctx.globalAlpha = 0.6; ctx.beginPath(); ctx.ellipse(x, y, w * 0.19, 3.3, 0, 0, 7); ctx.fill(); }
+    for (let i = 0; i < 16; i++) { const y = -20 + ((i * 61.8 + t * 24) % span), x = x0 + w * (0.25 + 0.5 * ((i * 0.618) % 1)) + 2 * Math.sin(t * 1.1 + i * 2.4); if (under(y)) continue; ctx.globalAlpha = 0.6 * nightK(); ctx.beginPath(); ctx.ellipse(x, y, w * 0.19, 3.3, 0, 0, 7); ctx.fill(); }
     ctx.fillStyle = '#E4F5FF'; for (let i = 0; i < 7; i++) { const y = -20 + ((i * 97.3 + t * 30) % span), x = x0 + w * (0.28 + 0.44 * ((i * 0.381) % 1)); if (under(y)) continue; ctx.globalAlpha = 0.75 * (0.5 + 0.5 * Math.sin(t * 3 + i)); ctx.beginPath(); ctx.ellipse(x, y, 2.7, 1.3, 0, 0, 7); ctx.fill(); }
+    if (MAP === 'snow') drawFloes(x0, w, t, spans);   /* round 24: ice floes drifting down the moat */
     drawDuck(x0, w, t, spans);   // round 20 (Isaac 10:33): the rubber duck
-    ctx.fillStyle = '#EDEADF'; for (const by of spans) for (let j = 0; j < 5; j++) { const q = ((t / (1.2 + 0.1 * j) + j * 0.37) % 1), y = by + LV.gw / 2 + 5 + q * 24, r = (2.6 + 1.2 * ((j * 0.73) % 1)) * (1 - 0.45 * q); ctx.globalAlpha = 0.6 * (1 - q); ctx.beginPath(); ctx.ellipse(x0 + w * (0.15 + 0.7 * ((j * 0.61) % 1)), y, r * 1.25, r * 0.62, 0, 0, 7); ctx.fill(); }
+    ctx.fillStyle = '#EDEADF'; for (const by of spans) for (let j = 0; j < 5; j++) { const q = ((t / (1.2 + 0.1 * j) + j * 0.37) % 1), y = by + LV.gw / 2 + 5 + q * 24, r = (2.6 + 1.2 * ((j * 0.73) % 1)) * (1 - 0.45 * q); ctx.globalAlpha = 0.6 * (1 - q) * nightK(); ctx.beginPath(); ctx.ellipse(x0 + w * (0.15 + 0.7 * ((j * 0.61) % 1)), y, r * 1.25, r * 0.62, 0, 0, 7); ctx.fill(); }
     ctx.globalAlpha = 1;
   }
   function drawTowers() { for (const [x, y, r, small] of LV.towersArt) pbm5Tower(ctx, x, y, r, small); }
@@ -1894,10 +1904,12 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
       ctx.fillStyle = '#3B3A36'; ctx.fillRect(gx - 2, top + h * 0.2, gw2 + 4, 4); ctx.fillRect(gx - 2, top + h * 0.74, gw2 + 4, 4);   // the iron bands
       ctx.strokeStyle = 'rgba(40,24,10,0.95)'; ctx.lineWidth = 2.4; ctx.strokeRect(gx, top, gw2, h);
       ctx.strokeStyle = '#2E2A24'; ctx.lineWidth = 3.2; ctx.setLineDash([4, 2.5]); ctx.beginPath(); ctx.moveTo(gx + 3, top + 3); ctx.lineTo(X - 6, y - gw / 2 - 22); ctx.moveTo(gx + 3, top + h - 3); ctx.lineTo(X - 6, y + gw / 2 + 22); ctx.stroke(); ctx.setLineDash([]);   // the chains to the gate towers
+      if (MAP === 'night') { ctx.globalAlpha = NIGHT_A; ctx.fillStyle = NIGHT_INK; ctx.beginPath(); ctx.rect(gx - 1.2, top - 1.2, gw2 + 2.4, h + 2.4); ctx.rect(gx - 2, top + h * 0.2, gw2 + 4, 4); ctx.rect(gx - 2, top + h * 0.74, gw2 + 4, 4); ctx.fill(); ctx.globalAlpha = 1; }   /* round 24 */
       if (DB.flash > 0) { ctx.globalAlpha = DB.flash * 0.35; ctx.fillStyle = '#fff2c4'; ctx.fillRect(gx, top, gw2, h); ctx.globalAlpha = 1; }
     } else {
       const k2 = clamp((S.t - DB.fallAt) / 0.55, 0, 1), e = k2 * k2, xl = (X - 26) + ((x0 - 10) - (X - 26)) * e;
       rvPlanks(ctx, Math.max(x0, xl + 10), x1 + 4, y - gw / 2, gw); if (xl + 10 < x0) rvPlanks(ctx, xl + 10, x1 + 4, y - gw / 2, gw);
+      if (MAP === 'night') nightPlanks(ctx, xl + 10 < x0 ? [Math.max(x0, xl + 10), xl + 10] : [Math.max(x0, xl + 10)], x1 + 4, y - gw / 2, gw);   /* round 24 */
     }
   }
   function drawDBBar() {
@@ -2002,7 +2014,8 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     for (let i = 0; i < NEST.n; i++) { const an = Math.PI * (NEST.a0 + i * NEST.da), bx = cx0 + Math.cos(an) * NEST.rx, by = cy + Math.sin(an) * NEST.ry;
       g.fillStyle = 'rgba(0,0,0,0.22)'; g.beginPath(); g.ellipse(bx + 2 * K9, by + 3 * K9, 10 * K9, 5.5 * K9, an + Math.PI / 2, 0, 7); g.fill();
       g.fillStyle = '#C4AE80'; g.strokeStyle = '#6E5B3A'; g.lineWidth = 1.6 * K9; g.beginPath(); g.ellipse(bx, by, 10 * K9, 5.5 * K9, an + Math.PI / 2, 0, 7); g.fill(); g.stroke();
-      g.strokeStyle = 'rgba(110,91,58,0.6)'; g.lineWidth = K9; g.beginPath(); g.moveTo(bx - Math.cos(an + Math.PI / 2) * 6 * K9, by - Math.sin(an + Math.PI / 2) * 3.3 * K9); g.lineTo(bx + Math.cos(an + Math.PI / 2) * 6 * K9, by + Math.sin(an + Math.PI / 2) * 3.3 * K9); g.stroke(); }
+      g.strokeStyle = 'rgba(110,91,58,0.6)'; g.lineWidth = K9; g.beginPath(); g.moveTo(bx - Math.cos(an + Math.PI / 2) * 6 * K9, by - Math.sin(an + Math.PI / 2) * 3.3 * K9); g.lineTo(bx + Math.cos(an + Math.PI / 2) * 6 * K9, by + Math.sin(an + Math.PI / 2) * 3.3 * K9); g.stroke();
+      if (MAP === 'snow') { g.fillStyle = 'rgba(250,252,255,0.92)'; g.beginPath(); g.ellipse(bx - 0.5 * K9, by - 2 * K9, 7.5 * K9, 3 * K9, an + Math.PI / 2, 0, 7); g.fill(); } }   /* round 24: snow on the bags */
   }
   function drawEmptyCannon() {   // the gun with nobody at it (after its crew falls, before ours climbs in)
     if (!cannonOn() || (CN.st !== 'empty' && CN.st !== 'mount')) return; const c = LV.cannon, H = UH * 1.25, img = spr('mcannon_e', H * L.k * L.dpr), vb = ART.vb.mcannon_e; if (!img) return;
@@ -2052,6 +2065,77 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     ctx.restore(); S.duckY = y;
   }
 
+
+  // ======== ROUND 24 · THE MAPS (Isaac 11/5 12:09: "create two more variations for 2 more different maps: a winter setting and a yellow grass setting. Overall
+  // design stays the same." + 12:19: "Let's also create a variation for the nighttime map, just like the portrait playable") ========
+  // A = the lawn as it was, B = WINTER, C = YELLOW GRASS, D = NIGHT (see MAP_IDS); the castle, the moat, the cannon, the troops and the road's line stay.
+  const GROUND = { lawn: { base: '#8DC063', band: 'rgba(20,60,10,0.05)', lit: 'rgba(255,255,255,0.065)', dark: 'rgba(58,108,36,0.5)', light: 'rgba(214,240,160,0.55)' },
+                   gold: { base: '#E6DA86', band: 'rgba(110,90,0,0.06)', lit: 'rgba(255,255,255,0.09)', dark: 'rgba(132,110,10,0.55)', light: 'rgba(255,248,196,0.7)' } };
+  const NIGHT_INK = '#0f1a38', NIGHT_A = 0.62;   // the portrait's night = the game's night painters' wash
+  function nightK() { return MAP === 'night' ? 1 - NIGHT_A : 1; }   // a live stroke on the map, as if the wash lay over it
+  function paintGround(g, c, d, k) {   // the field under everything; returns the lawn's dice (the crumbs on the road roll on from them, as before)
+    let s9 = 99; const r9 = () => { s9 = (Math.imul(s9, 1103515245) + 12345) >>> 0; return s9 / 4294967296; };
+    if (MAP === 'snow') {   // the portrait's winter field, at its density over this wider field
+      g.fillStyle = '#E9EEF4'; g.fillRect(0, 0, c.width, c.height);
+      g.save(); g.setTransform(d * k, 0, 0, d * k, d * L.ox, 0); const r = seeded(31), X0 = -L.ox / k, X1 = LV.W + L.ox / k, A = (X1 - X0) * L.H;
+      for (let i = 0, n = Math.round(A / 13300); i < n; i++) { const x = X0 + r() * (X1 - X0), y = r() * L.H, rx = 40 + r() * 70, ry = 14 + r() * 18;   // the drifts: a cool foot, a white crest
+        g.fillStyle = 'rgba(140,160,192,0.16)'; g.beginPath(); g.ellipse(x, y + ry * 0.35, rx, ry, 0, 0, 7); g.fill(); g.fillStyle = 'rgba(255,255,255,0.7)'; g.beginPath(); g.ellipse(x - rx * 0.1, y - ry * 0.15, rx * 0.8, ry * 0.55, 0, 0, 7); g.fill(); }
+      g.lineCap = 'round'; for (let i = 0, n = Math.round(A / 5770); i < n; i++) { const x = X0 + r() * (X1 - X0), y = r() * L.H, l = 10 + r() * 22; g.strokeStyle = r() < 0.5 ? 'rgba(255,255,255,0.85)' : 'rgba(150,170,200,0.28)'; g.lineWidth = 1.4; g.beginPath(); g.moveTo(x, y); g.lineTo(x + l, y - l * 0.12); g.stroke(); }   // the wind's streaks
+      for (let i = 0, n = Math.round(A / 4940); i < n; i++) { const x = X0 + r() * (X1 - X0), y = r() * L.H, s = 1.6 + r() * 2.6; if (!offRoad(x, y)) continue;   // the clods, each with its cool shadow
+        g.fillStyle = 'rgba(80,100,135,0.28)'; g.beginPath(); g.ellipse(x + 0.8, y + 1.2, s * 1.2, s * 0.75, 0, 0, 7); g.fill(); g.fillStyle = '#FFFFFF'; g.beginPath(); g.ellipse(x, y, s * 1.1, s * 0.7, 0, 0, 7); g.fill(); }
+      g.restore(); return r9;
+    }
+    const p = GROUND[MAP] || GROUND.lawn;   // A, D (the lawn, as it was) and C (the yellow grass): the same strokes, the map's own inks
+    g.fillStyle = p.base; g.fillRect(0, 0, c.width, c.height);
+    const band = Math.max(8, 46 * k * d); for (let i = 0, y = 0; y < c.height; i++, y += band) { g.fillStyle = i % 2 ? p.lit : p.band; g.fillRect(0, y, c.width, band); }
+    const n = Math.round(c.width * c.height / (2400 * d * d)), lw = Math.max(1, 1.15 * k * d);
+    for (let i = 0; i < n; i++) { const x = r9() * c.width, y = r9() * c.height, s = (2 + r9() * 2.4) * k * d; g.strokeStyle = r9() < 0.8 ? p.dark : p.light; g.lineWidth = lw; g.beginPath(); g.moveTo(x - s, y - s * 0.9); g.lineTo(x, y); g.lineTo(x + s * 0.8, y - s); g.stroke(); }
+    return r9;
+  }
+  function paintSnowRoad(g) {   // the portrait's trodden rut and its prints (left, right, left)
+    roadLine(g, PW + 16, 'rgba(110,130,165,0.22)', 0, 2); roadLine(g, PW + 7, '#B7C2D1'); roadLine(g, PW, '#8C9AAD'); roadLine(g, PW * 0.6, 'rgba(110,126,150,0.55)');
+    g.fillStyle = '#A9B5C6'; for (let s = 6, q = 0; s < P.len; s += 13, q++) { const i = Math.floor(s / 2), off = (q % 2 ? 7 : -7), x = P.x[i] + P.nx[i] * off, y = P.y[i] + P.ny[i] * off, a = Math.atan2(P.ny[i], P.nx[i]) + Math.PI / 2;
+      g.save(); g.translate(x, y); g.rotate(a); g.beginPath(); g.ellipse(0, 0, 4.6, 3, 0, 0, 7); g.fill(); g.restore(); }
+  }
+  function snowCourt(g, cz) {   // the courtyard under snow: a white wash over the flagstones, a few soft drifts
+    g.fillStyle = 'rgba(244,248,253,0.66)'; g.fillRect(cz[0], cz[1], cz[2] + 40 - cz[0], cz[3] - cz[1]);
+    const r = seeded(91); for (let i = 0; i < 9; i++) { const x = cz[0] + 20 + r() * (cz[2] - cz[0]), y = cz[1] + 14 + r() * (cz[3] - cz[1] - 28), rx = 24 + r() * 30, ry = 8 + r() * 8;
+      g.fillStyle = 'rgba(140,160,192,0.14)'; g.beginPath(); g.ellipse(x, y + ry * 0.4, rx, ry, 0, 0, 7); g.fill(); g.fillStyle = 'rgba(255,255,255,0.75)'; g.beginPath(); g.ellipse(x, y, rx * 0.8, ry * 0.6, 0, 0, 7); g.fill(); }
+  }
+  function paintNightOver(g, c) {   // the portrait's night over the whole castle map: the wash, the moonlight, the fireflies (the field side, off the road)
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.globalAlpha = NIGHT_A; g.fillStyle = NIGHT_INK; g.fillRect(0, 0, c.width, c.height); g.globalAlpha = 1;
+    const mx = c.width * 0.75, my = c.height * 0.12, mg = g.createRadialGradient(mx, my, 0, mx, my, Math.max(c.width, c.height) * 0.8);
+    mg.addColorStop(0, 'rgba(159,184,255,0.20)'); mg.addColorStop(1, 'rgba(159,184,255,0)'); g.fillStyle = mg; g.fillRect(0, 0, c.width, c.height);
+    const d = L.dpr, k = L.k; g.setTransform(d * k, 0, 0, d * k, d * L.ox, 0);
+    const r = seeded(77), X0 = -L.ox / k, X1 = LV.moat - 14;
+    for (let i = 0, n = Math.round((X1 - X0) * L.H / 15700); i < n; i++) { const x = X0 + r() * (X1 - X0), y = r() * L.H; if (!offRoad(x, y, 14)) continue;
+      const h = g.createRadialGradient(x, y, 0, x, y, 9); h.addColorStop(0, 'rgba(232,245,154,0.45)'); h.addColorStop(1, 'rgba(232,245,154,0)'); g.fillStyle = h; g.beginPath(); g.arc(x, y, 9, 0, 7); g.fill();
+      g.fillStyle = '#F2FBC0'; g.beginPath(); g.arc(x, y, 1.4, 0, 7); g.fill(); }
+  }
+  function nightPlanks(g, starts, x1, top, bw) {   // the night's wash on rvPlanks' own shapes (each span's planks, staggered ends, outline and top glint), one fill so it lies once
+    g.globalAlpha = NIGHT_A; g.fillStyle = NIGHT_INK; g.beginPath();
+    for (const x0 of starts) { const L0 = x0 - 10, R0 = x1 + 10; g.rect(L0 - 2.75, top - 0.75, R0 - L0 + 5.5, bw + 1.5); g.rect(x0, top - 1, x1 - x0, 1);
+      const yy = []; for (let q = 0; q < 5; q++) yy.push(top + 6 + q * (bw - 12) / 4);
+      for (let q = 0; q < 6; q++) { const a = q === 0 ? top : yy[q - 1] + 1.5, z = q === 5 ? top + bw : yy[q] - 1.5, px0 = L0 - (q % 2 ? 4 : 0), px1 = R0 + (q % 2 ? 0 : 4); g.rect(px0, a, px1 - px0, z - a); } }
+    g.fill(); g.globalAlpha = 1;
+  }
+  function drawFloes(x0, w, t, spans) {   // ice floes on the winter moat: pale plates drifting down with the current, under the bridges like the duck
+    ctx.save(); ctx.beginPath(); ctx.rect(x0 - 40, -200, w + 80, L.H + 400); for (const by of spans) ctx.rect(x0 - 40, by - LV.gw / 2, w + 80, LV.gw); ctx.clip('evenodd');
+    const span = L.H + 120; ctx.lineWidth = 1; ctx.globalAlpha = 1;   // the glints before leave their own alpha on the pen
+    for (let i = 0; i < 7; i++) { const y = -60 + ((i * 83.7 + t * 21) % span), x = x0 + w * (0.3 + 0.4 * ((i * 0.618) % 1)) + Math.sin(t * 0.8 + i) * 2, s = 4.5 + (i % 3) * 2;
+      ctx.save(); ctx.translate(x, y); ctx.rotate(i * 1.3 + t * 0.05); ctx.fillStyle = 'rgba(240,246,252,0.94)'; ctx.strokeStyle = 'rgba(140,168,200,0.9)';
+      ctx.beginPath(); ctx.moveTo(-s, -s * 0.4); ctx.lineTo(-s * 0.2, -s * 0.8); ctx.lineTo(s * 0.9, -s * 0.3); ctx.lineTo(s * 0.6, s * 0.6); ctx.lineTo(-s * 0.5, s * 0.7); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore(); }
+    ctx.restore();
+  }
+  function buildMapL() {   // the map tabs A B C D: a dark well at the top left beside the PLAY NOW plate (the field there is clear of the road; under the difficulty
+    // tab it hid tan's mortar crew in the courtyard), the twin of the difficulty well, each tab with its colour chip
+    const m = document.createElement('div'); m.id = 'mapL'; m.setAttribute('role', 'tablist'); m.setAttribute('aria-label', 'Maps');
+    m.innerHTML = MAP_IDS.map(id => '<button class="ltab" type="button" role="tab" data-map="' + id + '" aria-label="Map ' + MAP_LETTER[id] + '"><i style="background:' + MAP_SWATCH[id] + '"></i>' + MAP_LETTER[id] + '</button>').join('');
+    for (const b of m.querySelectorAll('.ltab')) b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); setMap(b.dataset.map); SFX.snap(); });
+    document.body.appendChild(m); syncTabs();
+  }
+
   // ---------------- BOOT ----------------
   let last = 0, MANUAL = false;
   function frame(ts) {
@@ -2067,7 +2151,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     S.stats.diff = DIFF; buildTabs(); buildTray(); layout();   // round 10: the tabs first (the store door sits under them; layout reads it) · round 17: the difficulty it opened on
     // frame one is the live field: their first men are already on their way down the path
     for (const f of [0.50, 0.545, 0.59]) { const u = mkUnit('t', 'tanrifle', LV.camera ? sAtX(LV.view * f) : sAtX(LV.moat * (f + 0.12)), rr(-13, 13)); S.f.push(u); }   // round 18: the first three already on the lawn, in sight
-    cannonStart(); buildDiffL();   // round 19
+    cannonStart(); buildDiffL(); buildMapL();   // round 19 · round 24: the map tabs (top left, beside the PLAY NOW plate)
     S.mode = 'play'; if (OPENER) showOpener(); syncHUD(0);   // round 8: THE FACE-OFF opens the playable
     $('playNow').addEventListener('pointerdown', e => { e.preventDefault(); cta('plate'); });
     $('endBtn').addEventListener('pointerdown', e => { e.preventDefault(); if (S.endKind === 'lose') restart(); else cta('end'); });
@@ -2087,6 +2171,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
       boxS: BOX_S, plen: +P.len.toFixed(0), endTap: S.stats.endTap == null ? null : S.stats.endTap, endV: EV.n, evOn: EV.on, evT: EV.on ? +(S.wall - S.endOn).toFixed(2) : null, fxDrawn: fxDirty, fw: S.fw.length,
       endKind: S.endKind, leaks: S.stats.leaks, hits: S.stats.hits, firstHit: S.stats.firstHit, defeatAt: S.stats.defeat, lastPlay: +S.lastPlay.toFixed(2), redT: +S.redT.toFixed(2),
       duck: S.duckY != null ? +S.duckY.toFixed(1) : null, maxTxt: document.getElementById('elimTxt').textContent,
+      mapTabs: Array.from(document.querySelectorAll('#mapL .ltab')).map(b => b.textContent + (b.classList.contains('on') ? '*' : '')).join(' '), maps: S.stats.maps || null,
       cannon: LV.cannon ? { st: CN.st, free: S.stats.cannonFreeAt || null, mount: S.stats.cannonMount || null, manned: S.stats.cannonManned || null, fired: S.stats.cannonFired || null, hit: S.stats.cannonHit || null } : null, portrait: !!L.portrait, diff: DIFF,
       v: LVN, lv: LV.name, cam: +CAM.x.toFixed(1), troops: LV.troops, db: LV.drawbridge ? { up: DB.up, hp: +DB.hp.toFixed(1), max: DB.max, at: S.stats.dbDown || null } : null, map: MAP === 'lawn' ? 'original' : MAP, mapL: MAP_LETTER[MAP] || null, diff: DIFF, dk: DIFF_K[DIFF], boxMax: +BOX.max.toFixed(1), tabs: TABS ? Array.from(document.querySelectorAll('#mapTabs .mtab')).map(b => b.dataset.map + (b.classList.contains('on') ? '*' : '')).join(',') : null, endAt: S.stats.endAt, dimAt: S.stats.dimAt, dim: +(getComputedStyle(document.getElementById('endDim')).opacity), icon: (ART.icon || '').length, mortars: S.f.filter(u => u.type === 'tanmort').length, shells: S.rk.filter(r => r.lob).length,
       tide: S.tide.st, tiders: S.f.filter(f => f.tide && !f.dead).length,
