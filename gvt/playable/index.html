@@ -17,7 +17,7 @@ html,body{ margin:0; height:100%; overflow:hidden; background:#8DC063; touch-act
 button{ font:inherit; color:inherit; border:0; margin:0; padding:0; background:none; -webkit-appearance:none; appearance:none; cursor:pointer; touch-action:manipulation; }
 
 /* THE STORE DOOR: the app icon and PLAY NOW, top left (the screenshot's plate) */
-#plate{ position:absolute; top:calc(env(safe-area-inset-top,0px) + 10px); left:10px; display:flex; flex-direction:column; align-items:center; gap:5px; pointer-events:auto; }
+#plate{ position:absolute; top:calc(env(safe-area-inset-top,0px) + 10px + var(--tabsH,0px)); left:10px; display:flex; flex-direction:column; align-items:center; gap:5px; pointer-events:auto; }
 #icon{ width:52px; height:52px; border-radius:12px; box-shadow:0 0 0 2px rgba(20,30,16,.75), 0 3px 6px rgba(0,0,0,.3); display:block; }
 #playNow{ font-size:12px; letter-spacing:.4px; padding:3px 9px 2px; border-radius:7px; background:linear-gradient(#63a64b,#3d742e); border:2px solid #1d3a15; box-shadow:0 2px 0 #1d3a15; }
 
@@ -107,6 +107,15 @@ html.land #pop.tray{ left:auto; right:6px; width:calc(var(--side) - 12px); }
 #endBtn{ font-size:38px; letter-spacing:1px; padding:12px 36px 10px; border-radius:20px; color:#3b2600; background:linear-gradient(180deg,#fff08a 0%,#ffd23f 45%,#f2a91a 100%);
   border:3px solid #6b4600; box-shadow:0 6px 0 #6b4600, 0 14px 26px rgba(0,0,0,.35); text-shadow:0 1px 0 rgba(255,255,255,.6); }
 #endWord{ font-size:30px; color:#fff; letter-spacing:1px; }
+/* ROUND 10 (Isaac 20:42): THE MAP TABS across the top (five maps, the same playable); the store door sits under them */
+html.tabs{ --tabsH:46px; }
+#mapTabs{ position:fixed; left:0; right:0; top:0; z-index:60; display:none; gap:6px; padding:calc(env(safe-area-inset-top,0px) + 6px) 8px 6px; box-sizing:border-box;
+  background:linear-gradient(180deg, rgba(14,18,13,.94), rgba(14,18,13,.82)); box-shadow:0 2px 10px rgba(0,0,0,.35); font-family:var(--f); }
+html.tabs #mapTabs{ display:flex; }
+.mtab{ flex:1; min-width:0; height:34px; border-radius:10px; border:2px solid rgba(255,255,255,.16); background:rgba(255,255,255,.07); color:#eef3e6;
+  font-size:13.5px; font-weight:800; letter-spacing:.05em; display:flex; align-items:center; justify-content:center; gap:5px; pointer-events:auto; white-space:nowrap; }
+.mtab i{ width:12px; height:12px; border-radius:4px; display:block; flex:none; box-shadow:inset 0 0 0 1.5px rgba(0,0,0,.35); }
+.mtab.on{ background:linear-gradient(180deg,#fff08a,#ffd23f 55%,#f2a91a); color:#3b2600; border-color:#6b4600; }
 
 /* ROUND 7 (Isaac 15:25): THE FIREWORKS OVER THE DIM, on the end screen's own layer (#fxcv: above the gray and the end screen's backdrop, under its words);
    and FIVE END SCREENS (?end=1..5) more Green vs Tan, for him to pick one. Each is the whole screen, nothing across the bottom (Wyatt 10/5). */
@@ -211,6 +220,7 @@ html.land #pop.tray{ left:auto; right:6px; width:calc(var(--side) - 12px); }
   <div id="endV"></div>
   <div id="hand"></div>
 </div>
+<div id="mapTabs" role="tablist" aria-label="Maps"></div>
 <script>
 'use strict';
 // CARD-PUP · THE UPGRADE PLAYABLE (Isaac's design, 11/4/2026) · a kit prototype for his go. The drawings are the game's own (HEAD v29.72).
@@ -391,8 +401,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     for (const u of S.g) place(u); for (const u of S.f) place(u);
     RAS.clear(); paintLawn();
   }
-  const MAPQ = Q.get('map');
-  function paintLawn() { if (MAPQ === 'game') paintGameLawn(); else paintOriginalLawn(); }
+  function paintLawn() { ({ rug: paintRug, snow: paintSnow, desert: paintDesert, night: paintNight, game: paintGameLawn }[MAP] || paintOriginalLawn)(); }   // round 10: the map of the tab (MAP, maps.part)
   function paintOriginalLawn() {   // ROUND 4 (Isaac 14:24, his picture): the ORIGINAL map, round 1's lawn and road, back as the default
     TALL = [];
     const c = document.createElement('canvas'); c.width = cv.width; c.height = cv.height; const g = c.getContext('2d');
@@ -1160,6 +1169,109 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     syncHUD(dt);
   }
 
+  // ---------------- ROUND 10 (Isaac 20:42: "Give me five different versions with different maps but the overall playable should still be the same thing: same layout,
+  // same everything. The only thing that changes is the maps. Put it on the same page but give me tabs at the top to switch between each map.") ----------------
+  // FIVE MAPS on the same S road, in the colours of the game's own worlds: THE LAWN (round 1's, the default), THE RUG (the campaign rug), THE SNOW (the winter field),
+  // THE DESERT, THE NIGHT (the lawn after dark, the elite ladder's night). Tabs across the top switch the map at once, the fight running on; ?map=<id> opens on one,
+  // ?tabs=0 hides the tabs (the ad's own file). Nothing else moves: the road, the men, the box, the mortars, the bar, the tray, the clock.
+  const MAP_IDS = ['lawn', 'rug', 'snow', 'desert', 'night'];
+  const MAP_NAME = { lawn: 'LAWN', rug: 'RUG', snow: 'SNOW', desert: 'DESERT', night: 'NIGHT' };
+  const MAP_SWATCH = { lawn: '#8DC063', rug: '#63251C', snow: '#E9EEF4', desert: '#E8C48C', night: '#1D2A4A' };
+  const TABS = Q.get('tabs') !== '0';
+  let MAP = MAP_IDS.indexOf(Q.get('map')) >= 0 || Q.get('map') === 'game' ? Q.get('map') : 'lawn';
+  function lawnCanvas() { const c = document.createElement('canvas'); c.width = cv.width; c.height = cv.height; return c; }
+  function roadLine(g, w, col, dx, dy) { g.save(); g.translate(dx || 0, dy || 0); g.strokeStyle = col; g.lineWidth = w; g.lineCap = 'round'; g.lineJoin = 'round'; g.beginPath(); g.moveTo(P.x[0], P.y[0]); for (let i = 1; i < P.n; i++) g.lineTo(P.x[i], P.y[i]); g.stroke(); g.restore(); }
+  function seeded(n) { let s = n >>> 0; return () => { s = (Math.imul(s, 1103515245) + 12345) >>> 0; return s / 4294967296; }; }
+  function offRoad(x, y, pad) { return nearestS(x, y).d > PW / 2 + (pad || 6); }
+  function paintRug() {   // THE RUG: the game's campaign rug (its crimson #63251C, its line #8F4634), edge to edge; the road a groove worn into the wool (the game's carpet groove: lip #8F4634, cut #3E1610, floor #2E100B, its rim's light)
+    TALL = []; const c = lawnCanvas(), g = c.getContext('2d');
+    g.fillStyle = '#63251C'; g.fillRect(0, 0, c.width, c.height);
+    const row = Math.max(2, 3 * L.k * L.dpr);   // the weave
+    for (let i = 0, y = 0; y < c.height; i++, y += row) { g.fillStyle = i % 2 ? 'rgba(255,214,190,0.035)' : 'rgba(30,6,4,0.07)'; g.fillRect(0, y, c.width, row * 0.5); }
+    g.setTransform(L.dpr * L.k, 0, 0, L.dpr * L.k, L.dpr * L.ox, 0);
+    const D = 72; g.lineWidth = 2.2; g.strokeStyle = 'rgba(143,70,52,0.42)';   // the rug's lattice in its line colour, a medallion in each diamond
+    for (let j = -1, y = -D; y < L.H + D; j++, y += D / 2) for (let x = L.xMin - D + ((j & 1) ? D / 2 : 0); x < L.xMax + D; x += D) {
+      g.beginPath(); g.moveTo(x, y - D / 2); g.lineTo(x + D / 2, y); g.lineTo(x, y + D / 2); g.lineTo(x - D / 2, y); g.closePath(); g.stroke();
+      g.fillStyle = 'rgba(214,140,108,0.16)'; g.beginPath(); g.ellipse(x, y, 5, 5, 0, 0, 7); g.fill();
+    }
+    roadLine(g, PW + 16, 'rgba(18,4,2,0.28)', 0, 2);   // the groove's shadow
+    roadLine(g, PW + 7, 'rgba(214,140,108,0.55)', -1.4, -1.4);   // the rim's light, up-left
+    roadLine(g, PW + 7, '#8F4634'); roadLine(g, PW + 1, '#3E1610'); roadLine(g, PW - 9, '#2E100B');
+    const r = seeded(7); for (let s = 5; s < P.len; s += 7) { const i = Math.floor(s / 2), off = (r() * 2 - 1) * PW * 0.38; g.fillStyle = r() < 0.6 ? 'rgba(214,140,108,0.28)' : 'rgba(10,2,1,0.35)'; g.beginPath(); g.ellipse(P.x[i] + P.nx[i] * off, P.y[i] + P.ny[i] * off, 1 + r() * 1.2, 0.7 + r() * 0.6, r() * 3, 0, 7); g.fill(); }   // lint in the groove
+    LAWN = c;
+  }
+  function paintSnow() {   // THE SNOW: the game's winter field (#E9EEF4), soft drifts, clods with a cool shadow under every white thing (the game's own lesson); the road a trodden rut (the game's trail #B7C2D1 / #CFD7E1, its prints #A9B5C6, its snow trench #8C9AAD)
+    TALL = []; const c = lawnCanvas(), g = c.getContext('2d');
+    g.fillStyle = '#E9EEF4'; g.fillRect(0, 0, c.width, c.height);
+    g.setTransform(L.dpr * L.k, 0, 0, L.dpr * L.k, L.dpr * L.ox, 0);
+    const r = seeded(31);
+    for (let i = 0; i < 26; i++) {   // the drifts: a cool foot, a white crest
+      const x = L.xMin + r() * (L.xMax - L.xMin), y = r() * L.H, rx = 40 + r() * 70, ry = 14 + r() * 18;
+      g.fillStyle = 'rgba(140,160,192,0.16)'; g.beginPath(); g.ellipse(x, y + ry * 0.35, rx, ry, 0, 0, 7); g.fill();
+      g.fillStyle = 'rgba(255,255,255,0.7)'; g.beginPath(); g.ellipse(x - rx * 0.1, y - ry * 0.15, rx * 0.8, ry * 0.55, 0, 0, 7); g.fill();
+    }
+    g.lineCap = 'round'; for (let i = 0; i < 60; i++) {   // the wind's streaks
+      const x = L.xMin + r() * (L.xMax - L.xMin), y = r() * L.H, l = 10 + r() * 22;
+      g.strokeStyle = r() < 0.5 ? 'rgba(255,255,255,0.85)' : 'rgba(150,170,200,0.28)'; g.lineWidth = 1.4; g.beginPath(); g.moveTo(x, y); g.lineTo(x + l, y - l * 0.12); g.stroke();
+    }
+    for (let i = 0; i < 70; i++) {   // the clods, each with its cool shadow
+      const x = L.xMin + r() * (L.xMax - L.xMin), y = r() * L.H, s = 1.6 + r() * 2.6; if (!offRoad(x, y)) continue;
+      g.fillStyle = 'rgba(80,100,135,0.28)'; g.beginPath(); g.ellipse(x + 0.8, y + 1.2, s * 1.2, s * 0.75, 0, 0, 7); g.fill();
+      g.fillStyle = '#FFFFFF'; g.beginPath(); g.ellipse(x, y, s * 1.1, s * 0.7, 0, 0, 7); g.fill();
+    }
+    roadLine(g, PW + 16, 'rgba(110,130,165,0.22)', 0, 2); roadLine(g, PW + 7, '#B7C2D1'); roadLine(g, PW, '#8C9AAD'); roadLine(g, PW * 0.6, 'rgba(110,126,150,0.55)');
+    g.fillStyle = '#A9B5C6';   // the prints, the game's trail: left, right, left
+    for (let s = 6, k = 0; s < P.len; s += 13, k++) { const i = Math.floor(s / 2), off = (k % 2 ? 7 : -7), x = P.x[i] + P.nx[i] * off, y = P.y[i] + P.ny[i] * off, a = Math.atan2(P.ny[i], P.nx[i]) + Math.PI / 2;
+      g.save(); g.translate(x, y); g.rotate(a); g.beginPath(); g.ellipse(0, 0, 4.6, 3, 0, 0, 7); g.fill(); g.restore(); }
+    LAWN = c;
+  }
+  function paintDesert() {   // THE DESERT: the sand, dune ripples, pebbles and dry tufts; the road the game's sand track (its trench colours: lip #9A5A28, cut #5E2E14, lit #7E4220, rim #F2C584)
+    TALL = []; const c = lawnCanvas(), g = c.getContext('2d');
+    g.fillStyle = '#E8C48C'; g.fillRect(0, 0, c.width, c.height);
+    g.setTransform(L.dpr * L.k, 0, 0, L.dpr * L.k, L.dpr * L.ox, 0);
+    const r = seeded(53); g.lineCap = 'round';
+    for (let y = -10, j = 0; y < L.H + 20; y += 19, j++) {   // the ripples: a shaded trough, a lit crest
+      const ph = r() * 6.28, amp = 4 + r() * 4, wl = 60 + r() * 50;
+      for (const [dy, col, w] of [[2.2, 'rgba(176,124,66,0.30)', 1.8], [0, 'rgba(255,238,204,0.50)', 1.3]]) {
+        g.strokeStyle = col; g.lineWidth = w; g.beginPath();
+        for (let x = L.xMin - 10; x <= L.xMax + 10; x += 6) { const yy = y + dy + Math.sin(x / wl * 6.28 + ph) * amp; x === L.xMin - 10 ? g.moveTo(x, yy) : g.lineTo(x, yy); }
+        g.stroke();
+      }
+    }
+    for (let i = 0; i < 90; i++) {   // the pebbles and the dry tufts
+      const x = L.xMin + r() * (L.xMax - L.xMin), y = r() * L.H; if (!offRoad(x, y)) continue;
+      if (r() < 0.7) { g.fillStyle = r() < 0.5 ? 'rgba(150,108,64,0.55)' : 'rgba(255,240,214,0.6)'; g.beginPath(); g.ellipse(x, y, 1.2 + r() * 1.6, 0.9 + r() * 1, 0, 0, 7); g.fill(); }
+      else { const s = 3 + r() * 3; g.strokeStyle = 'rgba(140,108,60,0.7)'; g.lineWidth = 1.3; g.beginPath(); g.moveTo(x - s, y - s); g.lineTo(x, y); g.lineTo(x + s * 0.2, y - s * 1.2); g.moveTo(x, y); g.lineTo(x + s, y - s * 0.8); g.stroke(); }
+    }
+    roadLine(g, PW + 16, 'rgba(110,64,28,0.22)', 0, 2); roadLine(g, PW + 7, 'rgba(242,197,132,0.9)', -1.2, -1.2); roadLine(g, PW + 7, '#9A5A28'); roadLine(g, PW, '#7E4220'); roadLine(g, PW * 0.55, 'rgba(150,96,52,0.45)');
+    for (let s = 5; s < P.len; s += 8) { const i = Math.floor(s / 2), off = (r() * 2 - 1) * PW * 0.4; g.fillStyle = r() < 0.55 ? 'rgba(94,46,20,0.55)' : 'rgba(200,150,96,0.5)'; g.beginPath(); g.ellipse(P.x[i] + P.nx[i] * off, P.y[i] + P.ny[i] * off, 1.2 + r() * 1.3, 0.8 + r() * 0.8, 0, 0, 7); g.fill(); }
+    LAWN = c;
+  }
+  function paintNight() {   // THE NIGHT: the lawn after dark, the game's night painters' numbers: its wash #0f1a38 at 0.62 over the grass, its moonlight (159,184,255), a few fireflies
+    paintOriginalLawn(); const c = LAWN, g = c.getContext('2d'); g.setTransform(1, 0, 0, 1, 0, 0);
+    g.globalAlpha = 0.62; g.fillStyle = '#0f1a38'; g.fillRect(0, 0, c.width, c.height); g.globalAlpha = 1;
+    const mx = c.width * 0.75, my = c.height * 0.12, mg = g.createRadialGradient(mx, my, 0, mx, my, Math.max(c.width, c.height) * 0.8);
+    mg.addColorStop(0, 'rgba(159,184,255,0.20)'); mg.addColorStop(1, 'rgba(159,184,255,0)'); g.fillStyle = mg; g.fillRect(0, 0, c.width, c.height);
+    g.setTransform(L.dpr * L.k, 0, 0, L.dpr * L.k, L.dpr * L.ox, 0);
+    const r = seeded(77);
+    for (let i = 0; i < 22; i++) { const x = L.xMin + r() * (L.xMax - L.xMin), y = r() * L.H; if (!offRoad(x, y, 14)) continue;
+      const h = g.createRadialGradient(x, y, 0, x, y, 9); h.addColorStop(0, 'rgba(232,245,154,0.45)'); h.addColorStop(1, 'rgba(232,245,154,0)'); g.fillStyle = h; g.beginPath(); g.arc(x, y, 9, 0, 7); g.fill();
+      g.fillStyle = '#F2FBC0'; g.beginPath(); g.arc(x, y, 1.4, 0, 7); g.fill(); }
+    LAWN = c;
+  }
+  function setMap(id, src) {   // a tab: the map changes at once, the fight runs on
+    if (MAP_IDS.indexOf(id) < 0 || id === MAP) return; MAP = id; S.stats.maps = (S.stats.maps || []).concat([{ id, t: +S.t.toFixed(2), src: src || 'tab' }]);
+    paintLawn(); syncTabs();
+    try { const u = new URL(location.href); u.searchParams.set('map', id); history.replaceState(null, '', u.toString()); } catch (e) {}
+  }
+  function buildTabs() {
+    document.documentElement.classList.toggle('tabs', TABS); if (!TABS) return;
+    const bar = $('mapTabs'); bar.innerHTML = MAP_IDS.map(id => '<button class="mtab" type="button" role="tab" data-map="' + id + '"><i style="background:' + MAP_SWATCH[id] + '"></i>' + MAP_NAME[id] + '</button>').join('');
+    for (const b of bar.children) b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); setMap(b.dataset.map); SFX.snap(); });
+    syncTabs();
+  }
+  function syncTabs() { if (!TABS) return; for (const b of $('mapTabs').children) { const on = b.dataset.map === MAP; b.classList.toggle('on', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); } }
+
   // ---------------- ROUND 7 (Isaac 15:25): FIVE END SCREENS, more Green vs Tan, for him to pick one (?end=1..5; no dial = round 6's card, untouched) ----------------
   // His words: "We want somewhere in there it says Play Green versus Tan or Green versus Tan, then play now. Just come up with five variations."
   // Each is the WHOLE screen (Wyatt 10/5), nothing across the bottom; the words are the game's own (the title's GREEN / VS / TAN, Sarge's own line);
@@ -1398,7 +1510,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
   function start() {
     const tu = tagURI(40); $('tagIco').src = tu; $('icon').src = ART.icon; $('endIcon').src = ART.icon;
     $('hand').innerHTML = '<svg viewBox="0 0 192 240">' + ART.glove + '</svg>';
-    buildTray(); layout();
+    buildTabs(); buildTray(); layout();   // round 10: the tabs first (the store door sits under them; layout reads it)
     // frame one is the live field: their first men are already on their way down the path
     for (const f of [0.50, 0.545, 0.59]) { const u = mkUnit('t', 'tanrifle', P.len * f, rr(-13, 13)); S.f.push(u); }
     S.mode = 'play'; if (OPENER) showOpener(); syncHUD(0);   // round 8: THE FACE-OFF opens the playable
@@ -1419,10 +1531,10 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
       opener: OP.on ? +(S.wall - OP.t0).toFixed(2) : (OP.done ? 'done' : 'off'), openerStats: S.stats.opener || null,
       endV: EV.n, evOn: EV.on, evT: EV.on ? +(S.wall - S.endOn).toFixed(2) : null, fxDrawn: fxDirty, fw: S.fw.length,
       endKind: S.endKind, leaks: S.stats.leaks, hits: S.stats.hits, firstHit: S.stats.firstHit, defeatAt: S.stats.defeat, lastPlay: +S.lastPlay.toFixed(2), redT: +S.redT.toFixed(2),
-      map: MAPQ === 'game' ? 'game' : 'original', endAt: S.stats.endAt, dimAt: S.stats.dimAt, dim: +(getComputedStyle(document.getElementById('endDim')).opacity), icon: (ART.icon || '').length, mortars: S.f.filter(u => u.type === 'tanmort').length, shells: S.rk.filter(r => r.lob).length,
+      map: MAP === 'lawn' ? 'original' : MAP, tabs: TABS ? Array.from(document.querySelectorAll('#mapTabs .mtab')).map(b => b.dataset.map + (b.classList.contains('on') ? '*' : '')).join(',') : null, endAt: S.stats.endAt, dimAt: S.stats.dimAt, dim: +(getComputedStyle(document.getElementById('endDim')).opacity), icon: (ART.icon || '').length, mortars: S.f.filter(u => u.type === 'tanmort').length, shells: S.rk.filter(r => r.lob).length,
       tide: S.tide.st, tiders: S.f.filter(f => f.tide && !f.dead).length,
       sarge: (S.sarge.unit && !S.sarge.unit.dead) ? { saber: S.sarge.unit.saber || null, st: S.sarge.unit.sb ? S.sarge.unit.sb.st : null, tkCd: +(S.sarge.unit.tkCd || 0).toFixed(2), x: Math.round(S.sarge.unit.x), y: Math.round(S.sarge.unit.y) } : null, tkReady: tkReady() }; },
-    tk: () => tkCast(), restart, ev: EV, evv: EVV, op: OP,
+    tk: () => tkCast(), restart, ev: EV, evv: EVV, op: OP, setMap,
   };
   loadArt().then(start);
 })();
