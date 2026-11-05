@@ -379,6 +379,22 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     // the apex of each bend = its halfway point (the heading straight up or down)
     P.tf = new Int8Array(n); for (let i = 0, last = 1; i < n; i++) { const d = xs[Math.min(n - 1, i + 1)] - xs[Math.max(0, i - 1)]; last = d > 0 ? 1 : d < 0 ? -1 : last; P.tf[i] = last; }
     P.apex = []; for (let i = 1; i < n; i++) if (P.tf[i] !== P.tf[i - 1]) P.apex.push(i);
+    // ROUND 15 (Isaac 22:37: "On the curves they need to turn like 15% earlier ... these are tactical genius soldiers ... They are actively peeking around it ... Make sure
+    // everyone starts turning at the exact same point in the curve, which is based on the foot soldiers"): EACH BEND (from where the road starts to bend to where it
+    // straightens, 20 % of its sharpest turn either side) gets ONE TURN POINT, 15 % of the bend's length before its halfway point, in the direction of march: the greens'
+    // on the way in, the tans' (who walk it the other way) on their way in. Everyone on the road turns by his place on it (the jets too), so all turn at the same point.
+    { const hd = new Float32Array(n), cu = new Float32Array(n);
+      for (let i = 0; i < n; i++) { const a = Math.max(0, i - 1), b = Math.min(n - 1, i + 1); hd[i] = Math.atan2(ys[b] - ys[a], xs[b] - xs[a]); }
+      for (let i = 1; i < n - 1; i++) { let d = hd[i + 1] - hd[i - 1]; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; cu[i] = Math.abs(d) / 2; }
+      P.bend = []; P.turnG = []; P.turnT = []; P.tfg = Int8Array.from(P.tf); P.tft = new Int8Array(n); for (let i = 0; i < n; i++) P.tft[i] = -P.tf[i];
+      for (const a of P.apex) {
+        let mx = 0; for (let j = Math.max(1, a - 70); j < Math.min(n - 1, a + 70); j++) mx = Math.max(mx, cu[j]);
+        let b0 = a; while (b0 > 1 && cu[b0] > mx * 0.2) b0--; let b1 = a; while (b1 < n - 2 && cu[b1] > mx * 0.2) b1++;
+        const Lb = b1 - b0, tg = Math.round(a - 0.15 * Lb), tt = Math.round(a + 0.15 * Lb);
+        P.bend.push([b0, a, b1]); P.turnG.push(tg); P.turnT.push(tt);
+        for (let i = tg; i < a; i++) P.tfg[i] = P.tf[a];            // a green on the way in already faces the way out
+        for (let i = a; i < tt; i++) P.tft[i] = -P.tf[a - 1];       // a tan on his way in (down the road) already faces his way out
+      } }
     ENTRY = 0; for (let i = 0; i < n; i++) { if (xs[i] >= 24) { ENTRY = i * STEP; break; } }
     BOX.x = 0.865 * 400; BOX.y = y1 + 6; BOX.fx = BOX.x - BW * 0.42; BOX.fy = BOX.y - BH * 0.42; BOX.s = P.len;
     { let i = P.n - 1; while (i > 0 && P.x[i] >= 0.41 * 400) i--; BOX_S = (i + 1) * 2; }   // ROUND 12 (Isaac's circle): the box is fought only from the last stretch, from x 0.41 of the column to the box
@@ -635,13 +651,12 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
   }
   // ---- THE SABER (the game's two-step) and THE CRYSTAL'S POWER ----
   function sabFoes(u, R) { const out = []; for (const e of S.f) { if (e.dead) continue; const d = Math.hypot(e.x - u.x, e.y - u.y); if (d <= R && inFront(u, e, R + 20)) out.push([d, e]); } out.sort((a, b) => a[0] - b[0]); return out.map(p => p[1]); }   // round 12: the road's law for his hunt, his next and his slam
-  function faceTravel(u, dir) {   // round 14: the way he travels on HIS OWN line (the road at his lane), so he turns exactly at the halfway point of the bend he walks
-    const i = clamp(u.pi | 0, 1, P.n - 2), ln = u.lane || 0, d = (P.x[i + 1] + P.nx[i + 1] * ln) - (P.x[i - 1] + P.nx[i - 1] * ln);
-    if (Math.abs(d) > 1e-4) u.face = (d > 0 ? 1 : -1) * dir;
+  function faceTravel(u, dir) {   // round 15: by his PLACE ON THE ROAD (not his lane): everyone, walkers and jets, turns at the bend's one turn point, 15 % of the bend before its halfway point
+    const i = clamp(u.pi | 0, 0, P.n - 1); u.face = dir > 0 ? P.tfg[i] : P.tft[i];
   }
   function lineFace(u, dir) { faceTravel(u, dir); }
-  function faceMotion(u) {   // round 14, the airtight rule: whoever is moving faces the way he actually moved this step (no moonwalk, ever); so a man turns exactly where his own line turns back
-    if (u.dead || u.fix) { u.mx = u.x; return; }
+  function faceMotion(u) {   // round 14's rule, kept OFF the road (Sarge's dash, the jets' loop over the box): whoever moves off the road faces the way he moved; on the road the turn points rule (round 15)
+    if (u.dead || u.fix || !(u.free || u.orb)) { u.mx = u.x; u.macc = 0; return; }
     if (u.moving && u.mx != null) { const d = u.x - u.mx; u.macc = (u.macc || 0) * 0.85 + d; if (Math.abs(u.macc) > 0.5 && (u.macc > 0 ? 1 : -1) !== u.face) { u.face = u.macc > 0 ? 1 : -1; u.macc = 0; } }   // a clear turn back, not a flicker
     else u.macc = 0;
     u.mx = u.x;
@@ -1183,6 +1198,12 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     }
   }
   function drawFloats() { for (const f of S.fl) { const k = f.t / f.dur; ctx.globalAlpha = k < 0.75 ? 1 : 1 - (k - 0.75) / 0.25; txt(f.txt, f.x, f.y - k * 26, f.size, f.col); } ctx.globalAlpha = 1; }
+  const MARKS = Q.get('marks') === '1';
+  function drawTurnMarks() {
+    const dot = (i, col, r, lab) => { const x = P.x[i], y = P.y[i]; ctx.globalAlpha = 0.95; ctx.fillStyle = col; ctx.strokeStyle = '#151a16'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); ctx.stroke(); txt(lab, x, y - r - 9, 11, col); };
+    P.bend.forEach(([b0, a, b1], k) => { dot(b0, '#9fb3c8', 4, 'BEND'); dot(b1, '#9fb3c8', 4, 'END'); dot(a, '#ffffff', 6, 'HALFWAY'); dot(P.turnG[k], '#ffd24a', 7, 'TURN'); });
+    ctx.globalAlpha = 1;
+  }
   function drawFireworks(ctx) {   // round 7: drawn on the glass it is handed (#fxcv, over the gray)
     for (const p of S.fw) {
       if (p.k === 'shell') { ctx.strokeStyle = 'rgba(255,214,140,0.55)'; ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(p.x - p.vx * 0.06, p.y - p.vy * 0.06); ctx.lineTo(p.x, p.y); ctx.stroke(); ctx.lineCap = 'butt';   // round 11: the rising streak
@@ -1201,6 +1222,7 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     const list = S.g.concat(S.f); list.push(BOX); list.sort((a, b) => (a.y - (a.alt > 8 ? 0.01 : 0)) - (b.y - (b.alt > 8 ? 0.01 : 0)));
     for (const e of list) e === BOX ? drawBox() : drawUnit(e);
     drawRockets(); drawFx(); drawFloats(); drawBoxBar();
+    if (MARKS) drawTurnMarks();   // round 15: ?marks=1 shows each bend's halfway point (white) and the greens' turn point (gold), for the review
     // ROUND 7 (Isaac 15:25: "have the fireworks appear over the dim screen, on the same layer as the end screen"): their own glass above the gray, under the end screen's words
     if (fxDirty) { fctx.setTransform(1, 0, 0, 1, 0, 0); fctx.clearRect(0, 0, fxcv.width, fxcv.height); fxDirty = false; }
     if (S.fw.length) { fctx.setTransform(d * k, 0, 0, d * k, d * (L.ox + sx * k), d * sy * k); drawFireworks(fctx); fxDirty = true; }
