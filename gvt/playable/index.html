@@ -408,7 +408,10 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
     if (u.free) { u.x = u.free.x; u.y = u.free.y; return; }
     const f = clamp(u.s, 0, P.len) / 2, i = Math.min(P.n - 2, Math.floor(f)), r = f - i;
     let x = P.x[i] + (P.x[i + 1] - P.x[i]) * r + P.nx[i] * u.lane, y = P.y[i] + (P.y[i + 1] - P.y[i]) * r + P.ny[i] * u.lane; u.pi = i;
-    if (u.orb) { const o = u.orb, cx = BOX.fx - 76, cy = BOX.y + 78, ox = cx + Math.cos(o.a) * o.R, oy = cy + Math.sin(o.a) * o.R * 0.45, b = o.blend * o.blend * (3 - 2 * o.blend); x = x + (ox - x) * b; y = y + (oy - y) * b; }
+    if (u.orb) { const o = u.orb, b = o.blend * o.blend * (3 - 2 * o.blend); let ox, oy;
+      if (o.st) { ox = o.sx + Math.sin(S.t * 1.1 + o.ph) * 1.5; oy = o.sy; }   // ROUND 16: his firing post in front of the box (a hair of sway, never a walk)
+      else { const cx = BOX.fx - 76, cy = BOX.y + 78; ox = cx + Math.cos(o.a) * o.R; oy = cy + Math.sin(o.a) * o.R * 0.45; }
+      x = x + (ox - x) * b; y = y + (oy - y) * b; }
     u.x = x; u.y = y;
   }
   function layout() {
@@ -619,15 +622,21 @@ const ART = {"svg":{"rifleman":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBo
       if (tg) { u.face = tg.x >= u.x ? 1 : -1; u.cd -= dt; if (u.cd <= 0) { fire(u, tg); u.cd = u.st.cd * rr(0.9, 1.12); } }
       place(u); return;
     }
-    if (u.jet) { u.alt += (JET_ALT + u.altJ - u.alt) * Math.min(1, dt * 3.2); if (Math.abs(u.lane) < 26 && !u.wide) { u.wide = 1; u.laneTo = (u.lane < 0 ? -1 : 1) * rr(20, 40); } if (u.laneTo != null && !P.apex.some(a => Math.abs(a - (u.pi | 0)) < 22)) u.lane += (u.laneTo - u.lane) * Math.min(1, dt * 3);   /* round 14: he drifts out to his wide lane (no jump sideways), never while rounding a bend (so he turns at its halfway point) */ if (!RM) { u.puffT -= dt; if (u.puffT <= 0) { u.puffT = 0.08; S.fx.push({ k: 'puff', x: u.x - u.face * 6 + rr(-2, 2), y: u.y - u.alt - 6, t: 0, dur: 0.32, R: 5.5, col: '#F2A93B', a: 0.75 }); } } }
-    if (u.jet && !u.orb && u.s >= Math.max(BOX_S, P.len - 260)) { const cx = BOX.fx - 76, cy = BOX.y + 78; u.orb = { a: Math.atan2((u.y - cy) / 0.45, u.x - cx), R: rr(40, 80), w: (u.id % 2 ? 1 : -1) * rr(0.75, 1.15), blend: 0 }; }
+    if (u.jet) { u.alt += (JET_ALT + u.altJ + (u.orb && u.orb.st ? Math.sin(S.t * 2.2 + u.orb.ph) * 6 : 0) - u.alt) * Math.min(1, dt * 3.2);   /* round 16: at his post he bobs up and down */ if (Math.abs(u.lane) < 26 && !u.wide) { u.wide = 1; u.laneTo = (u.lane < 0 ? -1 : 1) * rr(20, 40); } if (u.laneTo != null && !P.apex.some(a => Math.abs(a - (u.pi | 0)) < 22)) u.lane += (u.laneTo - u.lane) * Math.min(1, dt * 3);   /* round 14: he drifts out to his wide lane (no jump sideways), never while rounding a bend (so he turns at its halfway point) */ if (!RM) { u.puffT -= dt; if (u.puffT <= 0) { u.puffT = 0.08; S.fx.push({ k: 'puff', x: u.x - u.face * 6 + rr(-2, 2), y: u.y - u.alt - 6, t: 0, dur: 0.32, R: 5.5, col: '#F2A93B', a: 0.75 }); } } }
+    // ROUND 16 (Wyatt 22:52 on Discord: "Visually, the troops with the jetpacks, while they're jetpacking, are not shooting the enemy toybox, and they need to be."):
+    // since round 12 the box answered only from Isaac's circle (BOX_S) and the jets stopped short of it (their cap), so they never shot it. Now a jet flies on into the
+    // circle and takes a FIRING POST in front of the box (eight posts on an arc to its left, a second ring behind), well inside his rifle's reach; there he bobs, faces the
+    // box and keeps firing at it (the box first). His bob is up and down, so he never walks one way facing the other (Isaac's rule).
+    if (u.jet && !u.orb && u.s >= BOX_S) { const k = S.jetPost = (S.jetPost || 0) + 1, slot = (k - 1) % 8, ring = Math.floor((k - 1) / 8), ang = Math.PI * (0.75 + slot * 0.0643), R = 104 + ring * 30 + (slot % 2) * 10;
+      u.orb = { st: 1, sx: BOX.fx + Math.cos(ang) * R, sy: BOX.fy + 62 + Math.sin(ang) * R * 0.6, ph: rr(0, 6.28), blend: 0, a: 0, R: 0, w: 0, slot: k }; S.stats.jetPosts = k; }
     if (u.orb) { u.orb.blend = Math.min(1, u.orb.blend + dt / 0.8); u.orb.a += u.orb.w * dt * (S.mode === 'win' ? 0.4 : 1); u.moving = true; }
     const fight = S.mode === 'play' || (S.mode === 'pick' && POPMODE === 'tray');
     const tgt = fight ? findTarget(u) : null;
-    const cap = u.side === 'g' ? (u.saber ? P.len - 8 : P.len - (u.st.air ? 118 : 66) - u.capJ * (u.st.air ? 1 : 0.4)) : ENTRY - 6;
-    if (u.orb) {   // on his loop: he fires at whatever is in reach (the box most of all) and keeps flying
-      if (tgt) { u.cd -= dt; if (u.cd <= 0) { fire(u, tgt); u.cd = u.st.cd * rr(0.9, 1.12); } }
-      { const vx = -Math.sin(u.orb.a) * u.orb.w; if (Math.abs(vx) > 0.08) u.face = vx > 0 ? 1 : -1; }   // round 14: on his loop he faces the way he flies
+    const cap = u.side === 'g' ? (u.saber ? P.len - 8 : u.st.air ? Math.max(BOX_S + 6, P.len - 118 - u.capJ) : P.len - 66 - u.capJ * 0.4) : ENTRY - 6;   // round 16: a jet's road reaches into Isaac's circle
+    if (u.orb) {   // round 16: at his post he fires at the box (the box first), facing it; on his way to the post he faces the way he flies (faceMotion)
+      const aim = (u.orb.st && fight && !BOX.dead && u.orb.blend >= 0.6) ? BOX : tgt;
+      if (aim) { u.cd -= dt; if (u.cd <= 0) { fire(u, aim); u.cd = u.st.cd * rr(0.9, 1.12); } }
+      if (u.orb.st && u.orb.blend >= 1) u.face = ((aim === BOX || !aim) ? BOX.fx : aim.x) >= u.x ? 1 : -1;
       place(u); return;
     }
     if (tgt) {
