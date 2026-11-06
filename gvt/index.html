@@ -996566,22 +996566,6 @@ function rs2Read(){ var A=rs2Art(), P=window.RS2_PACK||null;
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 function lbwtmvOn(){ return !!(LBWTMV.on && !LBWTMV_OFF && typeof lbwbchOn==='function' && lbwbchOn() && typeof lbwbchToyBox==='function'); }
 function lbwtmvReady(){ try{ return lbwtmvOn() && lbwbchHere() && lbwbchFit() && !!LBWBCH.live && LBWBCH.s>=0.999 && !LBWBCH.gl && S.mode==='menu'; }catch(e){ return false; } }
 function lbwtmvSpot(id){ try{ const B=META.lbwtmv, q=(B && typeof B==='object')? B[id] : null; if(!q || q.length!==2) return null; const x=+q[0], f=+q[1]; return (isFinite(x) && isFinite(f))? [x, f] : null; }catch(e){ return null; } }
@@ -1207862,7 +1207846,7 @@ let BFQ=null;
 
 
 
-let GVT_CV='30.97';
+let GVT_CV='30.98';
 let NX_CAP_MUL=4;
 
 
@@ -4184124,7 +4184108,6 @@ const SDI=(function(){
   function foundLine(){ const f=SDR.found(); return tf('%1 OF %2 DISCOVERED', '<b data-notr>'+f.n+'</b>', '<b data-notr>'+f.of+'</b>'); }   
 
   
-  function line(){ return META.sdiFirst? t('Supply drop inbound, Commander! Pick your crate.') : t('The drops are open, Commander! Pick your crate.'); }
   function plateHTML(c){ if(!left(c)) return '<span class="sdi-plate done">'+t('EVERYTHING FOUND')+'</span>';
     return '<span class="sdi-plate'+(canPay(c)? '' : ' short')+'" data-notr>'+c.cost+'★</span>'; }   
   function oddsHTML(c){ const o=SDR.odds(c); let s=''; for(let i=0; i<5; i++){ if(o[i]<=0) continue; s+='<i><b style="background:'+TIER[i].hex+'"></b>'+pct(o[i])+'</i>'; } return '<span class="sdi-odds" data-notr>'+s+'</span>'; }
@@ -4184133,34 +4184116,26 @@ const SDI=(function(){
       +'<span class="sdi-drop"><span class="sdi-sway">'+hangSVG(c.tier)+'</span></span>'
       +'<span class="sdi-tag"><span class="sdi-band t'+c.tier+'">'+TIER[c.tier].w+'</span><span class="sdi-tline">'+c.line.replace('ANY TOY','ANY TOY OR GEAR')+'</span>'+oddsHTML(c)+'</span>'
       +plateHTML(c)+'</button>'; }
-  function portURI(){ try{ if(typeof cmpURI==='function') return cmpURI(dyeHex()||undefined, COMM_PORT_VB); }catch(e){} try{ return sargeWepURI('sarge', dyeHex()||undefined, undefined, COMM_PORT_VB); }catch(e){} return ''; }   
-  function stageHTML(){ const port=portURI();
+  function stageHTML(){
     let plane=''; try{ plane=sprURI('bomber', dyeHex()||'#5F7A3A', BMB_VB); }catch(e){}
     return skySVG()+raysSVG(0)+raysSVG(1)+farCloudsSVG()+(plane? '<img class="sdi-plane" alt="" src="'+plane+'">' : '')+nearCloudsSVG()+landSVG()+menHTML()+glints()
       +'<div class="sdi-frame"><div class="sdi-left">'
         +'<div class="sdi-title"><span class="sdi-t1">SUPPLY DROP</span><span class="sdi-t2">INBOUND!</span></div>'
         +'<div class="sdi-row1"><span class="sdi-pig" data-notr>'+SH_PIG+'<b>'+(META.starBank|0)+'★</b></span><span class="sdi-found">'+foundLine()+'</span></div>'
         +(wants(1).length? '<div class="sdi-wants"><span class="sdi-wr">'+wants(4).map(wantHTML).join('')+'</span></div>' : '')    
-        +'<div class="sdi-say"><span class="sdi-port">'+(port? '<img alt="">' : '')+'</span><span class="sdi-sw"><span class="sdi-nm">SARGE</span><span class="sdi-txt" id="sdiTxt"></span></span></div>'
         +'<button type="button" class="sdi-later" onclick="UI.sdiClose()">MAYBE LATER</button>'
       +'</div><div class="sdi-crates">'+CR.map((c,n)=>crateHTML(c,n)).join('')+'</div></div>'
       +'<button type="button" class="rmx sdi-x" aria-label="close" onclick="UI.sdiClose()">✕</button>'; }
   function menHTML(){ let h=''; try{ const d=dyeHex()||undefined; h=[['rifleman',0],['bazooka',1],['mgunner',2]].map(([k,i])=>'<img class="sdi-man m'+i+'" alt="" src="'+sprURI(k,d)+'">').join(''); }catch(e){} return '<div class="sdi-men">'+h+'</div>'; }   
-  let typeT=0, timers=[];
+  let timers=[];
   const later=(ms,f)=>{ const h=setTimeout(f,ms); timers.push(h); return h; };
-  function typeLine(el){ const s=el.querySelector('#sdiTxt'); if(!s) return; const full=commNoDash(line()); clearTimeout(typeT); if(RM()){ s.textContent=full; return; } s.textContent=''; let i=0;   
-    const tick=()=>{ if(!s.isConnected) return; i++; s.textContent=full.slice(0,i); const ch=full.charAt(i-1); if(COMM_SKIP.indexOf(ch)<0){ try{ commBlip(full.charCodeAt(i-1)); }catch(e){} } if(i<full.length) typeT=setTimeout(tick, (ch===','||ch==='、')? COMM_TYPE*7 : (ch==='.'||ch==='。'||ch==='!'||ch==='！'||ch==='?'||ch==='？')? COMM_TYPE*10 : COMM_TYPE); };
-    typeT=setTimeout(tick, 1050); }
-  function whole(){ clearTimeout(typeT); const s=document.getElementById('sdiTxt'); if(s) s.textContent=commNoDash(line()); }   
   function deal(o){ o=o||{}; if(document.getElementById('sdiStage')) return false;
     const el=document.createElement('div'); el.id='sdiStage'; el.className=RM()? 'rm rest' : ''; el.setAttribute('data-look', B.look); el.innerHTML=lite(stageHTML());
     document.body.appendChild(el); document.body.classList.add('sdi-up'); B.up=true;
     try{ localizeTree(el); }catch(e){}   
-    try{ const im=el.querySelector('.sdi-port img'); if(im) im.src=portURI(); }catch(e){}   
     fitTitle(el); addEventListener('resize', refit);
-    typeLine(el);
     if(!RM()){ later(620, ()=>sfx('thock')); later(380, ()=>sfx('jet2')); later(1000, ()=>sfx('pdrWhoosh')); later(1320, ()=>sfx('pdrWhoosh')); later(1640, ()=>sfx('pdrWhoosh')); later(2300, ()=>sfx('twink')); }
-    el.addEventListener('pointerdown', ev=>{ if(ev.target.closest('.rmx,.sdi-later')) return; if(!el.classList.contains('rest')){ B.skipT=Date.now(); rest(); whole(); } });   
+    el.addEventListener('pointerdown', ev=>{ if(ev.target.closest('.rmx,.sdi-later')) return; if(!el.classList.contains('rest')){ B.skipT=Date.now(); rest(); } });   
     later(2900, rest);
     META.sdiN=(META.sdiN|0)+1; META.sdiFirst=1; if(spOnSafe()) META.sdiSale=1; try{ saveMeta(); }catch(e){}
     try{ telMon('sdi_imp','land',spOnSafe()? 1 : 0); }catch(e){}
@@ -4184177,8 +4184152,8 @@ const SDI=(function(){
     for(const an of el.getAnimations({ subtree:true })){ try{ const tm=an.effect && an.effect.getTiming(); if(tm && tm.iterations!==Infinity) an.finish(); }catch(e){} } }
   function paint(){ const el=document.getElementById('sdiStage'); if(!el) return; for(const c of CR){ const b=document.getElementById('sdiCrate-'+c.k); if(!b) continue; const p=b.querySelector('.sdi-plate'); if(p){ const w=document.createElement('span'); w.innerHTML=plateHTML(c); try{ localizeTree(w); }catch(e){} p.replaceWith(w.firstChild); } }
     const pg=el.querySelector('.sdi-pig b'); if(pg) pg.textContent=(META.starBank|0)+'★'; }
-  function down(){ for(const h of timers) clearTimeout(h); timers=[]; clearTimeout(typeT); removeEventListener('resize', refit); const el=document.getElementById('sdiStage'); if(el) el.remove(); document.body.classList.remove('sdi-up'); B.up=false; }
-  function leave(){ const el=document.getElementById('sdiStage'); if(!el){ down(); return; } for(const h of timers) clearTimeout(h); timers=[]; clearTimeout(typeT); if(RM()){ down(); return; } el.classList.add('lift'); B.up=false; document.body.classList.remove('sdi-up'); setTimeout(()=>{ if(el.parentNode) el.remove(); }, 760); }   
+  function down(){ for(const h of timers) clearTimeout(h); timers=[]; removeEventListener('resize', refit); const el=document.getElementById('sdiStage'); if(el) el.remove(); document.body.classList.remove('sdi-up'); B.up=false; }
+  function leave(){ const el=document.getElementById('sdiStage'); if(!el){ down(); return; } for(const h of timers) clearTimeout(h); timers=[]; if(RM()){ down(); return; } el.classList.add('lift'); B.up=false; document.body.classList.remove('sdi-up'); setTimeout(()=>{ if(el.parentNode) el.remove(); }, 760); }   
   function closeUI(){ try{ sfx('blip'); }catch(e){} down(); try{ if(S.mode==='menu' && !shopIsOpen()) renderMenu(); }catch(e){} }
   UI.sdiClose=closeUI;
   UI.sdiPick=function(i){ const c=CR[i]; if(!c) return; if(Date.now()-(B.skipT||0)<500) return;
@@ -4184206,18 +4184181,11 @@ const SDI=(function(){
     '#sdiStage .sdi-row1{display:flex;align-items:center;gap:calc(var(--u)*2);animation:sdiUp .4s ease-out .8s both}@keyframes sdiUp{from{opacity:0;transform:translateY(calc(var(--u)*3))}to{opacity:1;transform:none}}',
     '#sdiStage .sdi-pig{display:inline-flex;align-items:center;gap:calc(var(--u)*.8);padding:calc(var(--u)*.5) calc(var(--u)*2) calc(var(--u)*.5) calc(var(--u)*1);border-radius:999px;background:#2B2116;border:calc(var(--u)*.5) solid #8a5b16;color:#FFE9A6;font-size:calc(var(--u)*4.6);line-height:1}#sdiStage .sdi-pig svg{width:calc(var(--u)*6.4);height:calc(var(--u)*4.8)}',
     '#sdiStage .sdi-found{font-size:calc(var(--u)*3.4);letter-spacing:.08em;color:#FFF6DC;text-shadow:0 1px 1px rgba(16,16,60,.95),0 0 calc(var(--u)*1.4) rgba(16,16,60,.6)}#sdiStage .sdi-found b{color:#FFD24A}',
-    '#sdiStage .sdi-wants{display:flex;align-items:center;gap:calc(var(--u)*1.6);animation:sdiUp .4s ease-out .95s both}',
-    '#sdiStage .sdi-wl{width:calc(var(--u)*14);font-size:calc(var(--u)*2.9);line-height:1.1;letter-spacing:.1em;color:#FFF6DC;text-shadow:0 1px 1px rgba(16,16,60,.95),0 0 calc(var(--u)*1.4) rgba(16,16,60,.6)}#sdiStage .sdi-wr{display:flex;gap:calc(var(--u)*1)}',
-    '#sdiStage .sdi-want{position:relative;display:block;width:calc(var(--u)*12.6);height:calc(var(--u)*12.6);border-radius:calc(var(--u)*2.4);background:linear-gradient(180deg,#FFF3D4,#EAD3A6);border:calc(var(--u)*.5) solid #B9A36E;box-shadow:0 calc(var(--u)*.5) 0 rgba(40,20,60,.35)}',
+    '#sdiStage .sdi-wants{align-self:center;animation:sdiUp .4s ease-out .95s both}#sdiStage .sdi-wr{display:grid;grid-template-columns:repeat(2,max-content);gap:calc(var(--u)*1.2)}',   
+    '#sdiStage .sdi-want{position:relative;display:block;width:calc(var(--u)*18.9);height:calc(var(--u)*18.9);border-radius:calc(var(--u)*3.6);background:linear-gradient(180deg,#FFF3D4,#EAD3A6);border:calc(var(--u)*.75) solid #B9A36E;box-shadow:0 calc(var(--u)*.75) 0 rgba(40,20,60,.35)}',
     '#sdiStage .sdi-want.t4{border-color:#FFD24A;box-shadow:0 0 calc(var(--u)*1.8) #FFD24A,0 calc(var(--u)*.5) 0 rgba(40,20,60,.35)}#sdiStage .sdi-want.t3{border-color:#8C5BC7}#sdiStage .sdi-want.t2{border-color:#4C7FA8}',
     '#sdiStage.mystery .sdi-wart svg,#sdiStage.mystery .sdi-wart img{filter:brightness(0)}',   
     '#sdiStage .sdi-wart{position:absolute;inset:8%;display:flex;align-items:center;justify-content:center}#sdiStage .sdi-wart svg,#sdiStage .sdi-wart img{max-width:100%;max-height:100%;width:100%;height:100%}',
-    
-    '#sdiStage .sdi-say{display:flex;align-items:center;gap:calc(var(--u)*1.8);box-sizing:border-box;width:calc(var(--u)*69.5);padding:calc(var(--u)*1.2) calc(var(--u)*1.8);background:linear-gradient(180deg,#1E2117,#13150E);border:calc(var(--u)*.55) solid #6E7A4E;border-radius:calc(var(--u)*2.4);box-shadow:0 calc(var(--u)*1.2) calc(var(--u)*3) rgba(20,10,40,.45),inset 0 0 0 calc(var(--u)*.4) rgba(0,0,0,.3);animation:sdiUp .4s ease-out .9s both}',
-    '#sdiStage .sdi-port{flex:0 0 auto;width:calc(var(--u)*12.5);height:calc(var(--u)*12.5);overflow:hidden;border-radius:calc(var(--u)*1.7);border:calc(var(--u)*.55) solid #B9A36E;background:#10130c}#sdiStage .sdi-port img{display:block;width:100%;height:100%}',
-    '#sdiStage .sdi-sw{flex:1;min-width:0;display:flex;flex-direction:column;gap:calc(var(--u)*.5)}#sdiStage .sdi-nm{align-self:flex-start;font-size:calc(var(--u)*2.8);letter-spacing:.12em;color:#FFD24A;background:rgba(0,0,0,.4);border-radius:calc(var(--u)*1);padding:.12em .5em}',
-    '#sdiStage .sdi-txt{min-height:2.3em;font-family:var(--ui);font-weight:normal;color:#EDEADF;font-size:calc(var(--u)*3.9);line-height:1.16}',
-    'html[data-lang=ko] #sdiStage .sdi-txt{word-break:keep-all}',   
     '#sdiStage .sdi-later{align-self:center;min-height:28px;background:rgba(30,22,14,.62);border:0;border-radius:999px;padding:calc(var(--u)*1.7) calc(var(--u)*3.8) calc(var(--u)*1.5);font-family:var(--uih);font-weight:bold;font-size:calc(var(--u)*3.4);line-height:1;letter-spacing:.14em;color:#FFF6DC;animation:sdiFade .4s ease-out 2.3s both}@keyframes sdiFade{from{opacity:0}to{opacity:1}}',
     
     '#sdiStage .sdi-crates{position:absolute;left:calc(var(--u)*74);right:calc(var(--u)*8);top:0;height:100%;display:flex;justify-content:space-between;align-items:flex-start}',
@@ -4184241,7 +4184209,7 @@ const SDI=(function(){
     '@media (prefers-reduced-motion: reduce){#sdiStage,#sdiStage *{animation:none!important;transition:none!important}}'
   ].join('\n'); document.head.appendChild(css);
 
-  return Object.assign(B, { deal, down, rest, whole, paint, leave, live, cheapest, canPay, left, wants, line });
+  return Object.assign(B, { deal, down, rest, paint, leave, live, cheapest, canPay, left, wants });
 })();
 window.GVT_SDI=SDI;
 if(SDI.on){
@@ -4184268,13 +4184236,13 @@ if(SDI.on){
   if(typeof roomQuiet==='function'){ const _quiet=roomQuiet; SDI.quiet0=_quiet; roomQuiet=function(){ try{ if(document.getElementById('sdiStage')) return false; }catch(e){} return _quiet.apply(this, arguments); }; }
   const _buy=UI.sdrBuy; UI.sdrBuy=function(i){ const r=_buy.apply(this, arguments); try{ if(SDR.st.stage && document.getElementById('sdiStage')) SDI.leave(); }catch(e){} return r; };   
 }
-try{ Object.assign(TR.es||(TR.es={}), { "INBOUND!":"¡EN CAMINO!", "%1 OF %2 DISCOVERED":"%1 DE %2 DESCUBIERTOS", "Supply drop inbound, Commander! Pick your crate.":"¡Suministro en camino, comandante! Elige tu caja.", "The drops are open, Commander! Pick your crate.":"¡Ya hay suministros, comandante! Elige tu caja." });
-  Object.assign(TR.de||(TR.de={}), { "INBOUND!":"IM ANFLUG!", "%1 OF %2 DISCOVERED":"%1 VON %2 ENTDECKT", "Supply drop inbound, Commander! Pick your crate.":"Nachschub im Anflug, Kommandant! Such dir deine Kiste aus.", "The drops are open, Commander! Pick your crate.":"Die Nachschubkisten sind da, Kommandant! Such dir deine Kiste aus." });
-  Object.assign(TR.ru||(TR.ru={}), { "INBOUND!":"НА ПОДЛЁТЕ!", "%1 OF %2 DISCOVERED":"ОТКРЫТО %1 ИЗ %2", "Supply drop inbound, Commander! Pick your crate.":"Сброс припасов на подлёте, командир! Выбирай ящик.", "The drops are open, Commander! Pick your crate.":"Сбросы припасов открыты, командир! Выбирай ящик." });
-  Object.assign(TR.ja||(TR.ja={}), { "INBOUND!":"くるぞ！", "%1 OF %2 DISCOVERED":"%2こ ちゅう %1こ はっけん", "Supply drop inbound, Commander! Pick your crate.":"サプライドロップが くるぞ、しれいかん！ はこを えらべ。", "The drops are open, Commander! Pick your crate.":"サプライドロップが ひらいたぞ、しれいかん！ はこを えらべ。" });
-  Object.assign(TR.ko||(TR.ko={}), { "INBOUND!":"투하 임박!", "%1 OF %2 DISCOVERED":"%2개 중 %1개 발견", "Supply drop inbound, Commander! Pick your crate.":"보급 상자 투하 임박, 사령관! 상자를 골라라.", "The drops are open, Commander! Pick your crate.":"보급 상자가 열렸다, 사령관! 상자를 골라라." });
-  Object.assign(TR['zh-Hans']||(TR['zh-Hans']={}), { "INBOUND!":"即将空投！", "%1 OF %2 DISCOVERED":"已发现 %1 / %2", "Supply drop inbound, Commander! Pick your crate.":"补给箱马上空投，指挥官！选一个箱子。", "The drops are open, Commander! Pick your crate.":"补给箱开放了，指挥官！选一个箱子。" });
-  Object.assign(TR.ar||(TR.ar={}), { "INBOUND!":"في الطريق!", "%1 OF %2 DISCOVERED":"اكتشفت %1 من %2", "Supply drop inbound, Commander! Pick your crate.":"صندوق الإمداد في الطريق أيها القائد! اختر صندوقك.", "The drops are open, Commander! Pick your crate.":"صناديق الإمداد مفتوحة أيها القائد! اختر صندوقك." });
+try{ Object.assign(TR.es||(TR.es={}), { "INBOUND!":"¡EN CAMINO!", "%1 OF %2 DISCOVERED":"%1 DE %2 DESCUBIERTOS" });
+  Object.assign(TR.de||(TR.de={}), { "INBOUND!":"IM ANFLUG!", "%1 OF %2 DISCOVERED":"%1 VON %2 ENTDECKT" });
+  Object.assign(TR.ru||(TR.ru={}), { "INBOUND!":"НА ПОДЛЁТЕ!", "%1 OF %2 DISCOVERED":"ОТКРЫТО %1 ИЗ %2" });
+  Object.assign(TR.ja||(TR.ja={}), { "INBOUND!":"くるぞ！", "%1 OF %2 DISCOVERED":"%2こ ちゅう %1こ はっけん" });
+  Object.assign(TR.ko||(TR.ko={}), { "INBOUND!":"투하 임박!", "%1 OF %2 DISCOVERED":"%2개 중 %1개 발견" });
+  Object.assign(TR['zh-Hans']||(TR['zh-Hans']={}), { "INBOUND!":"即将空投！", "%1 OF %2 DISCOVERED":"已发现 %1 / %2" });
+  Object.assign(TR.ar||(TR.ar={}), { "INBOUND!":"في الطريق!", "%1 OF %2 DISCOVERED":"اكتشفت %1 من %2" });
 }catch(e){}
 if(window.GVT && !GVT.sdi) GVT.sdi=function(o){ o=o||{}; if(o.deal && SDI.on) SDI.deal(); if(o.down && SDI.on) SDI.down(); if(o.look && SDI.on) SDI.look=o.look; const st=document.getElementById('sdiStage');   
   return { on:SDI.on, up:!!st, rest:!!(st&&st.classList.contains('rest')), lift:!!(st&&st.classList.contains('lift')), due:META.saleDue|0, first:META.sdiFirst|0, n:META.sdiN|0, sale:META.sdiSale|0, bank:META.starBank|0, lvl:META.lvl|0, lite:SDI.lite|0, owed:SDI.on? SDI.owed() : null, ready:SDI.on? SDI.ready() : null, free:SDI.on? SDI.free() : null, log:SDI.log }; };
