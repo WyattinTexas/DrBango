@@ -91483,7 +91483,7 @@ function bstU(u){ return !!u && u.type==='sarge' && !u.dead && enhU(u,'boomstick
 function bstStats(u,sw){ return (sw && sw.w==='shotgun' && u && u.type==='sarge' && enhU(u,'boomstick'))? Object.assign({},sw,{rng:BST.rng}) : sw; }
 function bstBar(wdir){ const t=BSA.on? bsaTilt() : BST.tilt; return wdir>0? t : Math.PI-t; }
 function bstMz(u,wdir){ const G=BSA.on? bsaGm() : BST.gm; return [u.x+G.mx*wdir, u.y+G.my]; }
-function bstInLane(u,f,len,wdir,wx){ const a=bstBar(wdir), ca=Math.cos(a), sa=Math.sin(a), vx=f.x-u.x, vy=f.y-u.y, al=vx*ca+vy*sa, pp=Math.abs(-vx*sa+vy*ca); if(al<0 || al>len) return false; return pp<=(BST.w0+(BST.w1-BST.w0)*al/len)*(wx||1)+7; }
+function bstInLane(u,f,len,wdir,wx){ const a=bstBar(wdir), ca=Math.cos(a), sa=Math.sin(a), L9=(typeof bhbLane==='function')? bhbLane() : null, up9=L9? L9.up : 0, mz9=L9? L9.mz : 0, vx=f.x-u.x, vy=f.y-u.y+up9, al=vx*ca+vy*sa, pp=Math.abs(-vx*sa+vy*ca); if(al<0 || al>len+mz9) return false; return pp<=(BST.w0+(BST.w1-BST.w0)*al/len)*(wx||1)+7; }
 function bstLaneAny(u,len,wx){ const wdir=unitFaceX(u); for(const f of TGT(u)){   if(f.dead||f.burrow||f.jetT>0||f.pendDie) continue; if(!bfCanTarget(u,f)) continue; if(bstInLane(u,f,len,wdir,wx)) return true; } return false; }
 function bstHash(n){ const s=Math.sin(n*12.9898)*43758.5453; return s-Math.floor(s); }
 function bstSm(x){ x=x<0?0:x>1?1:x; return x*x*(3-2*x); }
@@ -992257,7 +992257,7 @@ function bksSet(on){ BST.x=on? +BKS.x : +BKS.x0; return BST.x; }
 function bksPick(u,R){ const list=TGT(u); let best=null, bs=1e9; const men=[];   
   for(const f of list){ if(f.dead||f.burrow||f.jetT>0||f.pendDie) continue; if(!bfCanTarget(u,f)) continue; if(!S.bf && (f.x>W-10||f.x<-40||f.y<-30||f.y>WORLD_H+30)) continue; const d=Math.hypot(f.x-u.x,f.y-u.y); if(d>R) continue; men.push(f); const db=PRIO(u,f); if(db<bs){ bs=db; best=f; } }
   return best? { best:best, men:men } : null; }
-function bksNeed(u,f,R,wx,wdir){ const a=bstBar(wdir), ca=Math.cos(a), sa=Math.sin(a), vx=f.x-u.x, vy=f.y-u.y, al=vx*ca+vy*sa, pp=Math.abs(-vx*sa+vy*ca), hw=(BST.w0+(BST.w1-BST.w0)*Math.max(0,Math.min(R,al))/R)*(wx||1)+7;   
+function bksNeed(u,f,R,wx,wdir){ const a=bstBar(wdir), ca=Math.cos(a), sa=Math.sin(a), L9=(typeof bhbLane==='function')? bhbLane() : null, up9=L9? L9.up : 0, mz9=L9? L9.mz : 0, vx=f.x-u.x, vy=f.y-u.y+up9, al=vx*ca+vy*sa, pp=Math.abs(-vx*sa+vy*ca), hw=(BST.w0+(BST.w1-BST.w0)*Math.max(0,Math.min(R+mz9,al))/R)*(wx||1)+7;       
   return Math.max(0,pp-hw)+Math.max(0,+BKS.back-al); }
 function bksSteer(u,dt,sw){ if(!bksOn() || !bstU(u) || !sw || sw.w!=='shotgun') return 0;
   if(u.sgDash==='back' || u.stkT>0 || u.mcBy!=null || u.toadT>0 || u.glT>0 || u.jetT>0 || u.fzPost!=null || u.fzRam!=null || u.coopBy || (u.owId!=null && owPuppet(u))) return 0;
@@ -992266,8 +992266,8 @@ function bksSteer(u,dt,sw){ if(!bksOn() || !bstU(u) || !sw || sw.w!=='shotgun') 
   unitAim(u,pk.best); if(bstLaneAny(u,R,wx)) return 0;   
   const wdir=unitFaceX(u); let f=pk.best, need=bksNeed(u,f,R,wx,wdir);
   for(const m of pk.men){ if(m===f || ((m.x>u.x)? 1 : -1)!==wdir) continue; const n=bksNeed(u,m,R,wx,wdir); if(n<need){ need=n; f=m; } }   
-  const a=bstBar(wdir), ca=Math.cos(a), sa=Math.sin(a), vx=f.x-u.x, vy=f.y-u.y, al=Math.max(vx*ca+vy*sa, +BKS.back);
-  const g={ x:f.x-al*ca, y:f.y-al*sa };   
+  const a=bstBar(wdir), ca=Math.cos(a), sa=Math.sin(a), L9=(typeof bhbLane==='function')? bhbLane() : null, up9=L9? L9.up : 0, vx=f.x-u.x, vy=f.y-u.y+up9, al=Math.max(vx*ca+vy*sa, +BKS.back);
+  const g={ x:f.x-al*ca, y:f.y-al*sa+up9 };       
   bfMarch(u,dt,g); u.marching=true; BKS.n.steps++; BKS.last={ t:+S.t.toFixed(3), id:f.id, need:+need.toFixed(1), al:+al.toFixed(1), gx:+g.x.toFixed(1), gy:+g.y.toFixed(1) }; return 1; }
 
 
@@ -996083,6 +996083,23 @@ function bfxRead(){ let px=0; for(const id in BFX.img){ const c=BFX.img[id].cv; 
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function bhbLane(){ const L=BHB_LANE; if(!BHB.lane){ L.up=0; L.mz=0; return L; }   
+  const rig=(typeof BSA==='object' && BSA && BSA.on), G=rig? bsaGm() : BST.gm, t=rig? bsaTilt() : BST.tilt;
+  L.up=Math.max(0, -G.my-BHB_BODY); L.mz=Math.max(0, G.mx*Math.cos(t)+(G.my+L.up)*Math.sin(t)); return L; }
 function bhbDesc(id){ const P=BFX_P['hit-rbblast'], C=P.C;   
   if(id==='ball'){ const B=BHB_BALL, p=B.r+3; return { rg:B.rg, o:[C[0]+B.x, C[1]+B.y], b:[-p, -p, 2*p, 2*p] }; }
   const q=BHB_SP[+id.slice(2)]; return { rg:[q[0], q[1]], o:[C[0]+q[2], C[1]+q[3]], b:[q[4], q[5], q[6], q[7]] }; }
@@ -996099,7 +996116,7 @@ function bhbBake(id){ const c=bhbDesc(id), f=bfxF(BFX_P['hit-rbblast']), W=Math.
 function bhbPc(id){ const it=BHB.img[id]; if(it) return it; if(BHB.bad[id]) return null; if(!BHB.busy[id] && BHB.nb<3) bhbBake(id); return null; }
 function bhbAll(){ let ok=true; const o={ ball:bhbPc('ball'), sp:[] }; if(!o.ball) ok=false; for(let i=0;i<BHB_SP.length;i++){ const it=bhbPc('sp'+i); if(!it) ok=false; o.sp.push(it); } return ok? o : null; }
 
-function bhbBlast(e,k){ const was=BHB.was;
+function bhbBlast(e,k){ const was=BHB.was; if(BHB.orig) return null;   
   if(!BHB.on || e.tkb || e.rm || typeof was!=='function') return (typeof was==='function')? was(e,k) : null;
   const X=bfxAll('hit-rbblast', ['ring','glow','fire'], null), Y=X? bhbAll() : null; if(!X || !Y){ BHB.fall++; return was(e,k); }
   try{ const P=BFX_P['hit-rbblast'], t=e.t, R=e.R, x=e.x, y=e.y; if(typeof bfVis==='function' && !bfVis(x,y)) return true;   
@@ -996136,11 +996153,11 @@ function bhbBlast(e,k){ const was=BHB.was;
     cx.globalAlpha=1; BHB.n++; return true;
   }catch(err){ BHB.err++; try{ cx.globalAlpha=1; }catch(e2){} if(BHB.err>=10) BHB.on=0; return was(e,k); } }
 
-function bhbWarm(){ if(!BHB.on || BHB.t0) return; BHB.t0=Date.now(); const L=['ball']; for(let i=0;i<BHB_SP.length;i++) L.push('sp'+i); let i=0;
+function bhbWarm(){ if(!BHB.on || BHB.orig || BHB.t0) return; BHB.t0=Date.now(); const L=['ball']; for(let i=0;i<BHB_SP.length;i++) L.push('sp'+i); let i=0;
   const step=function(){ if(!BHB.on) return; while(i<L.length && (BHB.img[L[i]] || BHB.bad[L[i]])) i++; if(i>=L.length){ BHB.warmMs=Date.now()-BHB.t0; return; } if(BHB.nb<2) bhbPc(L[i]); setTimeout(step, 24); };
   setTimeout(step, 0); }
 function bhbRead(){ let px=0; for(const id in BHB.img){ const c=BHB.img[id].cv; px+=(c.naturalWidth||c.width)*(c.naturalHeight||c.height); }
-  return { on:BHB.on, installed:!!(typeof BFX_FX==='object' && BFX_FX && BFX_FX.rbblast===bhbBlast), balls:BHB_SM.length, sparks:BHB_SP.length, baked:Object.keys(BHB.img).length, bad:Object.keys(BHB.bad), px:px, warmMs:BHB.warmMs, n:BHB.n, fall:BHB.fall, err:BHB.err }; }
+  const L=bhbLane(); return { on:BHB.on, orig:BHB.orig, lane:BHB.lane, up:+L.up.toFixed(3), mz:+L.mz.toFixed(3), installed:!!(typeof BFX_FX==='object' && BFX_FX && BFX_FX.rbblast===bhbBlast), balls:BHB_SM.length, sparks:BHB_SP.length, baked:Object.keys(BHB.img).length, bad:Object.keys(BHB.bad), px:px, warmMs:BHB.warmMs, n:BHB.n, fall:BHB.fall, err:BHB.err }; }
 
 
 
@@ -1208220,7 +1208237,7 @@ let BFQ=null;
 
 
 
-let GVT_CV='31.02';
+let GVT_CV='31.03';
 let NX_CAP_MUL=4;
 
 
@@ -4184284,13 +4184301,30 @@ setTimeout(bfxWarm, 1500);
 
 
 
+
+
+
+
+
+
+
+
 const BHB_SM=[[-190,70,74],[190,76,70],[-120,-165,64],[150,-160,60],[0,160,72],[-230,-40,54],[240,-30,52]];
 const BHB_BALL={ rg:[7733,7785], x:-190, y:70, r:74 };
 const BHB_SP=[[10976,11221,260.14,-42.95,-22.35,-7.54,44.7,15.07],[11221,11462,-226.08,-16.11,-17.05,-6.19,34.11,12.39],[11462,11704,94.07,238.9,-10.44,-19.89,20.89,39.77],[11704,11948,-145.34,-188.19,-10.81,-13.03,21.62,26.05],[11948,12191,-275.96,-107.43,-13.59,-7.95,27.19,15.89],[12191,12430,116.02,-190.52,-14.82,-21.93,29.65,43.86],[12430,12677,-282.37,-113.9,-19.18,-10.31,38.37,20.61],[12677,12921,-313.63,26,-14.79,-6.19,29.59,12.38],[12921,13166,-140.26,-159.27,-15.67,-17.34,31.34,34.69],[13166,13405,59.46,169.56,-8.11,-15.01,16.22,30.01],[13405,13649,185.36,-133.67,-18.19,-14.04,36.38,28.07],[13649,13892,126.08,-111.71,-18.41,-16.69,36.81,33.38],[13892,14133,-265.79,40.92,-18.09,-6.7,36.18,13.41],[14133,14374,101.06,254.49,-8.2,-14.08,16.4,28.16],[14374,14617,156.4,-181.26,-17.26,-19.47,34.51,38.94],[14617,14866,-287.02,-52.28,-19.04,-7.24,38.08,14.48],[14866,15098,291.54,88.9,-12.63,-9.82,25.27,19.64],[15098,15260,-115.13,248.59,-8.68,-11.03,17.36,22.06],[15260,15422,-282.95,-86.74,-13.44,-10.38,26.88,20.77],[15422,15558,162.18,-222.8,-10.18,-11.87,20.37,23.74],[15558,15744,-118.21,-262.59,-8.54,-10,17.08,19.99],[15744,15902,-316.32,92,-9.22,-7.92,18.44,15.85]];
 var BHB={ on:(function(){ try{ const q=location.search||''; if(/[?&]bhb=0(&|$)/.test(q)){ try{ localStorage.setItem('gvt_bhb','0'); }catch(e){} return 0; }
     if(/[?&]bhb=1(&|$)/.test(q)){ try{ localStorage.removeItem('gvt_bhb'); }catch(e){} return 1; }
     try{ return localStorage.getItem('gvt_bhb')==='0'? 0 : 1; }catch(e){ return 1; } }catch(e){ return 1; } })(),
+  orig:(function(){ try{ const q=location.search||''; if(/[?&]bhbo=0(&|$)/.test(q)){ try{ localStorage.setItem('gvt_bhbo','0'); }catch(e){} return 0; } if(/[?&]bhbo=1(&|$)/.test(q)){ try{ localStorage.removeItem('gvt_bhbo'); }catch(e){} return 1; }
+    try{ return localStorage.getItem('gvt_bhbo')==='0'? 0 : 1; }catch(e){ return 1; } }catch(e){ return 1; } })(),   
+  lane:(function(){ try{ const q=location.search||''; if(/[?&]bhbl=0(&|$)/.test(q)){ try{ localStorage.setItem('gvt_bhbl','0'); }catch(e){} return 0; } if(/[?&]bhbl=1(&|$)/.test(q)){ try{ localStorage.removeItem('gvt_bhbl'); }catch(e){} return 1; }
+    try{ return localStorage.getItem('gvt_bhbl')==='0'? 0 : 1; }catch(e){ return 1; } }catch(e){ return 1; } })(),   
   img:{}, busy:{}, bad:{}, nb:0, n:0, fall:0, err:0, bakes:0, was:null, warmMs:null, t0:0 };
+const BHB_BODY=18;
+const BHB_LANE={ up:0, mz:0 };
+
+
+
 
 
 
