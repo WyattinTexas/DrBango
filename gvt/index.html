@@ -340336,7 +340336,7 @@ function update(dt){
         
         
         
-        if(u.type==='spy') u.def.moveSpd = S.bf? BF_MOVE.rifleman.moveSpd : CAMP_SPD.rifleman;
+        if(u.type==='spy') u.def.moveSpd = (S.bf? BF_MOVE.rifleman.moveSpd : CAMP_SPD.rifleman)*GSA_SPY_X;    
         if(u.type==='spy' && intelU(u)) u.inBurstA=1;   
       }
     }
@@ -997528,6 +997528,31 @@ function bdlRead(o){ o=o||{};
 
 
 
+function gsaYoursU(u){ if(!u || u.type!=='mortar') return false;   
+  if(S.bf){ const st=S.bf.seats? S.bf.seats[u.seat] : null; return !!(st && st.human); }   
+  return u.coopBy!=='bot'; }
+function gsaPickOn(){ return !!(GSA_ON || S.coop); }
+function gsaFar(u,f){ return -Math.hypot(f.x-u.x,f.y-u.y); }
+
+function gsaRead(){ return { cv:GVT_CV, on:GSA_ON, pickOn:gsaPickOn(), spyX:GSA_SPY_X, spy:{ camp:CAMP_SPD.spy, bf:BF_MOVE.spy.moveSpd, walkCamp:CAMP_SPD.rifleman*GSA_SPY_X, walkBf:BF_MOVE.rifleman.moveSpd*GSA_SPY_X, rifleCamp:CAMP_SPD.rifleman, rifleBf:BF_MOVE.rifleman.moveSpd },
+  gren:{ rng:UDEF.grenadier.rng, was:GSA_GREN.was, now:GSA_GREN.now }, mortar:{ rng:UDEF.mortar.rng, bf:BF_MOVE.mortar.rng, minRng:UDEF.mortar.minRng } }; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1096605,7 +1096630,7 @@ const BF_MOVE = {
   
   
   
-  spy:        { moveSpd:88, hp:2, rng:70 },
+  spy:        { moveSpd:101.2, hp:2, rng:70 },   
   sarge:      { moveSpd:40, hp:6 },
   
   
@@ -1191513,7 +1191538,7 @@ const UDEF = {
   
   
   
-  grenadier:{ rng:290, rate:0.35, dmg:2.5, air:false, grit:3, name:'GRENADIER', splash:60, scatter:70, fuse:0.5 },   
+  grenadier:{ rng:319, rate:0.35, dmg:2.5, air:false, grit:3, name:'GRENADIER', splash:60, scatter:70, fuse:0.5 },       
   sarge:   { rng:108, rate:PISTOL_RATE, dmg:1.5, air:true,  grit:4, name:'SARGE' },
   minesweeper:{ rng:130, rate:0.25, dmg:0, air:false, grit:3, name:'SWEEPER', mine:true },   
   flame:   { rng:85,  rate:8,   dmg:0.5, air:false, grit:3, name:'FLAME', multi:3 },
@@ -1209326,7 +1209351,7 @@ let BFQ=null;
 
 
 
-let GVT_CV='31.21';
+let GVT_CV='31.22';
 let NX_CAP_MUL=4;
 
 
@@ -4194593,6 +4194618,31 @@ try{ if(typeof LSW==='object' && LSW && typeof LSW.wall==='function' && typeof L
 
 
 try{ if(window.GVT) GVT.bdl=bdlRead; }catch(e){}
+
+
+
+
+
+
+
+
+
+
+
+
+
+const GSA_ON=(function(){ try{ const q=/[?&]gsa=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_gsa','0'); else localStorage.removeItem('gvt_gsa'); } return localStorage.getItem('gvt_gsa')==='0'? 0 : 1; }catch(e){ return 1; } })();
+const GSA_SPY_X=1.15;
+const GSA_GREN={ was:290, now:319 };
+
+
+
+
+
+if(typeof PRIO==='function'){ const prio0=PRIO; PRIO=function(u,f){ if(gsaYoursU(u) && gsaPickOn()) return gsaFar(u,f); return prio0.apply(this,arguments); }; }
+
+
+try{ if(window.GVT) GVT.gsa=gsaRead; else setTimeout(function(){ try{ if(window.GVT) GVT.gsa=gsaRead; }catch(e){} }, 0); }catch(e){}
 
 
 
