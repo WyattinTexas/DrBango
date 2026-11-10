@@ -997010,6 +997010,134 @@ function rzbProbe(o){ o=o||{}; if(o.zero){ for(const k in RZB.n) RZB.n[k]=0; RZB
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function ebaErr(k,e){ EBA.err++; if(EBA.e.length<400) EBA.e+=k+':'+String(e && e.message || e).slice(0,80)+';'; }
+function ebaTier(){ try{ return dhtTier(); }catch(e){ return 'e'; } }
+function ebaT(T){ const v=T[ebaTier()]; return (v==null)? T.g : v; }
+function ebaFields(){ try{ return !!(EBA.on && !S.bf && fieldsRaid()); }catch(e){ return false; } }
+function ebaCotOn(src){ return !!(EBA.on && !S.bf && src && src.type===EBA_WHO.cannon && src.kbMwf && (EBA_COT_WIDE || ebaFields())); }
+function ebaRifleHp(r){ return bfHpAt(EBA_WHO.rifleman, Math.max(0, r|0)); }
+function ebaRefRank(){ try{ const R=S.raid; if(R && R.k && BDC2.levels[R.k]!=null) return bdc2Rank(bdc2Level()); }catch(e){} return 0; }
+function ebaBearD(){ const k=+ebaT(EBA_COT); return (k>0)? k*ebaRifleHp(ebaRefRank()) : 0; }
+function ebaUnitPips(u){ const g=gritCap(u), k=+ebaT(EBA_COT); if(!(g>0) || !(k>0)) return 0; if(u.type===EBA_WHO.rifleman) return k*g;   
+  const H=dhtH(u); if(!(H>0)) return k*g; return k*ebaRifleHp(perkRank(u))*g/H; }
+function ebaTake(f){ const t=EBA_FF_TAKE[f.type]; return (t==null)? 1 : +t; }
+function ebaFriendly(x,y,R,src){   
+  const k=+ebaT(EBA_FF); if(!(k>0)) return 0; const D=ebaBearD()*k; if(!(D>0)) return 0; let n=0;
+  for(const f of S.foes.slice()){
+    if(!f || f.dead || !f.def || !(f.hp>0) || S.foes.indexOf(f)<0) continue;
+    if(Math.hypot(f.x-x,f.y-y)>R+(f.def.w||0)*0.3) continue;   
+    if(f.def.kb && f.gnSt==='snap') continue;   
+    if(f.paraSt==='drop' || f.dropT>0 || f.burrow || f.jetT>0 || f.gjAir || f.def.fly || f.skyDrop || f.retreat || f.x>=W-10) continue;   
+    const d=D*ebaTake(f); if(!(d>0)) continue;
+    const foot0=!!f.gnFoot; f.hp-=d; n++; EBA.n.ff++; EBA.n.ffHp+=d; EBA.last.ff={ t:f.type, d:+d.toFixed(2), hp:+f.hp.toFixed(2), tier:ebaTier() };
+    S.fx.push({k:'ring',x:f.x,y:f.y-20,r:5,R:22,t:0,dur:0.25,col:'#F2EFE6'});   
+    hitCheck(f,null);
+    if(f.def.kb && !foot0 && f.gnFoot) EBA.n.unhorse++; if(f.dead || S.foes.indexOf(f)<0) EBA.n.ffKill++;
+  }
+  return n; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function ebaLieutAt(x,y){ for(const o of S.foes){ if(o.type===EBA_WHO.lieut && !o.dead && o.x===x && o.y===y) return o; } return null; }
+
+
+
+
+
+function ebaCaptainWins(u,f){   
+  const fs=(u.x>=f.x)? 1 : -1, c=CMD_DUEL_CUTS[0]; try{ foeAim(f,u); }catch(e){}
+  S.fx.push({k:'ring',x:f.x,y:f.y-16,r:6,R:44,t:0,dur:0.24,col:KB_HUE_WAVE});
+  S.fx.push({k:'cres',x:f.x+fs*8,y:f.y-22,fs:fs,a0:Math.min(c.f,c.to),a1:Math.max(c.f,c.to),R:56,t:0,dur:0.8,hold:0.56,col:KB_HUE_WAVE,col3:'#9FB4E8'});   
+  bfSfx(SFX.swish,f.x,f.y);
+  u.hits=gritCap(u); knockKill(u); bfSfx(SFX.boom,u.x,u.y);   
+  EBA.n.wreck++; EBA.last.wreck={ x:Math.round(u.x), y:Math.round(u.y), hp:+f.hp.toFixed(2), hpMax:f.hpMax, tier:ebaTier() }; try{ tdLog(f,'jeep-wreck'); }catch(e){}
+  return true; }
+
+
+
+
+
+
+function ebaParaOn(){ return !!(EBA.on && +EBA_PARA.on && ebaFields()); }
+function ebaSt(){ const R=S.raid; if(!EBA.st || EBA.st.rd!==R) EBA.st={ rd:R, paraG:null, s1:0, s2:0, unT:null }; return EBA.st; }
+
+
+
+function ebaDrop(st,k){ const g=Object.assign({}, st.paraG, { ebaStick:k, at:0 }); spawnGroup(g, 'eba'+k); EBA.n['drop'+k]++; EBA.last['drop'+k]={ t:+(S.t-(S.raid.t0||0)).toFixed(2), n:g.n|0 }; }
+function ebaParaTick(){   
+  if(!ebaParaOn()) return; const st=ebaSt(); if(!st.paraG) return; const rt=S.t-(S.raid.t0||0);
+  let B=null; for(const o of S.foes){ if(o.type===EBA_WHO.emperor && !o.dead){ B=o; break; } }
+  if(B && B.gnFoot && st.unT==null) st.unT=rt;
+  if(!st.s1){ const bar=(B && !B.gnFoot && B.hpMax>0)? B.hp/B.hpMax : null;
+    if((rt>=+EBA_PARA.t || (bar!=null && bar<=+EBA_PARA.bar) || st.unT!=null) && (st.unT==null || rt-st.unT>=+EBA_PARA.hold)){ st.s1=1; ebaDrop(st,1); } }
+  else if(!st.s2 && st.unT!=null && rt-st.unT>=+EBA_PARA.after){ st.s2=1; ebaDrop(st,2); } }
+
+
+
+
+
+
+
+
+
+
+
+function ebaRead(o){ if(o && o.zero){ for(const k in EBA.n) EBA.n[k]=0; EBA.last={}; EBA.err=0; EBA.e=''; }
+  const st=EBA.st, r=ebaRefRank();
+  return { cv:GVT_CV, on:EBA.on, tier:ebaTier(), fields:ebaFields(), who:Object.assign({},EBA_WHO), ref:{ rank:r, rifleHp:ebaRifleHp(r), bearD:+ebaBearD().toFixed(3) },
+    dials:{ cot:Object.assign({},EBA_COT), ff:Object.assign({},EBA_FF), take:Object.assign({},EBA_FF_TAKE), wide:EBA_COT_WIDE, cutFlame:Object.assign({},EBA_CUT_FLAME), jeepRoy:Object.assign({},EBA_JEEP_ROY), capWreck:EBA_CAP_WRECK, para:Object.assign({},EBA_PARA), dfX:Object.assign({},EBA_DF_X) },
+    n:Object.assign({},EBA.n), last:EBA.last, para:st? { s1:st.s1, s2:st.s2, unT:st.unT, held:st.paraG? (st.paraG.n|0) : 0 } : null, err:EBA.err, e:EBA.e }; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 function thfOn(){ try{ return !!(THF && THF.on); }catch(e){ return false; } }
 function thfFp(s){ s=String(s==null? '' : s); let h=0x811c9dc5; for(let i=0;i<s.length;i++) h=Math.imul(h^s.charCodeAt(i),16777619)>>>0; return s.length+':'+('0000000'+h.toString(16)).slice(-8); }
 function thfGrad(g){ return '<linearGradient id="'+g+'T" x1="1" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff4dc" stop-opacity=".34"/><stop offset=".45" stop-color="#fff4dc" stop-opacity="0"/></linearGradient><linearGradient id="'+g+'F" x1="0" y1="0" x2="0" y2="1"><stop offset=".55" stop-color="#201406" stop-opacity="0"/><stop offset="1" stop-color="#201406" stop-opacity=".26"/></linearGradient>'; }
@@ -1209092,7 +1209220,7 @@ let BFQ=null;
 
 
 
-let GVT_CV='31.19';
+let GVT_CV='31.20';
 let NX_CAP_MUL=4;
 
 
@@ -4193451,6 +4193579,134 @@ try{ if(typeof BLB_RULES!=='undefined' && Array.isArray(BLB_RULES)){ const R7='b
   if(typeof BLB==='object' && BLB && BLB.booted && BLB.over && typeof blbCellSet==='function'){ for(const q of rows){ const o=BLB.over[q[0]]; if(o) for(const k of Object.keys(o)) blbCellSet(q[0],k,o[k]); } } } }catch(e){ rzbErr('lab',e); }
 
 setTimeout(()=>{ try{ if(typeof GVT==='object' && GVT) GVT.rzb=rzbProbe; }catch(e){} }, 0);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const EBA_ON=(function(){ try{ const q=/[?&]eba=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_eba','0'); else localStorage.removeItem('gvt_eba'); } return localStorage.getItem('gvt_eba')==='0'? 0 : 1; }catch(e){ return 1; } })();
+const EBA_WHO={ lieut:'troyal', captain:'troyoff', sling:'tpara', cannon:'tcannon', emperor:'bearnaparte', flamer:'flame', rifleman:'rifleman' };
+const EBA_COT={ e:0.9, m:0.9, h:0.9, g:0.9 };
+const EBA_FF={ e:1, m:1, h:1, g:1 };
+const EBA_FF_TAKE={ troyal:0.2, bearnaparte:0.4 };
+const EBA_COT_WIDE=0;
+const EBA_CUT_FLAME={ e:3.6, m:3.6, h:3.6, g:3.6 };
+const EBA_JEEP_ROY={ e:0.25, m:0.25, h:0.3, g:0.35 };
+const EBA_CAP_WRECK=1;
+const EBA_PARA={ on:1, bar:0.5, t:60, hold:3, after:12 };
+const EBA_DF_X={ e:1.5, m:1.5, h:1.5, g:1.5 };
+const EBA={ on:EBA_ON, cot:null, cut:null, st:null, n:{ land:0, ff:0, ffHp:0, ffKill:0, unhorse:0, caught:0, cut:0, wreck:0, roy:0, held:0, drop1:0, drop2:0, df:0 }, last:{}, err:0, e:'' };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+if(typeof foeSplash==='function'){ const fs0=foeSplash; foeSplash=function(x,y,R,src,mwf9,rb,msh){
+    if(!ebaCotOn(src)) return fs0.apply(this, arguments);
+    const C={ src:src, x:x, y:y, mw:(mwf9? SP_DMG : 1), caught:0 }, prev=EBA.cot; EBA.cot=C; let r;
+    try{ r=fs0.apply(this, arguments); } finally{ EBA.cot=prev; }
+    if(C.caught) EBA.n.caught++; else { try{ ebaFriendly(x,y,R,src); }catch(e){ ebaErr('ff',e); } }
+    return r; }; }
+if(typeof cmdoCatch==='function'){ const cc0=cmdoCatch; cmdoCatch=function(){ const r=cc0.apply(this, arguments); if(r && EBA.cot) EBA.cot.caught=1; return r; }; }
+if(typeof tanHit==='function'){ const th0=tanHit; tanHit=function(u,fx,fy,src,fire9){
+    const C=EBA.cot;
+    if(C && src && src===C.src && src.pipN>0 && u && !u.dead && !(u.def && u.def.vehicle) && S.units.indexOf(u)>=0){   
+      let p=0; try{ p=ebaUnitPips(u)*C.mw; }catch(e){ ebaErr('pips',e); p=0; }
+      if(p>0){ const hD=Object.prototype.hasOwnProperty.call(src,'dmpRaw'), vD=src.dmpRaw, hS=Object.prototype.hasOwnProperty.call(src,'dsmRaw'), vS=src.dsmRaw, p0=src.pipN;
+        src.pipN=p; src.dmpRaw=1; src.dsmRaw=1; EBA.n.land++; EBA.last.land={ u:u.type, pips:+p.toFixed(3), g:+gritCap(u).toFixed(2), tier:ebaTier() };
+        try{ return th0.apply(this, arguments); } finally{ src.pipN=p0; if(hD) src.dmpRaw=vD; else delete src.dmpRaw; if(hS) src.dsmRaw=vS; else delete src.dsmRaw; } } }
+    return th0.apply(this, arguments); }; }
+
+if(typeof knock==='function'){ const k0=knock; knock=function(u,sx,sy,rolled){
+    if(EBA.on && !S.bf && u && !u.dead && u.type===EBA_WHO.flamer && rolled!==true && +ebaT(EBA_CUT_FLAME)>0 && S.units.indexOf(u)>=0 && ebaLieutAt(sx,sy)){
+      const prev=EBA.cut; EBA.cut=u; EBA.n.cut++; try{ return k0.apply(this, arguments); } finally{ EBA.cut=prev; } }
+    return k0.apply(this, arguments); }; }
+if(typeof bdc2Price==='function'){ const bp0=bdc2Price; bdc2Price=function(){ if(EBA.cut && EBA.on){ const v=+ebaT(EBA_CUT_FLAME); if(v>0) return v; } return bp0.apply(this, arguments); }; }
+
+
+
+
+
+
+
+
+if(typeof jlCamp==='function'){ const j0=jlCamp; jlCamp=function(u,f){
+    if(!EBA.on || S.bf || !u || !f || u.dead || f.dead || !f.def || jlKeep(f) || f.def.vehicle) return j0.apply(this, arguments);
+    if(f.type===EBA_WHO.captain && EBA_CAP_WRECK && f.hp>=f.hpMax-1e-6) return ebaCaptainWins(u,f);
+    if(f.type===EBA_WHO.lieut){ const c=(typeof rzbJeepCell==='function' && RZB.on)? rzbJeepCell() : null, v=+ebaT(EBA_JEEP_ROY);
+      if(c && v>=0){ const d0=c.dent, b0=c.big; c.dent=v; c.big=v; EBA.n.roy++; try{ return j0.apply(this, arguments); } finally{ c.dent=d0; c.big=b0; } } }
+    return j0.apply(this, arguments); }; }
+
+
+if(typeof spawnGroup==='function'){ const g0=spawnGroup; spawnGroup=function(g,wk9){
+    if(g && g.t===EBA_WHO.sling && !g.ebaStick && ebaParaOn()){ const st=ebaSt(); if(!st.paraG) st.paraG=Object.assign({}, g); else st.paraG.n=(st.paraG.n|0)+(g.n|0); EBA.n.held++; return; }   
+    return g0.apply(this, arguments); }; }
+
+
+
+
+
+
+
+
+if(typeof raidTick==='function'){ const t0=raidTick; raidTick=function(dt){ t0.apply(this, arguments); try{ if(EBA.on && S.raid && S.mode==='play') ebaParaTick(); }catch(e){ ebaErr('para',e); } }; }
+if(typeof dfHit==='function'){ const d0=dfHit; dfHit=function(p,pips,src){ if(EBA.on && src && src.type===EBA_WHO.sling && p && pips>0){ const x=+ebaT(EBA_DF_X); if(x>0 && x!==1){ EBA.n.df++; pips*=x; } } return d0.call(this,p,pips,src); }; }
+try{ if(typeof BLB_RULES!=='undefined' && Array.isArray(BLB_RULES)){
+  BLB_RULES.push(['EBA_COT', ()=>EBA_COT, "THE CANNON'S LANDING: one landing of the Emperor's tubes takes this share of a Rifleman's HP off any of your units (0.9 = a full Rifleman left on 10 %); the same HP on the bears in its splash", 'fields'],
+                 ['EBA_FF', ()=>EBA_FF, "THE CANNONS' FRIENDLY FIRE: x this on the bears in a landing's splash (a lieutenant takes a fifth, the Emperor two fifths, every other bear whole; 0 = off)", 'fields'],
+                 ['EBA_CUT_FLAME', ()=>EBA_CUT_FLAME, "A LIEUTENANT'S CUT ON A FLAMER: HP off the Flamer (a fresh Flamer stands 16: 3.6 = the fifth cut fells him; 0 = the KO price)", 'fields'],
+                 ['EBA_JEEP_ROY', ()=>EBA_JEEP_ROY, "THE JEEP'S DENT FROM A LIEUTENANT: bar hits one ram on a lieutenant costs the Jeep (its bar is 6)", 'fields'],
+                 ['EBA_DF_X', ()=>EBA_DF_X, "THE SLINGSHOT BEAR'S PEBBLE ON A PLANE: x this (1.5 = +50 %)", 'fields']);
+  if(typeof blbShip==='function' && typeof BLB==='object' && BLB && BLB.ship) blbShip();
+  if(typeof BLB==='object' && BLB && BLB.booted && BLB.over && typeof blbCellSet==='function'){ for(const id of ['EBA_COT','EBA_FF','EBA_CUT_FLAME','EBA_JEEP_ROY','EBA_DF_X']){ const o=BLB.over[id]; if(o) for(const k of Object.keys(o)) blbCellSet(id,k,o[k]); } }
+} }catch(e){ ebaErr('lab',e); }
+
+
+
+
+
+try{ if(window.GVT) GVT.eba=ebaRead; else setTimeout(function(){ try{ if(window.GVT) GVT.eba=ebaRead; }catch(e){} }, 0); }catch(e){}
 
 
 
