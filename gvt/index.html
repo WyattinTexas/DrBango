@@ -340014,7 +340014,7 @@ function update(dt){
             S.fx.push({k:'ring',x:o.x,y:o.y-24,r:6,R:44,t:0,dur:0.3,col:'#FFFFFF'}); S.fx.push({k:'puff',x:o.x,y:o.y-28,t:0,dur:0.4,R:18,col:'#ffffff'}); S.fx.push({k:'flash',x:o.x,y:o.y-24,ang:0,R:26,lw:3,t:0,dur:0.14});
             if(ekoSarge(o)) ekoDown(o,sh,sx9);    
             else if(o.boss || (o.def&&o.def.boss)){ tdLog(o,'arrow-pips',estHit(o,sh,sx9)); }   
-            else { o.hp=0; hitCheck(o, sx9); tdLog(o,'arrow-gone',sx9&&sx9.type); } }
+            else if(!cheRugHit(o,sh,sx9)){ o.hp=0; hitCheck(o, sx9); tdLog(o,'arrow-gone',sx9&&sx9.type); } }    
           estBox(sh,crossed,sx9);   
         }
         if(sh.gone || sh.x>(S.bf? WORLD_W : W)+40 || sh.x<-40 || sh.y<-40 || sh.y>WORLD_H+40) S.shots.splice(i,1);   
@@ -996847,6 +996847,150 @@ function bsdRead(o){ o=o||{}; if(o.on!=null) BSD.on=o.on? 1 : 0; if(o.reset){ fo
 
 
 
+function cheErr(w,e){ CHE.err++; if(CHE.e.length<400) CHE.e+=w+':'+String(e && e.message || e).slice(0,80)+' '; }
+function cheOn(){ return !!(CHE_ON || S.coop); }
+function cheCap(){ const c=+MMD.cap; return (c>0 && isFinite(c))? Math.floor(c) : 0; }
+function cheKey(u){ if(S.bf) return 'b'+((u.seat!=null)? u.seat : String(u.side||'')); return (u.coopBy!=null && u.coopBy!=='')? 'c'+u.coopBy : 'me'; }
+function cheLaid(key){ let n=0; const M=S.mines||[]; for(let i=0;i<M.length;i++){ const m=M[i]; if(m && m.mmd===1 && m.cheP===key) n++; } return n; }
+function cheTelling(key){ let n=0; for(const q of S.units){ if(q && q.mmd===1 && !q.dead && q.mineSpot && cheKey(q)===key) n++; } return n; }
+function cheEsX(k){ const v=+CHE_ES[k]; return (v>=0 && isFinite(v))? v : 1; }
+function cheHeavyU(u){ return !!(u && ((u.def && u.def.vehicle) || CHE_HEAVY[u.type] || HEROES.indexOf(u.type)>=0)); }
+function cheHeavyF(o){ return !!(o && ((o.def && o.def.vehicle) || CHE_HEAVY[o.type])); }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function cheRugHit(o,sh,src){ try{ if(!cheOn() || !o || o.dead) return false;
+    if(!cheHeavyF(o)){ CHE.n.rugLight++; return false; }   
+    const K=cheEsX((sh && sh.pr)? 'pr' : 'rug'); if(!(K<1)) return false;
+    const full=Math.max(1e-6, +(o.hpMax || o.hp) || 1), d=+(full*K).toFixed(2), h0=Math.max(0, +o.hp || 0);
+    o.hp=Math.max(0, h0-d); o.hitT=0.25; CHE.n.rug++; CHE.last={ k:(sh && sh.pr)? 'pr' : 'rug', t:o.type, full:+full.toFixed(2), d, hp:+o.hp.toFixed(2) };   
+    S.floats.push({ x:o.x+14, y:o.y-62, txt:'−'+Math.max(1, Math.round(d)), t:0, col:(sh && sh.col) || '#FFE08A' });
+    tdLog(o,'arrow-half',d); if(o.hp<=0) hitCheck(o, src); return true; }catch(e){ cheErr('rug',e); return false; } }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function cheFill(s,a){ return String(s).replace(/\{(\d+)\}/g, (m,i)=> (a[+i]!==undefined)? a[+i] : m); }
+function cheTok(s){ let n=0; return String(s).replace(NUMTOK, ()=> '{'+(n++)+'}'); }
+function cheTokN(s){ return (String(s).match(NUMTOK) || []).length; }
+function cheShift(s,k){ return String(s).replace(/\{(\d+)\}/g, (m,i)=> '{'+(+i+k)+'}'); }
+function cheTrOf(l,en){ const d=TR[l]; if(!d) return null; if(d[en]!=null) return d[en]; const k=cheTok(en); return (d[k]!=null)? d[k] : null; }
+function cheCapLine(){ return cheFill(CHE_W.capLong.en, [cheCap(), cheCap()]); }
+function cheCapRow(){ return cheFill(CHE_W.capRow.en, [cheCap()]); }
+function cheEsPct(){ return Math.round(cheEsX('rug')*100); }
+function cheWords(){ try{
+    const MI=ENH_INFO.mousemod, LI=ENH_INFO.lightarrow;
+    if(MI && CHE_BASE.mmUp==null) CHE_BASE.mmUp=MI.up; if(LI && CHE_BASE.laUp==null) CHE_BASE.laUp=LI.up;
+    const on=cheOn(), cap=cheCap();
+    if(MI) MI.up=(on && cap>0)? CHE_BASE.mmUp+' '+cheCapLine() : CHE_BASE.mmUp;
+    if(LI) LI.up=(on && cheEsX('rug')<1)? cheFill(CHE_W.esLong.en, [LA_PLANT, LA_N, LA_FAN_DEG, LA_FAN_DEG, cheEsPct()]) : CHE_BASE.laUp;
+    for(const l of CHE_LANGS){
+      if(MI && cap>0){ const b=cheTrOf(l, CHE_BASE.mmUp); if(b!=null){ const nb=cheTokN(CHE_BASE.mmUp); const full=CHE_BASE.mmUp+' '+cheCapLine(); const d=TR[l] || (TR[l]={});
+          d[full]=cheFill(b, (CHE_BASE.mmUp.match(NUMTOK)||[]))+' '+cheFill(CHE_W.capLong[l], [cap, cap]); d[cheTok(full)]=b+' '+cheShift(CHE_W.capLong[l], nb); } }
+      if(LI){ const d=TR[l] || (TR[l]={}); d[cheTok(cheFill(CHE_W.esLong.en, [LA_PLANT, LA_N, LA_FAN_DEG, LA_FAN_DEG, cheEsPct()]))]=CHE_W.esLong[l]; } }
+  }catch(e){ cheErr('words',e); } }
+function cheRowTr(down){ try{ if(!down || !(cheCap()>0)) return; const row=down+' · '+cheCapRow();   
+    for(const l of CHE_LANGS){ const b=cheTrOf(l, down); if(b==null) continue; const d=TR[l] || (TR[l]={}); if(d[row]!=null) continue; const nb=cheTokN(down);
+      d[row]=cheFill(b, (down.match(NUMTOK)||[]))+' · '+cheFill(CHE_W.capRow[l], [cheCap()]); const k=cheTok(row); if(d[k]==null) d[k]=b+' · '+cheShift(CHE_W.capRow[l], nb); } }catch(e){ cheErr('row',e); } }
+
+
+
+
+function cheRead(o){ o=o||{}; try{ if(o.cap!=null){ MMD.cap=+o.cap; cheWords(); } if(o.es) for(const k in o.es){ if(k in CHE_ES) CHE_ES[k]=+o.es[k]; } if(o.es) cheWords(); if(o.reset){ for(const k in CHE.n) CHE.n[k]=0; CHE.err=0; CHE.e=''; CHE.last=null; } }catch(e){ cheErr('door',e); }
+  const by={}; for(const m of (S.mines||[])){ if(!m) continue; const k=(m.mmd===1)? ('cheese:'+(m.cheP||'?')) : (m.chz? 'chz' : 'drum'); by[k]=(by[k]|0)+1; }
+  return { cv:GVT_CV, on:CHE_ON, live:cheOn(), cap:cheCap(), es:Object.assign({}, CHE_ES), heavy:Object.keys(CHE_HEAVY), n:Object.assign({}, CHE.n), err:CHE.err, e:CHE.e, last:CHE.last, wrapped:CHE.wrapped, mines:by,
+    mice:S.units.filter(u=>u && u.mmd===1 && !u.dead).map(u=>({ id:u.id, key:cheKey(u), tell:u.mineSpot? 1 : 0, swT:(u.swT==null)? null : +(+u.swT).toFixed(3) })),
+    words:{ mmUp:(ENH_INFO.mousemod||{}).up || null, laUp:(ENH_INFO.lightarrow||{}).up || null, row:(typeof labShort==='function' && labShort('mousemod'))? labShort('mousemod').down : null } }; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1208482,7 +1208626,7 @@ let BFQ=null;
 
 
 
-let GVT_CV='31.29';
+let GVT_CV='31.30';
 let NX_CAP_MUL=4;
 
 
@@ -4414051,6 +4414195,150 @@ const BSD={ on:BSD_ON, rideX:0.8, snakeAt:25, fon:800000, mice:{ n:6, cap:12, r0
 
 
 try{ if(window.GVT) GVT.bsd=bsdRead; else setTimeout(function(){ try{ if(window.GVT) GVT.bsd=bsdRead; }catch(e){} }, 0); }catch(e){}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const CHE_ON=(function(){ try{ const q=/[?&]che=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_che','0'); else localStorage.removeItem('gvt_che'); } return localStorage.getItem('gvt_che')==='0'? 0 : 1; }catch(e){ return 1; } })();
+MMD.cap=20;
+const CHE_ES={ bf:0.5, boss:0.5, rug:0.5, pr:0.5, bill:0.5 };
+const CHE_HEAVY={ bazooka:1, flame:1, commando:1, tanbazooka:1, tanflame:1, tancommando:1 };
+const CHE={ n:{ laid:0, wait:0, carry:0, trim:0, bf:0, boss:0, box:0, rug:0, rugLight:0, bill:0, billLight:0, king:0 }, err:0, e:'', lane:null, h0:null, last:null, wrapped:0 };
+
+
+
+
+
+
+
+
+
+
+{ const st0=sweepTick; sweepTick=function(u,dt){
+    if(!u || u.mmd!==1 || u.dead || !cheOn()) return st0.apply(this,arguments);   
+    const cap=cheCap(); if(!(cap>0)) return st0.apply(this,arguments);
+    let lay=false, key=null;
+    try{ key=cheKey(u);
+      if(!(u.dropT>0) && !u.falling && !(S.drag && S.drag.unit===u)){   
+        if(u.mineSpot){ const tl=((u.swTell==null)? MINE_TELL : u.swTell)-dt;
+          if(tl<=0){ if(cheLaid(key)>=cap){ u.swTell=dt+1e-3; CHE.n.carry++; } else lay=true; } }   
+        else if(u.swT!=null && u.swT-dt<=0 && cheLaid(key)+cheTelling(key)>=cap){ u.swT=dt+1e-3; CHE.n.wait++; } }   
+    }catch(e){ cheErr('cap',e); return st0.apply(this,arguments); }
+    if(!lay) return st0.apply(this,arguments);
+    const M=S.mines; let own=false;   
+    try{ if(M && !Object.prototype.hasOwnProperty.call(M,'push')){ own=true; M.push=function(m){ try{ if(m && m.mmd===1){ if(cheLaid(key)>=cap){ CHE.n.trim++; return this.length; } m.cheP=key; CHE.n.laid++; } }catch(e){ cheErr('push',e); } return Array.prototype.push.apply(this,arguments); }; } }catch(e){ cheErr('shadow',e); }
+    try{ return st0.apply(this,arguments); } finally{ if(own){ try{ delete M.push; }catch(e){} } } };
+  CHE.wrapped++; }
+
+
+{ const nd0=nbeDmg; nbeDmg=function(sh){ const d=nd0.apply(this,arguments); try{ if(!cheOn() || !sh || sh.esd==null) return d; const K=cheEsX('bf'); if(K===1) return d;
+    CHE.n.bf++; return Math.max(1, Math.round(sh.esd*NBE.x[(sh.esi|0)%NBE.x.length]*K)); }catch(e){ cheErr('bf',e); return d; } };
+  CHE.wrapped++; }
+
+{ const eh0=estHit; estHit=function(o,sh,src){ if(!cheOn()) return eh0.apply(this,arguments); const K=cheEsX('boss'); if(K===1) return eh0.apply(this,arguments);
+    const fl=LA_BOSS_PIPS*LA_BOSS_X*K, bar=Math.max(1, Math.round(+(o.hpMax || o.hp) || 1)), V=sh.vol || (sh.vol={}), k=String(o.id), got=+V[k] || 0;
+    let d=Math.max(fl, Math.ceil(bar*EST_SHARE*K)-got); d=Math.min(d, Math.max(0, bar-1-got)); if(!(d>0)) return 0;   
+    const h0=Math.max(0, +o.hp || 0); HV_RD=true; try{ hurt(o, d, src); } finally{ HV_RD=false; }
+    const lost=Math.max(0, h0-Math.max(0, +o.hp || 0)); V[k]=got+lost; CHE.n.boss++; CHE.last={ k:'boss', t:o.type, d:+d.toFixed(2), lost:+lost.toFixed(2), bar }; return lost; };
+  CHE.wrapped++; }
+{ const eb0=estBox; estBox=function(sh,crossed,src){ if(!cheOn()) return eb0.apply(this,arguments); const K=cheEsX('boss'); if(K===1) return eb0.apply(this,arguments);
+    if(sh.gone || !jbxOn()) return; const b=S.tanBase; if(!b || b.dead || sh.hit.jbx || !crossed({ x:b.x, y:b.y-EST_BOX_DY })) return; sh.hit.jbx=1;
+    const bar=Math.max(1, Math.round(+b.hpMax || 1)), V=sh.vol || (sh.vol={}), got=+V.jbx || 0; let d=Math.max(LA_BOSS_PIPS*LA_BOSS_X*K, Math.ceil(bar*EST_SHARE*K)-got); d=Math.min(d, Math.max(0, bar-1-got));
+    S.fx.push({k:'ring',x:b.x,y:b.y-EST_BOX_DY,r:6,R:44,t:0,dur:0.3,col:'#FFFFFF'}); const lost=(d>0)? jbxHurt(d,'light',b.x,b.y) : 0; V.jbx=got+lost; CHE.n.box++; tdLog(src,'arrow-box',lost); };
+  CHE.wrapped++; }
+
+
+
+
+
+
+
+
+
+{ const g0=ovfLaneGreen18; ovfLaneGreen18=function(sh,s0,src){ if(!(sh && sh.playEs && !sh.bx19 && !S.bf && cheOn())) return g0.apply(this,arguments);
+    const was=CHE.lane, wasH=CHE.h0, H=new Map(); for(const u of S.units){ if(u && !u.dead) H.set(u, u.hits || 0); }   
+    CHE.lane=sh; CHE.h0=H; try{ return g0.apply(this,arguments); } finally{ CHE.lane=was; CHE.h0=wasH; } };
+  CHE.wrapped++; }
+{ const ed0=ekoDownGreen; ekoDownGreen=function(u,sh,src){ const L=CHE.lane; if(!L || sh!==L || !u || u.dead) return ed0.apply(this,arguments);
+    try{ if(!cheHeavyU(u)){ CHE.n.billLight++; return ed0.apply(this,arguments); }   
+      const K=cheEsX('bill'); if(!(K<1)) return ed0.apply(this,arguments);
+      const g=gritCap(u), h=(CHE.h0 && CHE.h0.has(u))? CHE.h0.get(u) : (u.hits || 0), nh=h+g*K;
+      if(nh>=g-1e-6){ u.hits=h; return ed0.apply(this,arguments); }   
+      u.hits=nh; u.hitT=0; const V=sh.vol; if(V && V.down>0) V.down--; CHE.n.bill++; CHE.last={ k:'bill', t:u.type, g:+g.toFixed(2), h0:+h.toFixed(2), h1:+nh.toFixed(2) };
+      S.fx.push({k:'ring',x:u.x,y:u.y-4,r:8,R:46,t:0,dur:0.4,col:(sh && sh.col) || '#FFD34D'}); try{ bfSfx(SFX.thock,u.x,u.y); }catch(e){} if(!reducedMotion()) S.shake=Math.max(S.shake||0,0.2);
+      tdLog(u,'beam-half',+(g*K).toFixed(2)); return; }catch(e){ cheErr('bill',e); return ed0.apply(this,arguments); } };
+  CHE.wrapped++; }
+{ const ks0=ovfKingShare18; ovfKingShare18=function(u,sh,src){ const L=CHE.lane; if(!L || sh!==L) return ks0.apply(this,arguments); const k0=OVF18.kingPips;
+    try{ OVF18.kingPips=k0*cheEsX('bill'); CHE.n.king++; return ks0.apply(this,arguments); } finally{ OVF18.kingPips=k0; } };   
+  CHE.wrapped++; }
+
+const CHE_W={ capLong:{ en:'At most {0} of your cheeses can lie on the field at once; at {1} the mice lay no more until one is gone.',
+    ar:'لا يمكن أن يكون لك أكثر من {0} قطعة جبن في الميدان في وقت واحد؛ وعند {1} لا يزرع الفأران المزيد حتى تختفي واحدة.', ja:'フィールドに おける チーズは いちどに {0}こ まで。{1}こ になると、どれかが なくなるまで ネズミは しかけない。',
+    ko:'필드에 둘 수 있는 치즈는 한 번에 {0}개까지. {1}개가 되면 하나가 사라질 때까지 생쥐는 더 깔지 않는다.', 'zh-Hans':'场上同时最多只能有 {0} 块你的奶酪；到 {1} 块时，老鼠要等有一块没了才会再埋。',
+    de:'Höchstens {0} deiner Käsestücke können gleichzeitig auf dem Feld liegen; bei {1} legen die Mäuse keine mehr, bis eins weg ist.', ru:'Одновременно на поле может лежать не больше {0} твоих кусков сыра; при {1} мыши не ставят новых, пока один не исчезнет.',
+    es:'Como mucho {0} de tus quesos pueden estar en el campo a la vez; con {1}, los ratones no ponen más hasta que desaparezca uno.' },
+  capRow:{ en:'AT MOST {0} CHEESES', ar:'{0} قطع جبن كحد أقصى', ja:'チーズは {0}こ まで', ko:'치즈는 최대 {0}개', 'zh-Hans':'奶酪最多 {0} 块', de:'HÖCHSTENS {0} KÄSESTÜCKE', ru:'НЕ БОЛЬШЕ {0} КУСКОВ СЫРА', es:'COMO MUCHO {0} QUESOS' },
+  esLong:{ en:'Fits the SNIPER RIFLE: one button, and Sarge plants his boots for {0} seconds while the rug dims — then {1} bolts of light fan out from his muzzle — straight ahead, {2}° up and {3}° down — and every light enemy they touch is gone; a heavy one (a machine, a bazooka, a flame or a commando) loses {4}% of its health.',
+    ar:'يُركَّب على بندقية القناص: زر واحد، فيثبّت سارج قدميه {0} ثوانٍ بينما تُعتم السجادة — ثم تتفرّع {1} ومضات من النور من فوهة بندقيته — إلى الأمام مباشرة، و{2}° إلى الأعلى و{3}° إلى الأسفل — وكل عدو خفيف تلمسه يختفي؛ أما الثقيل (آلة أو بازوكا أو قاذف لهب أو كوماندوز) فيخسر {4}% من صحته.',
+    ja:'スナイパーライフルに つける：ボタンひとつで サージが {0} びょう あしを ふんばり、ラグが くらくなる — そして じゅうこうから {1} ぼんの ひかりの やが ひろがる — まっすぐ、{2}° うえ、{3}° した — ふれた かるい てきは みんな きえる。おもい てき（のりもの、バズーカ、かえんほうしゃ、コマンドー）は たいりょくの {4}% を うしなう。',
+    ko:'스나이퍼 라이플에 장착: 버튼 하나면 사지가 {0}초 동안 발을 딛고 서고 러그가 어두워져 — 그다음 총구에서 빛의 화살 {1}줄기가 부채꼴로 퍼져 — 정면으로, {2}° 위로, {3}° 아래로 — 닿은 가벼운 적은 모두 사라지고, 무거운 적(차량, 바주카, 화염방사병, 코만도)은 체력의 {4}%를 잃어.',
+    'zh-Hans':'装在狙击步枪上：一个按钮，萨吉扎稳脚步 {0} 秒，地毯变暗——然后 {1} 道光箭从枪口扇形散开——一道直射、一道上扬 {2}°、一道下压 {3}°——碰到的每个轻型敌人都会消失；重型敌人（载具、火箭筒兵、喷火兵或突击队员）则失去 {4}% 的生命。',
+    de:'Passt aufs SCHARFSCHÜTZENGEWEHR: ein Knopf, und Sarge stemmt {0} Sekunden die Stiefel in den Boden, während der Teppich dunkel wird — dann fächern {1} Lichtblitze aus seiner Mündung auf — geradeaus, {2}° nach oben und {3}° nach unten — und jeder leichte Feind, den sie berühren, ist weg; ein schwerer (eine Maschine, ein Bazooka, ein Flammenwerfer oder ein Kommando) verliert {4}% seiner LP.',
+    ru:'Ставится на СНАЙПЕРСКУЮ ВИНТОВКУ: одна кнопка — и Сарж на {0} секунды врастает в пол, а ковёр темнеет; затем {1} световых луча веером расходятся из дула — прямо, на {2}° вверх и на {3}° вниз, — и каждый лёгкий враг на их пути исчезает, а тяжёлый (машина, базука, огнемётчик или коммандос) теряет {4}% здоровья.',
+    es:'Se monta en el RIFLE DE FRANCOTIRADOR: un botón, y Sarge planta las botas {0} segundos mientras la alfombra se oscurece; luego {1} rayos de luz salen en abanico de su cañón —de frente, {2}° arriba y {3}° abajo— y todo enemigo ligero que tocan desaparece; uno pesado (una máquina, un bazuca, un lanzallamas o un comando) pierde el {4}% de su salud.' } };
+const CHE_LANGS=['ar','ja','ko','zh-Hans','de','ru','es'];
+const CHE_BASE={ mmUp:null, laUp:null };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+{ const ls0=labShort; labShort=function(id){ const r=ls0.apply(this,arguments); try{ if(id==='mousemod' && r && cheOn() && cheCap()>0 && typeof r.down==='string' && r.down){ cheRowTr(r.down); return Object.assign({}, r, { down:r.down+' · '+cheCapRow() }); } }catch(e){ cheErr('short',e); } return r; };
+  CHE.wrapped++; }
+try{ cheWords(); }catch(e){ cheErr('boot',e); }
+
+
+
+
+
+
+setTimeout(function(){ try{ if(window.GVT && !GVT.che) GVT.che=function(o){ return cheRead(o); }; }catch(e){} }, 0);
 
 
 
