@@ -996764,6 +996764,93 @@ function wvbRead(){ const R=S.raid && S.raid.sky, W9=R && R.wvb, A=R && R.air, t
 
 
 
+
+
+function bsdErr(e){ BSD.stats.errs++; BSD.err=String(e && e.message || e).slice(0,200); }
+function bsdLive(){ return !!(BSD.on || S.coop); }
+function bsdOn(){ return !!(bsdLive() && bbsOn()); }
+
+function bsdTramples(f){ const R=(f && f.def && f.def.ride && f.def.ride.ramR) || 52;   
+  for(const u of S.units){ if(!u || u.dead || u.jetT>0 || u.dropT>0 || u.falling) continue; const dx=u.x-f.x, dy=u.y-f.y; if(dx<R && dx>-R && dy<R && dy>-R && dx*dx+dy*dy<R*R) return true; }
+  return false; }
+
+
+
+
+function bsdRaise(t){   
+  if(!t || !Array.isArray(t.rocks) || t.bsdRaised) return 0; let n=0; const seen={}, R=t.rocks.slice();
+  for(const rk of R){ if(!rk || rk.art!=='bbshit' || rk.bsd || !rk.key) continue; const T9=BSD_TOPS[rk.key]; if(!T9) continue; const id=rk.key+'|'+rk.fx+'|'+rk.fy; if(seen[id]) continue; seen[id]=1;
+    if(rk.fw!==T9.fw || rk.fh!==T9.fh || (rk.pw||0)!==T9.pw){ BSD.stats.skip++; continue; }   
+    for(const c of T9.c){ const x=rk.fx+c[0], y=rk.fy+c[1]; t.rocks.push({ x:x, y:y, lx:x, r:c[2], art:'bbshit', cov:1, grp:rk.grp, lead:0, key:rk.key, fx:rk.fx, fy:rk.fy, fw:rk.fw, fh:rk.fh, pw:rk.pw||0, bsd:1 }); n++; } }
+  if(n){ t.streets=bbsGraph(t.rocks); t.bsdRaised=n; BSD.stats.raised++; BSD.stats.circles=n; }
+  return n; }
+
+
+
+
+function bsdSnakeAsleep(f){ return !!(f && f.bbsSnake && f.bbsSnake.st==='sleep'); }
+function bsdSnakeEarly(){ const B=S.raid && S.raid.bbs; return !(B && (+B.t||0)>=BSD.snakeAt); }
+
+function bsdMiceUp(){ let n=0; for(const q of S.foes) if(q && q.bsdMouse && !q.dead) n++; return n; }
+function bsdMouseAt(k,j,sx,sy){   
+  const key='bsdm:'+rxDoorKey()+':'+k+':'+j, a=rxRoll(key+':a')*Math.PI*2, d=BSD.mice.r0+rxRoll(key+':d')*(BSD.mice.r1-BSD.mice.r0), ST=BTW_TOWN.street;
+  const x=Math.max(60, Math.min(W-40, sx+Math.cos(a)*d)), y=Math.max(ST.y0+30, Math.min(ST.y1-14, sy+Math.sin(a)*d*0.6));   
+  return [Math.round(x), Math.round(y)]; }
+function bsdMice(f){   
+  const M=BSD.mice, k=(f.bsdIn=(f.bsdIn|0)+1), up=bsdMiceUp(), n=Math.max(0, Math.min(M.n, M.cap-up)); BSD.stats.ins++;
+  BSD.last={ k:k, t:+(((S.raid && S.raid.bbs)? S.raid.bbs.t : S.t)||0).toFixed(2), x:Math.round(f.x), y:Math.round(f.y), up:up, n:n, at:[] };
+  if(!n){ BSD.stats.capped++; return 0; }
+  const q0=(S.foeSeq||(S.foeSeq={})), seq0=q0.wmouse, P=(bbsTier()==='e')? null : BBS_POSSE; let made=0;
+  try{ for(let j=0;j<n;j++){ const p=bsdMouseAt(k,j,f.x,f.y), m=spawnFoe('wmouse', p[0], p[1], null, false); if(!m) continue;
+      m.bsdMouse=1; m.foN=BSD.fon+k*10+j;   
+      if(P){ if(P.hpX) m.hp=m.hpMax=Math.max(1, Math.round(m.hpMax*P.hpX)); if(P.spdx) m.spdMul=+P.spdx||1; }
+      S.fx.push({ k:'puff', x:p[0], y:p[1]-4, t:0, dur:0.42, R:15 }); made++; BSD.last.at.push(p); } }
+  finally{ if(seq0==null) delete q0.wmouse; else q0.wmouse=seq0; }   
+  BSD.stats.mice+=made; return made; }
+
+
+
+
+
+
+function bsdRead(o){ o=o||{}; if(o.on!=null) BSD.on=o.on? 1 : 0; if(o.reset){ for(const k in BSD.stats) BSD.stats[k]=0; BSD.err=null; BSD.last=null; }
+  const TR=S.cfg && S.cfg.terrain, sn=S.foes? S.foes.find(q=>q && q.bbsSnake) : null;
+  return { cv:GVT_CV, on:BSD.on, live:bsdLive()? 1 : 0, here:bsdOn()? 1 : 0, rideX:BSD.rideX, snakeAt:BSD.snakeAt, mice:Object.assign({}, BSD.mice), raised:TR? (TR.bsdRaised|0) : 0,
+    tops:(TR && Array.isArray(TR.rocks))? TR.rocks.filter(r=>r && r.bsd).map(r=>[r.key, r.x, r.y, r.r]) : [], snake:sn? { st:sn.bbsSnake.st, s2:sn.bbsSnake.s2? sn.bbsSnake.s2.st : null, ins:sn.bsdIn|0, x:Math.round(sn.x), y:Math.round(sn.y), dead:!!sn.dead } : null,
+    miceUp:S.foes? bsdMiceUp() : 0, clock:(S.raid && S.raid.bbs)? +(+S.raid.bbs.t).toFixed(2) : null, last:BSD.last? JSON.parse(JSON.stringify(BSD.last)) : null, stats:Object.assign({}, BSD.stats), err:BSD.err }; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 function keepInit(){ if(OTK) return OTK; let on=1;
   try{ const q=/[?&]keep=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_keep','0'); else localStorage.removeItem('gvt_keep'); } on=(localStorage.getItem('gvt_keep')==='0')? 0 : 1; }catch(e){ on=1; }
   OTK={ on:on, boot:0, loaded:0, done:0, open:0, held:0, raw:null, hi0:'', ack0:0, u0:0, seen:0, busy:0, tries:0, why:'', err:0, n:{ home:0, over:0, pick:0, settle:0, held:0, heal:0, healed:0, ack:0, fetch:0 } };   
@@ -1208395,7 +1208482,7 @@ let BFQ=null;
 
 
 
-let GVT_CV='31.28';
+let GVT_CV='31.29';
 let NX_CAP_MUL=4;
 
 
@@ -4413877,6 +4413964,93 @@ try{ if(typeof BLB_RULES!=='undefined' && Array.isArray(BLB_RULES) && !BLB_RULES
 
 
 try{ if(window.GVT) GVT.wvb=wvbRead; else setTimeout(function(){ try{ if(window.GVT) GVT.wvb=wvbRead; }catch(e){} }, 0); }catch(e){}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const BSD_ON=(function(){ try{ const q=/[?&]bsd=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_bsd','0'); else localStorage.removeItem('gvt_bsd'); } return localStorage.getItem('gvt_bsd')==='0'? 0 : 1; }catch(e){ return 1; } })();
+const BSD_TOPS={   
+  saloon:{ fw:170, fh:80, pw:0,   c:[[22,-27,39],[65,-31,43],[107,-31,43],[144,-28,40],[85,56,24]] },   
+  store: { fw:150, fh:80, pw:0,   c:[[36,-39,51],[74,-32,44],[112,-41,53],[75,60,18]] },     
+  inn:   { fw:170, fh:90, pw:140, c:[[23,-8,20],[64,-19,31],[106,-21,33],[147,-8,20]] },     
+  tower: { fw:62,  fh:62, pw:0,   c:[[31,-19,31]] } };
+const BSD={ on:BSD_ON, rideX:0.8, snakeAt:25, fon:800000, mice:{ n:6, cap:12, r0:40, r1:96 },
+  stats:{ raised:0, circles:0, skip:0, slowF:0, held:0, sleptF:0, ins:0, mice:0, capped:0, errs:0 }, last:null, err:null };
+
+
+
+
+
+
+
+{ const pc0=petChillX; petChillX=function(o){ const k=pc0.apply(this, arguments);
+  try{ if(o && o.type==='wrider' && !o.dead && o.def && o.def.ride && bsdOn() && bsdTramples(o)){ BSD.stats.slowF++; return k*BSD.rideX; } }catch(e){ bsdErr(e); }
+  return k; }; }
+
+
+
+
+
+
+
+
+{ const st0=bbsStreetTerrain; bbsStreetTerrain=function(){ const t=st0.apply(this, arguments);
+  try{ if(t && bsdLive() && typeof BACK==='object' && BACK.laid && typeof OTS==='object' && OTS.laid && typeof BTW==='object' && BTW.laid) bsdRaise(t); }catch(e){ bsdErr(e); }
+  return t; }; }
+
+
+
+{ const w0=snakeWake; snakeWake=function(f){ try{ if(bsdOn() && bsdSnakeAsleep(f) && bsdSnakeEarly()){ BSD.stats.held++; return; } }catch(e){ bsdErr(e); } return w0.apply(this, arguments); }; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+{ const t0=snake2Tick; snake2Tick=function(dt,Bb){ let f=null, st0=null;
+  try{ if(bsdOn()){ f=S.foes.find(q=>q && q.bbsSnake && !q.dead)||null; if(f){ if(bsdSnakeAsleep(f) && bsdSnakeEarly()){ BSD.stats.sleptF++; return; } st0=f.bbsSnake.s2? f.bbsSnake.s2.st : null; } } }catch(e){ bsdErr(e); f=null; }
+  const r=t0.apply(this, arguments);
+  try{ if(f && !f.dead && (st0==='down2' || st0==='rest') && f.bbsSnake && f.bbsSnake.s2 && f.bbsSnake.s2.st==='rise') bsdMice(f); }catch(e){ bsdErr(e); }   
+  return r; }; }
+
+
+
+
+
+
+try{ if(window.GVT) GVT.bsd=bsdRead; else setTimeout(function(){ try{ if(window.GVT) GVT.bsd=bsdRead; }catch(e){} }, 0); }catch(e){}
 
 
 
