@@ -999400,6 +999400,57 @@ function ggrWearRig(ids){ const o=META.outfit; if(!o) return []; o.wear=(ids||[]
 
 
 
+function oadDay(){ try{ return todayStr(); }catch(e){ return ''; } }
+function oadWk(){ try{ return String((BD && BD.wk)||''); }catch(e){ return ''; } }
+function oadSpent(k){   
+  const d=oadDay(); if(!d) return false;
+  if(k==='sale') return META.saleDay===d || (!!OAD.one && META.bdToldDay===d);
+  const wk=oadWk();
+  return (!!wk && META.bdToldWk===wk) || META.bdToldDay===d || (!!OAD.one && META.saleDay===d);
+}
+function oadOver(){ try{ return !!(document.getElementById('sdiStage') || (SPOP && SPOP.el) || (NAOFF && NAOFF.el)); }catch(e){ return false; } }
+function oadNote(k, what){ try{ OAD[what][k]++; if(OAD.log.length<60) OAD.log.push({ k, what, d:oadDay(), wk:oadWk(), launches:META.launches|0 }); }catch(e){} }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1210641,7 +1210692,7 @@ let BFQ=null;
 
 
 
-let GVT_CV='31.46';
+let GVT_CV='31.47';
 let NX_CAP_MUL=4;
 
 
@@ -4423529,6 +4423580,57 @@ bfDressPool=(function(o){ return function(){ const P=o.apply(this,arguments); tr
 
 
 setTimeout(()=>{ try{ if(typeof GVT==='object' && GVT) GVT.ggr={ S:GGR, P:GGR_P, ids:GGR_IDS, run:GGR_RUN, shown:ggrShown, rig:ggrRig, give:ggrGiveRig, wear:ggrWearRig, grant:ggrGrant, part:ggrPartSVG, tile:ggrTileInner, tune:ggrTune, taken:ggrTakenX, troop:ggrTroopX, book:ggrBook, sum:ggrSum, mummy:ggrMummy, toss:ggrTossMine, presents:ggrThrowPresents, zap:ggrZap, teleTo:ggrTeleTo, saves:ggrSaves, stand:ggrStand, afterHit:ggrAfterHit, key:ggrKey, die:ggrDie, heal:ggrHeal, cvImg:ggrCvImg, frac:ggrHealthFrac, thru:ggrThru, mineHit:ggrMineHit, open:ggrOpen }; }catch(e){} },0);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const OAD=(function(){
+  const on=(function(){ try{ const q=/[?&]oad=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_oad','0'); else localStorage.removeItem('gvt_oad'); } return localStorage.getItem('gvt_oad')==='0'? 0 : 1; }catch(e){ return 1; } })();
+  return { on, one:1, hw:'', held:{ sale:0, night:0 }, dealt:{ sale:0, night:0 }, log:[] };
+})();
+window.GVT_OAD=OAD;
+
+
+
+
+
+
+
+
+
+
+if(OAD.on){
+  const _sale=saleSweep; saleSweep=function(){   
+    try{ if(oadSpent('sale')){ if((META.saleDue|0) || (typeof SDI==='object' && SDI && SDI.on && !META.sdiFirst)) oadNote('sale','held'); return false; } }catch(e){}   
+    const r=_sale.apply(this, arguments);
+    if(r){ try{ META.saleDay=oadDay(); saveMeta(); oadNote('sale','dealt'); }catch(e){} }   
+    return r;
+  };
+  const _ann=bdAnnTry; bdAnnTry=function(){   
+    try{ if(oadSpent('night')){ const wk=oadWk(); if(wk && OAD.hw!==wk && BDD.annWk!==wk){ OAD.hw=wk; oadNote('night','held'); } return false; } if(oadOver()) return false; }catch(e){}   
+    const r=_ann.apply(this, arguments);
+    if(r){ try{ META.bdToldWk=oadWk(); META.bdToldDay=oadDay(); saveMeta(); oadNote('night','dealt'); }catch(e){} }   
+    return r;
+  };
+}
+if(window.GVT && !GVT.oad) GVT.oad=function(o){ o=o||{}; if(o.one!=null) OAD.one=o.one? 1 : 0;
+  return { on:OAD.on, one:OAD.one, day:oadDay(), wk:oadWk(), saleDay:META.saleDay||'', saleDue:META.saleDue|0, launches:META.launches|0, sdiFirst:META.sdiFirst|0, bdToldWk:META.bdToldWk||'', bdToldDay:META.bdToldDay||'',
+    annWk:String((BDD && BDD.annWk)||''), spent:{ sale:oadSpent('sale'), night:oadSpent('night') }, held:Object.assign({}, OAD.held), dealt:Object.assign({}, OAD.dealt), log:OAD.log.slice() }; };
 
 
 
