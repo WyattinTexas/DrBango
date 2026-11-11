@@ -998477,6 +998477,220 @@ function crpRead(){ return { on:CRP.on, why:CRP.why, n:Object.assign({}, CRP.n),
 
 
 
+
+
+function pykErr(w,e){ PYK.err++; if(PYK.e.length<400) PYK.e+=w+':'+String(e && e.message || e).slice(0,80)+' '; }
+function pykOn(){ return !!(PYK_ON || S.coop); }
+function pykTier(){ const t=S.raid && S.raid.t; return (t==='m' || t==='h' || t==='g')? t : 'e'; }
+function pykNum(T,d){ const v=+(T && T[pykTier()]); return (isFinite(v) && v>=0)? v : d; }
+function pykLed(){ const rd=S.raid; if(!rd) return null; return rd.pyk || (rd.pyk={ n:0, men:0, planes:0, landed:0, broke:0, fizz:0, cut:0, throne:0, took:{}, log:[] }); }
+function pykLog(ev,o){ const L=pykLed(); if(L && L.log.length<300) L.log.push(Object.assign({ ev:ev, t:+S.t.toFixed(2) }, o||{})); }
+function pykEase(u){ return 0.3*u+0.7*(0.5-0.5*Math.cos(Math.PI*u)); }
+function pykHer(){ for(const f of S.foes){ if(f && f.def && f.def.harp && !f.dead) return f; } return null; }
+function pykSegD(px,py,x0,y0,x1,y1){ const dx=x1-x0, dy=y1-y0, L=dx*dx+dy*dy; let k=L>0? ((px-x0)*dx+(py-y0)*dy)/L : 0; k=Math.max(0,Math.min(1,k)); return Math.hypot(px-(x0+dx*k), py-(y0+dy*k)); }
+function pykClear(x0,y0,x1,y1){ const T9=S.cfg && S.cfg.terrain; if(!T9) return true;   
+  for(const rk of (T9.rocks||[])){ if(pykSegD(rk.x,rk.y,x0,y0,x1,y1)<rk.r+PYK_T.pad) return false; }
+  for(const p of (T9.pits||[])){ if(!p.sky && pykSegD(p.x,p.y,x0,y0,x1,y1)<p.r+PYK_T.pad) return false; }
+  return true; }
+function pykSpotOK(x,y){ if(x<40 || x>W-40 || y<60 || y>WORLD_H-84) return false; const T9=S.cfg && S.cfg.terrain; if(!T9) return true;
+  for(const rk of (T9.rocks||[])){ if(Math.hypot(rk.x-x,rk.y-y)<rk.r+16) return false; }
+  for(const p of (T9.pits||[])){ if(!p.sky && Math.hypot(p.x-x,p.y-y)<p.r+PIT_KEEP) return false; }
+  return true; }
+function pykFeet(f,far,fx){ const sd=(fx!=null && fx>f.x)? 1 : -1, k=far? 1.5 : 1;   
+  for(const o of [[30,14],[30,-14],[-30,14],[-30,-14],[0,22],[0,-22]]){ const x=f.x+sd*o[0]*k, y=f.y+o[1]*k; if(pykSpotOK(x,y)) return [x,y]; }
+  return [f.x,f.y]; }
+function pykManOK(u){ const d=u && u.def; return !!(u && !u.dead && u.type!=='sarge' && HEROES.indexOf(u.type)<0 && !(d && (d.vehicle || d.rider || d.lob || d.bur || d.fly)) && !(u.jetT>0) && !(u.cloakT>0) && !u.falling && !(u.dropT>0) && !u.shv && !(u.kyHeldT>0) && !u.trk && !u.coopBy && !u.kbMount && !u.hlbAir && !u.gmyAir && !u.pcBig && !(S.drag && S.drag.unit===u)); }
+function pykPlaneOK(p){ return !!(p && !p.down && !p.gone && !p.pyk && p.st && p.alt>=DF_ALT*0.5); }
+function pykPick(f){ const R=pykNum(PYK_REACH,380); let best=null, bd=R, any=false;   
+  for(const u of S.units){ if(!pykManOK(u)) continue; const d=Math.hypot(u.x-f.x,u.y-f.y); if(d>R) continue; any=true; if(d<PYK_T.near) continue; if(d<bd && pykClear(f.x,f.y,u.x,u.y)){ bd=d; best=u; } }
+  if(best) return { k:'man', u:best, d:bd };
+  if(any || !(pykNum(PYK_PLANE,1)>0) || !S.dfs) return null;
+  let bp=null; bd=R; for(const p of S.dfs){ if(!pykPlaneOK(p)) continue; const d=Math.hypot(p.gx-f.x,p.gy-f.y); if(d<bd){ bd=d; bp=p; } }
+  return bp? { k:'plane', p:bp, d:bd } : null; }
+function pykAt(Y){ try{ if(Y.k==='plane'){ const p=Y.p; return p? [p.x, p.y-6, p.gx, p.gy] : null; } const u=Y.u; return u? [u.x, u.y-30-((u.kyHeldT>0)? PYK_T.lift : 0), u.x, u.y] : null; }catch(e){ return null; } }
+function pykThrone(f){ if((f.pcLife||1)<2 || f.pcRet) return false; const Y=f.pyk, sp=(Y && Y.sp) || pcStage(); if(Y) Y.sp=sp; return Math.hypot(f.x-sp[0],f.y-sp[1])<=PYK_T.stageR; }
+function pykFree(f,D){ return !(f.pcRet || D.st!=='roam' || f.pcHopT>0 || f.pcTell>0 || f.pflArrow>0 || D.openT>0 || f.x>W-80 || f.falling || f.pendDie || pcNearest(f,f.def.harp.killR,true)); }
+function pykLandMax(){ let k=1; try{ if(megaActive()) k*=1.2; }catch(e){} try{ k*=befDmgX(); }catch(e){} return Math.max(0.05,k*1.1); }
+function pykBite(u,f){ const left=gritCap(u)-(u.hits||0); let p=PYK_T.hit; const room=(left-PYK_T.keep)/pykLandMax(); if(p>room) p=room;   
+  if(!(p>0.01)){ PYK.n.spared++; return 0; } const h0=u.hits||0; f.pipN=p; try{ tanHit(u,f.x,f.y,f); } finally { f.pipN=0; } return (u.hits||0)-h0; }
+function pykCdNext(f){ return pykThrone(f)? pykNum(PYK_THRONE,5) : pykNum(PYK_CD,14); }
+function pykTell(f,Y,T){ Y.st='tell'; Y.t=0; Y.k=T.k; Y.u=T.u||null; Y.p=T.p||null; Y.thr=pykThrone(f)? 1 : 0; Y.back=null; Y.cd=pykCdNext(f); f.pcPluck=0;
+  try{ foeAim(f, T.u || { x:T.p.gx, y:T.p.gy }); }catch(e){}
+  PYK.n.tell++; const L=pykLed(), who=T.u? T.u.type : 'dogfighter'; if(L){ L.n++; if(Y.thr) L.throne++; }
+  tdLog(f,'yoink-tell',[T.k, who, Math.round(T.d)]); pykLog('tell',{ k:T.k, who:who, d:Math.round(T.d), thr:Y.thr, hp:+(f.hp/Math.max(1,f.hpMax)).toFixed(3) }); }
+function pykEnd(f,Y,why){ const st=Y.st, A=pykAt(Y), L=pykLed(), who=Y.u? Y.u.type : (Y.p? 'dogfighter' : null);   
+  if(st==='reel'){ if(Y.k==='plane'){ if(Y.p && Y.p.pyk) pykPlaneFree(Y.p,'drop'); } else if(Y.u && !Y.u.dead){ Y.u.kyHeldT=0; } }   
+  if((st==='out' || st==='reel') && A){ const e0=(st==='out')? 1-Math.pow(1-Math.min(1,Y.t/PYK_T.out),2) : 1; Y.back={ t0:S.t, x:A[0], y:A[1], gy:A[3], ext:e0 }; }
+  if(why==='broke'){ PYK.n.broke++; if(L) L.broke++; if(A) S.fx.push({k:'ring',x:A[0],y:A[1],r:5,R:30,t:0,dur:0.28,col:'#FFFFFF'}); bfSfx(PYKV.snap,f.x,f.y); }
+  else if(why==='cut'){ PYK.n.cut++; if(L) L.cut++; }
+  else { PYK.n.fizz++; if(L) L.fizz++; Y.cd=Math.min(Y.cd,PYK_T.retry); }
+  tdLog(f,'yoink-'+why,[st, who]); pykLog(why,{ at:st, who:who, hp:+(f.hp/Math.max(1,f.hpMax)).toFixed(3) });
+  Y.st=null; Y.t=0; Y.u=null; Y.p=null; }
+function pykLand(f,Y,D){ const L=pykLed(), A0=pykAt(Y);   
+  if(Y.k==='plane'){ const p=Y.p, K=p.pyk, h0=p.hp; K.st='ground'; K.t=0; K.gx=Y.x1; K.gy=Y.y1; K.alt=0; K.bank=0; K.hd=(Math.cos(K.hd)>=0)? 0 : Math.PI; K.peck=PYK_T.peckCd*0.5;    
+    p.hp=Math.max(Math.min(p.hp,1), p.hp-PYK_T.planeHp*p.hpMax);
+    S.fx.push({k:'puff',x:Y.x1,y:Y.y1-4,t:0,dur:0.4,R:24}); S.fx.push({k:'ring',x:Y.x1,y:Y.y1,r:8,R:44,t:0,dur:0.35,col:'rgba(255,255,255,0.6)'}); bfSfx(SFX.thump||SFX.thock,Y.x1,Y.y1); if(!reducedMotion()) S.shake=Math.max(S.shake||0,0.16);
+    PYK.n.planeLand++; if(L){ L.planes++; L.landed++; L.took.dogfighter=(L.took.dogfighter|0)+1; }
+    tdLog(f,'yoink-land',['dogfighter', +h0.toFixed(2), +p.hp.toFixed(2)]); pykLog('land',{ who:'dogfighter', hp0:+h0.toFixed(2), hp1:+p.hp.toFixed(2), max:p.hpMax, x:Math.round(Y.x1), y:Math.round(Y.y1) }); }
+  else { const u=Y.u; u.x=Y.x1; u.y=Y.y1; u.kyHeldT=0; const got=pykBite(u,f); if(!u.dead){ u.haltT=Math.max(u.haltT||0,PYK_T.stun); u.marching=false; Y.dz={ u:u, t0:S.t, dur:PYK_T.stun }; }
+    S.fx.push({k:'puff',x:u.x,y:u.y+2,t:0,dur:0.3,R:14}); bfSfx(SFX.thock,u.x,u.y);
+    PYK.n.land++; if(L){ L.men++; L.landed++; L.took[u.type]=(L.took[u.type]|0)+1; }
+    tdLog(f,'yoink-land',[u.type, +got.toFixed(2), !!u.dead]); pykLog('land',{ who:u.type, hit:+got.toFixed(3), left:+(gritCap(u)-(u.hits||0)).toFixed(3), dead:u.dead? 1 : 0, x:Math.round(u.x), y:Math.round(u.y) }); }
+  D.shotCd=Math.max(D.shotCd,PYK_T.after);   
+  if(A0) Y.back={ t0:S.t, x:A0[0], y:A0[1], gy:A0[3], ext:1 };
+  Y.st=null; Y.t=0; Y.u=null; Y.p=null; }
+function pykPlaneFree(p,why){ p.pyk=null; p.st=null; p.bank=0; p.altT=DF_ALT; p.hd=(p.boxDir>0)? Math.PI : 0; p.spdNow=p.spd; PYK.n.planeFree++; pykLog('plane-'+why,{ hp:+(+p.hp).toFixed(2) }); }
+function pykRun(f,Y,D,dt){   
+  if(Y.cd>0) Y.cd=Math.max(0,Y.cd-dt);
+  if(f.pcRet || f.dead || !(f.hp>0) || D.st!=='roam'){ pykEnd(f,Y,'cut'); return false; }
+  const pl=(Y.k==='plane'), ok=pl? !!(Y.p && !Y.p.down && !Y.p.gone && S.dfs && S.dfs.indexOf(Y.p)>=0) : !!(Y.u && !Y.u.dead && S.units.indexOf(Y.u)>=0 && !(S.drag && S.drag.unit===Y.u) && !(Y.u.jetT>0) && !Y.u.falling);
+  if(!ok){ pykEnd(f,Y,'lost'); return false; }
+  Y.t+=dt;
+  if(Y.st==='tell' || Y.st==='out'){ const A=pykAt(Y);
+    if(!A || Math.hypot(A[2]-f.x,A[3]-f.y)>pykNum(PYK_REACH,380)*1.25 || (!pl && !pykManOK(Y.u))){ pykEnd(f,Y,'far'); return false; }
+    if(Y.st==='tell'){ if(Y.t>=PYK_T.tell){ Y.st='out'; Y.t=0; PYK.n.out++; bfSfx(PYKV.thwip,f.x,f.y); tdLog(f,'yoink-out'); } return true; }
+    if(Y.t<PYK_T.out) return true;
+    const Lp=pykFeet(f,pl,A[2]); if(!pl && !pykClear(A[2],A[3],Lp[0],Lp[1])){ pykEnd(f,Y,'miss'); return false; }   
+    Y.st='reel'; Y.t=0; Y.x0=A[2]; Y.y0=A[3]; Y.x1=Lp[0]; Y.y1=Lp[1]; Y.hp0=f.hp; PYK.n.stick++;
+    if(pl){ const p=Y.p, a0=Math.min(p.alt,DF_ALT-1); p.pyk={ st:'drag', f:f, t:0, a0:a0, gx:p.gx, gy:p.gy, alt:a0, hd:Math.atan2(Y.y1-p.gy,Y.x1-p.gx), bank:0, peck:0 }; p.st=null; p.run=null; p.roll=null; p.hunt=null; p.wing=0; p.wingBox=0; p.aceLoop=null; p.alt=a0; PYK.n.plane++; bfSfx(SFX.thock,A[0],A[1]); }
+    else { Y.u.kyHeldT=Math.max(Y.u.kyHeldT||0,0.25); Y.u.marching=false; bfSfx(SFX.ouch,A[0],A[1]); }
+    bfSfx(PYKV.stretch,f.x,f.y); S.fx.push({k:'ring',x:A[0],y:A[1],r:4,R:22,t:0,dur:0.22,col:'rgba(247,179,196,0.95)'});
+    tdLog(f,'yoink-stick',[pl? 'dogfighter' : Y.u.type, Math.round(Y.x0), Math.round(Y.y0)]); pykLog('stick',{ who:pl? 'dogfighter' : Y.u.type, x:Math.round(Y.x0), y:Math.round(Y.y0), to:[Math.round(Y.x1),Math.round(Y.y1)] });
+    return true; }
+  
+  if(Y.hp0-f.hp>=pykNum(PYK_BREAK,0.05)*f.hpMax-1e-6){ pykEnd(f,Y,'broke'); return false; }   
+  const k=Math.min(1,Y.t/PYK_T.reel), e=pykEase(k);
+  if(pl){ const K=Y.p.pyk; if(!K){ pykEnd(f,Y,'lost'); return false; } K.gx=Y.x0+(Y.x1-Y.x0)*e; K.gy=Y.y0+(Y.y1-Y.y0)*e; K.alt=K.a0*(1-e); K.bank=reducedMotion()? 0 : Math.sin(Y.t*22)*0.35*(1-k); }
+  else { const u=Y.u; u.x=Y.x0+(Y.x1-Y.x0)*e; u.y=Y.y0+(Y.y1-Y.y0)*e; u.kyHeldT=Math.max(u.kyHeldT||0,0.25); u.marching=false; }
+  if(k>=1) pykLand(f,Y,D);
+  return true; }
+function pykTick(f,dt){ const D=f.duel; if(!D) return false;   
+  const Y=f.pyk || (f.pyk={ cd:pykNum(PYK_CD,14)*PYK_T.first, st:null, t:0, k:null, u:null, p:null, scan:0, ret:0, sp:null, back:null, dz:null, thr:0 });
+  if(Y.st) return pykRun(f,Y,D,dt);
+  if(f.pcRet){ Y.ret=1; if(Y.cd>0) Y.cd=Math.max(0,Y.cd-dt); return false; }
+  const thr=pykThrone(f);
+  if(Y.ret){ Y.ret=0; if(thr) Y.cd=Math.min(Y.cd,PYK_T.throneIn); }   
+  if(thr) Y.cd=Math.min(Y.cd,pykNum(PYK_THRONE,5));
+  if(Y.cd>0){ Y.cd-=dt; if(Y.cd>0) return false; Y.cd=0; Y.scan=0; }
+  Y.scan-=dt; if(Y.scan>0) return false; Y.scan=PYK_T.scan;
+  if(!pykFree(f,D)) return false;
+  const T=pykPick(f); if(!T) return false;
+  pykTell(f,Y,T); return true; }
+function pykHarp(f,dt){ const D=f.duel; if(!D || D.st!=='roam' || f.pcRet || f.pcTell>0 || f.pcHopT>0 || !S.dfs || !S.dfs.length || !(D.shotCd-dt<=0)) return;   
+  let p=null; for(const q of S.dfs){ if(q.pyk && q.pyk.st==='ground' && q.pyk.f===f && !q.down && !q.gone){ p=q; break; } } if(!p) return;
+  const R=frng(f); if(Math.hypot(p.gx-f.x,p.gy-f.y)>R || pcNearest(f,R,false)) return;
+  const SH=PC_SHOT[pykTier()]||PC_SHOT.e; D.shotCd=SH.cd+dt; f.pcPluck=0.3; pcpShotFx(f.x-26,f.y-60,p.x,p.y-8,false); { const m9=phNext(f); bfSfx(function(){ PCV.shot(m9); },f.x,f.y); } dfHit(p,SH.pips,f); PYK.n.harp++; }
+function pykPlanes(dt){ if(!S.dfs) return;   
+  for(const p of S.dfs){ const K=p.pyk; if(!K) continue; if(p.down || p.gone){ p.pyk=null; continue; }
+    const f=K.f, her=!!(f && !f.dead && f.hp>0 && S.foes.indexOf(f)>=0);
+    if(K.st==='drag'){ if(!her || !f.pyk || f.pyk.p!==p || f.pyk.st!=='reel'){ pykPlaneFree(p,'drop'); continue; } }
+    else { K.t+=dt; if(!her || K.t>=PYK_T.ground){ pykPlaneFree(p,'up'); continue; }
+      K.peck-=dt; if(K.peck<=0){ K.peck=PYK_T.peckCd;   
+        for(const o of S.foes){ if(!o || o.dead || !(o.hp>0) || o.boss || o.falling || o.burrow || (o.def && (o.def.boss || o.def.bubbleOf || o.def.mine))) continue; if(Math.hypot(o.x-K.gx,o.y-K.gy)>PYK_T.peckR) continue;
+          S.fx.push({k:'tracer',x1:o.x,y1:o.y-16,x2:K.gx,y2:K.gy-10,t:0,dur:0.12,col:'#FFE39A',w:2}); dfHit(p,PYK_T.peckHit,o); PYK.n.peck++; if(p.down || p.gone) break; } }
+      if(p.down || p.gone){ p.pyk=null; continue; } }
+    p.st=null; p.gx=K.gx; p.gy=K.gy; p.alt=K.alt; p.hd=K.hd; p.bank=K.bank; p.spdNow=0; dfPlace(p); } }
+
+function pykXf(f){ const D=f.duel||{}, air=(D.st==='charge' || f.pcHopT>0 || (f.pcRet && f.pcRet.st==='fly')), w=air? 0 : Math.sin(S.t*(2*Math.PI/12.48))*0.014+Math.sin(S.t*(2*Math.PI/9.36))*0.02; return { fl:foeFl(f)? -1 : 1, w:w, c:Math.cos(w), s:Math.sin(w), x:f.x, y:f.y-(f.hopZ||0) }; }
+function pykPt(X,l){ return [X.x+X.fl*(l[0]*X.c-l[1]*X.s), X.y+(l[0]*X.s+l[1]*X.c)]; }
+function pykStar(x,y,r,col,rim){ cx.fillStyle=col; cx.beginPath(); for(let i=0;i<8;i++){ const a=i*Math.PI/4-Math.PI/2, q=(i&1)? r*0.36 : r; if(i) cx.lineTo(x+Math.cos(a)*q,y+Math.sin(a)*q); else cx.moveTo(x+Math.cos(a)*q,y+Math.sin(a)*q); } cx.closePath(); cx.fill(); if(rim){ cx.strokeStyle=rim; cx.lineWidth=0.9; cx.stroke(); } }
+function pykSwell(Y){ if(Y.st==='tell') return Math.min(1,Y.t/PYK_T.tell); if(Y.st) return 1; if(Y.back) return Math.max(0,1-(S.t-Y.back.t0)/PYK_T.back); return 0; }
+function pykDrawHer(f,Y){ const k0=pykSwell(Y); if(!(k0>0)) return; const k=k0*k0*(3-2*k0), X=pykXf(f), C=PYK_ART, a1=Math.min(1,k*1.6);
+  if(Y.st==='tell'){ cx.strokeStyle='rgba('+C.ring+',0.9)'; cx.lineWidth=2; cx.beginPath(); cx.ellipse(f.x,f.y+2,30+4*k,10+1.4*k,0,0,7); cx.stroke(); }   
+  cx.save(); cx.translate(X.x,X.y); cx.scale(X.fl,1); cx.rotate(X.w);
+  for(let i=0;i<2;i++){ const c=C.cheek[i], sd=i? 1 : -1, bx=c[0]+sd*2.6*k, by=c[1]+0.6*k, rx=2.6+5.2*k, ry=1.8+4.6*k;   
+    const g=cx.createLinearGradient(0,by-ry,0,by+ry); g.addColorStop(0,C.skinHi); g.addColorStop(0.55,C.skin); g.addColorStop(1,C.skinLo);
+    cx.globalAlpha=a1; cx.fillStyle=g; cx.beginPath(); cx.ellipse(bx,by,rx,ry,0,0,7); cx.fill();
+    cx.globalAlpha=0.55*a1; cx.strokeStyle=C.rim; cx.lineWidth=0.9; cx.stroke();
+    cx.globalAlpha=a1; cx.fillStyle=C.blush; cx.beginPath(); cx.ellipse(bx+sd*0.4*k,by+0.3,rx*0.56,ry*0.42,0,0,7); cx.fill();
+    cx.globalAlpha=0.5*a1; cx.fillStyle='#FFFFFF'; cx.beginPath(); cx.ellipse(bx-sd*rx*0.2,by-ry*0.5,rx*0.26,ry*0.16,0,0,7); cx.fill(); }
+  cx.globalAlpha=1;
+  if(Y.st==='tell' && !reducedMotion()){ const g9=Math.max(0,1-Y.t/0.32); if(g9>0) for(const e of C.eye) pykStar(e[0]-1.2,e[1]-1.2,3.4*g9+1,'rgba(255,255,255,'+(0.95*g9).toFixed(2)+')'); }   
+  if(Y.st==='out' || Y.st==='reel' || (!Y.st && Y.back)){ cx.fillStyle=C.gape; cx.beginPath(); cx.ellipse(C.mouth[0],C.mouth[1]+0.4,3.3*k,2.5*k,0,0,7); cx.fill(); }   
+  cx.restore(); }
+function pykDrawMark(f,Y){ const A=pykAt(Y); if(!A) return; const k=Math.min(1,Y.t/PYK_T.tell), r=reducedMotion()? 17 : 31-15*k, my=(Y.k==='plane')? A[1] : A[3]-22;   
+  cx.strokeStyle='rgba('+PYK_ART.ring+','+(0.4+0.55*k).toFixed(2)+')'; cx.lineWidth=2.2; cx.beginPath(); cx.arc(A[2],my,r,0,7); cx.stroke(); }
+function pykDrawTongue(f,Y){ const C=PYK_ART, M=pykPt(pykXf(f),C.mouth); let T=null, ext=1;
+  if(Y.st==='tell'){ const t0=PYK_T.tell-PYK_T.aim; if(Y.t<t0) return; const A=pykAt(Y); if(!A) return; const a=Math.min(1,(Y.t-t0)/PYK_T.aim);   
+    cx.strokeStyle='rgba('+C.ring+','+(0.2+0.3*a).toFixed(2)+')'; cx.lineWidth=2; cx.beginPath(); cx.moveTo(M[0],M[1]); cx.lineTo(A[0],A[1]); cx.stroke(); return; }
+  if(Y.st==='out'){ const A=pykAt(Y); if(!A) return; T=A; const u=Math.min(1,Y.t/PYK_T.out); ext=1-(1-u)*(1-u); }
+  else if(Y.st==='reel'){ const A=pykAt(Y); if(!A) return; T=A; }
+  else if(Y.back){ T=[Y.back.x,Y.back.y]; ext=Math.max(0,(Y.back.ext||1)*(1-(S.t-Y.back.t0)/PYK_T.back)); }
+  if(!T || !(ext>0.01)) return;
+  const mx=(M[0]+T[0])/2+(T[1]-M[1])*0.1, my=(M[1]+T[1])/2-Math.abs(T[0]-M[0])*0.08-12, n=16;   
+  const q=function(k){ const a=1-k; return [a*a*M[0]+2*a*k*mx+k*k*T[0], a*a*M[1]+2*a*k*my+k*k*T[1]]; };
+  const path=function(dy){ cx.beginPath(); for(let i=0;i<=n;i++){ const p=q(ext*i/n); if(i) cx.lineTo(p[0],p[1]+dy); else cx.moveTo(p[0],p[1]+dy); } };
+  cx.save(); cx.lineCap='round'; cx.lineJoin='round';
+  path(0); cx.strokeStyle=C.edge; cx.lineWidth=7.6; cx.stroke();   
+  path(0); cx.strokeStyle=C.band; cx.lineWidth=5.4; cx.stroke();   
+  path(-1.3); cx.globalAlpha=0.8; cx.strokeStyle=C.lite; cx.lineWidth=1.5; cx.stroke(); cx.globalAlpha=1;   
+  const tp=q(ext); cx.fillStyle=C.band; cx.beginPath(); cx.arc(tp[0],tp[1],6.2,0,7); cx.fill(); cx.globalAlpha=0.55; cx.strokeStyle=C.edge; cx.lineWidth=1.6; cx.stroke(); cx.globalAlpha=1;   
+  cx.fillStyle=C.spot; cx.beginPath(); cx.arc(tp[0]-1.9,tp[1]-2.1,1.9,0,7); cx.fill();
+  cx.restore(); }
+function pykDrawDaze(Z){ const u=Z.u, t=S.t-Z.t0, a=Math.max(0,Math.min(1,(Z.dur-t)/0.25)), RM=reducedMotion();   
+  for(let i=0;i<3;i++){ const an=(RM? 0 : t*5.2)+i*2.094; pykStar(u.x+Math.cos(an)*12, u.y-56+Math.sin(an)*3.8, 4.2, 'rgba(255,226,110,'+(0.97*a).toFixed(2)+')', 'rgba(168,118,20,'+(0.55*a).toFixed(2)+')'); } }
+function pykActors(A){ const f=pykHer(); if(!f) return; const Y=f.pyk; if(!Y) return;
+  if(Y.st){ const At=pykAt(Y); if(At){ A.push({ y:f.y+0.4, f:function(){ pykDrawHer(f,Y); } }); if(Y.st==='tell') A.push({ y:At[3]-0.3, f:function(){ pykDrawMark(f,Y); } }); A.push({ y:Math.max(f.y,At[3])+0.6, f:function(){ pykDrawTongue(f,Y); } }); } }
+  else if(Y.back && S.t-Y.back.t0<PYK_T.back){ A.push({ y:f.y+0.4, f:function(){ pykDrawHer(f,Y); } }); A.push({ y:Math.max(f.y,Y.back.gy)+0.6, f:function(){ pykDrawTongue(f,Y); } }); }
+  const Z=Y.dz; if(Z){ if(Z.u.dead || S.t-Z.t0>=Z.dur) Y.dz=null; else A.push({ y:Z.u.y+0.6, f:function(){ pykDrawDaze(Z); } }); } }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function pykRead(o){ o=o||{}; const f=(typeof S==='object' && S && S.foes)? pykHer() : null, Y=f && f.pyk, L=(typeof S==='object' && S && S.raid && S.raid.pyk) || null;
+  try{ if(Y){ if(o.now){ Y.cd=0; Y.scan=0; } if(o.cd!=null && isFinite(+o.cd)) Y.cd=Math.max(0,+o.cd); } }catch(e){}
+  return { cv:GVT_CV, on:pykOn()? 1 : 0, sw:PYK_ON, wrapped:PYK.wrapped, err:PYK.err, e:PYK.e, n:Object.assign({},PYK.n), dials:{ cd:Object.assign({},PYK_CD), throne:Object.assign({},PYK_THRONE), reach:Object.assign({},PYK_REACH), brk:Object.assign({},PYK_BREAK), plane:Object.assign({},PYK_PLANE), t:Object.assign({},PYK_T) },
+    her:f? { x:+f.x.toFixed(1), y:+f.y.toFixed(1), hp:+(+f.hp).toFixed(2), max:f.hpMax, life:f.pcLife||1, ret:f.pcRet? f.pcRet.st : null, st:f.duel? f.duel.st : null, shotCd:f.duel? +(+f.duel.shotCd).toFixed(3) : null, thr:pykThrone(f)? 1 : 0, mouth:pykPt(pykXf(f),PYK_ART.mouth).map(function(v){ return +v.toFixed(1); }),
+      yk:Y? { st:Y.st, t:+(+Y.t).toFixed(3), cd:+(+Y.cd).toFixed(3), k:Y.k, who:Y.u? Y.u.type : (Y.p? 'dogfighter' : null), id:Y.u? Y.u.id : (Y.p? Y.p.id : null) } : null } : null,
+    led:L? JSON.parse(JSON.stringify(L)) : null }; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 function keepInit(){ if(OTK) return OTK; let on=1;
   try{ const q=/[?&]keep=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_keep','0'); else localStorage.removeItem('gvt_keep'); } on=(localStorage.getItem('gvt_keep')==='0')? 0 : 1; }catch(e){ on=1; }
   OTK={ on:on, boot:0, loaded:0, done:0, open:0, held:0, raw:null, hi0:'', ack0:0, u0:0, seen:0, busy:0, tries:0, why:'', err:0, n:{ home:0, over:0, pick:0, settle:0, held:0, heal:0, healed:0, ack:0, fetch:0 } };   
@@ -1210296,7 +1210510,7 @@ let BFQ=null;
 
 
 
-let GVT_CV='31.44';
+let GVT_CV='31.45';
 let NX_CAP_MUL=4;
 
 
@@ -4421505,6 +4421719,220 @@ const CRP={ on:0, why:'', n:{ look:0, fx:0, seen:0, ask:0, paint:0, put:0, hit:0
   }catch(e){ CRP.on=0; CRP.why='failed to start: '+String(e && e.message || e).slice(0, 80); } })();
 try{ if(window.GVT && !GVT.crp) GVT.crp=crpRead; }catch(e){}
 setTimeout(function(){ try{ if(window.GVT && !GVT.crp) GVT.crp=crpRead; }catch(e){} }, 0);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const PYK_ON=(function(){ try{ const q=/[?&]pyk=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_pyk','0'); else localStorage.removeItem('gvt_pyk'); } return localStorage.getItem('gvt_pyk')==='0'? 0 : 1; }catch(e){ return 1; } })();
+const PYK_CD={ e:14, m:11, h:9, g:7 };
+const PYK_THRONE={ e:5, m:5, h:5, g:5 };
+const PYK_REACH={ e:380, m:380, h:380, g:380 };
+const PYK_BREAK={ e:0.05, m:0.05, h:0.05, g:0.05 };
+const PYK_PLANE={ e:1, m:1, h:1, g:1 };
+const PYK_T={ tell:0.6, aim:0.2, out:0.18, reel:0.8, back:0.14, hit:1, keep:1.05, stun:1, after:0.8, first:0.5, retry:1.5, scan:0.25, near:70, stageR:120, throneIn:1, pad:6, lift:17, planeHp:0.5, ground:3, peckR:90, peckCd:1, peckHit:1 };
+const PYK_ART={ mouth:[8.75,-64.2], cheek:[[-1.7,-67.7],[18.3,-70.5]], eye:[[-0.4,-77],[14.2,-78.8]], edge:'#B24A68', band:'#E8708E', lite:'#F7B3C4', spot:'#FBD3DD', ring:'240,120,150', skin:'#63A554', skinHi:'#8CC878', skinLo:'#4C8C43', rim:'#2F6E2A', blush:'#F39AB0', gape:'#7E2740' };
+const PYK={ n:{ tell:0, out:0, stick:0, land:0, broke:0, fizz:0, cut:0, spared:0, plane:0, planeLand:0, planeFree:0, peck:0, harp:0 }, err:0, e:'', wrapped:0 };
+const PYKV={   
+  thwip:function(){ noise(0.07,0.2,2600); tone(340,1500,0.07,'sine',0.07); tone(210,120,0.1,'sine',0.09); },
+  stretch:function(){ tone(150,330,PYK_T.reel,'triangle',0.045); tone(153,338,PYK_T.reel,'sawtooth',0.012); },
+  snap:function(){ noise(0.05,0.16,3200); tone(900,240,0.09,'square',0.05); } };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+{ const up0=updateFoePrincess; updateFoePrincess=function(f,dt){ let own=false;
+    try{ if(f && f.def && f.def.harp && pykOn() && palaceRaid()){ own=pykTick(f,dt); if(!own) pykHarp(f,dt); } else if(f && f.pyk && f.pyk.st) pykEnd(f,f.pyk,'cut'); }
+    catch(e){ pykErr('tick',e); own=false; try{ const Y=f && f.pyk; if(Y){ if(Y.u && Y.st==='reel') Y.u.kyHeldT=0; Y.st=null; Y.u=null; Y.p=null; Y.cd=pykNum(PYK_CD,14); } }catch(e2){} }
+    if(own) return;   
+    return up0.apply(this,arguments); };
+  PYK.wrapped++; }
+{ const oa0=olvActors; olvActors=function(A){ const r=oa0.apply(this,arguments); try{ if(S.cfg && !S.bf && pykOn() && palaceRaid()) pykActors(A); }catch(e){ pykErr('act',e); } return r; };
+  PYK.wrapped++; }
+{ const dp0=dfPass; dfPass=function(dt){ const r=dp0.apply(this,arguments); try{ if(S.dfs && S.dfs.length && S.mode==='play') pykPlanes(dt); }catch(e){ pykErr('df',e); } return r; };
+  PYK.wrapped++; }
+
+if(PYK_ON){ try{ if(typeof BLB_RULES!=='undefined' && Array.isArray(BLB_RULES) && !BLB_RULES.some(function(r){ return r[0]==='PYK_CD'; })){
+  BLB_RULES.push(['PYK_CD', ()=>PYK_CD, 'THE TONGUE YOINK: seconds between yoinks (CARD-PYK)', 'palace'], ['PYK_THRONE', ()=>PYK_THRONE, 'THE TONGUE YOINK FROM HER THRONE: seconds between yoinks while she stands on her stage after a retreat', 'palace'],
+    ['PYK_REACH', ()=>PYK_REACH, 'THE TONGUE YOINK: her reach (px)', 'palace'], ['PYK_BREAK', ()=>PYK_BREAK, 'THE TONGUE YOINK: the share of her bar landed during the reel that makes her let go (0.05 = 5%)', 'palace'],
+    ['PYK_PLANE', ()=>PYK_PLANE, 'THE TONGUE YOINK: 1 = a Dogfighter in reach is pulled down when no man stands in reach, 0 = never', 'palace']);
+  if(typeof blbShip==='function' && typeof BLB==='object' && BLB && BLB.ship) blbShip();
+  if(typeof BLB==='object' && BLB && BLB.booted && BLB.over && typeof blbCellSet==='function') for(const id of ['PYK_CD','PYK_THRONE','PYK_REACH','PYK_BREAK','PYK_PLANE']){ const o=BLB.over[id]; if(o) for(const k of Object.keys(o)) blbCellSet(id,k,o[k]); }
+} }catch(e){ pykErr('blb',e); } }
+
+
+
+
+
+
+setTimeout(function(){ try{ if(window.GVT && !GVT.pyk) GVT.pyk=function(o){ return pykRead(o); }; }catch(e){} }, 0);
 
 
 
