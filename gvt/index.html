@@ -998130,6 +998130,167 @@ function pkbRead(){ const F=(PKB.fs && PKB.fs.cfg===S.cfg)? PKB.fs : null;
 
 
 
+function crpGate(){ let w='';
+  try{ const q=/[?&]crp=(0|1|auto)(?![\w])/.exec(location.search||''); if(q){ if(q[1]==='auto') localStorage.removeItem('gvt_crp'); else localStorage.setItem('gvt_crp', q[1]); } w=localStorage.getItem('gvt_crp')||''; }catch(e){}
+  if(w==='0') return [0, 'off on this device (gvt_crp 0)'];
+  const dpr=window.devicePixelRatio||1;
+  if(w==='1') return [1, 'on on this device (gvt_crp 1), '+dpr+' dots a point'];
+  const ua=navigator.userAgent||'';
+  if(navigator.userAgentData) return [0, 'not WebKit (Chromium)'];   
+  const wk=!!window.__rslEarly || (/AppleWebKit\//.test(ua) && /Safari\//.test(ua) && !/Chrome\/|Chromium\/|CriOS\/|Edg\/|EdgiOS\/|OPR\/|Android|Firefox\/|FxiOS\/|Electron\//.test(ua));   
+  if(!wk) return [0, 'not WebKit'];
+  if(dpr<1.5) return [0, 'WebKit at '+dpr+' dot a point (her filters already sharp)'];
+  return [1, 'WebKit at '+dpr+' dots a point']; }
+function crpFx(s){ return typeof s==='string' && s.length>80 && s.lastIndexOf('data:image/svg+xml', 0)===0 && (s.indexOf('%3Cfilter')>0 || s.indexOf('<filter')>0); }
+function crpDec(s){ const i=s.indexOf(','); if(i<0 || /;base64/i.test(s.slice(0, i))) return null; return decodeURIComponent(s.slice(i+1)); }
+function crpBad(svg){ return /<(?:animate|animateTransform|animateMotion|set|foreignObject|script|video|audio|iframe)\b|@keyframes|[;{"'\s]animation(?:-name)?\s*:|\bhref\s*=\s*["']\s*(?:https?:|\/\/)/i.test(svg); }
+function crpNat(svg){   
+  const m=/<svg\b([^>]*)>/.exec(svg); if(!m) return null; const a=m[1];
+  const at=function(n){ const r=new RegExp('\\s'+n+'\\s*=\\s*["\']\\s*([0-9.]+)\\s*(px)?\\s*["\']').exec(a); return r? +r[1] : 0; };
+  const w=at('width'), h=at('height'), vb=/\sviewBox\s*=\s*["']\s*[-0-9.eE]+[\s,]+[-0-9.eE]+[\s,]+([0-9.eE]+)[\s,]+([0-9.eE]+)/.exec(a);
+  const ar=(vb && +vb[1]>0 && +vb[2]>0)? (+vb[1])/(+vb[2]) : 0;
+  if(w && h) return [w, h]; if(w && ar) return [w, w/ar]; if(h && ar) return [h*ar, h];
+  if(ar) return ar>=2? [300, 300/ar] : [150*ar, 150];
+  return [300, 150]; }
+function crpSized(svg, W, H){ return svg.replace(/<svg\b([^>]*)>/, function(m, a){ return '<svg'+a.replace(/\s(?:width|height)\s*=\s*(["'])[^"']*\1/g, '')+' width="'+W+'" height="'+H+'">'; }); }
+function crpKey(s){ let h1=0x811c9dc5, h2=5381; for(let i=0;i<s.length;i++){ const c=s.charCodeAt(i); h1=Math.imul(h1^c, 16777619); h2=(Math.imul(h2, 33)+c)|0; } return s.length+':'+(h1>>>0).toString(36)+':'+(h2>>>0).toString(36); }
+function crpOurs(ss){ const t=String(ss).trim(), i=t.search(/\s/); return CRP.urls.has(i<0? t : t.slice(0, i)); }
+function crpLook(img){   
+  CRP.n.look++;
+  const s=img.getAttribute('src');
+  if(img.__crpS===s) return;
+  img.__crpS=s; img.__crpN=null; img.__crpK=null;
+  const ss=img.getAttribute('srcset');
+  if(ss!==null){ if(img.__crpU || crpOurs(ss)){ img.removeAttribute('srcset'); img.__crpU=null; CRP.n.drop++; } else return; }   
+  if(!crpFx(s)) return;
+  CRP.n.fx++;
+  const k=img.__crpK=crpKey(s), L=CRP.bmp.get(k);
+  if(L===0) return;   
+  if(L){ const e=crpPick(L, 0, 0, 1); if(e){ crpPut(img, e); CRP.n.hit++; } }   
+  CRP.io.unobserve(img); CRP.io.observe(img); }
+function crpPick(L, W, H, natShape){   
+  let best=null; for(let i=0;i<L.length;i++){ const e=L[i]; const ar=natShape? e.nat[0]/e.nat[1] : W/H;
+    if(Math.abs(e.W/e.H-ar)>0.02*ar) continue; if(!natShape && (e.W<W*0.97 || e.H<H*0.97)) continue; if(!best || e.W>best.W) best=e; }
+  if(best) best.at=Date.now(); return best; }
+function crpSeen(es){ for(let i=0;i<es.length;i++){ const en=es[i], img=en.target;
+    if(!en.isIntersecting){ if(!img.isConnected) CRP.io.unobserve(img); continue; }
+    CRP.io.unobserve(img); CRP.n.seen++; crpNeed(img, en.boundingClientRect); crpLater(img); } }
+function crpLater(img){ CRP.later.add(img); if(CRP.lt) return;   
+  CRP.lt=setTimeout(function(){ const A=Array.from(CRP.later); CRP.later.clear(); CRP.lt=0; crpRecheck(A); CRP.pend++;
+    setTimeout(function(){ CRP.pend--; crpRecheck(A); }, 1000); }, 600); }
+function crpRecheck(A){ for(let i=0;i<A.length;i++){ const img=A[i]; if(!img.isConnected || img.getAttribute('src')!==img.__crpS) continue; const r=img.getBoundingClientRect();
+    if(r.width>=2 && r.height>=2 && r.bottom>0 && r.right>0 && r.top<innerHeight && r.left<innerWidth) crpNeed(img, r); } }
+function crpNatOf(s){   
+  try{ const c=s.indexOf(','), a=s.indexOf('%3Csvg', c), b=a>0? s.indexOf('%3E', a) : -1;
+    if(a>0 && b>a && b-a<6000) return crpNat(decodeURIComponent(s.slice(a, b+3)));
+    const a2=s.indexOf('<svg', c), b2=a2>0? s.indexOf('>', a2) : -1;
+    if(a2>0 && b2>a2 && b2-a2<6000) return crpNat(decodeURIComponent(s.slice(a2, b2+1))); }catch(e){}
+  return null; }
+function crpRatio(w, h){ const r=w/h; for(let q=1;q<=120;q++){ const p=Math.round(r*q); if(p>0 && Math.abs(p/q-r)<=1e-9*r) return [p, q]; } return null; }
+function crpNeed(img, r){   
+  const s=img.getAttribute('src'); if(s!==img.__crpS || !crpFx(s) || !r || r.width<2 || r.height<2) return;
+  let cs=null; try{ cs=getComputedStyle(img); }catch(e){}
+  const fit=cs? (cs.objectFit||'fill') : 'fill', pos=cs? (cs.objectPosition||'50% 50%') : '50% 50%';
+  if(fit!=='fill' && !(fit==='contain' && pos==='50% 50%')){ CRP.n.fit++; return; }   
+  const nat=crpNatOf(s); if(!nat || !(nat[0]>0 && nat[1]>0)){ CRP.n.skip++; return; }
+  let bw=cs? parseFloat(cs.width) : 0, bh=cs? parseFloat(cs.height) : 0;   
+  if(cs && cs.boxSizing==='border-box'){ bw-=(parseFloat(cs.paddingLeft)||0)+(parseFloat(cs.paddingRight)||0)+(parseFloat(cs.borderLeftWidth)||0)+(parseFloat(cs.borderRightWidth)||0); bh-=(parseFloat(cs.paddingTop)||0)+(parseFloat(cs.paddingBottom)||0)+(parseFloat(cs.borderTopWidth)||0)+(parseFloat(cs.borderBottomWidth)||0); }
+  if(!(bw>0 && bh>0)){ bw=img.offsetWidth; bh=img.offsetHeight; } if(!(bw>0 && bh>0)) return;
+  const dpr=window.devicePixelRatio||1, k=Math.max(r.width/bw, r.height/bh)*dpr*CRP.M;   
+  const nar=nat[0]/nat[1], own=fit==='contain' || Math.abs((bw/bh)/nar-1)<0.005;
+  let W, H;
+  if(own){ const pq=crpRatio(nat[0], nat[1]), wt=Math.min(bw, bh*nar)*k;   
+    if(pq){ const m=Math.max(1, Math.ceil(wt/pq[0])); W=pq[0]*m; H=pq[1]*m; } else { W=Math.max(1, Math.ceil(wt)); H=Math.max(1, Math.round(W/nar)); } }
+  else { W=Math.max(1, Math.ceil(bw*k)); H=Math.max(1, Math.ceil(bh*k)); }   
+  const w1=nat[0]*1.0001; if(W<w1){ if(own){ const pq=crpRatio(nat[0], nat[1]); if(pq){ const m=Math.ceil(w1/pq[0]); W=pq[0]*m; H=pq[1]*m; } else { W=Math.ceil(w1); H=Math.max(1, Math.round(W/nar)); } } else { const f=w1/W; W=Math.ceil(W*f); H=Math.ceil(H*f); } }
+  
+  if(W*H>CRP.MAXPX){ CRP.n.big++; if(CRP.bigs.length<12) CRP.bigs.push([W, H, Math.round(bw), Math.round(bh), String(img.id || img.className || (img.parentNode && (img.parentNode.id || img.parentNode.className)) || '').slice(0, 40)]); return; }
+  img.__crpN=[W, H];
+  const fk=img.__crpK || (img.__crpK=crpKey(s)), L=CRP.bmp.get(fk); if(L===0) return;
+  const e=L? crpPick(L, W, H, 0) : null; if(e){ crpPut(img, e); return; }
+  crpAsk(s, fk, W, H, img); }
+function crpAsk(s, k, W, H, img){ CRP.n.ask++; let j=CRP.wait.get(k);
+  if(!j){ j={ s:s, k:k, W:W, H:H, imgs:new Set() }; CRP.wait.set(k, j); CRP.q.push(j); }
+  else if(Math.abs(j.W/j.H-W/H)<=0.02*(W/H)){ if(W>j.W){ j.W=W; j.H=H; } }
+  j.imgs.add(img); crpPump(); }
+function crpPump(){ while(CRP.loading<3 && CRP.q.length){ const j=CRP.q.shift(); CRP.wait.delete(j.k); CRP.loading++; crpLoad(j); } }
+function crpLoad(j){ j.t0=Date.now(); let svg=null; try{ svg=crpDec(j.s); }catch(e){}
+  const quit=function(e){ if(j.up) return; j.up=1; CRP.loading--; crpDone(j, e); crpPump(); };
+  if(!svg || crpBad(svg)){ CRP.n.skip++; return quit(0); }
+  j.nat=crpNat(svg); if(!j.nat){ CRP.n.skip++; return quit(0); }
+  j.nest=svg.indexOf('<image')>=0;
+  const im=j.im=new Image();
+  const up=function(){ if(j.up) return; j.up=1; j.t1=Date.now(); CRP.loading--; CRP.ready.push(j); crpRender(); crpPump(); };
+  im.onload=up; im.onerror=function(){ CRP.n.err++; quit(null); };
+  j.tm=setTimeout(function(){ if(!j.up){ CRP.n.err++; quit(null); } }, 9000);
+  im.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(crpSized(svg, j.W, j.H));
+  if(im.decode) im.decode().then(up, function(){}); }
+function crpRender(){ if(CRP.rendering || !CRP.ready.length) return; CRP.rendering=1;   
+  setTimeout(function(){ const j=CRP.ready.shift(); let e=null; const t2=Date.now();
+    try{ const c=document.createElement('canvas'); c.width=j.W; c.height=j.H; c.getContext('2d').drawImage(j.im, 0, 0, j.W, j.H);
+      const url=c.toDataURL('image/png'); c.width=0; c.height=0;   
+      if(url && url.length>32 && url.lastIndexOf('data:image/png', 0)===0){ CRP.urls.add(url); CRP.px+=j.W*j.H; CRP.bytes+=url.length; e={ url:url, W:j.W, H:j.H, nat:j.nat, at:Date.now() }; }
+      else CRP.n.err++; }
+    catch(x){ CRP.n.err++; }
+    const ms=Date.now()-t2; CRP.ms+=ms; if(ms>CRP.max) CRP.max=ms; if(CRP.log.length>=40) CRP.log.shift(); CRP.log.push([j.W, j.H, (j.t1||t2)-j.t0, ms]);
+    CRP.rendering=0; crpDone(j, e); crpRender(); }, CRP.ready[0].nest? 40 : CRP.gap); }
+function crpDone(j, e){ if(j.fin) return; j.fin=1; clearTimeout(j.tm);
+  if(j.im){ j.im.onload=j.im.onerror=null; try{ j.im.src='data:,'; }catch(x){} j.im=null; }   
+  CRP.last=Date.now();
+  const s=j.s; j.s=null;   
+  if(e){ CRP.n.paint++; crpKeep(j.k, e); j.imgs.forEach(function(img){ if(!img.isConnected || img.getAttribute('src')!==s) return; const n=img.__crpN;
+      if(n && (Math.abs(n[0]/n[1]-e.W/e.H)>0.02*(e.W/e.H) || e.W<n[0]*0.97)){ CRP.n.again++; crpAsk(s, j.k, n[0], n[1], img); return; } crpPut(img, e); }); }
+  else if(!CRP.bmp.get(j.k)){ const f=(CRP.fails.get(j.k)||0)+1; CRP.fails.set(j.k, f); if(e===0 || f>=2) CRP.bmp.set(j.k, 0); } }
+function crpPut(img, e){ const d=e.W/(e.nat[0]*(1+1e-7)); if(!(d>0)) return;   
+  img.__crpU=e.url; img.setAttribute('srcset', e.url+' '+d+'x'); CRP.n.put++; }
+function crpKeep(k, e){ let L=CRP.bmp.get(k); if(!L){ L=[]; CRP.bmp.set(k, L); }
+  L.push(e); let n=0; CRP.bmp.forEach(function(v){ if(v) n+=v.length; });   
+  if(n>CRP.CAP || CRP.px>CRP.CAPPX) crpEvict(); }
+function crpEvict(){   
+  const used=new Set(), I=document.getElementsByTagName('img'); for(let i=0;i<I.length;i++){ const im=I[i]; if(im.__crpU) used.add(im.__crpU); else if(im.hasAttribute('srcset')){ const t=im.getAttribute('srcset').trim(), k=t.search(/\s/); used.add(k<0? t : t.slice(0, k)); } }
+  const all=[]; CRP.bmp.forEach(function(L, s){ if(L) for(let i=0;i<L.length;i++) all.push([L[i], s]); }); all.sort(function(a, b){ return a[0].at-b[0].at; });
+  let n=all.length; for(let i=0;i<all.length && (n>CRP.CAP*0.75 || CRP.px>CRP.CAPPX*0.75);i++){ const e=all[i][0], s=all[i][1]; if(used.has(e.url)) continue;
+    const L=CRP.bmp.get(s); const k=L? L.indexOf(e) : -1; if(k>=0) L.splice(k, 1); if(L && !L.length) CRP.bmp.delete(s);
+    CRP.urls.delete(e.url); CRP.px-=e.W*e.H; CRP.bytes-=e.url.length; n--; CRP.n.evict++; } }
+function crpMut(recs){ for(let i=0;i<recs.length;i++){ const r=recs[i];
+    if(r.type==='attributes'){ if(r.target.tagName==='IMG') crpLook(r.target); continue; }
+    const A=r.addedNodes; for(let j=0;j<A.length;j++){ const nd=A[j]; if(nd.nodeType!==1) continue;
+      if(nd.tagName==='IMG') crpLook(nd); else if(nd.firstElementChild){ const L=nd.getElementsByTagName('img'); for(let k=0;k<L.length;k++) crpLook(L[k]); } } } }
+function crpAgain(){ if(!CRP.on) return; const L=document.getElementsByTagName('img'); for(let i=0;i<L.length;i++){ const img=L[i]; if(img.__crpS && crpFx(img.__crpS)){ CRP.io.unobserve(img); CRP.io.observe(img); } } }
+function crpRead(){ return { on:CRP.on, why:CRP.why, n:Object.assign({}, CRP.n), ms:CRP.ms, max:CRP.max, q:CRP.q.length, busy:CRP.loading+CRP.rendering+CRP.ready.length+CRP.later.size+(CRP.lt? 1 : 0)+CRP.pend, kept:CRP.bmp.size, px:CRP.px, kb:Math.round(CRP.bytes/1024), M:CRP.M, log:CRP.log.slice(), bigs:CRP.bigs.slice(),
+  imgs:(function(){ let a=0, b=0; const L=document.getElementsByTagName('img'); for(let i=0;i<L.length;i++){ if(L[i].__crpS && crpFx(L[i].__crpS)){ a++; if(L[i].__crpU) b++; } } return { fx:a, sharp:b }; })() }; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1209958,7 +1210119,7 @@ let BFQ=null;
 
 
 
-let GVT_CV='31.42';
+let GVT_CV='31.43';
 let NX_CAP_MUL=4;
 
 
@@ -4419561,6 +4419722,167 @@ try{ if(typeof BLB_RULES!=='undefined' && Array.isArray(BLB_RULES) && !BLB_RULES
 
 
 setTimeout(function(){ try{ if(window.GVT && !GVT.pkb) GVT.pkb=function(o){ return pkbRead(o); }; }catch(e){} }, 0);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const CRP={ on:0, why:'', n:{ look:0, fx:0, seen:0, ask:0, paint:0, put:0, hit:0, drop:0, skip:0, fit:0, big:0, err:0, evict:0, again:0 }, ms:0, max:0, bmp:new Map(), wait:new Map(), q:[],
+  urls:new Set(), px:0, bytes:0, mo:null, io:null, M:1.08, MAXPX:750000, CAP:300, CAPPX:24000000, gap:24, t0:0, last:0, fails:new Map(), log:[], loading:0, rendering:0, ready:[], bigs:[], later:new Set(), lt:0, pend:0 };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+(function(){ try{ const g=crpGate(); CRP.on=g[0]; CRP.why=g[1]; if(!CRP.on) return;
+    if(typeof MutationObserver!=='function' || typeof IntersectionObserver!=='function'){ CRP.on=0; CRP.why='no observers on this engine'; return; }
+    CRP.t0=Date.now(); CRP.io=new IntersectionObserver(crpSeen, { rootMargin:'10%' }); CRP.mo=new MutationObserver(crpMut);
+    CRP.mo.observe(document.documentElement, { subtree:true, childList:true, attributes:true, attributeFilter:['src'] });
+    const L=document.getElementsByTagName('img'); for(let i=0;i<L.length;i++) crpLook(L[i]);
+    let rz=0; window.addEventListener('resize', function(){ clearTimeout(rz); rz=setTimeout(crpAgain, 400); });
+  }catch(e){ CRP.on=0; CRP.why='failed to start: '+String(e && e.message || e).slice(0, 80); } })();
+try{ if(window.GVT && !GVT.crp) GVT.crp=crpRead; }catch(e){}
+setTimeout(function(){ try{ if(window.GVT && !GVT.crp) GVT.crp=crpRead; }catch(e){} }, 0);
 
 
 
