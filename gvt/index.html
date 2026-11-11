@@ -997089,6 +997089,255 @@ function cheRead(o){ o=o||{}; try{ if(o.cap!=null){ MMD.cap=+o.cap; cheWords(); 
 
 
 
+
+
+
+function imhErr(w,e){ IMH.err++; if(IMH.e.length<400) IMH.e+=w+':'+String(e && e.message || e).slice(0,80)+' '; }
+function imhParty(){ try{ return !!(S.coop || coopLaunching); }catch(e){ return false; } }
+function imhOn(){ return !!((IMH.on || imhParty()) && cavesOn()); }
+function imhT(tab){ const v=+tab[cavesTier()]; return isFinite(v)? v : +tab.e; }
+function imhH(a,b,c){ let h=(a|0)^Math.imul((b|0)+0x9E3779B1,0x85EBCA6B)^Math.imul((c|0)+0x27D4EB2F,0xC2B2AE35); h=Math.imul(h^(h>>>16),0x7FEB352D); h=Math.imul(h^(h>>>15),0x846CA68B); h^=h>>>16; return (h>>>0)/4294967296; }
+function imhStr(s){ s=String(s); let h=2166136261; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); } return h|0; }
+function imhSeed(R){ let key;   
+  try{ key=(imhParty() && COOP && COOP.code)? 'party|'+COOP.code+'|'+((R.seats||[]).join(',')) : 'solo|'+todayStr()+'|'+IMH.fights; }catch(e){ key='solo|'+IMH.fights; }
+  return imhStr(key+'|'+R.t+'|'+(R.n|0)+'|'+(IMH.salt|0)); }
+function imhSt(){ const R=S.raid; if(!R || !cavesOn()) return null; if(!R.imh){ IMH.fights++; R.imh={ seed:imhSeed(R), salt:IMH.salt|0, arrive:null, next:null, k:0, n:0, holes:[], patches:[], band:null, said:0, ask:null, tryT:null, cnt:{ laid:0, clock:0, band:0, landed:0, caught:0, holes:0, skipped:0, nospot:0, rep:0, spawn:0, none:0, fell:0, ice:0, iceKill:0, waits:0, froze:0, maxOpen:0 } }; } return R.imh; }
+function imhBoss(){ for(const f of S.foes){ if(f.type==='fyeti' && !f.dead) return f; } return null; }
+function imhRim(){ try{ if(typeof icn3R==='function') return icn3R(); }catch(e){} return 34; }
+function imhRx(){ return imhRim()*((typeof ICN3_RX==='number')? ICN3_RX : 48/34); }
+function imhShut(i){ try{ return typeof icn2Asleep==='function' && !!icn2Asleep(i); }catch(e){ return false; } }
+function imhOpenRow(h){ return !!h && (!h.imh || h.imh.st==='open'); }
+function cavesHolesOpen(){ const out=[]; for(let i=0;i<CAVE_HOLES.length;i++){ const h=CAVE_HOLES[i]; if(!imhOpenRow(h) || imhShut(i)) continue; out.push(h); } return out; }
+function imhPending(){ let n=0; const L=S.caveIc; if(L) for(const c of L){ if(c.imh && c.imhRaid===S.raid) n++; } return n; }
+function imhOpenN(st){ let n=0; for(const r of st.holes){ if(r.st==='open' || r.st==='water') n++; } return n; }
+function imhRoom(st){ return imhOpenN(st)+imhPending() < Math.max(0, Math.round(imhT(CAVES_MADE_CAP))); }
+function imhSpotOk(x,y){ const D=IMH_D;
+  if(x<D.x0 || x>D.x1 || y<FOE_TOP+D.top || y>FOE_BOT-D.bot) return false;   
+  if(Math.hypot(x-T.x,y-T.y)<D.box) return false;   
+  for(const h of CAVE_HOLES){ if(Math.hypot(x-h[0],y-h[1])<D.hole) return false; }   
+  const L=S.caveIc; if(L) for(const c of L){ if(c.imh && Math.hypot(x-c.x,y-c.y)<D.hole) return false; }   
+  if(Math.hypot(x-CAVE_HOARD[0],y-CAVE_HOARD[1])<D.hoard) return false; if(Math.abs(x-(CAVE_HOARD[0]-HOARD_STAND))<D.stand) return false;   
+  if(Math.hypot(x-CAVE_MOUTH[0],y-CAVE_MOUTH[1])<D.mouth) return false;   
+  return true; }
+function imhSpot(st,n,xc,xr){ const D=IMH_D, y0=FOE_TOP+D.top, y1=FOE_BOT-D.bot;   
+  for(let k=0;k<D.tries;k++){ const a=imhH(st.seed,n*31+k,1), b=imhH(st.seed,n*31+k,2), x=(xc!=null)? xc+(a-0.5)*2*xr : D.x0+(D.x1-D.x0)*a, y=y0+(y1-y0)*b;
+    if(imhSpotOk(x,y)) return [Math.round(x), Math.round(y)]; }
+  return null; }
+function imhLay(st,x,y,by,band){ const f=imhBoss(); if(!f) return null; const w=Math.max(0.2, imhT(CAVES_MADE_WARN)), n=++st.n, L=S.caveIc||(S.caveIc=[]);   
+  const c={ x:x, y:y, t:0, by:f, warn:w, imh:1, imhN:n, imhBy:by, imhRaid:S.raid }; if(band) c.icn4B=1;   
+  L.push(c); S.fx.push({ k:'icfall', imh:1, x:x, y:y, t:0, dur:w, R:FY_ICICLE_R*IMH_D.R, tilt:(imhH(st.seed,n,7)-0.5)*0.3 });
+  try{ SFX.rumble(); }catch(e){} st.cnt.laid++; IMH.n.laid++; if(by==='band'){ st.cnt.band++; IMH.n.band++; } else if(by==='clock'){ st.cnt.clock++; IMH.n.clock++; } else IMH.n.rig++;
+  return c; }
+function imhBreath(i,add){ const B=S.caveBr; if(!B || !B.t) return; if(add){ while(B.t.length<i) B.t.push(0); B.t.splice(i,0,0); } else if(i<B.t.length) B.t.splice(i,1); }
+function imhDrop(row){ const i=CAVE_HOLES.indexOf(row); if(i>=0){ CAVE_HOLES.splice(i,1); imhBreath(i,false); } const j=IMH.rows.indexOf(row); if(j>=0) IMH.rows.splice(j,1); IMH.ver++; }
+function imhClear(){ if(!IMH.rows.length) return; for(const row of IMH.rows.slice()) imhDrop(row); IMH.rows.length=0; }
+function imhInside(u,x,y,pad){ const ry=imhRim()+(pad||0), rx=imhRx()+(pad||0), dx=(u.x-x)/rx, dy=(u.y-y)/ry; return dx*dx+dy*dy<1; }
+function imhBirth(st,x,y,by){ const row=[x,y], i=CAVE_HOLES.length, rec={ row:row, x:x, y:y, id:st.cnt.holes+1, by:by, st:'open', born:+(S.waveT||0), lifeAt:null, wAt:null, fAt:null, gAt:null, wait:0, first:null, cv:null, out:0 };
+  row.imh=rec; CAVE_HOLES.push(row); IMH.rows.push(row); IMH.ver++; imhBreath(i,true); st.holes.push(rec); st.cnt.holes++; IMH.n.holes++;
+  st.patches=st.patches.filter(p=>Math.hypot(p.x-x,p.y-y)>=IMH_D.patch);   
+  const live=(typeof icn3Live==='function') && icn3Live();
+  for(const u of S.units){ if(u.dead || u.falling || u.jetT>0 || u.dropT>0 || (S.drag && S.drag.unit===u)) continue; if(!imhInside(u,x,y,0)) continue; if(live && typeof hvbU==='function' && hvbU(u)) continue;   
+    u.shv=null; if(live && typeof icn3Edge==='function'){ icn3Edge(u,i); IMH.n.edged++; } IMH.n.nudged++; }   
+  const rm=(typeof reducedMotion==='function' && reducedMotion());
+  if(!rm) S.fx.push({ k:'icsplash', imh:1, x:x, y:y, t:0, dur:0.7 }); S.shake=Math.max(S.shake||0, rm? 0 : 0.35);   
+  if(!rm){ const rx=imhRx(); for(let k=0;k<7;k++){ const a=(k+imhH(st.seed,rec.id*13+k,3)*0.7)/7*6.283, c9=Math.cos(a), s9=Math.sin(a), r0=30, r1=rx+18+imhH(st.seed,rec.id*13+k,4)*46, w=(imhH(st.seed,rec.id*13+k,5)-0.5)*14;
+      S.fx.push({ k:'crk', x1:x+c9*r0, y1:y+s9*r0*0.62, mx:x+c9*(r0+r1)/2-s9*w, my:y+s9*(r0+r1)/2*0.62+c9*w*0.5, x2:x+c9*r1, y2:y+s9*r1*0.62, w:1.6, t:0, dur:0.6 }); } }   
+  try{ if(typeof bfVis!=='function' || bfVis(x,y)){ SFX.thump(); } }catch(e){}
+  if(!st.said && st.ask==null) st.ask=S.t;   
+  imhFirst(rec); return rec; }
+function imhFirst(rec){ const st=S.raid && S.raid.imh; let best=null;   
+  for(const f of S.foes){ if(f.dead || f.type!=='cyeti' || f.cyState!=='in' || f.rvCol || f.cyBox || f.cyRk===1) continue; if(f.cyEyeH && (f.cyT<=CY_EYES || f.cyEyeH.imh)) continue; if(!best || f.cyT<best.cyT) best=f; }
+  const pace=f9=>{ try{ const k=(typeof cvxPace==='function')? +cvxPace(f9) : 1; return (k>0.05 && isFinite(k))? k : 1; }catch(e){ return 1; } };   
+  if(best){ best.cyEyeH=rec.row; const T9=IMH_D.first*pace(best)*0.96; if(!(best.cyT<=T9)) best.cyT=T9; rec.first='rep'; if(st) st.cnt.rep++; IMH.n.rep++; return; }
+  let live=0; for(const g of S.foes) if(g.type==='cyeti' && !g.dead && !g.rvCol) live++; const C9=cavesCount(cavesN());
+  if(live<C9.cap){ const g=spawnFoe('cyeti',rec.x,rec.y,null,false); if(g){ g.cyTrips=1; cyHide(g, IMH_D.firstSpawn*pace(g)); g.cyEyeH=rec.row; rec.first='spawn'; if(st) st.cnt.spawn++; IMH.n.spawn++; return; } }
+  rec.first='none'; if(st) st.cnt.none++; IMH.n.none++; }
+function imhSayTry(st){ if(st.said || st.ask==null || st.tryT===S.t) return; st.tryT=S.t; if(S.t-st.ask>IMH_D.retry){ st.ask=null; return; }   
+  let ok=false; try{ ok=!!commSayAs(null, IMH_SAY, { rank:3, always:1 }); }catch(e){ ok=false; } if(ok){ st.said=1; st.saidAt=+S.t.toFixed(2); IMH.n.said++; } }
+function imhBlock(rec){ const row=rec.row, rx=imhRx(), ry=imhRim(); let out=null;   
+  for(const f of S.foes){ if(f.dead) continue;
+    if((f.cyEyeH===row && f.cyState==='in' && f.cyT<=CY_EYES) || (f.dyEyeH===row && f.dyState==='in' && f.dyT<=CY_EYES) || (f.fyEyeH===row && f.fyState==='in')) return 'lit';
+    if(f.burrow || f.caveIn || !f.def || !(f.def.cave || f.type==='fyeti')) continue; const dx=(f.x-row[0])/rx, dy=(f.y-row[1])/ry; if(dx*dx+dy*dy<1) out=f; }
+  return out? 'out' : null; }
+function imhRepoint(row){ for(const f of S.foes){ if(f.dead) continue;   
+    if(f.cyEyeH===row) f.cyEyeH=null; if(f.dyEyeH===row) f.dyEyeH=null; if(f.fyEyeH===row){ f.fyEyeH=null; f.fyEyeK=null; }
+    if(f.cyTo===row) f.cyTo=cyHoleNear(f.x,f.y); if(f.dyTo===row) f.dyTo=cyHoleNear(f.x,f.y); } }
+function imhLife(st,rec){ const now=+(S.waveT||0);
+  if(rec.st==='open'){ if(now-rec.born<imhT(CAVES_MADE_LIFE)) return; if(rec.lifeAt==null) rec.lifeAt=now;
+    const b=imhBlock(rec); if(b){ rec.wait=now-rec.lifeAt; if(b==='out' && rec.wait>=IMH_D.waitMax){ const rx=imhRx(), ry=imhRim(); for(const f of S.foes){ if(f.dead || f.burrow || f.caveIn) continue; let dx=f.x-rec.x, dy=f.y-rec.y; if((dx*dx)/(rx*rx)+(dy*dy)/(ry*ry)>=1) continue; if(Math.abs(dx)<0.01 && Math.abs(dy)<0.01){ dx=1; dy=0; } const q=(dx*dx)/(rx*rx)+(dy*dy)/(ry*ry), k=1/Math.sqrt(q)+1/Math.hypot(dx,dy); f.x=rec.x+dx*k; f.y=rec.y+dy*k; IMH.n.nudged++; } } else { if(!rec.waited){ rec.waited=1; st.cnt.waits++; IMH.n.waits++; } return; } }
+    rec.st='water'; rec.wAt=now; IMH.n.water++; imhRepoint(rec.row); return; }   
+  if(rec.st==='water'){ if(now-rec.wAt<IMH_D.water) return; rec.st='freeze'; rec.fAt=now; imhRepoint(rec.row); imhDrop(rec.row); st.cnt.froze++; IMH.n.froze++;   
+    try{ if(typeof bfVis!=='function' || bfVis(rec.x,rec.y)) SFX.icecrack(); }catch(e){} return; }
+  if(rec.st==='freeze'){ if(now-rec.fAt<IMH_D.freeze) return; rec.st='gone'; rec.gAt=now; rec.cv=null; st.patches.push({ x:rec.x, y:rec.y, id:rec.id, at:now, cv:null }); } }
+function imhTick(dt){
+  if(!cavesOn()){ imhClear(); IMH.raid=null; return; }
+  if(IMH.raid!==S.raid){ imhClear(); IMH.raid=S.raid; }
+  if(!imhOn()) return; const st=imhSt(); if(!st) return;
+  imhSayTry(st);
+  const R=S.raid, f=imhBoss(), now=+(S.waveT||0);
+  if(st.arrive==null && f && f.fyState && f.fyState!=='arrive'){ st.arrive=now; st.next=now+Math.max(1,imhT(CAVES_MADE_EVERY)); }   
+  if(st.arrive!=null && f && !R.won && !R.kingDown && !S.cleared){ for(let g9=0; g9<8 && now>=st.next; g9++){ st.k++; st.next+=Math.max(1,imhT(CAVES_MADE_EVERY));   
+      if(!imhRoom(st)){ st.cnt.skipped++; IMH.n.skipped++; continue; } const p=imhSpot(st,st.n+1,null,0); if(!p){ st.cnt.nospot++; IMH.n.nospot++; continue; } imhLay(st,p[0],p[1],'clock',0); } }
+  for(const rec of st.holes){ if(rec.st!=='gone') imhLife(st,rec); }
+  const o=imhOpenN(st); if(o>st.cnt.maxOpen) st.cnt.maxOpen=o; }
+function imhLand(c){ if(!c || c.imhRaid!==S.raid || !imhOn()) return null; const st=imhSt(); if(!st) return null; st.cnt.landed++; IMH.n.landed++;   
+  if(c.imhCaught){ st.cnt.caught++; IMH.n.caught++; return null; }
+  return imhBirth(st, Math.round(c.x), Math.round(c.y), c.imhBy||'clock'); }
+function imhBand(f,x,r){ const st=imhSt(); if(!st) return; const B=Math.max(0, Math.round(imhT(CAVES_MADE_BAND))); if(!B) return;   
+  if(!st.band){ const x1=T.x+LEAK_R+HRT_BAND_END, N=Math.max(1, Math.floor((HRT_BAND_X0-x1)/HRT_BAND_STEP)+1), lo=Math.min(N-1, Math.max(0, Math.ceil((HRT_BAND_X0-(CAVE_HOARD[0]-HOARD_STAND-IMH_D.stand-40))/HRT_BAND_STEP))), rows=[];
+    for(let j=0;j<B;j++){ let ix=lo+Math.round((((j+0.5)/B)+(imhH(st.seed,900+j,1)-0.5)*(0.5/B))*(N-1-lo)); ix=Math.max(lo,Math.min(N-1,ix)); while(rows.indexOf(ix)>=0 && ix<N-1) ix++; rows.push(ix); }
+    st.band={ rows:rows, done:[], N:N, lo:lo, laid:0 }; }
+  const S9=st.band; if(S9.done.indexOf(r)<0) S9.done.push(r); let owed=0; for(const q of S9.rows) if(q<=r) owed++; owed-=S9.laid; if(owed<=0) return;
+  if(!imhRoom(st)) return; const p=imhSpot(st,1000+r,x,40); if(!p) return; if(imhLay(st,p[0],p[1],'band',1)) S9.laid++; }
+function imhNearMen(){ let best=null, bd=1e9;   
+  const H=cavesHolesOpen(); if(!H.length) return null; let any=0;
+  for(const u of S.units){ if(u.dead || u.falling || u.jetT>0 || (S.drag && S.drag.unit===u)) continue; any=1; for(const h of H){ const d=Math.hypot(h[0]-u.x,h[1]-u.y); if(d<bd){ bd=d; best=h; } } }
+  return (any && best && best.imh)? best : null; }
+function imhColRow(c){ const cx0=CAVE_HOLES[c] && CAVE_HOLES[c][0]; if(cx0==null) return null; let best=null, bd=1e9; for(const h of IMH.rows){ if(!h.imh || h.imh.st!=='open') continue; const d=Math.abs(h[0]-cx0); if(d<=IMH_D.colDx && d<bd){ bd=d; best=h; } } return best; }
+function imhBare(fn,self,args){ if(!IMH.rows.length) return fn.apply(self,args); const out=[];   
+  for(let i=CAVE_HOLES.length-1;i>=0;i--){ if(CAVE_HOLES[i] && CAVE_HOLES[i].imh){ out.push([i,CAVE_HOLES[i]]); CAVE_HOLES.splice(i,1); } } IMH.n.bakes++;
+  try{ return fn.apply(self,args); } finally{ for(let k=out.length-1;k>=0;k--) CAVE_HOLES.splice(out[k][0],0,out[k][1]); } }
+
+function imhHoleCv(rec){ const W9=248, H9=248, c=document.createElement('canvas'); c.width=W9; c.height=H9; const g=c.getContext('2d'), x=W9/2, y=H9/2, rx=imhRx(), ry=imhRim(), k=ry/rx, T9=Math.PI*2, sd=(S.raid && S.raid.imh)? S.raid.imh.seed : 1; IMH.n.cv++;
+  const r=g.createRadialGradient(x,y,10,x,y,118); r.addColorStop(0,'rgba(196,234,255,0.85)'); r.addColorStop(0.45,'rgba(170,220,248,0.42)'); r.addColorStop(1,'rgba(170,220,248,0)'); g.fillStyle=r; g.fillRect(x-120,y-120,240,240);   
+  g.save(); g.beginPath(); g.ellipse(x,y,rx,ry,0,0,T9); g.ellipse(x,y,40,24,0,0,T9); g.clip('evenodd'); g.translate(x,y); g.scale(1,k);   
+  const gr=g.createRadialGradient(0,0,0,0,0,rx); gr.addColorStop(0,'rgba(21,40,58,0.66)'); gr.addColorStop(0.72,'rgba(21,40,58,0.56)'); gr.addColorStop(0.88,'rgba(21,40,58,0.34)'); gr.addColorStop(1,'rgba(21,40,58,0.12)'); g.fillStyle=gr; g.fillRect(-rx-2,-rx-2,rx*2+4,rx*2+4); g.restore();
+  g.lineCap='round'; g.lineJoin='round';
+  for(let j=0;j<11;j++){ const a=(j+imhH(sd,rec.id*29+j,11)*0.8)/11*T9, cs=Math.cos(a), sn=Math.sin(a), f=0.9+0.9*imhH(sd,rec.id*29+j,12), L=(rx-40)*f+16+imhH(sd,rec.id*29+j,13)*34, w=(imhH(sd,rec.id*29+j,14)-0.5)*8;   
+    const x0=x+cs*40, y0=y+sn*24, x1=x+cs*(40+L), y1=y+sn*(24+L*0.62), xm=(x0+x1)/2-sn*w, ym=(y0+y1)/2+cs*w*0.6;
+    g.strokeStyle='rgba(220,235,247,0.5)'; g.lineWidth=1; g.beginPath(); g.moveTo(x0+0.8,y0+0.8); g.lineTo(xm+0.8,ym+0.8); g.lineTo(x1+0.8,y1+0.8); g.stroke();   
+    g.strokeStyle='rgba(21,40,58,0.72)'; g.lineWidth=(j%3===0)? 1.6 : 1.2; g.beginPath(); g.moveTo(x0,y0); g.lineTo(xm,ym); g.lineTo(x1,y1); g.stroke();
+    if(j%2===0){ const bx=xm+(x1-xm)*0.4, by=ym+(y1-ym)*0.4, b=a+(imhH(sd,rec.id*29+j,15)>0.5? 0.7 : -0.7); g.beginPath(); g.moveTo(bx,by); g.lineTo(bx+Math.cos(b)*12,by+Math.sin(b)*8); g.stroke(); } }   
+  g.strokeStyle='rgba(21,40,58,0.55)'; g.lineWidth=1.4; g.beginPath(); g.ellipse(x,y,rx,ry,0,0,T9); g.stroke();   
+  g.fillStyle='#03070A'; g.beginPath(); g.ellipse(x,y,40,24,0,0,T9); g.fill();   
+  g.fillStyle='rgba(14,30,46,0.9)'; g.beginPath(); g.ellipse(x,y+9,30,10,0,0,T9); g.fill();   
+  g.strokeStyle='rgba(191,227,247,0.55)'; g.lineWidth=3; g.beginPath(); g.ellipse(x,y,40,24,0,3.3,6.1); g.stroke();   
+  g.strokeStyle='rgba(220,235,247,0.5)'; g.lineWidth=1.2; g.beginPath(); g.ellipse(x,y+1,rx-3,ry-3,0,3.5,5.9); g.stroke();   
+  return c; }
+function imhPatchCv(p){ const rx=imhRx()+6, ry=imhRim()+5, W9=Math.ceil(rx*2+16), H9=Math.ceil(ry*2+16), c=document.createElement('canvas'); c.width=W9; c.height=H9; const g=c.getContext('2d'), x=W9/2, y=H9/2, T9=Math.PI*2, sd=(S.raid && S.raid.imh)? S.raid.imh.seed : 1; IMH.n.cv++;   
+  const gr=g.createLinearGradient(0,y-ry,0,y+ry); gr.addColorStop(0,'#EEF7FD'); gr.addColorStop(0.55,'#D3EAF7'); gr.addColorStop(1,'#A9D2EC'); g.fillStyle=gr; g.beginPath(); g.ellipse(x,y,rx,ry,0,0,T9); g.fill();
+  g.globalAlpha=0.55; g.strokeStyle='#86B6D6'; g.lineWidth=1.5; g.stroke(); g.globalAlpha=1;   
+  g.fillStyle='rgba(120,170,205,0.22)'; g.beginPath(); g.ellipse(x,y+ry*0.5,rx*0.86,ry*0.36,0,0,T9); g.fill();   
+  g.save(); g.beginPath(); g.ellipse(x,y,rx-2,ry-2,0,0,T9); g.clip(); g.lineCap='round'; g.lineJoin='round';
+  for(let j=0;j<9;j++){ let px=x+(imhH(sd,p.id*41+j,21)-0.5)*rx*1.6, py=y+(imhH(sd,p.id*41+j,22)-0.5)*ry*1.5; g.strokeStyle=(j%2)? 'rgba(111,160,196,0.85)' : 'rgba(143,178,200,0.9)'; g.lineWidth=(j%3===0)? 1.3 : 0.9; g.beginPath(); g.moveTo(px,py);
+    for(let s=0;s<3;s++){ px+=(imhH(sd,p.id*41+j,23+s)-0.5)*rx*0.9; py+=(imhH(sd,p.id*41+j,27+s)-0.5)*ry*0.9; g.lineTo(px,py); } g.stroke(); }   
+  g.strokeStyle='rgba(255,255,255,0.7)'; g.lineWidth=2; g.beginPath(); g.ellipse(x,y,rx*0.82,ry*0.74,0,3.55,4.75); g.stroke(); g.restore();   
+  g.fillStyle='rgba(255,255,255,0.85)'; for(let j=0;j<14;j++){ const a=j/14*T9+imhH(sd,p.id*41+j,31)*0.3; g.beginPath(); g.arc(x+Math.cos(a)*rx*0.97,y+Math.sin(a)*ry*0.97,0.9+imhH(sd,p.id*41+j,32)*1.2,0,T9); g.fill(); }   
+  return c; }
+function imhWaterFace(x,y,p,rm){ const T9=Math.PI*2, q=rm? 1 : Math.max(0,Math.min(1,p));   
+  cx.save(); cx.beginPath(); cx.ellipse(x,y,40,24,0,0,T9); cx.clip();
+  const rx=40*(0.35+0.65*q), ry=24*(0.35+0.65*q), g=cx.createRadialGradient(x-8,y-6,2,x,y,rx); g.addColorStop(0,'#5FA6D6'); g.addColorStop(0.6,'#2E6E9E'); g.addColorStop(1,'#173F62'); cx.globalAlpha=0.35+0.65*q; cx.fillStyle=g; cx.beginPath(); cx.ellipse(x,y+(1-q)*6,rx,ry,0,0,T9); cx.fill();
+  if(!rm){ for(let i=0;i<2;i++){ const w=((S.t*0.9+i*0.5)%1); cx.globalAlpha=(1-w)*0.6*q; cx.strokeStyle='#BFE3F7'; cx.lineWidth=1.2; cx.beginPath(); cx.ellipse(x,y,6+w*32,3+w*19,0,0,T9); cx.stroke(); } }   
+  cx.globalAlpha=0.7*q; cx.strokeStyle='rgba(220,240,252,0.9)'; cx.lineWidth=1.6; cx.beginPath(); cx.ellipse(x-4,y-5,18,6,0,3.4,5.8); cx.stroke();   
+  cx.restore(); cx.globalAlpha=1;
+  if(!rm && q>0.2){ for(let i=0;i<3;i++){ const w=((S.t*0.7+i*0.34)%1), sx=x+(i-1)*14+Math.sin(S.t*2+i)*4, sy=y-6-w*44; cx.globalAlpha=(1-w)*0.5*q; cx.fillStyle='#F4FBFF'; cx.beginPath(); cx.ellipse(sx,sy,5+w*9,3+w*6,0,0,T9); cx.fill(); } cx.globalAlpha=1; } }
+function imhFreezeFace(x,y,q,rm,sd,id){ const T9=Math.PI*2; q=rm? 1 : Math.max(0,Math.min(1,q));   
+  cx.save(); cx.beginPath(); cx.ellipse(x,y,40,24,0,0,T9); cx.clip();
+  const g=cx.createLinearGradient(0,y-24,0,y+24); g.addColorStop(0,'#EEF7FD'); g.addColorStop(1,'#A9D2EC'); cx.fillStyle='#2E6E9E'; cx.fillRect(x-42,y-26,84,52); cx.globalAlpha=q; cx.fillStyle=g; cx.fillRect(x-42,y-26,84,52); cx.globalAlpha=1;
+  cx.strokeStyle='rgba(255,255,255,0.95)'; cx.lineWidth=1.4; cx.lineCap='round'; for(let j=0;j<7;j++){ const a=(j+imhH(sd,id*17+j,41))/7*T9, L=(18+imhH(sd,id*17+j,42)*26)*(rm? 1 : Math.min(1,q*1.6)); cx.beginPath(); cx.moveTo(x,y); cx.lineTo(x+Math.cos(a)*L*0.55,y+Math.sin(a)*L*0.32+2); cx.lineTo(x+Math.cos(a+0.25)*L,y+Math.sin(a+0.25)*L*0.6); cx.stroke(); }   
+  cx.restore();
+  if(!rm && q<1){ cx.globalAlpha=(1-q)*0.8; cx.strokeStyle='#FFFFFF'; cx.lineWidth=2.5; cx.beginPath(); cx.ellipse(x,y,40+q*16,24+q*10,0,0,T9); cx.stroke(); cx.globalAlpha=1; } }
+function imhPaint(){ const R=S.raid, st=R && R.imh; if(!st || IMH.raid!==R || !cavesOn()) return;
+  const rm=(typeof reducedMotion==='function' && reducedMotion()), now=+(S.waveT||0);
+  for(const p of st.patches){ if(!p.cv) p.cv=imhPatchCv(p); cx.drawImage(p.cv, p.x-p.cv.width/2, p.y-p.cv.height/2); }
+  for(const rec of st.holes){ if(rec.st==='gone') continue;
+    if(!rec.cv) rec.cv=imhHoleCv(rec); cx.drawImage(rec.cv, rec.x-rec.cv.width/2, rec.y-rec.cv.height/2);
+    if(rec.st==='water'){ if(rm) imhFreezeFace(rec.x,rec.y,1,true,st.seed,rec.id); else imhWaterFace(rec.x,rec.y,(now-rec.wAt)/IMH_D.water,rm); }   
+    else if(rec.st==='freeze'){ const q=(now-rec.fAt)/IMH_D.freeze; imhFreezeFace(rec.x,rec.y,q,rm,st.seed,rec.id); } } }
+function imhDrawFx(e,k){ const T9=Math.PI*2;
+  if(e.k==='icfall'){ const rr=10+(e.R*0.9-10)*k; cx.globalAlpha=0.3+0.45*k; cx.fillStyle='#04090F'; cx.beginPath(); cx.ellipse(e.x,e.y,rr,rr*0.45,0,0,T9); cx.fill(); cx.globalAlpha=1;   
+    cx.strokeStyle='rgba(214,238,255,'+(0.35+0.4*k).toFixed(3)+')'; cx.lineWidth=2; cx.beginPath(); cx.ellipse(e.x,e.y,rr+3,rr*0.45+2,0,0,T9); cx.stroke();   
+    if(k>0.6 && !(typeof reducedMotion==='function' && reducedMotion())){ const p=(k-0.6)/0.4; cx.strokeStyle='rgba(21,40,58,'+(0.5*p).toFixed(3)+')'; cx.lineWidth=1.2; for(let j=0;j<6;j++){ const a=j/6*T9+0.4, r0=rr*0.8, r1=rr*(0.8+0.5*p); cx.beginPath(); cx.moveTo(e.x+Math.cos(a)*r0,e.y+Math.sin(a)*r0*0.45); cx.lineTo(e.x+Math.cos(a)*r1,e.y+Math.sin(a)*r1*0.45); cx.stroke(); } }   
+    if(k>=0.35){ const p=(k-0.35)/0.65, q=p*p, s=IMH_D.art, yy=e.y-340*(1-q); cx.save(); cx.translate(e.x,yy); cx.rotate((e.tilt||0)*(1-p)); cx.scale(s,s);   
+      cx.fillStyle='#D5E7F4'; cx.beginPath(); cx.moveTo(-9,-78); cx.quadraticCurveTo(-5,-30,-1.5,0); cx.lineTo(1.5,0); cx.quadraticCurveTo(6,-30,9,-78); cx.quadraticCurveTo(0,-84,-9,-78); cx.closePath(); cx.fill();
+      cx.globalAlpha=0.55; cx.strokeStyle='#6F98B8'; cx.lineWidth=1.3; cx.stroke(); cx.globalAlpha=1;   
+      cx.fillStyle='#86AECB'; cx.beginPath(); cx.moveTo(-3.2,-74); cx.quadraticCurveTo(-1.2,-34,0,-6); cx.quadraticCurveTo(2.4,-34,3.6,-74); cx.closePath(); cx.fill();   
+      cx.strokeStyle='rgba(255,255,255,0.9)'; cx.lineWidth=1.6; cx.beginPath(); cx.moveTo(-6,-72); cx.lineTo(-2.2,-16); cx.stroke(); cx.restore(); }   
+    return true; }
+  if(e.k==='icsplash'){ for(let i=0;i<11;i++){ const h=caveHash(i,52), h2=caveHash(i,53), a=-0.2-h*2.75, sp=80+130*h2, bx=e.x+Math.cos(a)*sp*k, by=e.y+Math.sin(a)*sp*k*0.55+300*k*k-12; cx.save(); cx.globalAlpha=Math.max(0,1-k*1.05); cx.translate(bx,by); cx.rotate(k*6+h*6); cx.scale(1.5,1.5); cx.fillStyle=(i%2)? '#EAF4FF' : '#BFE3F7'; cx.beginPath(); cx.moveTo(-5,2); cx.lineTo(0,-7-h*5); cx.lineTo(5,2); cx.closePath(); cx.fill(); cx.strokeStyle='#4F7A99'; cx.lineWidth=0.9; cx.stroke(); cx.restore(); }   
+    cx.globalAlpha=(1-k)*0.55; cx.fillStyle='#CFE4F2'; cx.beginPath(); cx.ellipse(e.x,e.y-4,44*(0.5+k),16*(0.5+k),0,0,T9); cx.fill(); cx.globalAlpha=1; return true; }   
+  return false; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function imhRead(){ const R=S.raid, st=R && R.imh, on=(typeof cavesOn==='function') && cavesOn(), now=+(S.waveT||0);
+  return { cv:GVT_CV, on:IMH.on, live:imhOn(), party:imhParty(), wrapped:IMH.wrapped, caves:on? 1 : 0, tier:on? cavesTier() : null, waveT:+now.toFixed(3),
+    cells:{ every:Object.assign({},CAVES_MADE_EVERY), cap:Object.assign({},CAVES_MADE_CAP), life:Object.assign({},CAVES_MADE_LIFE), warn:Object.assign({},CAVES_MADE_WARN), band:Object.assign({},CAVES_MADE_BAND) }, d:Object.assign({},IMH_D),
+    seed:st? st.seed : null, salt:IMH.salt, arrive:st? st.arrive : null, next:st? st.next : null, k:st? st.k : 0, n:st? st.n : 0, said:st? st.said : 0, saidAt:st? (st.saidAt||null) : null, cnt:st? Object.assign({},st.cnt) : null, band:st && st.band? { rows:st.band.rows.slice(), done:st.band.done.slice(), N:st.band.N } : null,
+    holes:st? st.holes.map(r=>({ id:r.id, x:r.x, y:r.y, st:r.st, by:r.by, born:+r.born.toFixed(3), age:+(now-r.born).toFixed(3), wAt:r.wAt, fAt:r.fAt, gAt:r.gAt, wait:+(r.wait||0).toFixed(3), first:r.first, inTable:CAVE_HOLES.indexOf(r.row) })) : [], patches:st? st.patches.map(p=>({ id:p.id, x:p.x, y:p.y, at:p.at })) : [],
+    table:CAVE_HOLES.map(h=>[h[0],h[1],h.imh? 1 : 0]), open:cavesHolesOpen().map(h=>[h[0],h[1],h.imh? 1 : 0]), pending:(S.caveIc||[]).filter(c=>c.imh).map(c=>({ x:c.x, y:c.y, t:+c.t.toFixed(3), warn:c.warn, by:c.imhBy, band:c.icn4B? 1 : 0 })), n:Object.assign({},IMH.n), err:IMH.err, e:IMH.e, word:(typeof t==='function')? t(IMH_SAY) : IMH_SAY,
+    lab:(typeof BLB_RULES!=='undefined')? BLB_RULES.filter(q=>/^CAVES_MADE_/.test(q[0])).map(q=>q[0]) : null }; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 function keepInit(){ if(OTK) return OTK; let on=1;
   try{ const q=/[?&]keep=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_keep','0'); else localStorage.removeItem('gvt_keep'); } on=(localStorage.getItem('gvt_keep')==='0')? 0 : 1; }catch(e){ on=1; }
   OTK={ on:on, boot:0, loaded:0, done:0, open:0, held:0, raw:null, hi0:'', ack0:0, u0:0, seen:0, busy:0, tries:0, why:'', err:0, n:{ home:0, over:0, pick:0, settle:0, held:0, heal:0, healed:0, ack:0, fetch:0 } };   
@@ -1208720,7 +1208969,7 @@ let BFQ=null;
 
 
 
-let GVT_CV='31.32';
+let GVT_CV='31.33';
 let NX_CAP_MUL=4;
 
 
@@ -4414789,6 +4415038,255 @@ try{ cheWords(); }catch(e){ cheErr('boot',e); }
 
 
 setTimeout(function(){ try{ if(window.GVT && !GVT.che) GVT.che=function(o){ return cheRead(o); }; }catch(e){} }, 0);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const CAVES_MADE_EVERY={ e:16, m:14, h:12, g:10 };
+const CAVES_MADE_CAP={ e:2, m:3, h:3, g:4 };
+const CAVES_MADE_LIFE={ e:14, m:16, h:18, g:20 };
+const CAVES_MADE_WARN={ e:2.6, m:2.6, h:2.6, g:2.6 };
+const CAVES_MADE_BAND={ e:2, m:2, h:2, g:2 };
+const IMH_D={ box:170, hole:120, hoard:120, stand:120, mouth:120, x0:64, x1:1700, top:48, bot:52, first:2.5, firstSpawn:1.2, water:1.5, freeze:0.3, waitMax:12, colDx:180, tries:16, retry:3, R:1.5, art:1.6, patch:40 };
+const IMH_SAY='The ice broke open! Watch that hole, Soldier!';
+const IMH={ on:1, wrapped:0, raid:null, rows:[], ver:0, fights:0, salt:0, err:0, e:'', n:{ laid:0, clock:0, band:0, rig:0, landed:0, caught:0, holes:0, skipped:0, nospot:0, rep:0, spawn:0, none:0, picks:0, peeks:0, nears:0, wakes:0, waits:0, nudged:0, edged:0, water:0, froze:0, fell:0, ice:0, iceKill:0, said:0, bakes:0, cv:0 } };
+try{ const q=/[?&]imh=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_imh','0'); else localStorage.removeItem('gvt_imh'); } IMH.on=(localStorage.getItem('gvt_imh')==='0')? 0 : 1; }catch(e){ IMH.on=1; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+(function(){
+  if(typeof CAVE_HOLES==='undefined' || typeof cavesOn!=='function' || typeof caveIcPass!=='function' || typeof caveFxPass!=='function' || typeof caveDrawEyes!=='function' || typeof drawCaveFx!=='function' || typeof hrtBandRow!=='function' || typeof cyHolePick!=='function' || typeof cyHolePeek!=='function' || typeof cyHoleNear!=='function' || typeof rugPlateCaves!=='function') return;   
+  const tk0=caveFxPass; caveFxPass=function(dt){ try{ imhTick(dt); }catch(e){ imhErr('tick',e); } return tk0.apply(this,arguments); };   
+  const ic0=caveIcPass; caveIcPass=function(dt){ const L=S.caveIc; if(!L || !L.length || !imhOn()) return ic0.apply(this,arguments);   
+    let due=null, under=null; for(const c of L){ if(c.imh && c.t+dt>=(c.warn||FY_ICICLE_WARN)) (due||(due=[])).push(c); }
+    if(due){ under=[]; for(const c of due){ for(const q of S.units){ if(q.dead || q.jetT>0 || (S.drag && S.drag.unit===q)) continue; if(Math.hypot(q.x-c.x,q.y-c.y)<FY_ICICLE_R) under.push(q); } } }
+    const r=ic0.apply(this,arguments);
+    if(due){ const st=imhSt(); for(const q of under){ if(st) st.cnt.ice++; IMH.n.ice++; if(q.dead){ if(st) st.cnt.iceKill++; IMH.n.iceKill++; } } for(const c of due){ if(L.indexOf(c)>=0) continue; try{ imhLand(c); }catch(e){ imhErr('land',e); } } }
+    return r; };
+  if(typeof cirCatch==='function'){ const cc0=cirCatch; cirCatch=function(c){ const r=cc0.apply(this,arguments); if(r && c && c.imh) c.imhCaught=1; return r; }; }   
+  const br0=hrtBandRow; hrtBandRow=function(f,x,r){ const out=br0.apply(this,arguments); if(imhOn()){ try{ imhBand(f,x,r); }catch(e){ imhErr('band',e); } } return out; };   
+  const pk0=cyHolePick; cyHolePick=function(f){ const h=pk0.apply(this,arguments); if(!imhOn() || !IMH.rows.length) return h; try{ const m=imhNearMen(); if(m){ IMH.n.picks++; return m; } }catch(e){ imhErr('pick',e); } return h; };   
+  const pe0=cyHolePeek; cyHolePeek=function(f){ const h=pe0.apply(this,arguments); if(!imhOn() || !IMH.rows.length) return h; try{ const m=imhNearMen(); if(m){ IMH.n.peeks++; return m; } }catch(e){ imhErr('peek',e); } return h; };   
+  const nr0=cyHoleNear; cyHoleNear=function(x,y){ const h=nr0.apply(this,arguments); if(!h || !h.imh || h.imh.st==='open') return h; IMH.n.nears++; let b=null, bd=1e9; for(let i=0;i<CAVE_HOLES.length;i++){ const q=CAVE_HOLES[i]; if(!imhOpenRow(q) || imhShut(i)) continue; const d=Math.hypot(q[0]-x,q[1]-y); if(d<bd){ bd=d; b=q; } } return b||h; };   
+  if(typeof hrtWakeCol==='function'){ const wk0=hrtWakeCol; hrtWakeCol=function(f,c){ if(!imhOn() || !IMH.rows.length || !(c>=0 && c<3)) return wk0.apply(this,arguments); const m=imhColRow(c); if(!m) return wk0.apply(this,arguments);   
+    const j=(Math.abs(m[1]-CAVE_HOLES[c][1])<=Math.abs(m[1]-CAVE_HOLES[c+3][1]))? c : c+3, keep=CAVE_HOLES[j]; CAVE_HOLES[j]=m; IMH.n.wakes++; try{ return wk0.apply(this,arguments); } finally{ CAVE_HOLES[j]=keep; } }; }
+  const rp0=rugPlateCaves; rugPlateCaves=function(g,WD,HT){ return imhBare(rp0,this,arguments); };   
+  if(typeof icn1Paint==='function'){ const ip0=icn1Paint; icn1Paint=function(g,WD,HT,hh){ return imhBare(ip0,this,arguments); }; }   
+  if(typeof icn3Rims==='function'){ const ir0=icn3Rims; icn3Rims=function(){ if(IMH.rimVer!==IMH.ver){ IMH.rimVer=IMH.ver; try{ ICN3.rims=null; }catch(e){} } return ir0.apply(this,arguments); }; }   
+  if(typeof icn3Fall==='function'){ const if0=icn3Fall; icn3Fall=function(u,c){ const row=(c && c.i>=0)? CAVE_HOLES[c.i] : null; const r=if0.apply(this,arguments); try{ if(u && u.falling && row){ u.falling.row=row; if(row.imh){ const st=S.raid && S.raid.imh; if(st) st.cnt.fell++; IMH.n.fell++; } } }catch(e){ imhErr('fall',e); } return r; }; }   
+  if(typeof icn3DrawFaller==='function'){ const id0=icn3DrawFaller; icn3DrawFaller=function(o,img,w,flip){ const fl=o && o.falling, row=fl && fl.row; if(!row) return id0.apply(this,arguments); const i=CAVE_HOLES.indexOf(row); if(i>=0){ fl.h=i; return id0.apply(this,arguments); }
+    CAVE_HOLES.push(row); fl.h=CAVE_HOLES.length-1; try{ return id0.apply(this,arguments); } finally{ CAVE_HOLES.pop(); } }; }   
+  const de0=caveDrawEyes; caveDrawEyes=function(){ try{ imhPaint(); }catch(e){ imhErr('paint',e); } return de0.apply(this,arguments); };   
+  const dx0=drawCaveFx; drawCaveFx=function(e,k){ if(e && e.imh){ try{ if(imhDrawFx(e,k)) return; }catch(x){ imhErr('fx',x); } } return dx0.apply(this,arguments); };   
+  IMH.wrapped=1;
+  
+  try{ const W9={ ar:'انكسر الجليد! انتبه لتلك الحفرة يا جندي!‏', ja:'こおりが われた！ あの あなに きをつけろ、しんぺい！', ko:'얼음이 깨졌다! 저 구멍 조심해라, 신병!', 'zh-Hans':'冰面裂开了！小心那个洞，士兵！', de:'Das Eis ist aufgebrochen! Pass auf das Loch auf, Soldat!', ru:'Лёд проломился! Берегись этой ямы, боец!', es:'¡El hielo se rompió! ¡Cuidado con ese agujero, soldado!' };
+    for(const L in W9){ const d=TR[L]||(TR[L]={}); if(d[IMH_SAY]===undefined) d[IMH_SAY]=W9[L]; } }catch(e){ imhErr('words',e); }
+  
+  try{ if(IMH.on && typeof BLB_RULES!=='undefined' && Array.isArray(BLB_RULES) && !BLB_RULES.some(q=>q[0]==='CAVES_MADE_EVERY')){
+    BLB_RULES.push(['CAVES_MADE_EVERY', ()=>CAVES_MADE_EVERY, 'THE HEAVY ICICLES: ONE EVERY (s, from his arrival)', 'caves'], ['CAVES_MADE_CAP', ()=>CAVES_MADE_CAP, 'THE MADE HOLES OPEN AT ONCE (at most)', 'caves'], ['CAVES_MADE_LIFE', ()=>CAVES_MADE_LIFE, 'A MADE HOLE STANDS OPEN (s, then the water and the freeze)', 'caves'], ['CAVES_MADE_WARN', ()=>CAVES_MADE_WARN, "THE HEAVY ICICLE'S SHADOW (s)", 'caves'], ['CAVES_MADE_BAND', ()=>CAVES_MADE_BAND, 'THE HEAVY ICICLES THE CAVE-IN LEAVES', 'caves']);
+    if(typeof blbShip==='function' && typeof BLB==='object' && BLB && BLB.ship) blbShip();
+    if(typeof BLB==='object' && BLB && BLB.booted && BLB.over && typeof blbCellSet==='function') for(const id of ['CAVES_MADE_EVERY','CAVES_MADE_CAP','CAVES_MADE_LIFE','CAVES_MADE_WARN','CAVES_MADE_BAND']){ const o=BLB.over[id]; if(o) for(const k of Object.keys(o)) blbCellSet(id,k,o[k]); }
+  } }catch(e){ imhErr('lab',e); }
+})();
+
+
+
+
+
+
+
+setTimeout(function(){ try{ if(window.GVT && !GVT.imh) GVT.imh=function(o){ o=o||{};   
+  if(o.salt!=null) IMH.salt=o.salt|0;
+  if(o.lay && imhOn()){ const st=imhSt(); if(st) imhLay(st, +o.lay[0], +o.lay[1], 'rig', o.band? 1 : 0); }
+  if(o.open && imhOn()){ const st=imhSt(); if(st) imhBirth(st, Math.round(+o.open[0]), Math.round(+o.open[1]), 'rig'); }
+  if(o.age!=null && S.raid && S.raid.imh){ for(const r of S.raid.imh.holes){ if(r.st==='open' && (o.id==null || r.id===o.id)) r.born-=+o.age; } }
+  if(o.reset){ for(const k of Object.keys(IMH.n)) IMH.n[k]=0; IMH.err=0; IMH.e=''; }
+  return imhRead(); }; }catch(e){} }, 0);
 
 
 
