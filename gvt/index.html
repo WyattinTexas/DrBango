@@ -997498,6 +997498,48 @@ function imhRead(){ const R=S.raid, st=R && R.imh, on=(typeof cavesOn==='functio
 
 
 
+function cytErr(w,e){ CYT.err++; if(CYT.e.length<400) CYT.e+=w+':'+String(e && e.message || e).slice(0,80)+' '; }
+function cytParty(){ try{ return !!(S.coop || coopLaunching); }catch(e){ return false; } }
+function cytOn(){ return !!((CYT.on || cytParty()) && cavesOn()); }
+function cytCut(){ const v=+CAVES_CY_CUT[cavesTier()]; return (isFinite(v) && v>0)? v : 0; }
+function cytStamp(f){   
+  if(f.icn4X==null){ CYT.bare++; return; }   
+  const b=+f.def.bounty, cut=cytCut(); if(!(b>0) || !(cut>0)) return;
+  const pay0=Math.round(b*(f.bountyMul||1)); if(!(pay0>1)) return;   
+  const pay=Math.max(1, Math.round(pay0-cut)); if(!(pay<pay0)) return;   
+  f.bountyMul=pay/b; f.cytWas=pay0; f.cytPay=pay; CYT.cutN++; }
+
+
+
+
+
+
+
+
+
+
+
+function cytRead(){ const on=(typeof cavesOn==='function') && cavesOn();
+  return { cv:GVT_CV, on:CYT.on, wrapped:CYT.wrapped, party:cytParty()? 1 : 0, live:cytOn()? 1 : 0, caves:on? 1 : 0, tier:on? cavesTier() : null, cut:Object.assign({},CAVES_CY_CUT), now:on? cytCut() : null,
+    n:{ cutN:CYT.cutN, bare:CYT.bare }, err:CYT.err, e:CYT.e,
+    lab:(typeof BLB_RULES!=='undefined')? BLB_RULES.filter(function(r){ return r[0]==='CAVES_CY_CUT'; }).map(function(r){ return r[0]; }) : null }; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1209349,7 +1209391,7 @@ let BFQ=null;
 
 
 
-let GVT_CV='31.35';
+let GVT_CV='31.36';
 let NX_CAP_MUL=4;
 
 
@@ -4415846,6 +4415888,48 @@ setTimeout(function(){ try{ if(window.GVT && !GVT.imh) GVT.imh=function(o){ o=o|
   if(o.age!=null && S.raid && S.raid.imh){ for(const r of S.raid.imh.holes){ if(r.st==='open' && (o.id==null || r.id===o.id)) r.born-=+o.age; } }
   if(o.reset){ for(const k of Object.keys(IMH.n)) IMH.n[k]=0; IMH.err=0; IMH.e=''; }
   return imhRead(); }; }catch(e){} }, 0);
+
+
+
+
+
+
+
+
+
+
+const CAVES_CY_CUT={ e:10, m:10, h:10, g:10 };
+const CYT={ on:1, wrapped:0, cutN:0, bare:0, err:0, e:'' };
+try{ const q=/[?&]cyt=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_cyt','0'); else localStorage.removeItem('gvt_cyt'); } CYT.on=(localStorage.getItem('gvt_cyt')==='0')? 0 : 1; }catch(e){ CYT.on=1; }
+
+
+
+
+
+
+
+
+
+
+try{ const sf0=spawnFoe; spawnFoe=function(type,x,y,form,gu){ const f=sf0.apply(this,arguments);
+    if(f && f.type==='cyeti' && f.def && f.def.cave && !f.def.boss && cytOn()){ try{ cytStamp(f); }catch(e){ cytErr('spawn',e); } }
+    return f; };
+  CYT.wrapped=1;
+}catch(e){ cytErr('wrap',e); }
+
+if(CYT.on){ try{ if(typeof BLB_RULES!=='undefined' && Array.isArray(BLB_RULES)){
+  BLB_RULES.push(['CAVES_CY_CUT', ()=>CAVES_CY_CUT, 'THE CAVE YETI PAYS THIS MANY DOG TAGS LESS', 'caves']);
+  if(typeof blbShip==='function' && typeof BLB==='object' && BLB && BLB.ship) blbShip();
+  if(typeof BLB==='object' && BLB && BLB.booted && BLB.over && typeof blbCellSet==='function'){ const o=BLB.over.CAVES_CY_CUT; if(o) for(const k of Object.keys(o)) blbCellSet('CAVES_CY_CUT',k,o[k]); }
+} }catch(e){ cytErr('lab',e); } }
+
+
+
+
+setTimeout(function(){ try{ if(window.GVT && !GVT.cyt) GVT.cyt=function(o){ o=o||{};
+  if(o.cut) for(const k of Object.keys(o.cut)) CAVES_CY_CUT[k]=+o.cut[k];
+  if(o.reset){ CYT.cutN=0; CYT.bare=0; }
+  return cytRead(); }; }catch(e){} }, 0);
 
 
 
