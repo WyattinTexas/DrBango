@@ -1001170,6 +1001170,14 @@ function dmxPartSVG(){ return '<svg viewBox="0 0 132 62"><ellipse cx="66" cy="57
 
 
 
+
+
+
+
+
+
+
+
 function ptr2Err(w,e){ PTR2.err++; if(PTR2.e.length<400) PTR2.e+=w+':'+String(e&&e.message||e).slice(0,80)+' '; }
 function ptr2On(){ return !!((PTR2.on===1 || S.coop) && skyOn()); }
 function ptr2T(T){ const v=T[skyTier()]; return (typeof v==='number' && isFinite(v))? v : ((typeof T.h==='number')? T.h : 0); }
@@ -1001214,10 +1001222,16 @@ function ptr2P1Set(v){ const ks=['e','m','h','g']; for(const k of ks) PTR_P1[k]=
   if(typeof BLB==='object' && BLB && BLB.booted && BLB.over && BLB.over.PTR_P1 && typeof blbCellSet==='function'){ const o=BLB.over.PTR_P1; for(const k of Object.keys(o)) blbCellSet('PTR_P1',k,o[k]); } }
 function ptr2Read(){ const R=(S.raid && S.raid.sky)||null, F=R && R.ptr2 && R.ptr2.flood; let cap=null; try{ if(skyOn()) cap=Math.round(ptrT(PTR_CAP)); }catch(e){}
   return { cv:GVT_CV, on:PTR2.on, dev:PTR2_ON, live:skyOn()? ptr2On() : null, tier:skyOn()? skyTier() : null, n:Object.assign({},PTR2.n), err:PTR2.err, e:PTR2.e, cap,
-    p1:Object.assign({},PTR_P1), many:Object.assign({},PTR2_MANY), airsafe:Object.assign({},PTR2_AIRSAFE), gap:PTR2_FLOOD_GAP, sep:PTR2_FLOOD_SEP,
+    p1:Object.assign({},PTR_P1), many:Object.assign({},PTR2_MANY), airsafe:Object.assign({},PTR2_AIRSAFE), ssHp:Object.assign({},PTR2_SS_HP), sniperHp:Object.assign({},PTR2_SNIPER_HP), gap:PTR2_FLOOD_GAP, sep:PTR2_FLOOD_SEP,
+    bars:S.foes.filter(f=>!f.dead && (f.type==='skysarge' || f.type==='tansniper')).map(f=>({ id:f.id, type:f.type, hp:+(+f.hp).toFixed(1), max:f.hpMax, chute:!!f.skyDrop })),
     air:S.foes.filter(f=>!f.dead && f.skyDrop && !f.skyDrop.hanky).map(f=>({ id:f.id, type:f.type, hp:f.hp, max:f.hpMax, safe:ptr2Safe(f), t:+f.skyDrop.t.toFixed(2), x:Math.round(f.x), y:Math.round(f.y) })),
     flood:F? { t0:+F.t0.toFixed(2), i:F.i, many:F.many, at:F.at.slice(), men:F.men.slice(), groups:F.G.map(g=>{ const q=g.now||g.s; return { w:g.w, k:g.k, kind:g.kind, n:g.n, x:q? q.x : null, y:q? q.y : null, px:g.s? g.s.x : null, py:g.s? g.s.y : null, moved:(g.now && g.now.moved)? 1 : 0, c:g.s? g.s.c : null, d:g.s? g.s.d : null, tr:g.s? g.s.tr : null, alts:(g.s && g.s.alt)? g.s.alt.length : 0 }; }) } : null,
     lab:(typeof BLB_RULES!=='undefined')? BLB_RULES.filter(function(q){ return /^PTR2_/.test(q[0]); }).map(function(q){ return q[0]; }) : null }; }
+
+
+
+
+
 
 
 
@@ -1210229,7 +1210243,7 @@ let BFQ=null;
 
 
 
-let GVT_CV='31.65';
+let GVT_CV='31.66';
 let NX_CAP_MUL=4;
 
 
@@ -4409064,13 +4409078,22 @@ GVT.dmx=function(o){ if(o && typeof o==='object'){ if('pilot' in o) DMX.rig=(o.p
 
 
 
+
+
+
+
+
+
 const PTR2_ON=(function(){ try{ const q=/[?&]ptr2=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_ptr2','0'); else localStorage.removeItem('gvt_ptr2'); } return localStorage.getItem('gvt_ptr2')==='0'? 0 : 1; }catch(e){ return 1; } })();
 const PTR2_AIRSAFE={ e:1, m:1, h:1, g:1 };
 const PTR2_MANY={ e:4, m:4, h:4, g:4 };
+const PTR2_SS_HP={ e:3000, m:3000, h:3000, g:3000 };
+const PTR2_SNIPER_HP={ e:500, m:500, h:500, g:500 };
 const PTR2_P1=2;
 const PTR2_FLOOD_GAP=0.3, PTR2_FLOOD_SEP=110, PTR2_FLOOD_TRIES=40;
 const PTR2_DOOR_OFF=[[-17,-9],[17,9],[0,18],[-30,6],[30,-6],[0,-18],[-17,24],[17,-24],[34,14],[-34,-14],[0,34]];
-const PTR2={ on:PTR2_ON, n:{ pick:0, hurt:0, held:0, air:0, landed:0, beats:0, doorMen:0, capCut:0, floods:0, groups:0, floodMen:0, moved:0, wordWait:0, wordKept:0 }, busy:0, err:0, e:'' };
+const PTR2={ on:PTR2_ON, n:{ pick:0, hurt:0, held:0, air:0, landed:0, beats:0, doorMen:0, capCut:0, floods:0, groups:0, floodMen:0, moved:0, wordWait:0, wordKept:0, ssBar:0, sniperBar:0 }, busy:0, err:0, e:'' };
+
 
 
 
@@ -4409141,13 +4409164,18 @@ try{
       if(mine){ try{ ptr2FloodTick(R); return; }catch(e){ ptr2Err('flood',e); const Y=ptr2Z(R); if(Y.flood && Y.flood.men.length){ Y.flood.i=Y.flood.G.length; return; } Y.bad=1; } }   
       return st0.apply(this,arguments); }; }
   
+  { const n0=wvbSSNums; wvbSSNums=function(lv,t){ const N=n0.apply(this,arguments); try{ if(N && ptr2On()){ const c=PTR2_SS_HP[t||skyTier()], h=(typeof c==='number' && isFinite(c))? Math.round(c) : 0; if(h>0){ N.hp0=N.hp; N.hp=h; PTR2.n.ssBar++; } } }catch(e){ ptr2Err('ssbar',e); } return N; }; }
+  { const pc0=ptrChute; ptrChute=function(type,x,y,o){ const f=pc0.apply(this,arguments); try{ if(f && type==='tansniper' && !(o && o.hp!=null) && ptr2On()){ const h=Math.round(ptr2T(PTR2_SNIPER_HP)); if(h>0){ f.hp=f.hpMax=h; PTR2.n.sniperBar++; } } }catch(e){ ptr2Err('sniperbar',e); } return f; }; }
+  
   if(PTR2_ON) ptr2P1Set(PTR2_P1);
   
   if(typeof BLB_RULES!=='undefined' && Array.isArray(BLB_RULES) && !BLB_RULES.some(function(r){ return r[0]==='PTR2_AIRSAFE'; })){
     BLB_RULES.push(['PTR2_AIRSAFE', ()=>PTR2_AIRSAFE, "UNDER THE CHUTE: 1 = a man under a chute cannot be targeted or hurt until he lands; 0 = as before (PTR2)", 'sky'],
-                   ['PTR2_MANY', ()=>PTR2_MANY, "THE PARATROOPERS x: the scatter's men, the men out of the drop ship's door at each drop, her cap (his x4) (PTR2)", 'sky']);
+                   ['PTR2_MANY', ()=>PTR2_MANY, "THE PARATROOPERS x: the scatter's men, the men out of the drop ship's door at each drop, her cap (his x4) (PTR2)", 'sky'],
+                   ['PTR2_SS_HP', ()=>PTR2_SS_HP, "THEIR SABER SARGE'S BAR, HP (his 3,000; HARD and MEGA; 0 = as CARD-WVB built him) (PTR2)", 'sky'],
+                   ['PTR2_SNIPER_HP', ()=>PTR2_SNIPER_HP, "THE SNIPER SARGE UNDER A CHUTE: HIS BAR, HP (his 500; 0 = as CARD-PTR built him) (PTR2)", 'sky']);
     if(typeof blbShip==='function' && typeof BLB==='object' && BLB && BLB.ship) blbShip();
-    if(typeof BLB==='object' && BLB && BLB.booted && BLB.over && typeof blbCellSet==='function'){ for(const id of ['PTR2_AIRSAFE','PTR2_MANY']){ const o=BLB.over[id]; if(o) for(const k of Object.keys(o)) blbCellSet(id,k,o[k]); } } }
+    if(typeof BLB==='object' && BLB && BLB.booted && BLB.over && typeof blbCellSet==='function'){ for(const id of ['PTR2_AIRSAFE','PTR2_MANY','PTR2_SS_HP','PTR2_SNIPER_HP']){ const o=BLB.over[id]; if(o) for(const k of Object.keys(o)) blbCellSet(id,k,o[k]); } } }
 } catch(e){ ptr2Err('boot',e); }
 setTimeout(function(){ try{ if(window.GVT && !GVT.ptr2) GVT.ptr2=function(o){ o=o||{}; if(o.on===0 || o.on===1){ PTR2.on=o.on; ptr2P1Set(o.on? PTR2_P1 : 1); } return ptr2Read(); }; }catch(e){} },0);
 
