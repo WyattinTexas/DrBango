@@ -1001163,6 +1001163,124 @@ function dmxPartSVG(){ return '<svg viewBox="0 0 132 62"><ellipse cx="66" cy="57
 
 
 
+
+
+
+
+
+
+
+function ptr2Err(w,e){ PTR2.err++; if(PTR2.e.length<400) PTR2.e+=w+':'+String(e&&e.message||e).slice(0,80)+' '; }
+function ptr2On(){ return !!((PTR2.on===1 || S.coop) && skyOn()); }
+function ptr2T(T){ const v=T[skyTier()]; return (typeof v==='number' && isFinite(v))? v : ((typeof T.h==='number')? T.h : 0); }
+function ptr2Many(){ return Math.max(1, Math.min(12, Math.round(ptr2T(PTR2_MANY)))); }
+function ptr2Over(){ const rd=S.raid; return !!(!rd || rd.won || rd.kingDown || S.cleared || S.lives<=0 || S.mode!=='play'); }
+function ptr2Safe(f){ return !!(f && f.skyDrop && !f.skyDrop.hanky && !f.falling && !f.dead && ptr2On() && ptr2T(PTR2_AIRSAFE)>=0.5 && !ptr2Over()); }
+function ptr2Hold(f){ const h=(typeof f.ptr2H==='number')? f.ptr2H : f.hpMax; if(typeof h==='number' && !(f.hp>=h)) f.hp=h; }
+function ptr2Z(R){ return R.ptr2||(R.ptr2={ flood:null }); }
+function ptr2Foot(){ const safe=ptr2T(PTR2_AIRSAFE)>=0.5 && !ptr2Over(); let due=null;   
+  for(const f of S.foes){ if(f.dead) continue; const D=f.skyDrop;
+    if(D && !D.hanky){ if(!f.ptr2A){ f.ptr2A=1; if(f.hp>0) f.ptr2H=f.hp; PTR2.n.air++; } if(safe && !f.falling) ptr2Hold(f); }
+    else if(f.ptr2A===1){ f.ptr2A=2; PTR2.n.landed++; if(f.ptr2Word) (due||(due=[])).push(f); } }
+  if(due && PTR2_EW0){ for(const f of due){ f.ptr2Word=0; if(f.dead || S.foes.indexOf(f)<0) continue; try{ PTR2_EW0(f); PTR2.n.wordKept++; }catch(e){ ptr2Err('word',e); } } } }
+function ptr2FloodSeats(R,n){ const sp=PTR_SCAT_SPREAD, s0=skySeat(0,-1e4).y+sp, s1=skySeat(0,1e4).y-sp, w=(PTR_BAND[1]-PTR_BAND[0])/3, bx=skyBox(), out=[[],[],[]], all=[];   
+  const rocks=(S.cfg && S.cfg.terrain && S.cfg.terrain.rocks)||[];
+  for(let s=0;s<n;s++) for(let t=0;t<3;t++){ const a=PTR_BAND[0]+w*t+sp+8, b=PTR_BAND[0]+w*(t+1)-sp-8, C=[];
+    for(let tr=0;tr<PTR2_FLOOD_TRIES;tr++){ const x=Math.round(a+(b-a)*ptrRoll('p2x'+t+':'+s+':'+tr)), y=Math.round(s0+(s1-s0)*ptrRoll('p2y'+t+':'+s+':'+tr));
+      let c=Math.hypot(x-bx.x,y-bx.y)-(PTR_BOX_R+sp);
+      for(const r9 of rocks) c=Math.min(c, Math.hypot(x-r9.x,y-r9.y)-(r9.r+sp+PTR_SCAT_CLR));
+      let d=1e6; for(const g of all) d=Math.min(d, Math.hypot(x-g.x,y-g.y)-PTR2_FLOOD_SEP);
+      C.push({ x, y, tr, c:Math.round(c), d:Math.round(Math.min(d,9999)), sc:(c<0)? c-1e6 : Math.min(c,d) }); }
+    C.sort(function(p,q){ return (q.sc-p.sc) || (p.tr-q.tr); });
+    const best=C[0]; best.alt=C.slice(1).filter(function(q){ return q.c>=0; }).slice(0,10).map(function(q){ return [q.x,q.y]; }); delete best.sc;
+    out[t].push(best); all.push(best); }
+  return out; }
+function ptr2HoleClr(x,y){ const P=(S.cfg && S.cfg.terrain && S.cfg.terrain.pits)||[]; let c=1e6; for(const p of P){ if(p.sky) c=Math.min(c, Math.hypot(x-p.x,y-p.y)-(p.r+PTR_SCAT_SPREAD+PTR_SCAT_CLR)); } return c; }
+function ptr2FloodNow(F,i9){ const s=F.G[i9].s; if(!s || ptr2HoleClr(s.x,s.y)>=0) return s;   
+  for(const a of (s.alt||[])){ if(ptr2HoleClr(a[0],a[1])<0) continue; let ok=true; for(let j=0;j<F.G.length && ok;j++){ if(j===i9) continue; const q=F.G[j].now||F.G[j].s; if(q && Math.hypot(a[0]-q.x,a[1]-q.y)<PTR2_FLOOD_SEP) ok=false; } if(ok){ PTR2.n.moved++; return { x:a[0], y:a[1], moved:1 }; } }
+  return s; }
+function ptr2FloodPlan(R){ const Q=ptrZ(R).scat, n=ptr2Many(), seats=ptr2FloodSeats(R,n), G=[];   
+  for(let w9=0;w9<n;w9++){ const pm=[[0,1,2],[0,2,1],[1,0,2],[1,2,0],[2,0,1],[2,1,0]][Math.min(5,Math.floor(ptrRoll('p2perm'+w9)*6))];   
+    for(let k=0;k<3;k++) G.push({ w:w9, k, kind:Q.kinds[k], n:Q.n[k]|0, s:seats[pm[k]][w9], now:null }); }
+  PTR2.n.floods++; return { t0:Q.t0, i:0, many:n, G, men:[], at:[] }; }
+function ptr2FloodTick(R){ const Q=ptrZ(R).scat; if(!Q) return; const Y=ptr2Z(R), F=Y.flood||(Y.flood=ptr2FloodPlan(R));   
+  while(F.i<F.G.length && R.t-F.t0>=PTR2_FLOOD_GAP*F.i-1e-9){ const i9=F.i, g=F.G[i9]; F.i++; F.at.push(+R.t.toFixed(2)); const s=g.now=ptr2FloodNow(F,i9); if(!s || !(g.n>0)) continue;
+    const rot=ptrRoll('p2rot'+i9)*Math.PI*2;
+    for(let i=0;i<g.n;i++){ const o=ptrScatOff(g.n,i,rot), p=ptrSeat(s.x+o[0], s.y+o[1]); const m=ptrChute(g.kind, p.x, p.y, { alt:PTR_SCAT_ALT, sw:i9*2.1+i*1.3, ship:0 }); if(m){ m.ptrScat=g.k+1; m.ptr2G=i9+1; F.men.push({ id:m.id, type:m.type, x:p.x, y:p.y, g:i9, k:g.k, w:g.w }); PTR2.n.floodMen++; } }
+    PTR2.n.groups++; bfSfx(SFX.swish, s.x, s.y); }
+  if(F.i>=F.G.length && Q.k<3) Q.k=3; }
+function ptr2P1Set(v){ const ks=['e','m','h','g']; for(const k of ks) PTR_P1[k]=v;   
+  if(typeof BLB==='object' && BLB && BLB.ship && BLB.ship.PTR_P1){ for(const k of ks){ if(k in BLB.ship.PTR_P1) BLB.ship.PTR_P1[k]=v; } }   
+  if(typeof BLB==='object' && BLB && BLB.booted && BLB.over && BLB.over.PTR_P1 && typeof blbCellSet==='function'){ const o=BLB.over.PTR_P1; for(const k of Object.keys(o)) blbCellSet('PTR_P1',k,o[k]); } }
+function ptr2Read(){ const R=(S.raid && S.raid.sky)||null, F=R && R.ptr2 && R.ptr2.flood; let cap=null; try{ if(skyOn()) cap=Math.round(ptrT(PTR_CAP)); }catch(e){}
+  return { cv:GVT_CV, on:PTR2.on, dev:PTR2_ON, live:skyOn()? ptr2On() : null, tier:skyOn()? skyTier() : null, n:Object.assign({},PTR2.n), err:PTR2.err, e:PTR2.e, cap,
+    p1:Object.assign({},PTR_P1), many:Object.assign({},PTR2_MANY), airsafe:Object.assign({},PTR2_AIRSAFE), gap:PTR2_FLOOD_GAP, sep:PTR2_FLOOD_SEP,
+    air:S.foes.filter(f=>!f.dead && f.skyDrop && !f.skyDrop.hanky).map(f=>({ id:f.id, type:f.type, hp:f.hp, max:f.hpMax, safe:ptr2Safe(f), t:+f.skyDrop.t.toFixed(2), x:Math.round(f.x), y:Math.round(f.y) })),
+    flood:F? { t0:+F.t0.toFixed(2), i:F.i, many:F.many, at:F.at.slice(), men:F.men.slice(), groups:F.G.map(g=>{ const q=g.now||g.s; return { w:g.w, k:g.k, kind:g.kind, n:g.n, x:q? q.x : null, y:q? q.y : null, px:g.s? g.s.x : null, py:g.s? g.s.y : null, moved:(g.now && g.now.moved)? 1 : 0, c:g.s? g.s.c : null, d:g.s? g.s.d : null, tr:g.s? g.s.tr : null, alts:(g.s && g.s.alt)? g.s.alt.length : 0 }; }) } : null,
+    lab:(typeof BLB_RULES!=='undefined')? BLB_RULES.filter(function(q){ return /^PTR2_/.test(q[0]); }).map(function(q){ return q[0]; }) : null }; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 function keepInit(){ if(OTK) return OTK; let on=1;
   try{ const q=/[?&]keep=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_keep','0'); else localStorage.removeItem('gvt_keep'); } on=(localStorage.getItem('gvt_keep')==='0')? 0 : 1; }catch(e){ on=1; }
   OTK={ on:on, boot:0, loaded:0, done:0, open:0, held:0, raw:null, hi0:'', ack0:0, u0:0, seen:0, busy:0, tries:0, why:'', err:0, n:{ home:0, over:0, pick:0, settle:0, held:0, heal:0, healed:0, ack:0, fetch:0 } };   
@@ -1210073,7 +1210191,7 @@ let BFQ=null;
 
 
 
-let GVT_CV='31.63';
+let GVT_CV='31.64';
 let NX_CAP_MUL=4;
 
 
@@ -4408876,6 +4408994,124 @@ GVT.dmx=function(o){ if(o && typeof o==='object'){ if('pilot' in o) DMX.rig=(o.p
   const g=function(f){ try{ return f(); }catch(e){ return null; } };
   return { on:DMX.on, n:Object.assign({},DMX.n), err:DMX.err, rig:DMX.rig, at:ENH_ORDER.indexOf(DMX.id), len:ENH_ORDER.length, cost:ENH_COST[DMX.id], own:g(function(){ return enhOwns(DMX.id); }), fit:g(function(){ return enhOn(DMX.id); }), shows:g(function(){ return labShows(DMX.id); }),
     live:(S.dmxM||[]).filter(function(m){ return m.lg===S.dfLog && !m.dead; }).length, planes:(S.dfs||[]).filter(function(p){ return p.dmx; }).map(function(p){ return { id:p.id, mine:p.mine? 1 : 0, own:p.own, apt:p.dmx.apt, lv:p.dmx.lv, salt:p.dmx.salt, left:p.dmx.left, fired:p.dmx.k, hits:p.dmx.hits, stars:dmxStars(p.dmx.apt) }; }) }; };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const PTR2_ON=(function(){ try{ const q=/[?&]ptr2=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_ptr2','0'); else localStorage.removeItem('gvt_ptr2'); } return localStorage.getItem('gvt_ptr2')==='0'? 0 : 1; }catch(e){ return 1; } })();
+const PTR2_AIRSAFE={ e:1, m:1, h:1, g:1 };
+const PTR2_MANY={ e:4, m:4, h:4, g:4 };
+const PTR2_P1=2;
+const PTR2_FLOOD_GAP=0.3, PTR2_FLOOD_SEP=110, PTR2_FLOOD_TRIES=40;
+const PTR2_DOOR_OFF=[[-17,-9],[17,9],[0,18],[-30,6],[30,-6],[0,-18],[-17,24],[17,-24],[34,14],[-34,-14],[0,34]];
+const PTR2={ on:PTR2_ON, n:{ pick:0, hurt:0, held:0, air:0, landed:0, beats:0, doorMen:0, capCut:0, floods:0, groups:0, floodMen:0, moved:0, wordWait:0, wordKept:0 }, busy:0, err:0, e:'' };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+let PTR2_EW0=null;
+try{
+  
+  { const c0=bfCanTarget; bfCanTarget=function(u,o){ if(o && o.skyDrop && ptr2Safe(o)){ PTR2.n.pick++; return false; } return c0.apply(this,arguments); }; }
+  { const h0=hurt; hurt=function(f,dmg,src,fire9){ if(f && f.skyDrop && ptr2Safe(f)){ PTR2.n.hurt++; return; } return h0.apply(this,arguments); }; }
+  { const hc0=hitCheck; hitCheck=function(f,u){ if(f && f.skyDrop && ptr2Safe(f)){ ptr2Hold(f); PTR2.n.held++; return; } return hc0.apply(this,arguments); }; }
+  { const sp0=skyPass; skyPass=function(dt){ const r=sp0.apply(this,arguments); try{ if(ptr2On()) ptr2Foot(); }catch(e){ ptr2Err('foot',e); } return r; }; }
+  
+  
+  { const ew0=evKillByWord; PTR2_EW0=ew0; evKillByWord=function(f){ if(f && f.skyDrop && ptr2Safe(f)){ f.ptr2Word=1; PTR2.n.wordWait++; return; } return ew0.apply(this,arguments); }; }
+  { const sw0=fcnSweep; fcnSweep=function(seen9,hi9){ try{ if(seen9 && ptr2On() && ptr2T(PTR2_AIRSAFE)>=0.5 && !ptr2Over()){ for(const f of S.foes){ if(f.skyDrop && !f.skyDrop.hanky && !f.dead && !f.falling) seen9[f.type+':'+(f.foN|0)]=1; } } }catch(e){ ptr2Err('sweep',e); } return sw0.apply(this,arguments); }; }
+  
+  { const t0=ptrT; ptrT=function(T){ const v=t0.apply(this,arguments); try{ if(T===PTR_CAP){ if(ptr2On()) return v*ptr2Many(); } else if(T===PTR_P1){ if(v===1 && PTR2.on!==1 && S.coop && skyOn()) return PTR2_P1; } }catch(e){ ptr2Err('cell',e); } return v; }; }
+  { const dm0=ptrDropMan; ptrDropMan=function(f,K,Q,T,R,dx,type,ox,oy,j0){ const m=dm0.apply(this,arguments);   
+      try{ if(m && j0==null && !PTR2.busy && ptr2On()){ const n=ptr2Many(); if(n>1){ PTR2.busy=1; PTR2.n.beats++;
+          try{ const j1=m.ptrJ, cap=Math.round(ptrT(PTR_CAP)); for(let i=1;i<n;i++){ if(ptrAlive()>=cap){ PTR2.n.capCut++; break; } const o=PTR2_DOOR_OFF[(i-1)%PTR2_DOOR_OFF.length]; if(dm0.call(this,f,K,Q,T,R,dx,type,(ox||0)+o[0],(oy||0)+o[1],j1)) PTR2.n.doorMen++; } }
+          finally{ PTR2.busy=0; } } } }catch(e){ ptr2Err('door',e); }
+      return m; }; }
+  { const st0=ptrScatTick; ptrScatTick=function(R){ let mine=false; try{ mine=!!(R && ptr2On() && ptr2Many()>1 && !(R.ptr2 && R.ptr2.bad)); }catch(e){ ptr2Err('scat',e); }
+      if(mine){ try{ ptr2FloodTick(R); return; }catch(e){ ptr2Err('flood',e); const Y=ptr2Z(R); if(Y.flood && Y.flood.men.length){ Y.flood.i=Y.flood.G.length; return; } Y.bad=1; } }   
+      return st0.apply(this,arguments); }; }
+  
+  if(PTR2_ON) ptr2P1Set(PTR2_P1);
+  
+  if(typeof BLB_RULES!=='undefined' && Array.isArray(BLB_RULES) && !BLB_RULES.some(function(r){ return r[0]==='PTR2_AIRSAFE'; })){
+    BLB_RULES.push(['PTR2_AIRSAFE', ()=>PTR2_AIRSAFE, "UNDER THE CHUTE: 1 = a man under a chute cannot be targeted or hurt until he lands; 0 = as before (PTR2)", 'sky'],
+                   ['PTR2_MANY', ()=>PTR2_MANY, "THE PARATROOPERS x: the scatter's men, the men out of the drop ship's door at each drop, her cap (his x4) (PTR2)", 'sky']);
+    if(typeof blbShip==='function' && typeof BLB==='object' && BLB && BLB.ship) blbShip();
+    if(typeof BLB==='object' && BLB && BLB.booted && BLB.over && typeof blbCellSet==='function'){ for(const id of ['PTR2_AIRSAFE','PTR2_MANY']){ const o=BLB.over[id]; if(o) for(const k of Object.keys(o)) blbCellSet(id,k,o[k]); } } }
+} catch(e){ ptr2Err('boot',e); }
+setTimeout(function(){ try{ if(window.GVT && !GVT.ptr2) GVT.ptr2=function(o){ o=o||{}; if(o.on===0 || o.on===1){ PTR2.on=o.on; ptr2P1Set(o.on? PTR2_P1 : 1); } return ptr2Read(); }; }catch(e){} },0);
 
 
 
