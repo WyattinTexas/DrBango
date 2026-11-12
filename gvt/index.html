@@ -1000457,6 +1000457,160 @@ function xslRead(o){ o=o||{}; if(o.m!=null && xslOwns()){ META.xsl.m=(+o.m|0)%3;
 
 
 
+function slpErr(w,e){ SLP.err++; if(SLP.e.length<400) SLP.e+=w+':'+String(e && e.message || e).slice(0,80)+' '; }
+function slpOn(){ return !!(SLP_ON || (typeof S==='object' && S && S.coop)); }
+function slpLv(p){ return Math.max(1, Math.min(PET_LV_MAX, p.r|0)); }
+function slpDmg(p){ return SLP_K.dmg*(1+SLP_K.per*(slpLv(p)-1))*petPotX(p); }
+function slpBlow(p){ const L=slpLv(p); return L>=SLP_K.lvBigger? SLP_K.blowBigger : L>=SLP_K.lvBig? SLP_K.blowBig : SLP_K.blow; }
+function slpWhirlR(p){ return smhR(p)*(slpLv(p)>=SLP_K.lvWide? SLP_K.whirlWideX : SLP_K.whirlX); }
+function slpLive(u,f){ return !!f && petMeLive(f) && !(f.dropT>0) && petTgtOk(u,f); }
+function slpBox(f){ if(!S.bf) return T; try{ return (S.bf.base && S.bf.base[enemySide(f)]) || null; }catch(e){ return null; } }
+function slpBusy(p){ const s=p.state; return s==='leap' || s==='squat' || s==='whirl' || s==='home'; }
+function slpAt(f){ const sv=f.shv; if(!sv || !(sv.dur>0)) return f; const k=Math.min(1,Math.max(0,(sv.dur-sv.t)/sv.dur)), rem=(sv.p||GG_PUSH)*(1-k*k*(3-2*k)); return { x:f.x+sv.x*rem, y:f.y+sv.y*rem }; }
+function slpPick(p,u){   
+  const R=SLP_K.reach, r=smhR(p), L=[]; for(const f of TGT(u)){ if(slpLive(u,f)) L.push({ f:f, a:slpAt(f) }); }
+  let best=null, bn=-1, bd=1e9;
+  for(const o of L){ const d=Math.hypot(o.a.x-u.x,o.a.y-u.y); if(!(d<=R)) continue;
+    let n=0; for(const g of L){ if(g!==o && Math.hypot(g.a.x-o.a.x,g.a.y-o.a.y)<=r) n++; }
+    if(n>bn || (n===bn && d<bd)){ best=o.f; bn=n; bd=d; } }
+  return best; }
+function slpSpot(p,u,m){   
+  const a=slpAt(m), dx=a.x-p.x, dy=a.y-p.y, d=Math.hypot(dx,dy)||1, k=Math.max(0,d-SLP_K.short)/d; let x=p.x+dx*k, y=p.y+dy*k;
+  const ex=x-u.x, ey=y-u.y, e=Math.hypot(ex,ey); if(e>SLP_K.reach){ x=u.x+ex/e*SLP_K.reach; y=u.y+ey/e*SLP_K.reach; }
+  const lim=(S.bf? WORLD_W : W); x=Math.max(SLP_K.edge, Math.min(lim-SLP_K.edge, x)); y=Math.max(SLP_K.edge, Math.min(WORLD_H-SLP_K.edge, y));
+  const o=frkOut(x, y, FRK.pad); if(!o) return { x:x, y:y };   
+  if(Math.hypot(o.x-u.x,o.y-u.y)<=SLP_K.reach) return o;   
+  return frkSeat(x, y, u.x, u.y); }
+function slpGo(p,u,m,st){   
+  const s=(st==='home')? frkHeel(u) : slpSpot(p,u,m), d=Math.hypot(s.x-p.x,s.y-p.y);
+  p.sl={ x0:p.x, y0:p.y, x1:s.x, y1:s.y, T:Math.max(SLP_K.tMin, Math.min(SLP_K.tMax, d/SLP_K.spd)), h:SLP_K.arc+SLP_K.arcK*d, d:d };
+  p.state=st; p.phase='leap'; p.t=0; p.tgt=(st==='home')? null : m; if(Math.abs(s.x-p.x)>0.5) p.fx=(s.x>p.x)? 1 : -1;
+  if(st==='home') SLP.n.home++; else { SLP.n.leap++; p.leaps=(p.leaps|0)+1; }
+  if(st!=='home'){ try{ bfSfx(SFX.jet,p.x,p.y); }catch(e){} } }
+function slpRest(p,u){ p.state='idle'; p.tgt=null; p.sl=null; p.phase='heel'; p.t=0; p.cd=smhCd(p); p.fx=petDir(u); }
+function slpSmash(p,u){   
+  let n=0; const R=smhR(p), dmg=slpDmg(p), T=smhFlat(p);
+  if(!reducedMotion()){ S.fx.push({k:'ring',x:p.x,y:p.y-4,r:6,R:R,t:0,dur:0.4,col:'#FFD24A'}); S.fx.push({k:'puff',x:p.x-12,y:p.y-3,t:0,dur:0.4,R:15}); S.fx.push({k:'puff',x:p.x+12,y:p.y-3,t:0,dur:0.4,R:15}); S.shake=Math.max(S.shake||0,0.18); }
+  for(const f of TGTC(u)){ if(!slpLive(u,f)) continue; if(!(Math.hypot(f.x-p.x,f.y-p.y)<=R)) continue;
+    petTtHurt(p,f,dmg); n++;
+    if((!petTtKing(f) && !f.boss) || smhKing(p)){ if(S.bf){ f.haltT=Math.max(f.haltT||0,T); f.marching=false; } else f.flatT=Math.max(f.flatT||0,T); f.aimT=0; f.burst=0; f.shot=0; } }
+  if(n && petMine(p)) petXp(p,'smash',n); p.smashes=(p.smashes|0)+1; p.smashed=(p.smashed|0)+n; p.lastDmg=dmg; SLP.n.smash++; try{ bfSfx(SFX.thump,p.x,p.y); }catch(e){} return n; }
+function slpGust(p,u){   
+  const R=slpWhirlR(p), D=slpBlow(p), src=petTtSrc(p)||p, dir=p.fx>0? 1 : -1, M=[]; let n=0;
+  if(!reducedMotion()) S.fx.push({k:'ring',x:p.x,y:p.y-10,r:10,R:R,t:0,dur:0.32,col:'#CDE6FF',lw:4});
+  for(const f of TGTC(u)){ if(!slpLive(u,f) || !ggCanShove(f)) continue; const d=Math.hypot(f.x-p.x,f.y-p.y); if(!(d<=R)) continue; M.push({ f:f, d:d }); }
+  if(M.length>SLP_K.gustMax){ M.sort(function(a,b){ return a.d-b.d; }); M.length=SLP_K.gustMax; }   
+  for(const o of M){ const f=o.f; let mx=(o.d<1)? p.x-dir : p.x, my=p.y;   
+    
+    const B=slpBox(f); if(B){ const rx=f.x-mx, ry=f.y-my, rl=Math.hypot(rx,ry)||1, ux=rx/rl, uy=ry/rl, t=Math.max(0,Math.min(D,(B.x-f.x)*ux+(B.y-f.y)*uy)); if(Math.hypot(f.x+ux*t-B.x,f.y+uy*t-B.y)<LEAK_R+SLP_K.boxPad){ mx=B.x; my=B.y; p.turned=(p.turned|0)+1; } }
+    ggShove(f, mx, my-18, src, null, D); n++; }
+  p.blown=(p.blown|0)+n; SLP.n.blown+=n; if(n){ try{ bfSfx(SFX.jet,p.x,p.y); }catch(e){} } return n; }
+function slpTick(p,u,dt){   
+  const st=p.state;
+  if(st==='leap' || st==='home'){ const L=p.sl; if(!L){ slpRest(p,u); return false; }
+    p.t+=dt; if(st==='home'){ const s=frkHeel(u); L.x1=s.x; L.y1=s.y; }   
+    const k=(L.T>0)? Math.min(1,p.t/L.T) : 1; p.x=L.x0+(L.x1-L.x0)*k; p.y=L.y0+(L.y1-L.y0)*k;
+    if(!(k<1)){ if(st==='home'){ try{ bfSfx(SFX.clack,p.x,p.y); }catch(e){} slpRest(p,u); return false; }
+      handRoll(p); slpSmash(p,u); p.state='squat'; p.t=0; }
+    return true; }
+  if(st==='squat'){ p.t+=dt; if(p.t>=SLP_K.squat){ p.state='whirl'; p.t=0; p.gust=0; p.whirls=(p.whirls|0)+1; SLP.n.whirl++; } return true; }
+  if(st==='whirl'){ p.t+=dt; if(!p.gust && p.t>=SLP_K.gust){ p.gust=1; slpGust(p,u); }
+    if(p.t>=SLP_K.whirl){ p.left=(p.left|0)-1; const m=(p.left>0)? slpPick(p,u) : null; if(m) slpGo(p,u,m,'leap'); else slpGo(p,u,null,'home'); }   
+    return true; }
+  p.state='idle';
+  if(p.cd<=0 && S.mode==='play'){ const m=slpPick(p,u); if(m){ p.left=smhN(p); slpGo(p,u,m,'leap'); return true; } }   
+  return false; }
+function slpPose(p,RM9){   
+  if(RM9) return { lift:0, rot:0 }; const st=p.state, L=p.sl;   
+  if((st==='leap' || st==='home') && L){ const k=Math.min(1,p.t/L.T), a=Math.sin(Math.PI*k); return { lift:a*L.h, rot:(st==='leap')? (0.22-0.7*k) : (0.14-0.28*k) }; }   
+  if(st==='squat'){ const k=Math.min(1,p.t/SLP_K.squat); return { lift:0, rot:-(0.48-0.34*k) }; }
+  if(st==='whirl'){ const k=Math.min(1,p.t/SLP_K.whirl); return { lift:Math.abs(Math.sin(Math.PI*2*SLP_K.turns*k))*3, rot:0 }; }
+  return { lift:0, rot:0 }; }
+function slpStreaks(p,k,th,near){   
+  const R=slpWhirlR(p)*(0.45+0.55*Math.min(1,k*2.2)), ry=R*0.36, y0=p.y-15, fade=(k<0.8)? 1 : Math.max(0,(1-k)/0.2), K=(PET_COATS.smash && PET_COATS.smash[p.c|0]) || null, trim=(K && K.trim) || '#FFD24A';   
+  cx.save(); cx.lineCap='round';
+  for(let i=0;i<2;i++){ const a0=th+i*Math.PI;
+    for(let s=0;s<7;s++){ const a=a0-s*0.17, b=a-0.21; if(((Math.sin(a)>=0)? 1 : 0)!==near) continue;
+      cx.globalAlpha=fade*(0.85-0.11*s); cx.strokeStyle=i? trim : '#C99556'; cx.lineWidth=Math.max(1,4-0.45*s);
+      cx.beginPath(); cx.moveTo(p.x+Math.cos(a)*R, y0+Math.sin(a)*ry); cx.lineTo(p.x+Math.cos(b)*R, y0+Math.sin(b)*ry); cx.stroke(); } }
+  cx.restore(); }
+function slpDrawPet(p){   
+  const st=p.state, w=unitW(p.k); let saved=0;
+  try{
+    if(st==='leap' || st==='home'){ const L=p.sl, k=L? Math.min(1,p.t/L.T) : 1, a=Math.sin(Math.PI*k);
+      cx.save(); saved=1; cx.globalAlpha=0.26*(1-0.45*a); cx.fillStyle='#000'; cx.beginPath(); cx.ellipse(p.x, p.y+2, w*0.3*(1-0.35*a), 4*(1-0.35*a), 0, 0, 7); cx.fill(); cx.restore(); saved=0;
+      slpDrawPet0(p); return; }
+    if(st==='squat'){ const q=1-Math.min(1,p.t/SLP_K.squat);
+      cx.save(); saved=1; cx.translate(p.x,p.y); cx.scale(1+0.2*q, 1-0.22*q); cx.translate(-p.x,-p.y); slpDrawPet0(p); cx.restore(); saved=0; return; }
+    const k=Math.min(1,p.t/SLP_K.whirl), th=Math.PI*2*SLP_K.turns*k; let c=Math.cos(th); if(Math.abs(c)<0.12) c=(c<0)? -0.12 : 0.12;
+    slpStreaks(p,k,th,0);
+    cx.save(); saved=1; cx.translate(p.x,0); cx.scale(c,1); cx.translate(-p.x,0); slpDrawPet0(p); cx.restore(); saved=0;
+    slpStreaks(p,k,th,1);
+  }catch(e){ if(saved){ try{ cx.restore(); }catch(e2){} } slpErr('draw',e); } }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function slpRead(o){ o=o||{}; const me=()=>(typeof S==='object' && S && S.pets)? S.pets.find(q=>q.k==='smash' && q.key===(S.bf? 's:'+bfMySeat() : 'me')) : null;   
+  try{ if(o.grant){ if(petGrant('smash')) saveMeta(); } if(o.lv!=null && META.pet){ META.pet.xp=META.pet.xp||{}; META.pet.xp.smash=petXpAt(Math.max(1,Math.min(PET_LV_MAX,o.lv|0))); } const p0=me(); if(p0 && o.rest){ p0.cd=0; if(!slpBusy(p0)) p0.state='idle'; } }catch(e){ slpErr('door',e); }
+  const R=(typeof S==='object' && S && S.pets)? S.pets.filter(q=>q.k==='smash') : [];
+  return { cv:GVT_CV, on:slpOn()? 1 : 0, sw:SLP_ON, wrapped:SLP.wrapped, err:SLP.err, e:SLP.e, n:Object.assign({},SLP.n), dials:Object.assign({},SLP_K), own:petOwns('smash'), lv:petLv('smash'), line:PET_INFO.smash.line, rungs:(PET_RUNGS.smash||[]).map(r=>r.lv+':'+r.id+':'+r.name),
+    law:[1,2,10,50,60,100].map(L=>[L, +(SLP_K.dmg*(1+SLP_K.per*(L-1))).toFixed(4)]),
+    pets:R.map(q=>({ key:q.key, r:q.r|0, phase:q.phase, state:q.state, x:+q.x.toFixed(1), y:+q.y.toFixed(1), fx:q.fx, t:+(q.t||0).toFixed(3), cd:+(q.cd||0).toFixed(3), left:q.left|0, leaps:q.leaps|0, smashes:q.smashes|0, smashed:q.smashed|0, whirls:q.whirls|0, blown:q.blown|0, turned:q.turned|0, lastDmg:q.lastDmg==null? null : +(+q.lastDmg).toFixed(4), dmg:+slpDmg(q).toFixed(4), R:+smhR(q).toFixed(1), whirlR:+slpWhirlR(q).toFixed(1), blow:slpBlow(q), flat:smhFlat(q), n:smhN(q), rest:+smhCd(q).toFixed(3), sl:q.sl? { x1:+q.sl.x1.toFixed(1), y1:+q.sl.y1.toFixed(1), T:+q.sl.T.toFixed(3), h:+q.sl.h.toFixed(1), d:+q.sl.d.toFixed(1) } : null })) }; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1209365,7 +1209519,7 @@ let BFQ=null;
 
 
 
-let GVT_CV='31.57';
+let GVT_CV='31.58';
 let NX_CAP_MUL=4;
 
 
@@ -4407383,6 +4407537,160 @@ try{ if(xslOn()){
 
 
 try{ if(window.GVT) GVT.xsl=xslRead; }catch(e){}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const SLP_ON=(function(){ try{ const q=/[?&]slp=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_slp','0'); else localStorage.removeItem('gvt_slp'); } return localStorage.getItem('gvt_slp')==='0'? 0 : 1; }catch(e){ return 1; } })();
+const SLP_K={ reach:10*TK_M, short:16, spd:520, tMin:0.28, tMax:0.6, arc:26, arcK:0.12, dmg:1, per:0.01, squat:0.16, whirl:0.5, gust:0.12, turns:2, blow:2.5*TK_M, blowBig:3.5*TK_M, blowBigger:4.5*TK_M, whirlX:1.15, whirlWideX:1.6, edge:24, boxPad:10, gustMax:16,
+  lvBig:10, lvBigger:60, lvWide:90 };
+const SLP={ n:{ leap:0, smash:0, whirl:0, blown:0, home:0 }, err:0, e:'', wrapped:0 };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const slpTick0=petSmTick;petSmTick=function(p,u,dt){ if(!slpOn()){ if(slpBusy(p)){ p.state='idle'; p.tgt=null; p.sl=null; p.t=0; p.phase='sprint'; p.cd=smhCd(p); } return slpTick0(p,u,dt); }     try{ return slpTick(p,u,dt); }catch(e){ slpErr('tick',e); try{ slpRest(p,u); }catch(e2){} return false; } };
+const slpSmDraw0=petSmDraw;petSmDraw=function(p,RM9){ return slpBusy(p)? slpPose(p,RM9) : slpSmDraw0(p,RM9); };
+const slpDrawPet0=drawPet;drawPet=function(p){ if(!p || p.k!=='smash' || p.phase==='gone' || !slpBusy(p) || reducedMotion() || (S.bf && p.own && p.own.side!==bfMyTeam() && (p.own.cloakT>0 || p.own.dropT>0))) return slpDrawPet0(p); return slpDrawPet(p); };
+SLP.wrapped=3;
+
+const SLP_LINE="He marches at Sarge’s heel. When the Tan come close he leaps out, smashes the ground and whirls his hammer: everyone near him is hurt, knocked flat and blown back! Then he leaps home.";
+const SLP_RUNGS=[ {lv:10,id:'slpbig',name:'THE BIG WHIRL',line:'His whirl blows the Tan back farther.'}, {lv:20,id:'smhquick',name:'THE QUICK JAW',line:'He rests less between smashes.'}, {lv:30,id:'smhwide',name:'THE WIDE SMASH',line:'His smash reaches farther.'}, {lv:40,id:'smhlong',name:'THE LONG FLAT',line:'A smashed man stays down longer.'}, {lv:50,id:'smhdouble',name:'THE DOUBLE SMASH',line:'He slams twice, one after the other.'}, {lv:60,id:'slpbigger',name:'THE BIGGER WHIRL',line:'His whirl blows the Tan back the farthest.'}, {lv:70,id:'smhquicker',name:'THE QUICKER JAW',line:'He rests even less between smashes.'}, {lv:80,id:'smhwider',name:'THE WIDER SMASH',line:'His smash reaches the farthest.'}, {lv:90,id:'slpwide',name:'THE WIDE WHIRL',line:'His whirl reaches farther.'}, {lv:100,id:'smhcrack',name:'THE BIG CRACK',line:'Even a king goes flat under his jaw.'} ];
+let SLP_ROWS0=null;try{ SLP_ROWS0={ line:PET_INFO.smash.line, rungs:PET_RUNGS.smash };   
+  if(SLP_ON){ PET_INFO.smash.line=SLP_LINE; PET_RUNGS.smash=SLP_RUNGS; } }catch(e){ slpErr('rows',e); }
+try{ (function(){ const W9={   
+  "ar":{"He marches at Sarge’s heel. When the Tan come close he leaps out, smashes the ground and whirls his hammer: everyone near him is hurt, knocked flat and blown back! Then he leaps home.":"يسير عند قدم سارج. عندما يقترب جنود البيج يقفز نحوهم، يضرب الأرض ثم يدور بمطرقته: كل من حوله يتأذى ويُطرح أرضًا ويُدفع إلى الخلف! ثم يقفز عائدًا.","THE BIG WHIRL":"الدوّامة الكبيرة","His whirl blows the Tan back farther.":"دورانه يدفع جنود البيج أبعد إلى الخلف.","THE BIGGER WHIRL":"الدوّامة الأكبر","His whirl blows the Tan back the farthest.":"دورانه يدفع جنود البيج إلى أبعد مدى.","THE WIDE WHIRL":"الدوّامة الواسعة","His whirl reaches farther.":"دورانه يصل أبعد."},
+  "ja":{"He marches at Sarge’s heel. When the Tan come close he leaps out, smashes the ground and whirls his hammer: everyone near him is hurt, knocked flat and blown back! Then he leaps home.":"サージの そばを こうしんするよ。タンの へいたいが ちかづくと、ぴょーんと とびだして じめんを ドン！と たたき、ハンマーを ぐるぐる ふりまわすんだ。まわりの みんなは たおれて ふきとばされちゃう！ そのあと ぴょんと もどってくるよ。","THE BIG WHIRL":"おおきな ぐるぐる","His whirl blows the Tan back farther.":"ぐるぐるで タンの へいたいを もっと とおくへ ふきとばすよ。","THE BIGGER WHIRL":"もっと おおきな ぐるぐる","His whirl blows the Tan back the farthest.":"ぐるぐるで タンの へいたいを いちばん とおくへ ふきとばすよ。","THE WIDE WHIRL":"ひろい ぐるぐる","His whirl reaches farther.":"ぐるぐるが もっと とおくまで とどくよ。"},
+  "ko":{"He marches at Sarge’s heel. When the Tan come close he leaps out, smashes the ground and whirls his hammer: everyone near him is hurt, knocked flat and blown back! Then he leaps home.":"사지 곁에서 행진해. 탄 병사들이 가까이 오면 훌쩍 뛰어나가 땅을 쾅 내리치고 망치를 빙글빙글 휘둘러서, 근처의 모두가 다치고 쓰러지고 뒤로 날아가! 그리고 다시 뛰어서 돌아와.","THE BIG WHIRL":"큰 회오리","His whirl blows the Tan back farther.":"회오리가 탄 병사를 더 멀리 날려 보내요.","THE BIGGER WHIRL":"더 큰 회오리","His whirl blows the Tan back the farthest.":"회오리가 탄 병사를 가장 멀리 날려 보내요.","THE WIDE WHIRL":"넓은 회오리","His whirl reaches farther.":"회오리가 더 멀리 닿아요."},
+  "zh-Hans":{"He marches at Sarge’s heel. When the Tan come close he leaps out, smashes the ground and whirls his hammer: everyone near him is hurt, knocked flat and blown back! Then he leaps home.":"他跟在萨奇身边行军。黄军靠近时，他会一跃而出，猛砸地面，再抡起锤子转圈：周围的人都会受伤、被砸趴下并被吹飞！然后他再跳回来。","THE BIG WHIRL":"大旋风","His whirl blows the Tan back farther.":"他的旋风把黄军吹得更远。","THE BIGGER WHIRL":"超大旋风","His whirl blows the Tan back the farthest.":"他的旋风把黄军吹得最远。","THE WIDE WHIRL":"大范围旋风","His whirl reaches farther.":"他的旋风范围更远。"},
+  "de":{"He marches at Sarge’s heel. When the Tan come close he leaps out, smashes the ground and whirls his hammer: everyone near him is hurt, knocked flat and blown back! Then he leaps home.":"Er marschiert an Sarges Seite. Kommen die Braunen nahe, springt er hinaus, schmettert auf den Boden und wirbelt seinen Hammer: Jeder in seiner Nähe wird verletzt, umgeworfen und zurückgeschleudert! Dann springt er heim.","THE BIG WHIRL":"DER GROSSE WIRBEL","His whirl blows the Tan back farther.":"Sein Wirbel schleudert die Braunen weiter zurück.","THE BIGGER WHIRL":"DER GRÖSSERE WIRBEL","His whirl blows the Tan back the farthest.":"Sein Wirbel schleudert die Braunen am weitesten zurück.","THE WIDE WHIRL":"DER WEITE WIRBEL","His whirl reaches farther.":"Sein Wirbel reicht weiter."},
+  "ru":{"He marches at Sarge’s heel. When the Tan come close he leaps out, smashes the ground and whirls his hammer: everyone near him is hurt, knocked flat and blown back! Then he leaps home.":"Он марширует у ног Сержа. Когда бежевые подходят близко, он выпрыгивает вперёд, бьёт по земле и раскручивает молот: все рядом получают урон, падают и отлетают назад! Потом он прыгает обратно.","THE BIG WHIRL":"БОЛЬШОЙ ВИХРЬ","His whirl blows the Tan back farther.":"Его вихрь отбрасывает бежевых дальше.","THE BIGGER WHIRL":"ОГРОМНЫЙ ВИХРЬ","His whirl blows the Tan back the farthest.":"Его вихрь отбрасывает бежевых дальше всего.","THE WIDE WHIRL":"ШИРОКИЙ ВИХРЬ","His whirl reaches farther.":"Его вихрь достаёт дальше."},
+  "es":{"He marches at Sarge’s heel. When the Tan come close he leaps out, smashes the ground and whirls his hammer: everyone near him is hurt, knocked flat and blown back! Then he leaps home.":"Marcha junto a Sarge. Cuando los soldados beige se acercan, salta hacia ellos, golpea el suelo y gira con su martillo: ¡todos los que están cerca salen heridos, caen al suelo y salen volando hacia atrás! Luego vuelve de un salto.","THE BIG WHIRL":"EL GRAN GIRO","His whirl blows the Tan back farther.":"Su giro lanza a los soldados beige más lejos.","THE BIGGER WHIRL":"EL GIRO MÁS GRANDE","His whirl blows the Tan back the farthest.":"Su giro lanza a los soldados beige lo más lejos.","THE WIDE WHIRL":"EL GIRO AMPLIO","His whirl reaches farther.":"Su giro llega más lejos."} };
+  for(const lg in W9){ const tb=TR[lg]||(TR[lg]={}); for(const k in W9[lg]) if(!(k in tb)) tb[k]=W9[lg][k]; } })(); }catch(e){ slpErr('words',e); }
+
+const slpScene0=ptsScene;ptsScene=function(k){ const sc=slpScene0(k);
+  try{ if(SLP_ON && sc && sc.m && sc.m.length>=6 && ptsKind(k)==='smash'){
+    const X=62, F='scale(-1,1)', P=(o,x,y,s)=>[o,x,y,s||'scale(1,1)'];   
+    sc.m=sc.m.slice(0,4).concat([ { c:'ring', fx:'left:72px;bottom:8px;width:150px;height:36px;border:2px solid #FFD24A;border-radius:50%' }, { c:'flash', fx:'left:134px;bottom:14px;width:26px;height:12px;border-radius:50%;background:radial-gradient(circle,#FFF6C0,#FFD24A 50%,transparent 72%)' }, { c:'ring', fx:'left:62px;bottom:6px;width:170px;height:40px;border:2px solid #CDE6FF;border-radius:50%' } ]);   
+    sc.t=[ [3,'transform',[ P(0,0,0), P(0.1,0,0), P(0.135,14,-22), P(0.17,31,-32), P(0.205,48,-22), P(0.24,X,5,'scale(1.2,0.78)'), P(0.29,X,0), P(0.33,X,-3), P(0.375,X,-3,F), P(0.42,X,-3), P(0.465,X,-3,F), P(0.51,X,0), P(0.56,X,0,F), P(0.6,48,-22,F), P(0.64,31,-32,F), P(0.68,14,-22,F), P(0.72,0,4,'scale(-1.12,0.86)'), P(0.76,0,0,F), P(0.82,0,0), P(1,0,0) ]],
+      [4,'opacity',[[0,0],[0.24,0],[0.25,0.9],[0.44,0],[1,0]]], [4,'transform',[[0,0,0,'scale(0.3)'],[0.24,0,0,'scale(0.3)'],[0.44,0,0,'scale(1.1)'],[1,0,0,'scale(1.1)']]],
+      [5,'opacity',[[0,0],[0.24,0],[0.25,1],[0.3,0],[1,0]]],
+      [6,'opacity',[[0,0],[0.37,0],[0.38,0.95],[0.56,0],[1,0]]], [6,'transform',[[0,0,0,'scale(0.35)'],[0.37,0,0,'scale(0.35)'],[0.56,0,0,'scale(1.15)'],[1,0,0,'scale(1.15)']]],
+      [1,'transform',[[0,0,0],[0.24,0,0],[0.3,4,6,'rotate(70deg)'],[0.38,4,6,'rotate(70deg)'],[0.5,34,6,'rotate(70deg)'],[0.8,34,6,'rotate(70deg)'],[0.88,32,0,'rotate(8deg)'],[0.95,0,0],[1,0,0]]],
+      [2,'transform',[[0,0,0],[0.24,0,0],[0.3,8,6,'rotate(70deg)'],[0.38,8,6,'rotate(70deg)'],[0.5,44,6,'rotate(70deg)'],[0.8,44,6,'rotate(70deg)'],[0.88,42,0,'rotate(8deg)'],[0.95,0,0],[1,0,0]]] ];
+  } }catch(e){ slpErr('film',e); } return sc; };
+SLP.wrapped=4;
+
+
+
+
+
+
+setTimeout(function(){ try{ if(window.GVT && !GVT.slp) GVT.slp=function(o){ return slpRead(o); }; }catch(e){} }, 0);
 
 
 
