@@ -1003083,33 +1003083,28 @@ function hvmRead(o){ if(o && typeof o==='object'){ if('hvc' in o) HVM.c=o.hvc? 1
 
 
 
-
 function rmcOops(e){ RMC.err++; if(RMC.errs.length<8) RMC.errs.push(String(e && e.message || e)); }
 function rmcDue(){ try{ return !!(RMC.on && !RMC_OFF && reducedMotion() && bchOn() && roomCur()==='bedroom' && !MAPPIN); }catch(e){ return false; } }
 function rmcBand(){ try{ if(typeof rzSeenBand!=='function') return 0; const r=roomCur(); if(ROOM_EDGE_OFF[r] || ROOM_WING_OFF[r]) return 0; return Math.max(0, Math.floor(rzSeenBand(r, 1))); }catch(e){ rmcOops(e); return 0; } }
-function rmcLend(f, self, a){ RMC.lend++; try{ return f.apply(self, a); } finally{ RMC.lend--; } }
-
-
-function rmcWhole(s){ const E=rmcBand(); if(!s || !(E>0)) return false; const d=(typeof chwDue==='function' && chwDue() && typeof chwSeat==='function')? chwSeat(s) : s, pad=(typeof CHW==='object' && CHW && CHW.pad>=0)? CHW.pad : 6; return d.x>=-E && d.x+d.w<=960+E-pad; }
-function rmcBed(){ if(!rmcDue() || !RMC_SEAT0) return false; try{ return rmcWhole(rmcLend(RMC_SEAT0, null, [])); }catch(e){ rmcOops(e); return false; } }
 
 
 
 
 
-
-function rmcArm(){ const st=document.getElementById('roomStage'); if(!st) return false; const svg=st.querySelector('#roomStage > svg'); const on=!!(svg && !st.classList.contains('te-on') && rmcBed()); st.classList.toggle('rmc-on', on); if(svg) svg.classList.toggle('rmc-room', on); if(on) RMC.n.arm++; return on; }
+function rmcArm(){ const st=document.getElementById('roomStage'); if(!st) return false; const svg=st.querySelector('#roomStage > svg'); const on=!!(svg && !st.classList.contains('te-on') && rmcDue() && rmcBand()>0); st.classList.toggle('rmc-on', on); if(svg) svg.classList.toggle('rmc-room', on); if(on) RMC.n.arm++; return on; }
 
 
 
 
 
 
-function rmcPeek(){ let seat=null, at=null, xy=null, lx=null; const n0=RMC.n.lx; try{ seat=chestSeat(); at=chestAt(); xy=tcmXY(); lx=(typeof chwDue==='function' && chwDue())? chwLx(seat) : null; }catch(e){ rmcOops(e); } RMC.n.lx=n0;
+
+
+function rmcPeek(){ let seat=null, at=null, xy=null, lx=null, exr=null; try{ seat=chestSeat(); at=chestAt(); xy=tcmXY(); lx=(typeof chwDue==='function' && chwDue())? chwLx(seat) : null; exr=[exrRoomOn()? 1 : 0, exrEast()]; }catch(e){ rmcOops(e); }
   const st=document.getElementById('roomStage');
-  return { cv:GVT_CV, v:RMC.v, on:RMC.on, off:RMC_OFF? 1 : 0, key:(function(){ try{ return localStorage.getItem('gvt_rmcoff'); }catch(e){ return null; } })(), rm:reducedMotion()? 1 : 0, due:rmcDue()? 1 : 0, bed:rmcBed()? 1 : 0, room:roomCur(), band:rmcBand(), xr:xrBand(),
+  return { cv:GVT_CV, v:RMC.v, on:RMC.on, off:RMC_OFF? 1 : 0, key:(function(){ try{ return localStorage.getItem('gvt_rmcoff'); }catch(e){ return null; } })(), rm:reducedMotion()? 1 : 0, due:rmcDue()? 1 : 0, room:roomCur(), band:rmcBand(), xr:xrBand(), exr:exr,
     seat:seat, at:at, xy:xy, lx:lx, arm:!!(st && st.classList.contains('rmc-on')), te:!!(st && st.classList.contains('te-on')), n:Object.assign({}, RMC.n), err:RMC.err, errs:RMC.errs.slice() }; }
-function rmcDoor(o){ o=o||{}; try{ if(o.reset){ for(const k of Object.keys(RMC.n)) RMC.n[k]=0; RMC.err=0; RMC.errs.length=0; } if(o.on!=null){ RMC.on=o.on? 1 : 0; if(S.mode==='menu') renderMenu(); } }catch(e){ rmcOops(e); } return rmcPeek(); }</script><script type="text/x-gvt-part">'use strict';
+function rmcDoor(o){ o=o||{}; try{ if(o.reset){ for(const k of Object.keys(RMC.n)) RMC.n[k]=0; RMC.err=0; RMC.errs.length=0; } if(o.on!=null){ RMC.on=o.on? 1 : 0; if(S.mode==='menu'){ renderMenu(); if(typeof sizeRoom==='function') sizeRoom(); } } }catch(e){ rmcOops(e); } return rmcPeek(); }</script><script type="text/x-gvt-part">'use strict';
 
 
 
@@ -1211482,7 +1211477,7 @@ let BFQ=null;
 
 
 
-let GVT_CV='32.03';
+let GVT_CV='32.04';
 let NX_CAP_MUL=4;
 
 
@@ -4645089,28 +4645084,23 @@ setTimeout(function(){ try{ if(window.GVT && !GVT.hvm) GVT.hvm=hvmRead; }catch(e
 
 
 
-
 const RMC_OFF=(function(){ try{ const q=/[?&]rmc=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_rmcoff','1'); else localStorage.removeItem('gvt_rmcoff'); } return localStorage.getItem('gvt_rmcoff')==='1'; }catch(e){ return false; } })();
-const RMC={ v:1, on:1, lend:0, err:0, errs:[], n:{ seat:0, narrow:0, lx:0, drag:0, park:0, arm:0 } };
+const RMC={ v:2, on:1, err:0, errs:[], n:{ memo:0, park:0, arm:0 } };
 
 
 
-
-const RMC_SEAT0=(typeof bchSeatBR==='function')? bchSeatBR : null;
 const RMC_CLAMP0=(typeof rdragClamp==='function')? rdragClamp : null;
-
-
-if(typeof xrBand==='function'){ const p0=xrBand; xrBand=function(){ if(RMC.lend>0) return rmcBand(); return p0.apply(this, arguments); }; }
-if(typeof exrRoomOn==='function'){ const p0=exrRoomOn; exrRoomOn=function(){ if(RMC.lend>0) return false; return p0.apply(this, arguments); }; }
-if(typeof bchSeatBR==='function'){ const p0=bchSeatBR; bchSeatBR=function(){ if(!rmcDue()) return p0.apply(this, arguments); try{ const s=rmcLend(p0, this, arguments); if(rmcWhole(s)){ RMC.n.seat++; return s; } RMC.n.narrow++; }catch(e){ rmcOops(e); } return p0.apply(this, arguments); }; }
-if(typeof chwLx==='function'){ const p0=chwLx; chwLx=function(){ if(!rmcBed()) return p0.apply(this, arguments); RMC.n.lx++; return rmcLend(p0, this, arguments); }; }
-if(typeof rdragClamp==='function'){ const p0=rdragClamp; rdragClamp=function(base){ try{ if(RDRAG && RDRAG.k===CHEST_DOOR && base===RDRAG.base && rmcBed()){ RMC.n.drag++; return rmcLend(p0, this, arguments); } }catch(e){ rmcOops(e); } return p0.apply(this, arguments); }; }
-if(typeof tcmXY==='function'){ const p0=tcmXY; tcmXY=function(){ const d=p0.apply(this, arguments); try{ if(d && (d[0] || d[1]) && RMC_CLAMP0 && rmcBed()){ const c=rmcLend(RMC_CLAMP0, null, [chestSeat(), +d[0] || 0, +d[1] || 0]); if(c[0]!==Math.round(+d[0] || 0)){ RMC.n.park++; return [c[0], d[1]]; } } }catch(e){ rmcOops(e); } return d; }; }
+if(typeof xrBand==='function'){ const p0=xrBand; xrBand=function(){ if(!rmcDue()) return p0.apply(this, arguments); let k=null; try{ k=(typeof BYP==='object' && BYP && BYP.on)? BYP.ku : null; }catch(e){ k=null; }
+  if(k){ const key=innerWidth+'x'+innerHeight+'|'+roomCur(), m=k.__rmcXr; if(m && m.key===key){ RMC.n.memo++; return m.v; } const v=rmcBand(); k.__rmcXr={ key:key, v:v }; return v; }   
+  return rmcBand(); }; }
+if(typeof tcmXY==='function'){ const p0=tcmXY; tcmXY=function(){ const d=p0.apply(this, arguments); try{ if(d && (d[0] || d[1]) && RMC_CLAMP0 && rmcDue()){ const c=RMC_CLAMP0(chestSeat(), +d[0] || 0, +d[1] || 0); if(c[0]!==Math.round(+d[0] || 0)){ RMC.n.park++; return [c[0], d[1]]; } } }catch(e){ rmcOops(e); } return d; }; }
 
 if(typeof roomWingsPaint==='function'){ const p0=roomWingsPaint; roomWingsPaint=function(){ const r=p0.apply(this, arguments); try{ rmcArm(); }catch(e){ rmcOops(e); } return r; }; }
 (function(){ try{ const s=document.createElement('style'); s.id='rmcCss';
   s.textContent='#roomStage.rmc-on > svg.rmc-room { overflow:visible; -webkit-clip-path:inset(0px calc(0px - var(--rzb,0px))); clip-path:inset(0px calc(0px - var(--rzb,0px))); }'   
-    +'@supports (left:round(up, 1.5px, 1px)) { #roomStage.rmc-on > svg.rmc-room { overflow:hidden; left:calc(0px - round(up, var(--rzb,0px), 1px)) !important; right:calc(0px - round(up, var(--rzb,0px), 1px)) !important; width:calc(100% + 2 * round(up, var(--rzb,0px), 1px)) !important; -webkit-clip-path:inset(0px calc(round(up, var(--rzb,0px), 1px) - var(--rzb,0px))); clip-path:inset(0px calc(round(up, var(--rzb,0px), 1px) - var(--rzb,0px))); } }';   
+    +'@supports (left:round(up, 1.5px, 1px)) { #roomStage.rmc-on > svg.rmc-room, #roomStage.rmc-on > svg.dogtop { overflow:hidden; left:calc(0px - round(up, var(--rzb,0px), 1px)) !important; right:calc(0px - round(up, var(--rzb,0px), 1px)) !important; width:calc(100% + 2 * round(up, var(--rzb,0px), 1px)) !important; -webkit-clip-path:inset(0px calc(round(up, var(--rzb,0px), 1px) - var(--rzb,0px))); clip-path:inset(0px calc(round(up, var(--rzb,0px), 1px) - var(--rzb,0px))); } }'   
+    +'#roomStage.rmc-on.exr-on > svg.rmc-room { -webkit-clip-path:inset(0px calc(0px - var(--rzb,0px) - var(--exr,0px)) 0px calc(0px - var(--rzb,0px))); clip-path:inset(0px calc(0px - var(--rzb,0px) - var(--exr,0px)) 0px calc(0px - var(--rzb,0px))); }'   
+    +'@supports (left:round(up, 1.5px, 1px)) { #roomStage.rmc-on.exr-on > svg.rmc-room, #roomStage.rmc-on.exr-on > svg.dogtop { left:calc(0px - round(up, var(--rzb,0px), 1px) - var(--exr,0px)) !important; right:calc(0px - round(up, var(--rzb,0px), 1px) - var(--exr,0px)) !important; width:calc(100% + 2 * round(up, var(--rzb,0px), 1px) + 2 * var(--exr,0px)) !important; -webkit-clip-path:inset(0px calc(round(up, var(--rzb,0px), 1px) - var(--rzb,0px)) 0px calc(round(up, var(--rzb,0px), 1px) + var(--exr,0px) - var(--rzb,0px))); clip-path:inset(0px calc(round(up, var(--rzb,0px), 1px) - var(--rzb,0px)) 0px calc(round(up, var(--rzb,0px), 1px) + var(--exr,0px) - var(--rzb,0px))); } }';   
   (document.head || document.documentElement).appendChild(s); }catch(e){ rmcOops(e); } })();
 
 
