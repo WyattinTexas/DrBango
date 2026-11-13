@@ -1003650,10 +1003650,17 @@ function fpePotPass(dt){ if(!FPE.on || !(FPE.potHp>0)) return;
 
 
 
+
+
+
+
+
 function pfpSheet(id, css){ let st=document.getElementById(id); if(st) return st;   
   st=document.createElement('style'); st.id=id; st.media='not all'; st.textContent=css; (document.head||document.documentElement).appendChild(st); return st; }
 function pfpCssC(){ const w=String(PFP.where||'').split(',').map(function(s){ return s.trim(); }).filter(Boolean); if(!w.length) return null;
-  return pfpSheet('pfpCssC', w.map(function(s){ return s+' img[src^="data:image/svg+xml"][src*="%3Cfilter"]:not([srcset]),'+s+' img[src^="data:image/svg+xml"][src*="<filter"]:not([srcset])'; }).join(',')+'{visibility:hidden !important}'); }
+  const no=PFP.b? ':not([data-pfp])' : ':not([srcset])';   
+  const css=w.map(function(s){ return s+' img[src^="data:image/svg+xml"][src*="%3Cfilter"]'+no+','+s+' img[src^="data:image/svg+xml"][src*="<filter"]'+no; }).join(',')+'{visibility:hidden !important}';   
+  const st=pfpSheet('pfpCssC', css); if(st.textContent!==css) st.textContent=css; return st; }
 function pfpCssY(){ return pfpSheet('pfpCssY', '#fortBg svg:not(.fyp-l0) image[href^="data:image/svg+xml"]{visibility:hidden}'); }
 
 function pfpBurst(){ const n=PFP.cb; PFP.cb=0; if(!PFP.h || !n) return; if(n<PFP.bulk && !PFP.cOn){ PFP.n.few++; return; } pfpCardOn(); }
@@ -1003671,6 +1003678,13 @@ function pfpCardTick(){ PFP.cTid=0; if(!PFP.cOn) return;
 
 
 
+
+
+
+
+
+function pfpIn(ev){ try{ const t=ev && ev.target; if(!t || t.localName!=='img' || !t.__crpU || !PFP.where) return;   
+    if(t.complete && t.naturalWidth>0 && t.hasAttribute('srcset') && !t.hasAttribute('data-pfp') && t.closest(PFP.where)){ t.setAttribute('data-pfp', '1'); PFP.n.in++; } }catch(e){ PFP.err++; } }
 
 
 
@@ -1003715,10 +1003729,11 @@ function pfpYardGo(h, f){ pfpForget(h); pfpForget(f);
 function pfpGap(){ try{ if(typeof HVK!=='object' || !HVK || !(HVK.gap>0)) return; if(!((typeof CRP==='object' && CRP && CRP.on) || (typeof FYP==='object' && FYP && FYP.on && FYP.wk))) return; if(PFP.w){ if(!PFP.gap0) PFP.gap0=HVK.gap; HVK.gap=Math.min(PFP.gap0, PFP.gap); } else if(PFP.gap0) HVK.gap=PFP.gap0; }catch(e){ PFP.err++; } }
 
 function pfpRead(o){ if(o && typeof o==='object'){ ['bulk','min','cap','capY','yardAt','tick','gap'].forEach(function(k){ if(o[k]!=null && +o[k]>=0) PFP[k]=+o[k]; });
-    if('h' in o){ PFP.h=o.h? 1 : 0; if(!PFP.h){ pfpCardOff('dial'); pfpYardOff('dial'); } } if('y' in o){ PFP.y=o.y? 1 : 0; if(!PFP.y) pfpFree(); } if('g' in o) PFP.g=o.g? 1 : 0; if('w' in o) PFP.w=o.w? 1 : 0; if('w' in o || 'gap' in o) pfpGap(); }
-  let hid=0, hidY=0; try{ if(PFP.cOn){ const L=document.querySelectorAll('img'); for(let i=0;i<L.length;i++) if(L[i].__crpK && !L[i].hasAttribute('srcset') && getComputedStyle(L[i]).visibility==='hidden' && L[i].closest(PFP.where)) hid++; }
+    if('h' in o){ PFP.h=o.h? 1 : 0; if(!PFP.h){ pfpCardOff('dial'); pfpYardOff('dial'); } } if('y' in o){ PFP.y=o.y? 1 : 0; if(!PFP.y) pfpFree(); } if('g' in o) PFP.g=o.g? 1 : 0; if('w' in o) PFP.w=o.w? 1 : 0; if('w' in o || 'gap' in o) pfpGap();
+    if('b' in o){ PFP.b=o.b? 1 : 0; try{ if(document.getElementById('pfpCssC')) pfpCssC(); }catch(e){ PFP.err++; } } }
+  let hid=0, hidY=0; try{ if(PFP.cOn){ const L=document.querySelectorAll('img'); for(let i=0;i<L.length;i++) if(L[i].__crpK && getComputedStyle(L[i]).visibility==='hidden' && L[i].closest(PFP.where)) hid++; }
     if(PFP.yOn){ const L=document.querySelectorAll('#fortBg svg:not(.fyp-l0) image'); for(let i=0;i<L.length;i++) if((L[i].getAttribute('href')||'').lastIndexOf('data:image/svg+xml', 0)===0) hidY++; } }catch(e){}
-  return { h:PFP.h, y:PFP.y, g:PFP.g, w:PFP.w, wrapped:!!(PFP.look0 && PFP.lay0 && PFP.done0 && PFP.make0), card:PFP.cOn, yard:PFP.yOn, hold:(PFP.f0!=null)? 1 : 0, yardAt:PFP.yardAt, waiting:hid, waitingY:hidY, n:Object.assign({}, PFP.n), last:PFP.last, where:PFP.where, bulk:PFP.bulk, min:PFP.min, cap:PFP.cap, capY:PFP.capY,
+  return { h:PFP.h, y:PFP.y, g:PFP.g, w:PFP.w, b:PFP.b, wrapped:!!(PFP.look0 && PFP.lay0 && PFP.done0 && PFP.make0), card:PFP.cOn, yard:PFP.yOn, hold:(PFP.f0!=null)? 1 : 0, yardAt:PFP.yardAt, waiting:hid, waitingY:hidY, n:Object.assign({}, PFP.n), last:PFP.last, where:PFP.where, bulk:PFP.bulk, min:PFP.min, cap:PFP.cap, capY:PFP.capY,
     gap:(typeof HVK==='object' && HVK)? HVK.gap : null, gap0:PFP.gap0, err:PFP.err }; }
 
 
@@ -1212293,7 +1212308,7 @@ let BFQ=null;
 
 
 
-let GVT_CV='32.14';
+let GVT_CV='32.15';
 let NX_CAP_MUL=4;
 
 
@@ -4647773,13 +4647788,20 @@ setTimeout(function(){ try{ if(window.GVT && !GVT.fpe) GVT.fpe=function(){ retur
 
 
 
+
+
+
+
 var PFP={ h:(function(){ try{ var q=/[?&]pfh=([01])(?![\w])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_pfh','0'); else localStorage.removeItem('gvt_pfh'); } return localStorage.getItem('gvt_pfh')==='0'? 0 : 1; }catch(e){ return 1; } })(),
   w:(function(){ try{ var q=/[?&]pfw=([01])(?![\w])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_pfw','0'); else localStorage.removeItem('gvt_pfw'); } return localStorage.getItem('gvt_pfw')==='0'? 0 : 1; }catch(e){ return 1; } })(),
   y:(function(){ try{ var q=/[?&]pfy=([01])(?![\w])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_pfy','0'); else localStorage.removeItem('gvt_pfy'); } return localStorage.getItem('gvt_pfy')==='0'? 0 : 1; }catch(e){ return 1; } })(),
   g:(function(){ try{ var q=/[?&]pfg=([01])(?![\w])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_pfg','0'); else localStorage.removeItem('gvt_pfg'); } return localStorage.getItem('gvt_pfg')==='0'? 0 : 1; }catch(e){ return 1; } })(),
+  b:(function(){ try{ var q=/[?&]pfb=([01])(?![\w])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_pfb','0'); else localStorage.removeItem('gvt_pfb'); } return localStorage.getItem('gvt_pfb')==='0'? 0 : 1; }catch(e){ return 1; } })(),
   where:'.pw-tile', bulk:3, min:140, cap:2400, capY:3000, yardAt:1700, tick:50, gap:150,   
   look0:null, lay0:null, done0:null, make0:null, frame0:null, fr:null, gap0:0, f0:null, ht:0, cb:0, cOn:0, c0:0, cT:0, cSeen:0, cIdle:0, cTid:0, yOn:0, y0:0, yIdle:0, yTid:0,   
-  n:{ cArm:0, cDone:0, cCap:0, few:0, hold:0, yArm:0, yDone:0, yCap:0, yFew:0, go:0, goC:0, goS:0, goY:0 }, last:'', err:0 };
+  n:{ cArm:0, cDone:0, cCap:0, few:0, hold:0, yArm:0, yDone:0, yCap:0, yFew:0, go:0, goC:0, goS:0, goY:0, in:0 }, last:'', err:0 };
+
+
 
 
 
@@ -4647799,9 +4647821,16 @@ var PFP={ h:(function(){ try{ var q=/[?&]pfh=([01])(?![\w])/.exec(location.searc
 
 
 try{ if(typeof crpLook==='function' && typeof CRP==='object' && CRP){ PFP.look0=crpLook;   
-  crpLook=function(img){ const r=PFP.look0.apply(this, arguments);
+  crpLook=function(img){ try{ if(img && img.hasAttribute && img.hasAttribute('data-pfp') && img.getAttribute('src')!==img.__crpS) img.removeAttribute('data-pfp'); }catch(e){ PFP.err++; }   
+    const r=PFP.look0.apply(this, arguments);
     try{ if(PFP.h && CRP.on && img && img.__crpK && !img.__crpU && CRP.bmp.get(img.__crpK)!==0 && PFP.where && img.closest && img.closest(PFP.where)){ if(!PFP.cb++) Promise.resolve().then(pfpBurst); } }catch(e){ PFP.err++; }   
     return r; }; } }catch(e){}
+
+
+
+
+
+try{ if(PFP.look0 && typeof CRP==='object' && CRP && CRP.on) document.addEventListener('load', pfpIn, true); }catch(e){}
 
 
 
@@ -4647844,6 +4647873,7 @@ try{ if(typeof fypMake==='function' && typeof fypFrame==='function'){ PFP.make0=
 
 
 pfpGap();
+
 
 
 
