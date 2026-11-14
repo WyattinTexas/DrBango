@@ -1,6 +1,6 @@
 /* JUMPR shell cache — cache-first so the pad opens in dead zones,
    background refresh so deploys still arrive. */
-const V = "jr-v11";   // 11/9 CARD-JMS THE SUMMIT: the pad wears the mountain, like Wyatt's watch
+const V = "jr-v12";   // 11/13 CARD-DBJ: the Bug button (jr-v11 = 11/9 CARD-JMS THE SUMMIT)
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon-180.png", "./icon-512.png"];
 
 self.addEventListener("install", e => {
