@@ -1004929,7 +1004929,175 @@ function cpfWatch(){ try{ if(!CPF.on || !S.raid || S.bf || !S.coop || !COOP || C
 function cpfRead(o){ o=o||{}; try{ if(o.reset){ CPF.pin=null; CPF.last=null; CPF.carry=null; CPF.room=null; for(const k in CPF.stats) CPF.stats[k]=0; } }catch(e){ cpfErr(e); }
   const f=cpfHer(); return { on:CPF.on, live:CPF_LIVE, active:cpfOn()? 1 : 0, party:cpfParty()? 1 : 0, ref:sqRef()? 1 : 0, guest:coopGuest()? 1 : 0, refSeat:cpfRefSeat(),
     pin:CPF.pin? { x:CPF.pin.x, y:CPF.pin.y, n:CPF.pin.n, t:CPF.pin.t, here:CPF.pin.cfg===S.cfg? 1 : 0 } : null, last:CPF.last? { x:CPF.last.x, y:CPF.last.y, n:CPF.last.n, t:CPF.last.t, why:CPF.last.why, here:CPF.last.cfg===S.cfg? 1 : 0 } : null,
-    her:f? { life:f.pcLife|0||1, hp:Math.round(f.hp), max:f.hpMax, mille:cpfMille(f), ret:f.pcRet? 1 : 0, held:cpfHolds(f)? 1 : 0 } : null, carry:CPF.carry, stats:Object.assign({}, CPF.stats), err:CPF.err }; }</script><script type="text/x-gvt-part">'use strict';
+    her:f? { life:f.pcLife|0||1, hp:Math.round(f.hp), max:f.hpMax, mille:cpfMille(f), ret:f.pcRet? 1 : 0, held:cpfHolds(f)? 1 : 0 } : null, carry:CPF.carry, stats:Object.assign({}, CPF.stats), err:CPF.err }; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function phxErr(w,e){ PHX.err++; if(PHX.e.length<400) PHX.e+=w+':'+String(e && e.message || e).slice(0,80)+' '; }
+function phxOn(){ return !!(PHX_ON || S.coop); }
+function phxLive(){ return !!(phxOn() && !S.bf && S.mode==='play' && palaceRaid()); }
+function phxTier(){ const t=S.raid && S.raid.t; return (t==='m' || t==='h' || t==='g')? t : 'e'; }
+function phxNum(T,d){ const v=+(T && T[phxTier()]); return (isFinite(v) && v>=0)? v : d; }
+function phxLed(){ const rd=S.raid; if(!rd) return null; return rd.phx || (rd.phx={ auto:0, kill:0, part:0, saved:0, jb:0, jbKill:0, jbSaved:0, jbCut:0, jbFar:0, planes:0, court:{ groups:0, base:0, made:0, fairies:0, sages:0 }, took:{}, log:[] }); }
+function phxLog(ev,o){ const L=phxLed(); if(L && L.log.length<300) L.log.push(Object.assign({ ev:ev, t:+S.t.toFixed(2) }, o||{})); }
+function phxHeavy(u){ return !!(u && (PHX_HEAVY_T[u.type] || (u.def && u.def.vehicle))); }
+function phxLevel(u){ try{ return perkRank(u)|0; }catch(e){ return 0; } }
+function phxShare(u){   
+  if(!u || u.type==='sarge' || HEROES.indexOf(u.type)>=0) return 0;   
+  if(!(phxNum(PHX_AUTO,1)>0)) return 0;
+  if(phxHeavy(u)){ const lv=phxNum(PHX_LV,0); if(lv>0 && phxLevel(u)<lv) return 1; const k=Math.max(1,Math.round(phxNum(PHX_HEAVY,2))); return 1/k; }
+  return 1; }
+function phxFloor(u,h0,fx,fy,X){   
+  if(!u) return 0; if(u.dead) return 1; const h1=u.hits||0; if(!(h1>h0+1e-9)) return -1;
+  const s=phxShare(u)*X; if(!(s>0)) return 0;
+  const cap=gritCap(u), need=h0+s*cap; if(h1<need) u.hits=need;
+  if(u.hits>=cap*(1-1e-9)){ if(u.hits<cap) u.hits=cap; knock(u,fx,fy,true); }   
+  return 1; }
+function phxAuto(u,f,h0,fx,fy){ const L=phxLed(), r=phxFloor(u,h0,fx,fy,1); PHX.n.auto++; if(L) L.auto++;
+  if(r<0){ PHX.n.autoSaved++; if(L) L.saved++; return; } if(r===0){ PHX.n.autoNone++; return; }
+  if(u.dead){ PHX.n.autoKill++; if(L){ L.kill++; L.took[u.type]=(L.took[u.type]|0)+1; } tdLog(f,'pch-auto',[u.type, phxLevel(u), 1]); }
+  else { PHX.n.autoPart++; if(L) L.part++; tdLog(f,'pch-auto',[u.type, phxLevel(u), 0]); } }
+
+function phxJbStart(f,J){ const H=f.def.harp, T=J.u || J.p; if(!T){ f.phxJb=null; return; }
+  const rx1=W-80, dx=f.x-T.x, dy=f.y-T.y, d=Math.max(1,Math.hypot(dx,dy)); let tx=f.x+dx/d*H.hopPx, ty=f.y+dy/d*H.hopPx;   
+  if(!pcLandOK(tx,ty)){ tx=Math.min(rx1,f.x+H.hopPx); ty=f.y; if(!pcLandOK(tx,ty)){ tx=f.x; ty=f.y+(dy>=0?1:-1)*H.hopPx; } }
+  if(pcLandOK(tx,ty) && !(f.pcHopT>0) && !(f.pcTell>0)){ f.pcU=J.u || null; f.pcX0=f.x; f.pcY0=f.y; f.pcX1=tx; f.pcY1=ty; f.pcHopT=H.hopT; J.st='hop'; J.t1=S.t; bfSfx(SFX.jet,f.x,f.y); PHX.n.jbHop++;
+    tdLog(f,'pch-jb-hop',[Math.round(tx),Math.round(ty)]); phxLog('jb-hop',{ who:J.u? J.u.type : 'dogfighter', x:Math.round(tx), y:Math.round(ty) }); return; }
+  PHX.n.jbStand++; phxJbShot(f,J); }
+function phxJbShot(f,J){ f.phxJb=null; const H=f.def.harp, L=phxLed(), u=J.u, p=J.p, T=u || p;
+  if(!T || (u && (u.dead || S.units.indexOf(u)<0)) || (p && (p.down || p.gone))){ PHX.n.jbCut++; if(L) L.jbCut++; phxLog('jb-lost',{}); return; }
+  if(Math.hypot(T.x-f.x,T.y-f.y)>H.killR+H.hopPx+40){ PHX.n.jbFar++; if(L) L.jbFar++; phxLog('jb-far',{ who:u? u.type : 'dogfighter' }); return; }   
+  const ty=T.y-(u? 30 : 12);
+  S.fx.push({k:'flash',x:T.x,y:ty,ang:Math.atan2(ty-(f.y-60),T.x-f.x),R:22,lw:4,t:0,dur:0.16});   
+  S.fx.push({k:'ring',x:T.x,y:ty,r:4,R:36,t:0,dur:0.3,col:'#FFFFFF'}); S.fx.push({k:'puff',x:T.x,y:ty-6,t:0,dur:0.4,R:14,col:'#ffffff'});
+  S.fx.push({k:'tracer',x1:f.x-26,y1:f.y-60,x2:T.x,y2:ty,t:0,dur:0.2,col:'#FFFFFF',w:4});
+  bfSfx(PCV.face,f.x,f.y); bfSfx(SFX.crack,T.x,T.y); if(!reducedMotion()) S.shake=Math.max(S.shake,0.3);
+  critFx(T);   
+  PHX.n.jbShot++; const SH=PC_SHOT[phxTier()]||PC_SHOT.e;
+  if(u){ const h0=u.hits||0; let r=0; PHX.arm=f; PHX.armX=CRIT_MULT; PHX.armWhy='jb'; f.pipN=SH.pips*CRIT_MULT;
+    PHX.armR=0; try{ tanHit(u,f.x,f.y,f); } finally { f.pipN=0; r=PHX.armR; PHX.arm=null; PHX.armX=1; PHX.armWhy=null; PHX.armR=0; }
+    if(u.dead){ PHX.n.jbKill++; if(L){ L.jbKill++; L.took[u.type]=(L.took[u.type]|0)+1; } } else if(r<0){ PHX.n.jbSaved++; if(L) L.jbSaved++; }
+    tdLog(f,'pch-jb-crit',[u.type, phxLevel(u), !!u.dead]); phxLog('jb-crit',{ who:u.type, lv:phxLevel(u), dead:u.dead? 1 : 0, left:+(gritCap(u)-(u.hits||0)).toFixed(3), h0:+h0.toFixed(3) }); return; }
+  const hp0=+p.hp; PHX.n.jbPlane++; if(L) L.planes++;   
+  dfHit(p, Math.max(1,p.hpMax)*CRIT_MULT, f); if(p.mine && !p.down && phxNum(PHX_AUTO,1)>0) dfDown(p,f);
+  if(p.down) PHX.n.jbPlaneDown++;
+  tdLog(f,'pch-jb-crit',['dogfighter', 0, !!p.down]); phxLog('jb-crit',{ who:'dogfighter', hp0:+hp0.toFixed(2), hp1:+(+p.hp).toFixed(2), down:p.down? 1 : 0, mine:p.mine? 1 : 0 }); }
+function phxJbTick(f){ const J=f.phxJb; if(!J) return;   
+  if(f.dead || !(f.hp>0) || f.pcRet){ f.phxJb=null; PHX.n.jbCut++; const L=phxLed(); if(L) L.jbCut++; phxLog('jb-cut',{ why:f.pcRet? 'retreat' : 'fall' }); return; }
+  if(J.st==='land'){ phxJbStart(f,J); return; }
+  if(J.st==='hop' && f.duel && f.duel.st==='charge'){   
+    if(f.pcHopT>0){ f.pcHopT=0; f.hopZ=0; f.x=f.pcX1; f.y=f.pcY1; } f.hopZ=0; S.fx.push({k:'puff',x:f.x,y:f.y+2,t:0,dur:0.35,R:18}); bfSfx(SFX.thock,f.x,f.y); f.pcU=null; PHX.n.jbSnap=(PHX.n.jbSnap|0)+1; phxLog('jb-snap',{}); phxJbShot(f,J); return; }
+  if(J.st==='hop' && !(f.pcHopT>0)){ f.phxJb=null; PHX.n.jbCut++; const L=phxLed(); if(L) L.jbCut++; phxLog('jb-cut',{ why:'hop' }); } }
+
+function phxCourtX(g){ if(!g || g.phxX || !phxLive() || g.t==='princess' || g.pin || g.f==='boss' || g.boss || !(typeof FDEF==='object' && FDEF[g.t])) return 1;
+  const M=phxNum(PHX_COURT,2); return (M>0 && M!==1 && isFinite(M))? M : 1; }
+function phxCourtG(g,M){ const g2=Object.assign({}, g, { phxX:M });   
+  if(g.f==='spout' && g.pts) g2.per=Math.max(1,Math.round((g.per||1)*M));   
+  if((g.n|0)>0) g2.n=Math.max(1,Math.round((g.n|0)*M));
+  return g2; }
+function phxCount(g){ return (g && g.f==='spout' && g.pts)? g.pts.length*Math.max(1,g.per||1) : Math.max(0,g? (g.n|0) : 0); }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function phxRead(o){ o=o||{}; const L=(typeof S==='object' && S && S.raid && S.raid.phx) || null; let her=null;
+  try{ for(const f of S.foes){ if(f && f.def && f.def.harp && !f.dead){ her=f; break; } } }catch(e){}
+  const out={ cv:GVT_CV, on:phxOn()? 1 : 0, sw:PHX_ON, live:(typeof S==='object' && S && S.raid)? (phxLive()? 1 : 0) : 0, wrapped:PHX.wrapped, err:PHX.err, e:PHX.e, n:Object.assign({}, PHX.n),
+    dials:{ auto:Object.assign({}, PHX_AUTO), heavy:Object.assign({}, PHX_HEAVY), lv:Object.assign({}, PHX_LV), jb:Object.assign({}, PHX_JB), court:Object.assign({}, PHX_COURT), heavyT:Object.keys(PHX_HEAVY_T) },
+    her:her? { hp:+(+her.hp).toFixed(2), max:her.hpMax, life:her.pcLife||1, jb:her.phxJb? her.phxJb.st : null, hop:+(+(her.pcHopT||0)).toFixed(3) } : null, led:L? JSON.parse(JSON.stringify(L)) : null };
+  try{ if(o.u){ const u=o.u; out.law={ type:u.type, heavy:phxHeavy(u)? 1 : 0, lv:phxLevel(u), share:phxShare(u), cap:gritCap(u) }; } }catch(e){}
+  return out; }</script><script type="text/x-gvt-part">'use strict';
 
 
 
@@ -1213390,7 +1213558,7 @@ let BFQ=null;
 
 
 
-let GVT_CV='32.26';
+let GVT_CV='32.27';
 let NX_CAP_MUL=4;
 
 
@@ -4652613,7 +4652781,175 @@ const CPF={ on:(function(){ try{ const q=/[?&](?:cpf|pcs)=([01])/.exec(location.
 
 
 
-setTimeout(function(){ try{ if(window.GVT && !GVT.cpf) GVT.cpf=function(o){ return cpfRead(o); }; }catch(e){} }, 0);</script><script>(function(){var ps=document.querySelectorAll('script[type="text/x-gvt-part"]');for(var i=0;i<ps.length;i++){var p=ps[i],s=document.createElement('script');s.text=p.text;p.parentNode.replaceChild(s,p);if(s.parentNode)s.parentNode.removeChild(s);}})();</script>
+setTimeout(function(){ try{ if(window.GVT && !GVT.cpf) GVT.cpf=function(o){ return cpfRead(o); }; }catch(e){} }, 0);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const PHX_ON=(function(){ try{ const q=/[?&]pch=([01])/.exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_pch','0'); else localStorage.removeItem('gvt_pch'); } return localStorage.getItem('gvt_pch')==='0'? 0 : 1; }catch(e){ return 1; } })();
+const PHX_AUTO={ e:1, m:1, h:1, g:1 };
+const PHX_HEAVY={ e:2, m:2, h:2, g:2 };
+const PHX_LV={ e:0, m:0, h:0, g:70 };
+const PHX_JB={ e:1, m:1, h:1, g:1 };
+const PHX_COURT={ e:2, m:2, h:2, g:2 };
+const PHX_HEAVY_T={ bazooka:1, flame:1, commando:1 };
+const PHX={ n:{ auto:0, autoKill:0, autoPart:0, autoSaved:0, autoNone:0, jb:0, jbHop:0, jbStand:0, jbShot:0, jbKill:0, jbSaved:0, jbCut:0, jbFar:0, jbPlane:0, jbPlaneDown:0, jbSnap:0, court:0, courtBase:0, courtMade:0, fairyAdd:0, sageAdd:0 }, err:0, e:'', wrapped:0, cur:null, arm:null, armX:1, armWhy:null, armR:0, bite:0 };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+{ const up0=updateFoePrincess; updateFoePrincess=function(f,dt){ let on=false;
+    try{ on=!!(f && f.def && f.def.harp && phxLive()); if(on){ PHX.cur=f; PHX.arm=null; } }catch(e){ phxErr('pre',e); on=false; }
+    let r; try{ r=up0.apply(this,arguments); } finally { if(on){ PHX.cur=null; PHX.arm=null; PHX.armX=1; PHX.armWhy=null; } }
+    if(on){ try{ phxJbTick(f); }catch(e){ phxErr('jb',e); try{ f.phxJb=null; }catch(e2){} } }
+    else if(f && f.phxJb){ f.phxJb=null; }
+    return r; };
+  PHX.wrapped++; }
+{ const ps0=pcpShotFx; pcpShotFx=function(x1,y1,x2,y2,crit){ try{ if(PHX.cur && !PHX.armWhy){ PHX.arm=PHX.cur; PHX.armX=1; } }catch(e){} return ps0.apply(this,arguments); };   
+  PHX.wrapped++; }
+{ const th0=tanHit; tanHit=function(u,fx,fy,src,fire9){ const A=PHX.arm; if(!A || src!==A) return th0.apply(this,arguments);
+    const X=PHX.armX||1, why=PHX.armWhy; PHX.arm=null; PHX.armX=1; PHX.armWhy=null;   
+    let ok=false, h0=0; try{ ok=!!(u && !u.dead && phxLive() && S.units.indexOf(u)>=0); h0=(u && u.hits)||0; }catch(e){ phxErr('arm',e); ok=false; }
+    const r=th0.apply(this,arguments);
+    if(ok){ try{ if(why==='jb') PHX.armR=phxFloor(u,h0,fx,fy,X); else phxAuto(u,src,h0,fx,fy); }catch(e){ phxErr(why? 'crit' : 'auto',e); } }
+    return r; };
+  PHX.wrapped++; }
+{ const pl0=pykLand; pykLand=function(f,Y,D){ const on=!!(f && Y && phxLive() && phxNum(PHX_JB,1)>0), k=Y && Y.k, u=Y && Y.u, p=Y && Y.p; if(on) PHX.bite=1;
+    try{ pl0.apply(this,arguments); } finally { PHX.bite=0; }
+    try{ if(on && ((k==='plane' && p && !p.down && !p.gone) || (k!=='plane' && u && !u.dead))){ f.phxJb={ u:(k==='plane')? null : u, p:(k==='plane')? p : null, st:'land', t0:S.t }; PHX.n.jb++; const L=phxLed(); if(L) L.jb++; phxLog('jb-land',{ who:(k==='plane')? 'dogfighter' : u.type }); } }catch(e){ phxErr('land',e); }
+  };
+  PHX.wrapped++; }
+{ const pb0=pykBite; pykBite=function(u,f){ if(PHX.bite) return 0; return pb0.apply(this,arguments); };   
+  PHX.wrapped++; }
+{ const fs0=pcFaceShot; pcFaceShot=function(f){ try{ const J=f && f.phxJb; if(J && J.st==='hop'){ f.pcU=null; phxJbShot(f,J); return; } }catch(e){ phxErr('face',e); try{ f.phxJb=null; }catch(e2){} }
+    return fs0.apply(this,arguments); };
+  PHX.wrapped++; }
+{ const sg0=spawnGroup; spawnGroup=function(g,wk9){ let g2=g, M=1, sv=null, n0=0;
+    try{ M=phxCourtX(g); if(M!==1){ g2=phxCourtG(g,M); n0=phxCount(g);
+      if(g.pkbFtLead && typeof PKB_FT==='object' && PKB_FT && PKB_FT.sage){ const t9=(typeof pkbTier==='function')? pkbTier() : phxTier(), v0=+PKB_FT.sage[t9]; if(v0>0){ sv=[t9,v0]; PKB_FT.sage[t9]=Math.max(1,Math.round(v0*M)); } } } }catch(e){ phxErr('court',e); g2=g; M=1; }
+    const i0=S.foes.length; let r;
+    try{ r=sg0.call(this,g2,wk9); }
+    finally{ if(sv){ try{ PKB_FT.sage[sv[0]]=sv[1]; }catch(e){} }
+      if(M!==1){ try{ const k=S.foes.length-i0, L=phxLed(); PHX.n.court++; PHX.n.courtBase+=n0; PHX.n.courtMade+=k; if(sv){ PHX.n.sageAdd+=sv[1]*(M-1); }
+        if(L){ L.court.groups++; L.court.base+=n0; L.court.made+=k; if(sv) L.court.sages+=sv[1]*(M-1); } phxLog('court',{ t9:g.t, f:g.f||'', n0:n0, n:k, w:S.wave|0 }); }catch(e){ phxErr('count',e); } } }
+    return r; };
+  PHX.wrapped++; }
+{ const pi0=pcSummonIn; pcSummonIn=function(n){ let sv=null;   
+    try{ const rd=S.raid; if(phxLive() && rd){ const M=phxNum(PHX_COURT,2), SM=PC_SUMMON[rd.t]||PC_SUMMON.h; if(SM && M>0 && M!==1 && SM.fairies>0){ sv=[SM,SM.fairies]; SM.fairies=Math.max(1,Math.round(SM.fairies*M)); } } }catch(e){ phxErr('summon',e); }
+    let r; try{ r=pi0.apply(this,arguments); } finally{ if(sv){ sv[0].fairies=sv[1]; } }
+    try{ if(sv && r>0){ const L=phxLed(); PHX.n.fairyAdd+=sv[1]; if(L) L.court.fairies+=sv[1]; } }catch(e){}
+    return r; };
+  PHX.wrapped++; }
+{ const pw0=pcwWave; pcwWave=function(n,w){ let sv=null;   
+    try{ if(phxLive() && S.raid){ const M=phxNum(PHX_COURT,2), P=PCW[S.raid.t]; if(P && M>0 && M!==1 && P.fairies>0){ sv=[P,P.fairies]; P.fairies=Math.max(1,Math.round(P.fairies*M)); } } }catch(e){ phxErr('pcw',e); }
+    let r; try{ r=pw0.apply(this,arguments); } finally{ if(sv){ sv[0].fairies=sv[1]; } }
+    try{ if(sv && r>0){ const L=phxLed(); PHX.n.fairyAdd+=sv[1]; if(L) L.court.fairies+=sv[1]; } }catch(e){}
+    return r; };
+  PHX.wrapped++; }
+{ const bs0=blbSheet; blbSheet=function(rk,tier,N){ const R=bs0.apply(this,arguments);   
+    try{ if(rk==='palace' && PHX_ON && R && !R.err && R.waves){ const t9=(tier==='m' || tier==='h' || tier==='g')? tier : 'e', M=+PHX_COURT[t9]; if(M>0 && M!==1 && isFinite(M)){ let tr=0;
+      for(const w of R.waves) for(const g of (w.groups||[])){ if(!g.boss && g.t!=='princess' && !g.pin){ g.n0=g.n; g.n=Math.max(1,Math.round(g.n*M)); } if(!g.boss) tr+=g.n; }
+      R.troops=tr; R.phxCourt=M; } } }catch(e){ phxErr('sheet',e); }
+    return R; };
+  PHX.wrapped++; }
+
+if(PHX_ON){ try{ if(typeof BLB_RULES!=='undefined' && Array.isArray(BLB_RULES) && !BLB_RULES.some(function(r){ return r[0]==='PHX_AUTO'; })){
+  BLB_RULES.push(['PHX_AUTO', ()=>PHX_AUTO, "HER AUTO ATTACK KILLS: 1 = one shot of hers that lands fells any man on foot and takes a heavy's bar in PHX_HEAVY shots; 0 = her shot as it was (CARD-PCH)", 'palace'],
+    ['PHX_HEAVY', ()=>PHX_HEAVY, 'HER AUTO ATTACK: the shots a HEAVY takes to fall (bazooka, flame, commando, every machine)', 'palace'],
+    ['PHX_LV', ()=>PHX_LV, 'HER AUTO ATTACK: a heavy BELOW this level falls to ONE shot (MEGA 70; 0 = off)', 'palace'],
+    ['PHX_JB', ()=>PHX_JB, 'THE JUMP-BACK CRIT: 1 = the man she yoinks takes her hop back and one shot that always crits; 0 = the old bar hit', 'palace'],
+    ['PHX_COURT', ()=>PHX_COURT, "HER COURT: every body on her side x this (2 = twice the court)", 'palace']);
+  if(typeof blbShip==='function' && typeof BLB==='object' && BLB && BLB.ship) blbShip();
+  if(typeof BLB==='object' && BLB && BLB.booted && BLB.over && typeof blbCellSet==='function') for(const id of ['PHX_AUTO','PHX_HEAVY','PHX_LV','PHX_JB','PHX_COURT']){ const o=BLB.over[id]; if(o) for(const k of Object.keys(o)) blbCellSet(id,k,o[k]); }
+} }catch(e){ phxErr('blb',e); } }
+
+
+
+
+
+
+
+setTimeout(function(){ try{ if(window.GVT && !GVT.phx) GVT.phx=function(o){ return phxRead(o); }; }catch(e){} }, 0);</script><script>(function(){var ps=document.querySelectorAll('script[type="text/x-gvt-part"]');for(var i=0;i<ps.length;i++){var p=ps[i],s=document.createElement('script');s.text=p.text;p.parentNode.replaceChild(s,p);if(s.parentNode)s.parentNode.removeChild(s);}})();</script>
 <svg id="bcnDefs" width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute;left:0;top:0;width:0;height:0;overflow:hidden;pointer-events:none"><defs><filter id="bcnS" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="9" flood-color="rgb(255,210,74)" flood-opacity="0.7"/></filter><filter id="bcnCS" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="5.952" flood-color="rgb(255,210,74)" flood-opacity="0.7"/></filter><filter id="bcnT" x="-70%" y="-70%" width="240%" height="240%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="10" flood-color="rgb(255,210,74)" flood-opacity="0.95"/><feDropShadow dx="0" dy="0" stdDeviation="24" flood-color="rgb(255,210,74)" flood-opacity="0.55"/></filter><filter id="bcnH0" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="rgb(255,210,74)" flood-opacity="0.55"/></filter><filter id="bcnW0" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="rgb(255,210,74)" flood-opacity="0.55"/></filter><filter id="bcnC0" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="3.968" flood-color="rgb(255,210,74)" flood-opacity="0.55"/></filter><filter id="bcnH1" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="6.5" flood-color="rgb(255,210,74)" flood-opacity="0.57"/></filter><filter id="bcnW1" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="6.5" flood-color="rgb(255,210,74)" flood-opacity="0.57"/></filter><filter id="bcnC1" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="4.299" flood-color="rgb(255,210,74)" flood-opacity="0.57"/></filter><filter id="bcnH2" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="7" flood-color="rgb(255,210,74)" flood-opacity="0.59"/></filter><filter id="bcnW2" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="7" flood-color="rgb(255,210,74)" flood-opacity="0.59"/></filter><filter id="bcnC2" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="4.63" flood-color="rgb(255,210,74)" flood-opacity="0.59"/></filter><filter id="bcnH3" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="7.5" flood-color="rgb(255,211,74)" flood-opacity="0.61"/></filter><filter id="bcnW3" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="7.5" flood-color="rgb(255,211,74)" flood-opacity="0.61"/></filter><filter id="bcnC3" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="4.96" flood-color="rgb(255,211,74)" flood-opacity="0.61"/></filter><filter id="bcnH4" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="rgb(255,211,74)" flood-opacity="0.63"/></filter><filter id="bcnW4" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="rgb(255,211,74)" flood-opacity="0.63"/></filter><filter id="bcnC4" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="5.291" flood-color="rgb(255,211,74)" flood-opacity="0.63"/></filter><filter id="bcnH5" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="8.5" flood-color="rgb(255,211,74)" flood-opacity="0.65"/></filter><filter id="bcnW5" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="8.5" flood-color="rgb(255,211,74)" flood-opacity="0.65"/></filter><filter id="bcnC5" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="5.622" flood-color="rgb(255,211,74)" flood-opacity="0.65"/></filter><filter id="bcnH6" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="9" flood-color="rgb(255,211,74)" flood-opacity="0.67"/></filter><filter id="bcnW6" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="9" flood-color="rgb(255,211,74)" flood-opacity="0.67"/></filter><filter id="bcnC6" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="5.952" flood-color="rgb(255,211,74)" flood-opacity="0.67"/></filter><filter id="bcnH7" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="9.5" flood-color="rgb(255,211,74)" flood-opacity="0.69"/></filter><filter id="bcnW7" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="9.5" flood-color="rgb(255,211,74)" flood-opacity="0.69"/></filter><filter id="bcnC7" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="6.283" flood-color="rgb(255,211,74)" flood-opacity="0.69"/></filter><filter id="bcnH8" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="10" flood-color="rgb(255,212,74)" flood-opacity="0.71"/></filter><filter id="bcnW8" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="10" flood-color="rgb(255,212,74)" flood-opacity="0.71"/></filter><filter id="bcnC8" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="6.614" flood-color="rgb(255,212,74)" flood-opacity="0.71"/></filter><filter id="bcnH9" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="10.5" flood-color="rgb(255,212,74)" flood-opacity="0.73"/></filter><filter id="bcnW9" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="10.5" flood-color="rgb(255,212,74)" flood-opacity="0.73"/></filter><filter id="bcnC9" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="6.944" flood-color="rgb(255,212,74)" flood-opacity="0.73"/></filter><filter id="bcnH10" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="11" flood-color="rgb(255,212,74)" flood-opacity="0.75"/></filter><filter id="bcnW10" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="11" flood-color="rgb(255,212,74)" flood-opacity="0.75"/></filter><filter id="bcnC10" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="7.275" flood-color="rgb(255,212,74)" flood-opacity="0.75"/></filter><filter id="bcnH11" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="11.5" flood-color="rgb(255,212,74)" flood-opacity="0.77"/></filter><filter id="bcnW11" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="11.5" flood-color="rgb(255,212,74)" flood-opacity="0.77"/></filter><filter id="bcnC11" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="7.606" flood-color="rgb(255,212,74)" flood-opacity="0.77"/></filter><filter id="bcnH12" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="12" flood-color="rgb(255,212,74)" flood-opacity="0.79"/></filter><filter id="bcnW12" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="12" flood-color="rgb(255,212,74)" flood-opacity="0.79"/></filter><filter id="bcnC12" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="7.937" flood-color="rgb(255,212,74)" flood-opacity="0.79"/></filter><filter id="bcnH13" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="12.5" flood-color="rgb(255,213,74)" flood-opacity="0.81"/></filter><filter id="bcnW13" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="12.5" flood-color="rgb(255,213,74)" flood-opacity="0.81"/></filter><filter id="bcnC13" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="8.267" flood-color="rgb(255,213,74)" flood-opacity="0.81"/></filter><filter id="bcnH14" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="13" flood-color="rgb(255,213,74)" flood-opacity="0.83"/></filter><filter id="bcnW14" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="13" flood-color="rgb(255,213,74)" flood-opacity="0.83"/></filter><filter id="bcnC14" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="8.598" flood-color="rgb(255,213,74)" flood-opacity="0.83"/></filter><filter id="bcnH15" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="13.5" flood-color="rgb(255,213,74)" flood-opacity="0.85"/></filter><filter id="bcnW15" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="13.5" flood-color="rgb(255,213,74)" flood-opacity="0.85"/></filter><filter id="bcnC15" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="8.929" flood-color="rgb(255,213,74)" flood-opacity="0.85"/></filter><filter id="bcnH16" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="14" flood-color="rgb(255,213,74)" flood-opacity="0.87"/></filter><filter id="bcnW16" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="14" flood-color="rgb(255,213,74)" flood-opacity="0.87"/></filter><filter id="bcnC16" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="9.259" flood-color="rgb(255,213,74)" flood-opacity="0.87"/></filter><filter id="bcnH17" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="14.5" flood-color="rgb(255,213,74)" flood-opacity="0.89"/></filter><filter id="bcnW17" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="14.5" flood-color="rgb(255,213,74)" flood-opacity="0.89"/></filter><filter id="bcnC17" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="9.59" flood-color="rgb(255,213,74)" flood-opacity="0.89"/></filter><filter id="bcnH18" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="15" flood-color="rgb(255,214,74)" flood-opacity="0.91"/></filter><filter id="bcnW18" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="15" flood-color="rgb(255,214,74)" flood-opacity="0.91"/></filter><filter id="bcnC18" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="9.921" flood-color="rgb(255,214,74)" flood-opacity="0.91"/></filter><filter id="bcnH19" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="15.5" flood-color="rgb(255,214,74)" flood-opacity="0.93"/></filter><filter id="bcnW19" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="15.5" flood-color="rgb(255,214,74)" flood-opacity="0.93"/></filter><filter id="bcnC19" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="10.251" flood-color="rgb(255,214,74)" flood-opacity="0.93"/></filter><filter id="bcnH20" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="16" flood-color="rgb(255,214,74)" flood-opacity="0.95"/></filter><filter id="bcnW20" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="16" flood-color="rgb(255,214,74)" flood-opacity="0.95"/></filter><filter id="bcnC20" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="10.582" flood-color="rgb(255,214,74)" flood-opacity="0.95"/></filter><filter id="bcnB0" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="rgb(255,210,74)" flood-opacity="0.4"/></filter><filter id="bcnB1" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="4.5" flood-color="rgb(255,210,74)" flood-opacity="0.423"/></filter><filter id="bcnB2" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="5" flood-color="rgb(255,210,74)" flood-opacity="0.446"/></filter><filter id="bcnB3" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="5.5" flood-color="rgb(255,210,74)" flood-opacity="0.469"/></filter><filter id="bcnB4" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="rgb(255,211,74)" flood-opacity="0.492"/></filter><filter id="bcnB5" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="6.5" flood-color="rgb(255,211,74)" flood-opacity="0.515"/></filter><filter id="bcnB6" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="7" flood-color="rgb(255,211,74)" flood-opacity="0.537"/></filter><filter id="bcnB7" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="7.5" flood-color="rgb(255,211,74)" flood-opacity="0.56"/></filter><filter id="bcnB8" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="rgb(255,211,74)" flood-opacity="0.583"/></filter><filter id="bcnB9" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="8.5" flood-color="rgb(255,212,74)" flood-opacity="0.606"/></filter><filter id="bcnB10" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="9" flood-color="rgb(255,212,74)" flood-opacity="0.629"/></filter><filter id="bcnB11" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="9.5" flood-color="rgb(255,212,74)" flood-opacity="0.652"/></filter><filter id="bcnB12" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="10" flood-color="rgb(255,212,74)" flood-opacity="0.675"/></filter><filter id="bcnB13" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="10.5" flood-color="rgb(255,212,74)" flood-opacity="0.698"/></filter><filter id="bcnB14" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="11" flood-color="rgb(255,212,74)" flood-opacity="0.721"/></filter><filter id="bcnB15" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="11.5" flood-color="rgb(255,212,74)" flood-opacity="0.744"/></filter><filter id="bcnB16" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="12" flood-color="rgb(255,213,74)" flood-opacity="0.767"/></filter><filter id="bcnB17" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="12.5" flood-color="rgb(255,213,74)" flood-opacity="0.79"/></filter><filter id="bcnB18" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="13" flood-color="rgb(255,213,74)" flood-opacity="0.812"/></filter><filter id="bcnB19" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="13.5" flood-color="rgb(255,213,74)" flood-opacity="0.835"/></filter><filter id="bcnB20" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="14" flood-color="rgb(255,213,74)" flood-opacity="0.858"/></filter><filter id="bcnB21" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="14.5" flood-color="rgb(255,214,74)" flood-opacity="0.881"/></filter><filter id="bcnB22" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="15" flood-color="rgb(255,214,74)" flood-opacity="0.904"/></filter><filter id="bcnB23" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="15.5" flood-color="rgb(255,214,74)" flood-opacity="0.927"/></filter><filter id="bcnB24" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="16" flood-color="rgb(255,214,74)" flood-opacity="0.95"/></filter></defs></svg>
 <script> try{ if(typeof olrOn==='function' && olrOn()) document.documentElement.classList.add('olrmen'); }catch(e){} </script>
 </body>
