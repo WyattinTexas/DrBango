@@ -1010327,7 +1010327,22 @@ function sfbRead(o){ if(o && typeof o==='object'){ if('on' in o) SFB.on=o.on? 1 
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 function sfoSw(k){ try{ const q=new RegExp('[?&]'+k+'=([01])(?![\\w])').exec(location.search||''); if(q){ if(q[1]==='0') localStorage.setItem('gvt_'+k,'0'); else localStorage.removeItem('gvt_'+k); } return localStorage.getItem('gvt_'+k)==='0'? 0 : 1; }catch(e){ return 1; } }
+
 
 
 
@@ -1010340,7 +1010355,7 @@ function sfoCards(ts){ const out=[];
   return out; }
 function sfoGlass(d){ const r=d.getBoundingClientRect(); return { l:Math.max(0, r.left), t:Math.max(0, r.top), r:Math.min(innerWidth, r.right), b:Math.min(innerHeight, r.bottom) }; }
 function sfoIn(b, g, m){ return b.right>g.l-m && b.left<g.r+m && b.bottom>g.t-m && b.top<g.b+m && g.r>g.l && g.b>g.t; }
-function sfoShow(c){ if(!SFO.hid.has(c)) return; SFO.hid.delete(c); const I=SFO.idsOf.get(c); if(I){ for(const id of I) if(SFO.owns.get(id)===c) SFO.owns.delete(id); SFO.idsOf.delete(c); } try{ c.style.removeProperty('content-visibility'); c.style.removeProperty('contain-intrinsic-size'); if(!c.getAttribute('style')) c.removeAttribute('style'); }catch(e){ SFO.err++; }
+function sfoShow(c){ if(!SFO.hid.has(c)) return; SFO.hid.delete(c); const I=SFO.idsOf.get(c); if(I){ for(const id of I) if(SFO.owns.get(id)===c) SFO.owns.delete(id); SFO.idsOf.delete(c); } try{ c.style.removeProperty('content-visibility'); c.style.removeProperty('contain-intrinsic-size'); c.style.removeProperty(SFO_FLOOR); if(!c.getAttribute('style')) c.removeAttribute('style'); }catch(e){ SFO.err++; }
   for(const io of SFO.ios){ try{ io.unobserve(c); }catch(e){} } }
 function sfoAll(why){ let k=0; for(const c of SFO.list){ if(SFO.hid.has(c)){ sfoShow(c); k++; } } SFO.list=[]; for(const io of SFO.ios){ try{ io.disconnect(); }catch(e){} } SFO.ios=[]; sfoAnchor(); sfoUnguard(); if(k) SFO.n.all++; return k; }
 function sfoAnchor(){ for(const d of SFO.depts){ try{ d.style.removeProperty('overflow-anchor'); if(!d.getAttribute('style')) d.removeAttribute('style'); }catch(e){} } SFO.depts=[]; }
@@ -1010373,7 +1010388,9 @@ function sfoPaint(){ let shown=false; try{ shown=shopIsOpen(); }catch(e){} if(!s
     if(s.transform && s.transform!=='none'){ SFO.n.kept++; continue; }   
     let w=b.width, h=b.height;
     const px=v=>parseFloat(v)||0; w-=px(s.paddingLeft)+px(s.paddingRight)+px(s.borderLeftWidth)+px(s.borderRightWidth); h-=px(s.paddingTop)+px(s.paddingBottom)+px(s.borderTopWidth)+px(s.borderBottomWidth);
-    if(!(w>0 && h>0)){ SFO.n.kept++; continue; } W.push([c, d, w, h, b.width, b.height]); }
+    if(!(w>0 && h>0)){ SFO.n.kept++; continue; }
+    if(!SFO.hid.has(c) && c.style.getPropertyValue(SFO_FLOOR)){ SFO.n.kept++; SFO.n.ownFloor++; continue; }   
+    W.push([c, d, w, h, b.width, b.height, s.boxSizing==='border-box'? 1 : 0]); }
   const cnt=new Map(); for(const e of document.querySelectorAll('[id]')) cnt.set(e.id, (cnt.get(e.id)|0)+1);
   const owns=new Map();
   for(let i=W.length-1; i>=0; i--){ const c=W[i][0]; let shared=false; const mine=[];
@@ -1010382,11 +1010399,11 @@ function sfoPaint(){ let shown=false; try{ shown=shopIsOpen(); }catch(e){} if(!s
     for(const id of mine) owns.set(id, c); SFO.idsOf.set(c, mine); }
   SFO.owns=owns;
   const byD=new Map();
-  for(const [c, d, w, h] of W){ c.style.setProperty('contain-intrinsic-size', w+'px '+h+'px'); c.style.setProperty('content-visibility', 'hidden'); SFO.hid.add(c); SFO.list.push(c); SFO.n.hid++; let a=byD.get(d); if(!a){ a=[]; byD.set(d, a); } a.push(c); }
+  for(const [c, d, w, h, bw, bh, bb] of W){ c.style.setProperty('contain-intrinsic-size', w+'px '+h+'px'); c.style.setProperty('content-visibility', 'hidden'); if(SFO.sfh){ c.style.setProperty(SFO_FLOOR, (bb? bh : h)+'px'); SFO.n.floor++; } SFO.hid.add(c); SFO.list.push(c); SFO.n.hid++; let a=byD.get(d); if(!a){ a=[]; byD.set(d, a); } a.push(c); }
   
   
   for(let k=0; k<2 && W.length; k++){ const fix=[]; for(const R of W){ const b=R[0].getBoundingClientRect(), dw=R[4]-b.width, dh=R[5]-b.height; if(Math.abs(dw)>0.001 || Math.abs(dh)>0.001){ R[2]+=dw; R[3]+=dh; fix.push(R); } }
-    for(const R of fix) R[0].style.setProperty('contain-intrinsic-size', R[2]+'px '+R[3]+'px'); SFO.n.snap=(SFO.n.snap|0)+fix.length; if(!fix.length) break; }
+    for(const R of fix){ R[0].style.setProperty('contain-intrinsic-size', R[2]+'px '+R[3]+'px'); if(SFO.sfh && !R[6]) R[0].style.setProperty(SFO_FLOOR, R[3]+'px'); } SFO.n.snap=(SFO.n.snap|0)+fix.length; if(!fix.length) break; }
   SFO.n.cards+=C.length;
   
   
@@ -1010400,9 +1010417,9 @@ function sfoPaint(){ let shown=false; try{ shown=shopIsOpen(); }catch(e){} if(!s
 
 
 
-function sfoRead(o){ if(o && typeof o==='object'){ if(o.near!=null) SFO.near=String(o.near); if(o.show) sfoAll('rig'); if(o.v!=null){ SFO.v=(o.v && SFO.on && SFO_CV)? 1 : 0; if(!SFO.v) sfoAll('rig'); } if(o.c!=null){ SFO.c=(o.c && SFO.on)? 1 : 0; if(!SFO.c) SFO.until=0; } }
+function sfoRead(o){ if(o && typeof o==='object'){ if(o.near!=null) SFO.near=String(o.near); if(o.show) sfoAll('rig'); if(o.v!=null){ SFO.v=(o.v && SFO.on && SFO_CV)? 1 : 0; if(!SFO.v) sfoAll('rig'); } if(o.c!=null){ SFO.c=(o.c && SFO.on)? 1 : 0; if(!SFO.c) SFO.until=0; } if(o.sfh!=null){ SFO.sfh=(o.sfh && SFO.on)? 1 : 0; sfoAll('rig'); } }
   let hid=0; for(const c of SFO.list) if(SFO.hid.has(c) && c.isConnected) hid++;
-  return { cv:GVT_CV, on:SFO.on, v:SFO.v, c:SFO.c, engine:SFO_CV? 1 : 0, wrapped:{ renderShop:!!SFO.old.renderShop, shTagFit:!!SFO.old.shTagFit, afxSweep:!!SFO.old.afxSweep, afxnSweep:!!SFO.old.afxnSweep, siv:!!SFO.old.siv },
+  return { cv:GVT_CV, on:SFO.on, v:SFO.v, c:SFO.c, sfh:SFO.sfh, engine:SFO_CV? 1 : 0, wrapped:{ renderShop:!!SFO.old.renderShop, shTagFit:!!SFO.old.shTagFit, afxSweep:!!SFO.old.afxSweep, afxnSweep:!!SFO.old.afxnSweep, siv:!!SFO.old.siv },
     hidNow:hid, ios:SFO.ios.length, near:SFO.near, busy:sfoBusy(), settling:sfoSettling(), n:Object.assign({}, SFO.n), ms:+SFO.ms.toFixed(1), max:+SFO.max.toFixed(1), err:SFO.err, why:SFO.why }; }
 
 
@@ -1106210,7 +1106227,7 @@ let BFQ=null;
 
 
 
-let GVT_CV='32.85';
+let GVT_CV='32.86';
 let NX_CAP_MUL=4;
 
 
@@ -1632368,11 +1632385,28 @@ setTimeout(function(){ try{ if(window.GVT && !GVT.sfb) GVT.sfb=sfbRead; }catch(e
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 const SFO_MIN=20, SFO_ROW=300, SFO_CAP=6000, SFO_CALM=30, SFO_GAP=50, SFO_EDGE=24, SFO_NEAR='0px', SFO_AFTERX=1500;
 const SFO_CV=(function(){ try{ return !!(window.CSS && CSS.supports && CSS.supports('content-visibility', 'hidden') && CSS.supports('contain-intrinsic-size', '1px 1px')); }catch(e){ return false; } })();
 var SFO={ on:sfoSw('sfo'), v:0, c:0, near:SFO_NEAR, minT:0, list:[], hid:new WeakSet(), ios:[], depts:[], owns:new Map(), idsOf:new WeakMap(), gmo:null, until:0, calmN:0, watchT:0, watching:0, mo:null, old:{}, err:0, why:'', ms:0, max:0,
   n:{ paints:0, cards:0, kept:0, shared:0, hid:0, snap:0, back:0, guard:0, spot:0, fit:0, shut:0, calm:0, capped:0, held:0, heldN:0, all:0 } };
 SFO.v=SFO.on && sfoSw('sfv') && SFO_CV? 1 : 0;SFO.c=SFO.on && sfoSw('sfc')? 1 : 0;
+const SFO_FLOOR='min-block-size';SFO.sfh=SFO.on && sfoSw('sfh')? 1 : 0;SFO.n.floor=0;SFO.n.ownFloor=0;
+
+
 
 
 
@@ -1632964,7 +1632998,7 @@ const SBP_DIVE={ div:1, section:1 };
 const SBP_BIG=4000;
 const SBP_FIELD=/<(?:input|textarea|select|video|audio|iframe|object)\b/i;
 const SBP_FTAG={ input:1, textarea:1, select:1, video:1, audio:1, iframe:1, object:1 };
-const SBP_SFO=/^(?:content-visibility|contain-intrinsic-size|overflow-anchor)\s*:/i;
+const SBP_SFO=/^(?:content-visibility|contain-intrinsic-size|overflow-anchor|min-block-size)\s*:/i;
 const SBP_OWN={ 'data-lgz':1 };
 var SBP={ on:sbpSw(), rec:null, mo:null, arm:0, depth:0, lay:null, setAside:null, gave:0, proto:null, err:0, why:'', ms:0, max:0, last:null,
   n:{ paints:0, whole:0, kept:0, first:0, shut:0, lang:0, store:0, tree:0, cut:0, error:0, units:0, same:0, ids:0, dealt:0, dealtEls:0, conf:0, extra:0, blur:0, sfoBack:0, sfoNear:0, anchor:0, forgot:0 } };
