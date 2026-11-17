@@ -727,7 +727,7 @@ function updateGo() {
   const has = pad.length || $("pad").value.trim();
   const n = imgMax > 0 ? Math.min(shots.length, imgMax) : 0;
   $("go").disabled = !has || shotBusy;
-  const bug = proj === "bug" && !guest;   // 11/13 CARD-DBJ: a Bug note waits in tonight's bug jump
+  const bug = bugOn();   // 11/13 CARD-DBJ: a Bug note waits in tonight's bug jump (11/17 CARD-BUG-1116 p2: a guest's too, when the Mac gives that link the Bug button)
   $("go").textContent = has ? (bug ? "ADD TO BUG JUMP 🐞" : "SEND TO JUMPR 🦘") + (n ? ` · 🖼 ${n}` : "") : n ? "ADD A NOTE TOO" : "ADD NOTES FIRST";
 }
 function renderSent() {
@@ -971,14 +971,22 @@ async function pollHeldAcks() {
    jump coming up." A Bug note leaves like any note (its words, its screenshots, the same sealed road) with
    project "bug". The Mac does not queue it: it joins tonight's bug jump (its state/bugjump/), which goes in line
    at the Mac's midnight as one GVT card. This card shows what the jump holds (the heartbeat's `bugjump`) and ✕
-   takes a bug back before midnight. Wyatt's pad only: a guest's buttons come from the Mac and never hold Bug. */
+   takes a bug back before midnight. That card is on Wyatt's pad only. A guest's buttons come from the Mac: they hold Bug only
+   when the Mac gives that link the Bug button (11/17 CARD-BUG-1116 p2: bugOn below). */
 const bugSent = {};          // bug n -> { pid, at }
 let bugLast = null;          // the last bugjump the heartbeat carried
 function bugTime(at) {
   try { return new Date(at * 1000).toLocaleTimeString([], { hour:"numeric", minute:"2-digit" }); } catch (e) { return "midnight"; }
 }
+/* 11/17 CARD-BUG-1116 part 2 (the night's bug 8). Wyatt by phone, 11/16/2026 3:20 PM: "On Isaac's jumpr, he's missing the bug
+   tab. Please make sure he has the bug tab so he can report bugs through his jumpr." A guest's buttons are the Mac's word (the
+   heartbeat's `projects`): a guest whose row on the Mac has the Bug button (Isaac) gets 🐞 Bug there, and this pad then reads
+   like Wyatt's in Bug mode (the hint, ADD TO BUG JUMP 🐞); the Mac files the note in tonight's bug jump as THAT GUEST'S bug.
+   A guest the Mac gives no Bug button never has proj "bug" (renderProjButtons falls back to the link's first button), so every
+   other guest's pad is as it was. The TONIGHT'S BUG JUMP card stays Wyatt's alone. */
+function bugOn() { return proj === "bug" && (!guest || projects.some(p => p.id === "bug")); }
 function bugMode() {
-  const bug = proj === "bug" && !guest;
+  const bug = bugOn();
   $("pad").placeholder = bug ? "What's broken? Say where it is and what it should do, then add screenshots. It joins tonight's bug jump."
     : guest ? "Design notes for Wyatt's Mac — talk it out, Wispr Flow lands here." : "Talk it out — Wispr Flow lands here. Paint the picture.";
   document.body.classList.toggle("bugmode", bug);
