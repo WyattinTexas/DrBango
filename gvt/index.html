@@ -1013370,6 +1013370,26 @@ function wdfRead(o){ if(o && o.on!==undefined){ WDF.on=o.on? 1 : 0; WDF.sig=''; 
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 function zrbAddr(h, b){ const doc=afxnDoc(h); const z=doc? afxnSize(doc) : null; if(!z) return null;   
   const wide=z.w>=z.h, W=Math.max(1, Math.round(wide? b : b*z.w/z.h)), H=Math.max(1, Math.round(wide? b*z.h/z.w : b));
   const tag=z.tag.replace(/\s(width|height|viewBox)\s*=\s*("[^"]*"|'[^']*')/gi, '').replace(/^<svg\b/i, '<svg width="'+W+'" height="'+H+'" viewBox="'+z.vb+'"');
@@ -1013381,15 +1013401,17 @@ function zrbStill(now){ let v=''; try{ v=RZ.z+'|'+RZ.tx+'|'+RZ.ty; if(RZ.pts && 
   if(ZRB.down>0){ if(now-ZRB.last>ZRB_LOST) ZRB.down=0; else ZRB.last=now; } if(v!==ZRB.view){ ZRB.view=v; ZRB.last=now; } return now-ZRB.last>=ZRB_STILL; }
 function zrbAsk(h, b, self){ let res=null; const p=new Promise(function(ok){ res=ok; }), j={ h:h, b:b, self:self, p:p, res:res, t0:performance.now(), cv:null, im:null, px:0 };
   let m=ZRB.by.get(h); if(!m){ m={}; ZRB.by.set(h, m); } m[b]=j; ZRB.q.push(j); ZRB.n.asked++; zrbKick(); return p; }
-function zrbOut(j, u){ const now=performance.now(); try{ if(ZRB.log.length>=32) ZRB.log.shift(); ZRB.log.push([j.h.length, j.b, Math.round(j.t0), Math.round(j.tt || 0), Math.round(j.tl || 0), Math.round(j.tc || 0), Math.round(now), u? u.length : 0]); }catch(e){}   
+function zrbOut(j, u){ const now=performance.now(); try{ if(ZRB.log.length>=32) ZRB.log.shift(); ZRB.log.push([j.h.length, j.b, Math.round(j.t0), Math.round(j.tt || 0), Math.round(j.tl || 0), Math.round(j.tc || 0), Math.round(now), u? u.length : 0, j.taps|0]); }catch(e){}   
   const m=ZRB.by.get(j.h); if(m && m[j.b]===j){ delete m[j.b]; let any=0; for(const k in m){ any=1; break; } if(!any) ZRB.by.delete(j.h); }
   try{ if(j.im){ j.im.onload=j.im.onerror=null; j.im.removeAttribute('src'); } }catch(e){ ZRB.err++; } j.im=null; try{ if(j.cv){ j.cv.width=0; j.cv.height=0; } }catch(e){} j.cv=null;
   if(u) ZRB.n.made++; else ZRB.n.none++; try{ j.res(u || null); }catch(e){ ZRB.err++; } }
 function zrbRoom(){ try{ return afxnRoomOk() && document.visibilityState!=='hidden'; }catch(e){ return false; } }
 function zrbKick(){ if(ZRB.raf || !(ZRB.q.length || ZRB.run)) return; try{ if(zrbRoom()) ZRB.raf=requestAnimationFrame(zrbTick); else { ZRB.calm=0; ZRB.lf=0; ZRB.raf=setTimeout(zrbTick, 500); } }catch(e){ ZRB.err++; } }
 function zrbTick(){ ZRB.raf=0; const now=performance.now(); let still=false; try{ still=zrbStill(now); }catch(e){ ZRB.err++; }
-  if(ZRB.lf){ if(now-ZRB.lf<ZRB_FRAME) ZRB.calm++; else ZRB.calm=0; } ZRB.lf=now;   
-  const r=ZRB.run; if(r && r.tl && !r.tc){ const w=now-r.tl, wj=r.wait || ZRB.wait; if((w>=wj && ZRB.calm>=ZRB_CALM) || w>=wj+ZRB_LATE) zrbCall(r); }   
+  let late=false; if(ZRB.lf){ if(now-ZRB.lf<ZRB_FRAME) ZRB.calm++; else { ZRB.calm=0; late=true; } } ZRB.lf=now;   
+  const r=ZRB.run; if(r && r.tl && !r.tc){ const w=now-r.tl, wj=r.wait || ZRB.wait;
+    if(ZRB.zrc && r.cv){ if(late && !r.dirty){ r.dirty=1; if(!r.taps) ZRB.n.late++; } if(r.dirty && ZRB.calm>=ZRB_CALM && (r.taps|0)<ZRB_TAPS) zrbTap(r); }   
+    if((w>=wj && ZRB.calm>=ZRB_CALM) || w>=wj+ZRB_LATE) zrbCall(r); }   
   if(!ZRB.run && ZRB.q.length){ const j=ZRB.q[0];
     if(zrbRoom() && !zrbBusy()){ const capped=now-j.t0>=ZRB_CAP; if((still && ZRB.calm>=ZRB_CALM) || capped){ if(!(still && ZRB.calm>=ZRB_CALM)) ZRB.n.capped++; ZRB.q.shift(); zrbRun(j); } } }
   zrbKick(); }
@@ -1013401,9 +1013423,14 @@ function zrbRun(j){ ZRB.run=j; ZRB.n.jobs++; j.tt=performance.now();
   try{ const pic=new Image(); j.im=pic;
     pic.onload=function(){ try{ const c2=document.createElement('canvas'); c2.width=a.W; c2.height=a.H; c2.getContext('2d').drawImage(pic, 0, 0, a.W, a.H); j.cv=c2; ZRB.n.warm++; }catch(e){ ZRB.err++; ZRB.why='warm: '+String((e && e.message) || e).slice(0, 60); } j.tl=performance.now(); ZRB.calm=0; zrbKick(); };   
     pic.onerror=function(){ ZRB.err++; j.tl=performance.now(); zrbKick(); }; pic.src=a.u; }catch(e){ ZRB.err++; zrbCall(j); } }
+function zrbTap(j){ try{ j.cv.getContext('2d').drawImage(j.im, 0, 0, j.cv.width, j.cv.height); }catch(e){ ZRB.err++; ZRB.why='tap: '+String((e && e.message) || e).slice(0, 60); } j.taps=(j.taps|0)+1; j.dirty=0; ZRB.n.tap++; ZRB.calm=0; }
+function zrbEase(slow){ if(!ZRB.zrc) return;   
+  if(slow){ if(ZRB.eased && ZRB.since<=ZRB_NEAR) ZRB.held=1; ZRB.quick=0; return; }   
+  ZRB.since++; if(ZRB.held || !(ZRB.wait>ZRB_WAIT0 || ZRB.k>ZRB_K0)) return;
+  if(++ZRB.quick>=ZRB_EASE){ ZRB.quick=0; ZRB.since=0; ZRB.eased++; ZRB.n.ease++; ZRB.wait=Math.max(ZRB_WAIT0, ZRB.wait/2); ZRB.k=Math.max(ZRB_K0, ZRB.k/2); } }
 function zrbCall(j){ if(j.tc) return; const f0=ZRB.old.afxnBake, t0=performance.now(); let p=null; ZRB.n.ran++; j.tc=t0;
   try{ p=f0.call(j.self, j.h, j.b); }catch(e){ ZRB.err++; ZRB.why='call: '+String((e && e.message) || e).slice(0, 60); p=null; }
-  const end=function(u){ const ms=performance.now()-t0; if(j.tl && ms>ZRB_SLOW+j.px/40000){ ZRB.n.slow++; ZRB.wait=Math.min(ZRB_WAITMAX, ZRB.wait*2); ZRB.k=Math.min(ZRB_KMAX, ZRB.k*2); } if(ZRB.run===j) ZRB.run=null; zrbOut(j, u); zrbKick(); };
+  const end=function(u){ const ms=performance.now()-t0; if(j.tl && ms>ZRB_SLOW+j.px/40000){ ZRB.n.slow++; ZRB.wait=Math.min(ZRB_WAITMAX, ZRB.wait*2); ZRB.k=Math.min(ZRB_KMAX, ZRB.k*2); zrbEase(1); } else if(j.tl) zrbEase(0); if(ZRB.run===j) ZRB.run=null; zrbOut(j, u); zrbKick(); };
   try{ Promise.resolve(p).then(end, function(){ end(null); }); }catch(e){ ZRB.err++; end(null); } }
 
 function zrbThru(self, args){ return ZRB.old.afxnBake.apply(self, args); }
@@ -1013421,9 +1013448,9 @@ function zrbThru(self, args){ return ZRB.old.afxnBake.apply(self, args); }
 
 
 
-function zrbRead(o){ if(o && typeof o==='object'){ if('on' in o) ZRB.on=o.on? 1 : 0; if(o.wait!=null && +o.wait>=0) ZRB.wait=+o.wait; }
+function zrbRead(o){ if(o && typeof o==='object'){ if('on' in o) ZRB.on=o.on? 1 : 0; if(o.wait!=null && +o.wait>=0) ZRB.wait=+o.wait; if('zrc' in o) ZRB.zrc=o.zrc? 1 : 0; }
   return { cv:(typeof GVT_CV==='string')? GVT_CV : null, on:ZRB.on, word:ZRB.word, wk:ZRB.wk, wrapped:!!ZRB.old.afxnBake && afxnBake!==ZRB.old.afxnBake, q:ZRB.q.length+(ZRB.run? 1 : 0), run:!!ZRB.run, wait:ZRB.wait, k:ZRB.k,
-    still:ZRB_STILL, cap:ZRB_CAP, down:ZRB.down, n:Object.assign({}, ZRB.n), log:ZRB.log.slice(), err:ZRB.err, why:ZRB.why }; }
+    zrc:ZRB.zrc, held:ZRB.held, eased:ZRB.eased, still:ZRB_STILL, cap:ZRB_CAP, down:ZRB.down, n:Object.assign({}, ZRB.n), log:ZRB.log.slice(), err:ZRB.err, why:ZRB.why }; }
 
 
 
@@ -1112340,7 +1112367,7 @@ let BFQ=null;
 
 
 
-let GVT_CV='33.33';
+let GVT_CV='33.34';
 let NX_CAP_MUL=4;
 
 
@@ -1641119,6 +1641146,23 @@ setTimeout(function(){ try{ if(window.GVT && !GVT.wdf) GVT.wdf=wdfRead; }catch(e
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 var ZRB=(function(){ const o={ on:0, word:'', wk:0, old:{}, q:[], by:new Map(), run:null, raf:0, last:0, view:'', down:0, wait:0, k:0, lf:0, calm:0, err:0, why:'', log:[],
     n:{ asked:0, again:0, lay:0, jobs:0, warm:0, nowarm:0, ran:0, gone:0, capped:0, slow:0, made:0, none:0 } };   
   try{ const qs=location.search||'', m=/[?&]zrb=(0|1|auto)(?![\w])/.exec(qs); if(m){ if(m[1]==='auto') localStorage.removeItem('gvt_zrb'); else localStorage.setItem('gvt_zrb', m[1]); }
@@ -1641127,6 +1641171,16 @@ var ZRB=(function(){ const o={ on:0, word:'', wk:0, old:{}, q:[], by:new Map(), 
   o.on=(o.word==='')? o.wk : +o.word; return o; })();
 const ZRB_STILL=250, ZRB_CAP=6000, ZRB_WAIT0=120, ZRB_K0=3, ZRB_KMAX=24, ZRB_WAITMAX=1200, ZRB_SLOW=30, ZRB_LOST=5000, ZRB_CALM=6, ZRB_FRAME=34, ZRB_LATE=1500;
 ZRB.wait=ZRB_WAIT0;ZRB.k=ZRB_K0;
+const ZRB_TAPS=4, ZRB_EASE=2, ZRB_NEAR=6;
+ZRB.zrc=(function(){ try{ const m=/[?&]zrc=(0|1)(?![\w])/.exec(location.search||''); if(m){ if(m[1]==='0') localStorage.setItem('gvt_zrc', '0'); else localStorage.removeItem('gvt_zrc'); } return localStorage.getItem('gvt_zrc')==='0'? 0 : 1; }catch(e){ return 1; } })();
+ZRB.quick=0;ZRB.since=0;ZRB.eased=0;ZRB.held=0;ZRB.n.late=0;ZRB.n.tap=0;ZRB.n.ease=0;
+
+
+
+
+
+
+
 
 
 
