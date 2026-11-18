@@ -1,6 +1,6 @@
 /* JUMPR shell cache — cache-first so the pad opens in dead zones,
    background refresh so deploys still arrive. */
-const V = "jr-v13";   // 11/17 CARD-BUG-1116 p2: 🐞 Bug on the pad of a guest whose link has it (Isaac) · jr-v12 = 11/13 CARD-DBJ: the Bug button (jr-v11 = 11/9 CARD-JMS THE SUMMIT)
+const V = "jr-v14";   // 11/17 CARD-BUG-1116 p2: 🐞 Bug on the pad of a guest whose link has it (Isaac) · jr-v13 = 11/17 CARD-BUG-1116 p4: "+ N more" opens the whole bug jump (jr-v12 = 11/13 CARD-DBJ the Bug button, jr-v11 = 11/9 CARD-JMS THE SUMMIT)
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon-180.png", "./icon-512.png"];
 
 self.addEventListener("install", e => {

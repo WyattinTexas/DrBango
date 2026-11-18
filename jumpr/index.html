@@ -76,6 +76,8 @@
   .bugrow .bx { flex:0 0 auto; background:none; border:none; color:var(--muted); font-size:15px; line-height:22px; cursor:pointer; padding:0 2px; }
   .bugrow .bx:disabled { opacity:.4; }
   .bugmore { font-family:var(--mono); font-size:11.5px; color:var(--muted); margin:8px 0 0; }
+  button.bugmore { display:block; width:100%; min-height:44px; padding:10px 12px; background:var(--panel2); border:1px solid var(--line); border-radius:10px; color:var(--violet); font-size:12.5px; font-weight:600; text-align:center; cursor:pointer; }   /* 11/17 CARD-BUG-1116 part 4 (the night's bug 19): "+ N more" is a button: a tap opens every bug of the night, "show fewer" folds them */
+  button.bugmore:active { background:var(--line); }
   /* 9/30 screenshots: five across, each with its own ✕ */
   .shots { display:grid; grid-template-columns:repeat(5, 1fr); gap:8px; margin-top:10px; }
   .shot { position:relative; aspect-ratio:1 / 1; border-radius:10px; overflow:hidden;
@@ -227,6 +229,7 @@
   html.summit .bugrow p { font-size:13.5px; }
   html.summit .bugrow .bx { color:transparent; text-shadow:0 0 0 var(--muted); }
   html.summit .bugmore { font:600 13px/1.2 var(--cond); letter-spacing:.05em; }
+  html.summit button.bugmore { border-radius:12px; border-color:var(--rule); color:var(--blue-hi); font:700 14px/1 var(--cond); letter-spacing:.06em; }   /* 11/17 CARD-BUG-1116 p4: the button in the one blue */
   html.summit .btn.rel { background:var(--on); color:var(--on-ink); font:700 15px/1 var(--cond); letter-spacing:.08em; }
   html.summit .btn.drop { font:700 15px/1 var(--cond); letter-spacing:.08em; }
   html.summit .statrow { font:600 13.5px/1.25 var(--cond); letter-spacing:.03em; }
@@ -975,6 +978,7 @@ async function pollHeldAcks() {
    when the Mac gives that link the Bug button (11/17 CARD-BUG-1116 p2: bugOn below). */
 const bugSent = {};          // bug n -> { pid, at }
 let bugLast = null;          // the last bugjump the heartbeat carried
+let bugAll = false, bugAllId = null;   // 11/17 CARD-BUG-1116 part 4 (the night's bug 19, Wyatt 11/16 10:41 PM: "It says there are 9 more, but even if I click the plus, it doesn't expand and show me all of the bugs, and it needs to."): the card folds at 8, "+ N more" opens the rest; a new night starts folded
 function bugTime(at) {
   try { return new Date(at * 1000).toLocaleTimeString([], { hour:"numeric", minute:"2-digit" }); } catch (e) { return "midnight"; }
 }
@@ -996,10 +1000,12 @@ function renderBugs(b) {
   bugLast = b || null;
   const card = $("bugcard"), box = $("buglist");
   if (guest || !b || !b.n) { card.classList.add("hidden"); box.textContent = ""; $("bugwhen").textContent = ""; return; }
+  if (b.id !== bugAllId) { bugAll = false; bugAllId = b.id; }
   card.classList.remove("hidden"); box.textContent = "";
   $("bugwhen").textContent = `🐞 ${b.n} bug${b.n > 1 ? "s" : ""}` + (b.img ? ` · ${b.img} screenshot${b.img > 1 ? "s" : ""}` : "") +
     (b.going ? " · going in line now" : ` · in line at ${bugTime(b.at)}`) + " · one card, the first free computer takes it";
-  (b.rows || []).slice(0, 8).forEach(r => {
+  const rows = b.rows || [], open = bugAll && rows.length > 8;   // the Mac sends every row now (bin/jumpr_bugjump.py ROWS_MAX 60); an older Mac sends 8
+  (open ? rows : rows.slice(0, 8)).forEach(r => {
     const row = document.createElement("div"); row.className = "bugrow";
     const n = document.createElement("span"); n.className = "bn"; n.textContent = String(r.pos || "");
     const t = document.createElement("p");
@@ -1009,7 +1015,13 @@ function renderBugs(b) {
     x.onclick = () => bugDrop(r.n, b.id);
     row.append(n, t, x); box.append(row);
   });
-  if (b.n > 8) { const more = document.createElement("p"); more.className = "bugmore"; more.textContent = `+ ${b.n - 8} more`; box.append(more); }
+  if (rows.length > 8) {   // the rest are here: a button opens them, and folds them again
+    const more = document.createElement("button"); more.type = "button"; more.className = "bugmore"; more.id = "bugmore";
+    more.textContent = open ? "show fewer" : `+ ${b.n - 8} more`; more.setAttribute("aria-expanded", open ? "true" : "false");
+    more.onclick = () => { bugAll = !open; renderBugs(bugLast); };
+    box.append(more);
+    if (open && b.n > rows.length) { const rest = document.createElement("p"); rest.className = "bugmore"; rest.textContent = `+ ${b.n - rows.length} more`; box.append(rest); }   // a night past the heartbeat's 60
+  } else if (b.n > 8) { const more = document.createElement("p"); more.className = "bugmore"; more.textContent = `+ ${b.n - 8} more`; box.append(more); }   // an older Mac (8 rows): the line as it was
 }
 async function bugDrop(n, night) {
   if (!confirm("Take this bug out of tonight's bug jump? It is kept on the Mac, never run.")) return;
