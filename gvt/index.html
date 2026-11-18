@@ -1018600,7 +1018600,155 @@ function bycArm(){ try{ const C=BYP.cache; if(BYC.on && BYC.ok){ if(C.delete!==b
 function bycRead(o){ if(o && typeof o==='object' && 'on' in o){ BYC.on=o.on? 1 : 0; bycArm(); }
   let rows=0, made=0, door=0; try{ rows=BYP.cache.size; BYP.cache.forEach(function(c){ if(c && c.png) made++; }); door=(BYP.cache.delete===bycDelete)? 1 : 0; }catch(e){}
   return { v:1, cv:(typeof GVT_CV==='string')? GVT_CV : null, on:BYC.on, ok:BYC.ok, why:BYC.why, key:(function(){ try{ return localStorage.getItem('gvt_byc'); }catch(e){ return null; } })(),
-    door:door, wrapped:(!!BYC.old.bypScan && bypScan!==BYC.old.bypScan)? 1 : 0, cap:(typeof BYP_CACHE==='number')? BYP_CACHE : null, rows:rows, made:made, n:Object.assign({}, BYC.n), err:BYC.err }; }</script><script type="text/x-gvt-part">'use strict';
+    door:door, wrapped:(!!BYC.old.bypScan && bypScan!==BYC.old.bypScan)? 1 : 0, cap:(typeof BYP_CACHE==='number')? BYP_CACHE : null, rows:rows, made:made, n:Object.assign({}, BYC.n), err:BYC.err }; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function mjuF(n){ return (+n).toFixed(1); }
+function mjuBiome(x, y){   
+  if(y < 56 && x < 470) return 'snow';            
+  if(x < 62 && y < 205) return 'snow';            
+  if(x < 62) return 'grass';                      
+  if(y > 448 && x < 730) return 'grass';          
+  if(y > 448 && x > 925) return 'red';            
+  if(x > 1150 && y > 300) return 'red';           
+  if(x > 1150 || (y < 56 && x > 930)) return 'sand';   
+  return null; }
+
+function mjuGround(V){   
+  const B=MJU_AT.biome, X0=V.x-420, X1=V.x+V.w+420, Y0=V.y-420, Y1=V.y+V.h+420, f=mjuF;
+  let s='<defs><filter id="mju-gs" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="10"/></filter></defs><g id="mju-ground" pointer-events="none">';
+  s+='<path d="M'+f(X0)+' '+f(Y0)+' L'+f(478)+' '+f(Y0)+' L476 50 Q300 56 120 50 Q60 50 50 62 L48 205 Q30 214 '+f(X0)+' 214 Z" fill="'+B.snow+'" filter="url(#mju-gs)"/>';   
+  s+='<path d="M'+f(X0)+' 214 Q30 214 48 222 L48 446 Q56 452 120 452 L760 452 L760 '+f(Y1)+' L'+f(X0)+' '+f(Y1)+' Z" fill="'+B.grass+'" filter="url(#mju-gs)"/>';   
+  s+='<path d="M900 452 L1060 452 Q1130 452 1150 440 L1152 300 Q1170 292 '+f(X1)+' 292 L'+f(X1)+' '+f(Y1)+' L900 '+f(Y1)+' Z" fill="'+B.red+'" filter="url(#mju-gs)"/>';   
+  return s+'</g>'; }
+
+
+function mjuPine(x, y, s){ return '<g transform="translate('+mjuF(x)+','+mjuF(y)+') scale('+s.toFixed(3)+')"><ellipse cx="0" cy="2" rx="14" ry="4" fill="rgba(0,0,0,.15)"/><path d="M-12 0 L0 -30 L12 0 Z" fill="#3E6455"/><path d="M-4 -20 L0 -30 L4 -20 Z" fill="#F9FCFF"/><rect x="-2" y="0" width="4" height="5" fill="#6E4522"/></g>'; }
+function mjuSaguaro(x, y, s){ return '<g transform="translate('+mjuF(x)+','+mjuF(y)+') scale('+s.toFixed(3)+')"><ellipse cx="1" cy="19" rx="11" ry="3" fill="rgba(58,42,20,.2)"/><path d="M-5 18 Q-8 -6 -5 -16 Q-2 -22 3 -22 Q8 -22 9 -14 Q10 -2 8 18 z" fill="#4E8C4A" stroke="#33633a" stroke-width="1.6"/><path d="M-5 -3 Q-14 -4 -15 -13 Q-15 -18 -11 -18 Q-8 -17 -8 -12 z" fill="#4E8C4A" stroke="#33633a" stroke-width="1.6"/><path d="M8 0 Q17 -3 17 -12 Q17 -17 13 -17 Q11 -16 11 -11 z" fill="#4E8C4A" stroke="#33633a" stroke-width="1.6"/></g>'; }
+function mjuRetheme(body){   
+  let out='', d=0, i=0; const re=/<svg\b|<\/svg>/g; let m;   
+  const fix=function(seg){
+    seg=seg.replace(MJU_TREE, function(all, x, y, s){ x=+x; y=+y; s=+s; if(s>0.5) return all; const b=mjuBiome(x, y+34*s);   
+      if(b==='snow'){ MJU.n.pines++; return mjuPine(x, y+34*s, s*1.55); } if(b==='red' || b==='sand'){ MJU.n.cacti++; return mjuSaguaro(x, y+16*s, s*1.1); } MJU.n.trees++; return all; });
+    return seg.replace(MJU_WHEAT, function(all, x, y){ const b=mjuBiome(+x, +y); if(b==='snow' || b==='red'){ MJU.n.wheat++; return ''; } return all; }); };
+  while((m=re.exec(body))){ const seg=body.slice(i, m.index); out+=(d===1? fix(seg) : seg); i=m.index; if(m[0]==='</svg>') d=Math.max(0, d-1); else d++; }
+  const seg=body.slice(i); return out+(d===1? fix(seg) : seg); }
+
+function mjuPlank(p){ const x=p[0], y=p[1], L=p[2], a=p[3]; return '<g transform="translate('+mjuF(x)+' '+mjuF(y)+') rotate('+a+')"><rect x="'+mjuF(-L/2+0.6)+'" y="-1.4" width="'+mjuF(L)+'" height="4.2" rx="0.8" fill="rgba(40,25,10,.28)"/><rect x="'+mjuF(-L/2)+'" y="-2.2" width="'+mjuF(L)+'" height="4.2" rx="0.8" fill="#C9A06A" stroke="#6B4A24" stroke-width=".5"/><path d="M'+mjuF(-L/2+2)+' -0.6 h'+mjuF(L*0.42)+' M'+mjuF(L*0.08)+' 0.9 h'+mjuF(L*0.34)+'" stroke="#9A7444" stroke-width=".35"/><circle cx="'+mjuF(-L/2+1.6)+'" cy="-0.1" r=".45" fill="#5A4A3A"/><circle cx="'+mjuF(L/2-1.6)+'" cy="-0.1" r=".45" fill="#5A4A3A"/></g>'; }
+function mjuPaper(){ return '<g id="mju-roof" pointer-events="none">'+MJU_AT.planks.map(mjuPlank).join('')+'</g>'; }
+
+
+function mjuURI(k){ try{ return (typeof SPRITES_SRC==='object' && SPRITES_SRC[k] && typeof sprURI==='function')? sprURI(k, k==='rifleman'? '#4A6B35' : undefined) : ''; }catch(e){ return ''; } }
+function mjuBox(k){ return k==='bomber'? [170,100] : (/^sky/.test(k)? [150,90] : [120,140]); }
+function mjuBake(then){   
+  const keys=[]; MJU_AT.crew.forEach(c=>{ if(keys.indexOf(c[0])<0) keys.push(c[0]); }); MJU_AT.planes.forEach(p=>{ if(keys.indexOf(p[0])<0) keys.push(p[0]); }); if(keys.indexOf(MJU_AT.bomber[0])<0) keys.push(MJU_AT.bomber[0]);
+  const todo=keys.filter(k=>!MJU_PNG[k] && mjuURI(k)); if(!todo.length){ if(then) then(); return; } if(MJU_BAKING) return; MJU_BAKING=1; let left=todo.length;
+  const one=function(){ if(--left===0){ MJU_BAKING=0; MJU.n.baked=Object.keys(MJU_PNG).length; if(then) then(); } };
+  todo.forEach(function(k){ try{ const im=new Image(); im.onload=function(){ try{ const b=mjuBox(k), c=document.createElement('canvas'); c.width=b[0]*1.5; c.height=b[1]*1.5; c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); MJU_PNG[k]=c.toDataURL('image/png'); }catch(e){} one(); };
+    im.onerror=one; im.src=mjuURI(k); }catch(e){ one(); } }); }
+function mjuWear(){ try{ document.querySelectorAll('#travelMap #mju-run image[data-k]').forEach(function(im){ const k=im.getAttribute('data-k'); if(MJU_PNG[k]) im.setAttribute('href', MJU_PNG[k]); }); }catch(e){} }
+function mjuPic(k, w){   
+  const u=MJU_PNG[k] || mjuURI(k); if(!u){ MJU.n.skip++; MJU.why='no picture for '+k; return ''; } const b=mjuBox(k), h=w*b[1]/b[0], man=b[0]===120;
+  return '<image data-k="'+k+'" href="'+u+'" x="'+mjuF(-w/2)+'" y="'+mjuF(man? -h*131/140 : -h/2)+'" width="'+mjuF(w)+'" height="'+mjuF(h)+'"/>'; }
+function mjuBird(s){ return '<g transform="scale('+s+')"><ellipse cx="0" cy="12" rx="9" ry="2" fill="#000" opacity="0.18"/><ellipse cx="0" cy="2" rx="9" ry="6.5" fill="#8C97A6" stroke="#4A5568" stroke-width="1.4"/><ellipse cx="-2" cy="4" rx="5.5" ry="4" fill="#B8C0CC"/><path d="M-8 0 l-7 -4 l1 6 z" fill="#6B7684" stroke="#4A5568" stroke-width="1.2" stroke-linejoin="round"/><path class="mju-wing" d="M-2 -1 q6 -3 9 2" fill="none" stroke="#6B7684" stroke-width="2.4" stroke-linecap="round"/><circle cx="8" cy="-6" r="4.4" fill="#6B7684" stroke="#4A5568" stroke-width="1.2"/><circle cx="9.4" cy="-7" r="1.2" fill="#FFF3C4"/><path d="M12 -5 l3 1 l-3 1 z" fill="#E0A23A"/></g>'; }
+function mjuMovers(){   
+  const A=MJU_AT, f=mjuF; let css='', g='';
+  
+  const SM=MJU.smokeAt || A.smoke; for(let i=0;i<8;i++){ g+='<g transform="translate('+f(SM[0])+' '+f(SM[1])+')"><circle class="mju-puff" style="animation-delay:-'+(i*0.6).toFixed(1)+'s" r="4.2" fill="#ECEAE2" stroke="#C9C5BA" stroke-width=".5"/></g>'; }
+  css+='@keyframes mjuPuff{0%{transform:translate(0px,0px) scale(.5);opacity:0}8%{opacity:.95}100%{transform:translate(16px,-44px) scale(2.6);opacity:0}}#mju-run .mju-puff{animation:mjuPuff 4.8s linear infinite}';
+  
+  A.pigeons.forEach(function(p, i){ g+='<g transform="translate('+f(p[0])+' '+f(p[1])+')"><g class="mju-hop" style="animation-delay:-'+(i*0.9).toFixed(1)+'s"><g transform="scale('+p[2]+' 1)">'+mjuBird(p[3])+'</g></g></g>'; });
+  css+='@keyframes mjuHop{0%,60%,100%{transform:translate(0px,0px)}66%{transform:translate(1.5px,-3px)}72%{transform:translate(3px,0px)}78%{transform:translate(4.5px,-3px)}84%,96%{transform:translate(6px,0px)}}#mju-run .mju-hop{animation:mjuHop 5.2s ease-in-out infinite alternate}';
+  const F=A.flyer; g+='<g class="mju-fly"><g transform="scale(0.55)">'+mjuBird(1)+'</g></g>';
+  css+='@keyframes mjuFly{0%,10%{transform:translate('+F[0][0]+'px,'+F[0][1]+'px) scaleX(-1)}40%,50%{transform:translate('+F[1][0]+'px,'+F[1][1]+'px) scaleX(-1)}80%,88%{transform:translate('+F[2][0]+'px,'+F[2][1]+'px) scaleX(-1)}89%,99%{transform:translate('+F[2][0]+'px,'+F[2][1]+'px) scaleX(1)}100%{transform:translate('+F[0][0]+'px,'+F[0][1]+'px) scaleX(1)}}#mju-run .mju-fly{animation:mjuFly 16s ease-in-out infinite}'
+     +'@keyframes mjuWing{from{transform:scaleY(1)}to{transform:scaleY(-0.6)}}#mju-run .mju-fly .mju-wing{transform-box:fill-box;transform-origin:0 100%;animation:mjuWing .18s ease-in-out infinite alternate}';
+  
+  A.planes.forEach(function(p, i){ const pic=mjuPic(p[0], p[6]); if(!pic) return; MJU.n.run++;
+    g+='<g transform="translate('+f(p[1])+' '+f(p[2])+')"><g class="mju-plane'+i+'"><ellipse cx="6" cy="'+f(p[6]*0.62)+'" rx="'+f(p[6]*0.36)+'" ry="'+f(p[6]*0.09)+'" fill="rgba(30,20,10,.2)"/><g transform="scale('+(p[3]<0? -1 : 1)+' 1)">'+pic+'</g></g></g>';   
+    css+='@keyframes mjuPlane'+i+'{0%{transform:translate(0px,0px)}100%{transform:translate('+p[3]+'px,'+p[4]+'px)}}#mju-run .mju-plane'+i+'{animation:mjuPlane'+i+' '+p[5]+'s linear -'+p[7]+'s infinite}'; });
+  
+  const Bm=A.bomber, bp=mjuPic(Bm[0], Bm[6]), K=A.bomb, dropX=K[0]-Bm[1];
+  if(bp){ MJU.n.run++; const T=Bm[5], vis=14, at=(dropX/Bm[3])*vis;
+    g+='<g transform="translate('+f(Bm[1])+' '+f(Bm[2])+')"><g class="mju-bomber"><ellipse cx="8" cy="'+f(Bm[6]*0.7)+'" rx="'+f(Bm[6]*0.38)+'" ry="'+f(Bm[6]*0.1)+'" fill="rgba(30,20,10,.2)"/>'+bp+'</g></g>'
+     +'<g transform="translate('+f(K[0])+' '+f(Bm[2])+')"><g class="mju-bomb"><path d="M-2 -4 Q0 -6 2 -4 L2 3 Q0 6 -2 3 Z" fill="#3A3F45" stroke="#1E2226" stroke-width=".5"/><path d="M-2 -4 l-1.5 -2.4 h7 l-1.5 2.4" fill="#6B7684"/></g></g>'
+     +'<g transform="translate('+f(K[0])+' '+f(K[1])+')"><g class="mju-boom"><circle r="'+f(K[2]*0.5)+'" fill="#B8AFA2" stroke="#7A6E62" stroke-width=".6"/><circle cx="'+f(-K[2]*0.35)+'" cy="'+f(K[2]*0.12)+'" r="'+f(K[2]*0.32)+'" fill="#CFC7BB"/><circle cx="'+f(K[2]*0.38)+'" cy="'+f(K[2]*0.1)+'" r="'+f(K[2]*0.3)+'" fill="#A69C90"/><circle r="'+f(K[2]*0.22)+'" fill="#F2B04A" opacity=".9"/><circle r="'+f(K[2]*0.1)+'" fill="#FFF1B8"/></g></g>';
+    css+='@keyframes mjuBomber{0%{transform:translate(0px,0px);opacity:1}'+vis+'%{transform:translate('+Bm[3]+'px,'+Bm[4]+'px);opacity:1}'+(vis+0.1)+'%,100%{transform:translate('+Bm[3]+'px,'+Bm[4]+'px);opacity:0}}#mju-run .mju-bomber{animation:mjuBomber '+T+'s linear infinite}'
+       +'@keyframes mjuBomb{0%,'+at.toFixed(2)+'%{transform:translate(0px,0px);opacity:0}'+(at+0.1).toFixed(2)+'%{transform:translate(0px,0px);opacity:1}'+(at+2.2).toFixed(2)+'%{transform:translate(0px,'+(K[1]-Bm[2])+'px);opacity:1}'+(at+2.3).toFixed(2)+'%,100%{transform:translate(0px,'+(K[1]-Bm[2])+'px);opacity:0}}#mju-run .mju-bomb{animation:mjuBomb '+T+'s cubic-bezier(.5,0,.9,.4) infinite}'
+       +'@keyframes mjuBoom{0%,'+(at+2.2).toFixed(2)+'%{transform:scale(0);opacity:0}'+(at+2.6).toFixed(2)+'%{transform:scale(1);opacity:1}'+(at+6.5).toFixed(2)+'%{transform:scale(1.6) translate(0px,-3px);opacity:0}100%{transform:scale(0);opacity:0}}#mju-run .mju-boom{animation:mjuBoom '+T+'s ease-out infinite}'; }
+  
+  A.crew.forEach(function(c, i){ const pic=mjuPic(c[0], c[3]*120/101); if(!pic) return; MJU.n.run++;
+    const tool= c[4]==='hammer'? '<g class="mju-hammer"><rect x="-0.5" y="-9" width="1.1" height="7" fill="#7A5230"/><rect x="-2.4" y="-10.4" width="4.8" height="2.2" rx=".5" fill="#6B7684" stroke="#3A3F45" stroke-width=".3"/></g>'
+      : c[4]==='carry'? '<g transform="translate(0 -14) rotate(-8)"><rect x="-9" y="-1.1" width="18" height="2.4" rx=".5" fill="#C9A06A" stroke="#6B4A24" stroke-width=".4"/></g>' : '';
+    g+='<g transform="translate('+f(c[1])+' '+f(c[2])+')"><g class="mju-'+c[4]+'-man">'+pic+(tool? '<g transform="translate(5 -6)">'+tool+'</g>' : '')+'</g></g>'; });
+  css+='@keyframes mjuClimb{0%,12%{transform:translate(0px,0px)}50%,62%{transform:translate(0px,-12px)}100%{transform:translate(0px,0px)}}#mju-run .mju-climb-man{animation:mjuClimb 6s ease-in-out infinite}'
+     +'@keyframes mjuSwing{0%{transform:rotate(-40deg)}100%{transform:rotate(30deg)}}#mju-run .mju-hammer{transform-box:fill-box;transform-origin:50% 100%;animation:mjuSwing .35s ease-in infinite alternate}'
+     +'@keyframes mjuCarry{0%,8%{transform:translate(0px,0px) scaleX(-1)}46%{transform:translate(70px,-18px) scaleX(-1)}50%,58%{transform:translate(70px,-18px) scaleX(1)}96%{transform:translate(0px,0px) scaleX(1)}100%{transform:translate(0px,0px) scaleX(-1)}}#mju-run .mju-carry-man{animation:mjuCarry 11s ease-in-out infinite}'
+     +'@keyframes mjuBob{from{transform:translateY(0px)}to{transform:translateY(-1px)}}#mju-run .mju-hammer-man{animation:mjuBob .35s ease-in-out infinite alternate}';
+  css+='@media (prefers-reduced-motion: reduce){#mju-run *{animation:none!important}}';
+  return '<g id="mju-run" pointer-events="none"><style>'+css+'</style>'+g+'</g>'; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function mjuGroupEnd(s, from){   
+  const re=/<g\b[^>]*>|<\/g>/g; re.lastIndex=from; let d=0, m; while((m=re.exec(s))){ if(m[0]==='</g>'){ d--; if(d===0) return m.index; } else if(m[0].slice(-2)!=='/>') d++; } return -1; }
+function mjuRead(o){ o=o||{}; if(o.mode!=null) MJU.mode=+o.mode|0;
+  const el=document.getElementById('travelMap'), q=s=>el? el.querySelector(s) : null;
+  return { v:MJU.v, mode:MJU.mode, err:MJU.err, why:MJU.why, n:Object.assign({}, MJU.n), ground:!!q('#mju-ground'), roof:!!q('#mju-roof'), run:!!q('#mju-run'), bitmaps:el? [...el.querySelectorAll('#mju-run image')].filter(im=>/^data:image\/png/.test(im.getAttribute('href')||'')).length : 0, at:MJU_AT }; }</script><script type="text/x-gvt-part">'use strict';
 
 
 
@@ -1113019,7 +1113167,7 @@ let BFQ=null;
 
 
 
-let GVT_CV='33.41';
+let GVT_CV='33.42';
 let NX_CAP_MUL=4;
 
 
@@ -1646892,7 +1647040,155 @@ try{ if(typeof bypScan==='function' && typeof bypKey==='function' && typeof bypD
 
 
 try{ if(window.GVT && !GVT.byc) GVT.byc=bycRead; }catch(e){}
-setTimeout(function(){ try{ if(window.GVT && !GVT.byc) GVT.byc=bycRead; }catch(e){} }, 0);</script><script>(function(){var ps=document.querySelectorAll('script[type="text/x-gvt-part"]');for(var i=0;i<ps.length;i++){var p=ps[i],s=document.createElement('script');s.text=p.text;p.parentNode.replaceChild(s,p);if(s.parentNode)s.parentNode.removeChild(s);}})();</script>
+setTimeout(function(){ try{ if(window.GVT && !GVT.byc) GVT.byc=bycRead; }catch(e){} }, 0);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const MJU={ v:1, err:0, why:'', n:{ cut:0, miss:0, skip:0, trees:0, pines:0, cacti:0, wheat:0, run:0, baked:0 }, live:0,
+  mode:(function(){ try{ const m=/[?&]mju=(\d)/.exec(location.search); if(m) return +m[1]; const k=localStorage.getItem('gvt_mju'); if(k!==null && /^\d$/.test(k)) return +k; }catch(e){} return 1; })() };
+const MJU_AT={   
+  
+  chimney:1.6,                                                         
+  smoke:[395.6, 71],                                                   
+  planks:[[176,124,22,-18],[318,168,20,24],[214,190,24,8],[160,176,18,-30]],   
+  pigeons:[[150,96,1,0.55],[372,108,-1,0.5],[404,182,1,0.5]],         
+  flyer:[[470,112],[300,58],[110,100]],                                
+  crew:[['rifleman',245,100,16,'climb'],['rifleman',302,150,16,'hammer'],['rifleman',120,176,16,'carry']],   
+  planes:[['skyfighter',-60,100,560,-12,14,26,0],['skyace',520,150,-600,8,19,24,7]],   
+  bomber:['bomber',-80,64,640,0,72,34],                               
+  bomb:[150,132,18],                                                   
+  ribbon:595,                                                          
+  biome:{ snow:'#E9EEF4', grass:'#5A9A48', grass2:'#4E8C3E', red:'#A8522B', red2:'#8B3E1E' }   
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const MJU_TREE=/<g transform="translate\((-?[\d.]+),(-?[\d.]+)\) scale\(([\d.]+)\)"><ellipse cx="0" cy="34" rx="22" ry="5" fill="rgba\(0,0,0,\.18\)"\/><rect x="-6" y="0" width="12" height="38" rx="3" fill="#6E4522"\/>(?:<circle [^>]*\/>){4}<\/g>/g;
+const MJU_WHEAT=/<g transform="translate\((-?[\d.]+),(-?[\d.]+)\) scale\(([\d.]+)\)" stroke-linecap="round"><g stroke="#C9A24A"[\s\S]*?<\/g><g fill="#B8862A">[\s\S]*?<\/g><\/g>/g;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const MJU_PNG={};let MJU_BAKING=0;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+(function(){ try{
+  if(typeof travelMapHTML!=='function' || typeof TMAP_ART!=='object' || !TMAP_ART || typeof TMAP_ART.map!=='function'){ MJU.why='the map is not on this page as this card read it'; return; }
+  const m0=TMAP_ART.map; TMAP_ART.map=function(){ const L=m0.apply(this, arguments); if(!MJU.live) return L;
+    try{ let p=L && L.paper, mv=L && L.movers, dk=L && L.desk; if(typeof p!=='string' || typeof mv!=='string' || typeof dk!=='string'){ MJU.n.miss++; MJU.why='the map is not three layers'; return L; }
+      
+      const G0='<rect id="kwf-ground"', gi=p.indexOf(G0), ge=gi>=0? p.indexOf('/>', gi) : -1;
+      if(gi>=0 && ge>0 && p.indexOf(G0, gi+1)<0){ const V=(typeof KWF==='object' && KWF && KWF.V)? KWF.V : { x:50, y:13.5, w:1100, h:506 }; p=p.slice(0, ge+2)+mjuGround(V)+p.slice(ge+2); MJU.n.cut++; } else { MJU.n.miss++; MJU.why='no CARD-KWF ground once (the biomes need look 4)'; }
+      p=mjuRetheme(p);
+      
+      const CH=/<g transform="translate\((-?[\d.]+),(-?[\d.]+)\)"><rect x="-1" y="10" width="20" height="5" fill="rgba\(58,42,20,\.3\)"\/><path d="M0 0 h16 v12 h-16 z"/g, cm=p.match(CH);   
+      if(cm && cm.length===1){ let X=0, Y=0; const k=MJU_AT.chimney;
+        p=p.replace(CH, function(all, x, y){ X=+x; Y=+y; return all.replace('translate('+x+','+y+')', 'translate('+x+','+y+') translate(8,14) scale('+k+') translate(-8,-14)'); });
+        const PF='<g fill="#EDEADF" opacity=".7"><circle cx="10" cy="-8" r="2.4"/><circle cx="13" cy="-13" r="3"/><circle cx="18" cy="-18" r="3.6"/></g>'; if(p.split(PF).length===2) p=p.replace(PF, '');   
+        MJU.smokeAt=[X+8+(9-8)*k, Y+14+(-1.6-14)*k]; MJU.n.cut++; }   
+      else { MJU.n.miss++; MJU.why='the map\'s chimney not there once'; }
+      const j=p.lastIndexOf('</svg>'); p=p.slice(0, j)+mjuPaper()+p.slice(j);
+      
+      const k=mv.lastIndexOf('</svg>'); if(k>0) mv=mv.slice(0, k)+mjuMovers()+mv.slice(k);
+      
+      const R0='<g class="tm-rib" data-room="winter"', ri=dk.indexOf(R0);
+      if(ri>=0 && dk.indexOf(R0, ri+1)<0){ const ce=mjuGroupEnd(dk, ri); if(ce>ri){ const W='<g class="mju-rib" transform="translate('+(MJU_AT.ribbon-806)+' 0)">'; dk=dk.slice(0, ri)+W+dk.slice(ri, ce+4)+'</g>'+dk.slice(ce+4); MJU.n.cut++; } else { MJU.n.miss++; MJU.why='the winter ribbon has no end'; } }
+      else { MJU.n.miss++; MJU.why='no winter ribbon once'; }
+      return Object.assign({}, L, { paper:p, movers:mv, desk:dk }); }catch(e){ MJU.err++; MJU.why='scene: '+String(e && e.message || e).slice(0, 80); return L; } };
+  const h0=travelMapHTML; travelMapHTML=function(kind){ if(!MJU.mode || kind==='adventure') return h0.apply(this, arguments);   
+    MJU.live=MJU.mode; try{ return h0.apply(this, arguments); } finally{ MJU.live=0; setTimeout(function(){ mjuBake(mjuWear); }, 0); } };
+  setTimeout(function(){ try{ if(MJU.mode) mjuBake(); }catch(e){} }, 6500);   
+}catch(e){ MJU.err++; MJU.why='seat: '+String(e && e.message || e).slice(0, 80); } })();
+
+
+
+
+
+try{ if(window.GVT && !GVT.mju) GVT.mju=mjuRead; }catch(e){}
+setTimeout(function(){ try{ if(window.GVT && !GVT.mju) GVT.mju=mjuRead; }catch(e){} }, 0);</script><script>(function(){var ps=document.querySelectorAll('script[type="text/x-gvt-part"]');for(var i=0;i<ps.length;i++){var p=ps[i],s=document.createElement('script');s.text=p.text;p.parentNode.replaceChild(s,p);if(s.parentNode)s.parentNode.removeChild(s);}})();</script>
 <svg id="bcnDefs" width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute;left:0;top:0;width:0;height:0;overflow:hidden;pointer-events:none"><defs><filter id="bcnS" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="9" flood-color="rgb(255,210,74)" flood-opacity="0.7"/></filter><filter id="bcnCS" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="5.952" flood-color="rgb(255,210,74)" flood-opacity="0.7"/></filter><filter id="bcnT" x="-70%" y="-70%" width="240%" height="240%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="10" flood-color="rgb(255,210,74)" flood-opacity="0.95"/><feDropShadow dx="0" dy="0" stdDeviation="24" flood-color="rgb(255,210,74)" flood-opacity="0.55"/></filter><filter id="bcnH0" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="rgb(255,210,74)" flood-opacity="0.55"/></filter><filter id="bcnW0" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="rgb(255,210,74)" flood-opacity="0.55"/></filter><filter id="bcnC0" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="3.968" flood-color="rgb(255,210,74)" flood-opacity="0.55"/></filter><filter id="bcnH1" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="6.5" flood-color="rgb(255,210,74)" flood-opacity="0.57"/></filter><filter id="bcnW1" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="6.5" flood-color="rgb(255,210,74)" flood-opacity="0.57"/></filter><filter id="bcnC1" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="4.299" flood-color="rgb(255,210,74)" flood-opacity="0.57"/></filter><filter id="bcnH2" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="7" flood-color="rgb(255,210,74)" flood-opacity="0.59"/></filter><filter id="bcnW2" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="7" flood-color="rgb(255,210,74)" flood-opacity="0.59"/></filter><filter id="bcnC2" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="4.63" flood-color="rgb(255,210,74)" flood-opacity="0.59"/></filter><filter id="bcnH3" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="7.5" flood-color="rgb(255,211,74)" flood-opacity="0.61"/></filter><filter id="bcnW3" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="7.5" flood-color="rgb(255,211,74)" flood-opacity="0.61"/></filter><filter id="bcnC3" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="4.96" flood-color="rgb(255,211,74)" flood-opacity="0.61"/></filter><filter id="bcnH4" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="rgb(255,211,74)" flood-opacity="0.63"/></filter><filter id="bcnW4" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="rgb(255,211,74)" flood-opacity="0.63"/></filter><filter id="bcnC4" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="5.291" flood-color="rgb(255,211,74)" flood-opacity="0.63"/></filter><filter id="bcnH5" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="8.5" flood-color="rgb(255,211,74)" flood-opacity="0.65"/></filter><filter id="bcnW5" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="8.5" flood-color="rgb(255,211,74)" flood-opacity="0.65"/></filter><filter id="bcnC5" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="5.622" flood-color="rgb(255,211,74)" flood-opacity="0.65"/></filter><filter id="bcnH6" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="9" flood-color="rgb(255,211,74)" flood-opacity="0.67"/></filter><filter id="bcnW6" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="9" flood-color="rgb(255,211,74)" flood-opacity="0.67"/></filter><filter id="bcnC6" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="5.952" flood-color="rgb(255,211,74)" flood-opacity="0.67"/></filter><filter id="bcnH7" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="9.5" flood-color="rgb(255,211,74)" flood-opacity="0.69"/></filter><filter id="bcnW7" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="9.5" flood-color="rgb(255,211,74)" flood-opacity="0.69"/></filter><filter id="bcnC7" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="6.283" flood-color="rgb(255,211,74)" flood-opacity="0.69"/></filter><filter id="bcnH8" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="10" flood-color="rgb(255,212,74)" flood-opacity="0.71"/></filter><filter id="bcnW8" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="10" flood-color="rgb(255,212,74)" flood-opacity="0.71"/></filter><filter id="bcnC8" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="6.614" flood-color="rgb(255,212,74)" flood-opacity="0.71"/></filter><filter id="bcnH9" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="10.5" flood-color="rgb(255,212,74)" flood-opacity="0.73"/></filter><filter id="bcnW9" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="10.5" flood-color="rgb(255,212,74)" flood-opacity="0.73"/></filter><filter id="bcnC9" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="6.944" flood-color="rgb(255,212,74)" flood-opacity="0.73"/></filter><filter id="bcnH10" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="11" flood-color="rgb(255,212,74)" flood-opacity="0.75"/></filter><filter id="bcnW10" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="11" flood-color="rgb(255,212,74)" flood-opacity="0.75"/></filter><filter id="bcnC10" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="7.275" flood-color="rgb(255,212,74)" flood-opacity="0.75"/></filter><filter id="bcnH11" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="11.5" flood-color="rgb(255,212,74)" flood-opacity="0.77"/></filter><filter id="bcnW11" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="11.5" flood-color="rgb(255,212,74)" flood-opacity="0.77"/></filter><filter id="bcnC11" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="7.606" flood-color="rgb(255,212,74)" flood-opacity="0.77"/></filter><filter id="bcnH12" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="12" flood-color="rgb(255,212,74)" flood-opacity="0.79"/></filter><filter id="bcnW12" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="12" flood-color="rgb(255,212,74)" flood-opacity="0.79"/></filter><filter id="bcnC12" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="7.937" flood-color="rgb(255,212,74)" flood-opacity="0.79"/></filter><filter id="bcnH13" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="12.5" flood-color="rgb(255,213,74)" flood-opacity="0.81"/></filter><filter id="bcnW13" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="12.5" flood-color="rgb(255,213,74)" flood-opacity="0.81"/></filter><filter id="bcnC13" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="8.267" flood-color="rgb(255,213,74)" flood-opacity="0.81"/></filter><filter id="bcnH14" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="13" flood-color="rgb(255,213,74)" flood-opacity="0.83"/></filter><filter id="bcnW14" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="13" flood-color="rgb(255,213,74)" flood-opacity="0.83"/></filter><filter id="bcnC14" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="8.598" flood-color="rgb(255,213,74)" flood-opacity="0.83"/></filter><filter id="bcnH15" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="13.5" flood-color="rgb(255,213,74)" flood-opacity="0.85"/></filter><filter id="bcnW15" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="13.5" flood-color="rgb(255,213,74)" flood-opacity="0.85"/></filter><filter id="bcnC15" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="8.929" flood-color="rgb(255,213,74)" flood-opacity="0.85"/></filter><filter id="bcnH16" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="14" flood-color="rgb(255,213,74)" flood-opacity="0.87"/></filter><filter id="bcnW16" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="14" flood-color="rgb(255,213,74)" flood-opacity="0.87"/></filter><filter id="bcnC16" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="9.259" flood-color="rgb(255,213,74)" flood-opacity="0.87"/></filter><filter id="bcnH17" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="14.5" flood-color="rgb(255,213,74)" flood-opacity="0.89"/></filter><filter id="bcnW17" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="14.5" flood-color="rgb(255,213,74)" flood-opacity="0.89"/></filter><filter id="bcnC17" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="9.59" flood-color="rgb(255,213,74)" flood-opacity="0.89"/></filter><filter id="bcnH18" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="15" flood-color="rgb(255,214,74)" flood-opacity="0.91"/></filter><filter id="bcnW18" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="15" flood-color="rgb(255,214,74)" flood-opacity="0.91"/></filter><filter id="bcnC18" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="9.921" flood-color="rgb(255,214,74)" flood-opacity="0.91"/></filter><filter id="bcnH19" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="15.5" flood-color="rgb(255,214,74)" flood-opacity="0.93"/></filter><filter id="bcnW19" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="15.5" flood-color="rgb(255,214,74)" flood-opacity="0.93"/></filter><filter id="bcnC19" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="10.251" flood-color="rgb(255,214,74)" flood-opacity="0.93"/></filter><filter id="bcnH20" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="16" flood-color="rgb(255,214,74)" flood-opacity="0.95"/></filter><filter id="bcnW20" x="-34%" y="-34%" width="168%" height="168%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="16" flood-color="rgb(255,214,74)" flood-opacity="0.95"/></filter><filter id="bcnC20" x="-27%" y="-27%" width="154%" height="154%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="10.582" flood-color="rgb(255,214,74)" flood-opacity="0.95"/></filter><filter id="bcnB0" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="rgb(255,210,74)" flood-opacity="0.4"/></filter><filter id="bcnB1" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="4.5" flood-color="rgb(255,210,74)" flood-opacity="0.423"/></filter><filter id="bcnB2" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="5" flood-color="rgb(255,210,74)" flood-opacity="0.446"/></filter><filter id="bcnB3" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="5.5" flood-color="rgb(255,210,74)" flood-opacity="0.469"/></filter><filter id="bcnB4" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="rgb(255,211,74)" flood-opacity="0.492"/></filter><filter id="bcnB5" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="6.5" flood-color="rgb(255,211,74)" flood-opacity="0.515"/></filter><filter id="bcnB6" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="7" flood-color="rgb(255,211,74)" flood-opacity="0.537"/></filter><filter id="bcnB7" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="7.5" flood-color="rgb(255,211,74)" flood-opacity="0.56"/></filter><filter id="bcnB8" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="rgb(255,211,74)" flood-opacity="0.583"/></filter><filter id="bcnB9" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="8.5" flood-color="rgb(255,212,74)" flood-opacity="0.606"/></filter><filter id="bcnB10" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="9" flood-color="rgb(255,212,74)" flood-opacity="0.629"/></filter><filter id="bcnB11" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="9.5" flood-color="rgb(255,212,74)" flood-opacity="0.652"/></filter><filter id="bcnB12" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="10" flood-color="rgb(255,212,74)" flood-opacity="0.675"/></filter><filter id="bcnB13" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="10.5" flood-color="rgb(255,212,74)" flood-opacity="0.698"/></filter><filter id="bcnB14" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="11" flood-color="rgb(255,212,74)" flood-opacity="0.721"/></filter><filter id="bcnB15" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="11.5" flood-color="rgb(255,212,74)" flood-opacity="0.744"/></filter><filter id="bcnB16" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="12" flood-color="rgb(255,213,74)" flood-opacity="0.767"/></filter><filter id="bcnB17" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="12.5" flood-color="rgb(255,213,74)" flood-opacity="0.79"/></filter><filter id="bcnB18" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="13" flood-color="rgb(255,213,74)" flood-opacity="0.812"/></filter><filter id="bcnB19" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="13.5" flood-color="rgb(255,213,74)" flood-opacity="0.835"/></filter><filter id="bcnB20" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="14" flood-color="rgb(255,213,74)" flood-opacity="0.858"/></filter><filter id="bcnB21" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="14.5" flood-color="rgb(255,214,74)" flood-opacity="0.881"/></filter><filter id="bcnB22" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="15" flood-color="rgb(255,214,74)" flood-opacity="0.904"/></filter><filter id="bcnB23" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="15.5" flood-color="rgb(255,214,74)" flood-opacity="0.927"/></filter><filter id="bcnB24" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="16" flood-color="rgb(255,214,74)" flood-opacity="0.95"/></filter></defs></svg>
 <script> try{ if(typeof olrOn==='function' && olrOn()) document.documentElement.classList.add('olrmen'); }catch(e){} </script>
 </body>
