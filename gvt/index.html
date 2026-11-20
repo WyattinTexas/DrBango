@@ -1017565,6 +1017565,13 @@ function updRead(o){
 
 
 
+
+
+
+
+
+
+
 function lcdWall(){ if(LCD.NOW!=null) return LCD.NOW; let o=0; try{ o=(typeof EV==='object' && EV && +EV.offs)||0; }catch(e){} return Date.now()+o*1000; }
 function lcdT(){ return LCD.T!=null? LCD.T : performance.now(); }
 function lcdLeft(){ return Math.max(0, LCD.AT-lcdWall()); }
@@ -1017660,7 +1017667,7 @@ function lcdShipSVG(){ const body='#F4EBD6', red='#C8483A', olive='#6B7C4A';
     +'</svg>'; }
 function lcdURI(svg){ return 'data:image/svg+xml;utf8,'+encodeURIComponent(svg); }
 function lcdDragonURI(k){ try{ return lcdURI('<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="'+BDH_ART.box+'">'+BDH_ART.mold[k]+'</svg>'); }catch(e){ LCD.err++; return ''; } }
-function lcdPlaneURI(){ return lcdURI('<svg xmlns="http://www.w3.org/2000/svg" viewBox="-62 -34 124 66">'+warplaneArt().replace(/^<ellipse[^>]*\/>/,'')+'</svg>'); }
+function lcdPlaneURI(){ return lcdURI('<svg xmlns="http://www.w3.org/2000/svg" viewBox="-62 -34 124 66"><style>.wpprop,.wpdisc,.wppuff,.wpdust,.wpspark{display:none}</style>'+warplaneArt().replace(/^<ellipse[^>]*\/>/,'')+'</svg>'); }
 function lcdTeddyURI(){ return lcdURI('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 200"><g>'+SPRITES_SRC.tparachute+'<g transform="translate(22 56) scale(0.68)">'+SPRITES_SRC.tpara.replace(/<ellipse cx="62" cy="130"[^>]*\/>/,'')+'</g></g></svg>'); }
 function lcdCrateURI(){ const C=['#6F8F4A','#E9DFC0'], xs=[10,42,74,100,126,158,190], KN={ FL:[50.7,150], FR:[149.3,150], BL:[68.1,135.5], BR:[166.7,135.5] }; let cn='';   
   for(let i=0; i<6; i++){ const x0=xs[i], x1=xs[i+1], f=C[i%2]; cn+='<path d="M100 8 Q'+((x0+x1)/2-40+40*(i/5))+' 20 '+x0+' 78 Q'+((x0+x1)/2)+' 70 '+x1+' 78 Q'+((x0+x1)/2+40-40*(i/5))+' 20 100 8 Z" fill="'+f+'"'+LCD_RIM(f)+'/>'; }
@@ -1017705,8 +1017712,40 @@ function lcdFlame(ctx, x, y, dx, dy, len, w, t, blue){
     ctx.bezierCurveTo(x+dx*l*.35+nx*ww, y+dy*l*.35+ny*ww, x+dx*l*.8+nx*ww*.5, y+dy*l*.8+ny*ww*.5, x+dx*l, y+dy*l);
     ctx.bezierCurveTo(x+dx*l*.8-nx*ww*.5, y+dy*l*.8-ny*ww*.5, x+dx*l*.35-nx*ww, y+dy*l*.35-ny*ww, x-nx*ww*.35, y-ny*ww*.35); ctx.closePath(); ctx.fill(); }
   if(blue){ ctx.fillStyle='#3D7BF0'; ctx.globalAlpha=0.9; ctx.beginPath(); ctx.ellipse(x+dx*len*.12, y+dy*len*.12, len*.13, w*.3, Math.atan2(dy,dx), 0, 7); ctx.fill(); ctx.globalAlpha=1; } }
+function lcdProp(ctx, k, tms, RM){   
+  const a=RM? 0 : (((tms%110)+110)%110)/110*Math.PI; ctx.save(); ctx.translate(47*k, 2*k); ctx.save(); ctx.rotate(a);
+  ctx.fillStyle='#8A5A2E'; for(const s of [-1,1]){ ctx.beginPath(); ctx.ellipse(0, s*8.6*k, 2.5*k, 8.2*k, 0, 0, 7); ctx.fill(); }
+  ctx.strokeStyle='#E0CFA4'; ctx.lineWidth=1.6*k; ctx.lineCap='butt'; ctx.beginPath(); ctx.arc(-2*k, -13.7*k, 2.5*k, -0.6435, 0.6435); ctx.stroke(); ctx.beginPath(); ctx.arc(2*k, 13.7*k, 2.5*k, Math.PI-0.6435, Math.PI+0.6435); ctx.stroke();
+  ctx.fillStyle='#D9A544'; ctx.strokeStyle='#7A5A22'; ctx.lineWidth=k; ctx.beginPath(); ctx.arc(0, 0, 2.9*k, 0, 7); ctx.fill(); ctx.stroke(); ctx.restore();
+  if(!RM){ ctx.globalAlpha=0.5; ctx.fillStyle='#E8E4D4'; ctx.beginPath(); ctx.arc(0, 0, 16*k, 0, 7); ctx.fill(); ctx.globalAlpha=1; }
+  ctx.restore(); LCD.lastProp={ a:+a.toFixed(3), disc:RM? 0 : 0.5 }; }
+
+function lcdJet(c, P0, P1, d0, E, wLip, wEnd, al, grow, ph, wk){   
+  const len=Math.hypot(E[0]-P1[0],E[1]-P1[1]), C=[P1[0]+d0[0]*len*0.3, P1[1]+d0[1]*len*0.3], N=18;
+  const at=q=>{ const a=1-q; return [a*a*P1[0]+2*a*q*C[0]+q*q*E[0], a*a*P1[1]+2*a*q*C[1]+q*q*E[1]]; };
+  const tan=q=>{ const a=1-q, x=2*a*(C[0]-P1[0])+2*q*(E[0]-C[0]), y=2*a*(C[1]-P1[1])+2*q*(E[1]-C[1]), m=Math.hypot(x,y)||1; return [x/m,y/m]; };
+  const plume=(col,k,reach,wave)=>{ const up=[], dn=[]; for(let i=0;i<=N;i++){ const q=i/N*reach, p=at(q), tg=tan(q), nx=-tg[1], ny=tg[0]; let w=(wLip+(wEnd-wLip)*Math.pow(q,0.85))*k; if(q>reach*0.86) w*=Math.sqrt(Math.max(0,(reach-q)/(reach*0.14)));
+        const wv=wave*wk*q*Math.sin(q*11-ph+k*5); up.push([p[0]+nx*(w+wv), p[1]+ny*(w+wv)]); dn.push([p[0]-nx*(w-wv*0.7), p[1]-ny*(w-wv*0.7)]); }
+    c.fillStyle=col; c.beginPath(); c.moveTo(P0[0],P0[1]); for(const p of up) c.lineTo(p[0],p[1]); for(let i=dn.length-1;i>=0;i--) c.lineTo(dn[i][0],dn[i][1]); c.closePath(); c.fill(); };
+  c.save(); c.globalAlpha=al;
+  plume('#F07A28',1,1,5); plume('#FFB52E',0.8,0.96,4); plume('#FFE24A',0.6,0.9,3); plume('#FFF6D8',0.4,0.8,2);
+  const lens=(col,k,r)=>{ c.fillStyle=col; c.beginPath(); c.moveTo(P0[0],P0[1]); const M=10, a=[], b=[]; for(let i=0;i<=M;i++){ const q=i/M*r, p=at(q), tg=tan(q), nx=-tg[1], ny=tg[0], w=(wLip*1.0+wEnd*0.17*Math.sin(Math.PI*Math.min(1,i/M*0.92)))*k*(1-Math.pow(i/M,3)); a.push([p[0]+nx*w,p[1]+ny*w]); b.push([p[0]-nx*w,p[1]-ny*w]); } for(const p of a) c.lineTo(p[0],p[1]); for(let i=b.length-1;i>=0;i--) c.lineTo(b[i][0],b[i][1]); c.closePath(); c.fill(); };
+  lens('#3D7BF0',1,0.34*grow+0.02); lens('#D6ECFF',0.5,0.27*grow+0.02);   
+  c.restore(); }
+function lcdFire(g, tms, dpr){   
+  const cv=g.fire, G=(typeof BDH_ART==='object' && BDH_ART && BDH_ART.geo)||null; if(!cv || !G || !G.throat || !G.lips || !G.dir) return;
+  const b=lcdBreath(tms), u=g.u, F=LCD_FIRE;
+  if(!b){ if(LCD.fireOn){ LCD.fireOn=0; const c0=cv.getContext('2d'); if(c0){ c0.setTransform(1,0,0,1,0,0); c0.clearRect(0,0,cv.width,cv.height); } } LCD.lastJet=null; return; }
+  const W=Math.max(2,Math.round(F[2]*u*dpr)), H=Math.max(2,Math.round(F[3]*u*dpr)); if(cv.width!==W || cv.height!==H){ cv.width=W; cv.height=H; }
+  const c=cv.getContext('2d'); if(!c) return; c.setTransform(dpr,0,0,dpr,0,0); c.clearRect(0,0,F[2]*u,F[3]*u); LCD.fireOn=1;
+  const pt=q=>[(q[0]*54-F[0])*u, (q[1]*45.25-F[1])*u], P0=pt(G.throat), P1=pt(G.lips), K=54*u/170, J=LCD.JET;   
+  if(b.tell>=0){ c.globalAlpha=1-b.tell; c.strokeStyle='#6FA8FF'; c.lineWidth=3*K; c.beginPath(); c.arc(P1[0], P1[1], (3+17*b.tell)*K, 0, 7); c.stroke(); c.globalAlpha=1; }
+  let grow=0, al=0;
+  if(b.jet>=0){ grow=Math.min(1, b.jet/160); al=Math.max(0, Math.min(1, (LCD.PUFF-b.jet)/180)); const L=J[0]*u*grow, E=[P1[0]+Math.cos(J[1])*L, P1[1]+Math.sin(J[1])*L];
+    if(al>0 && L>0.5) lcdJet(c, P0, P1, G.dir, E, G.half*54*u/(G.boxW||432), J[2]*u, al, grow, tms/1000*13, J[2]*u/44.2); }   
+  LCD.lastJet={ tell:+b.tell.toFixed(3), jet:Math.round(b.jet), grow:+grow.toFixed(3), al:+al.toFixed(3), lips:[+(P1[0]/u+F[0]).toFixed(2), +(P1[1]/u+F[1]).toFixed(2)], w:cv.width, h:cv.height }; }
 function lcdGeo(st){ const fr=st.querySelector('.lcd-frame'); if(!fr) return null; const a=st.getBoundingClientRect(), r=fr.getBoundingClientRect(); const g={ W:a.width, H:a.height, x:r.left-a.left, y:r.top-a.top, u:r.width/217 };
-  const dg=st.querySelector('.lcd-dragon'); if(dg){ const q=dg.getBoundingClientRect(); g.dg={ x:q.left-a.left, y:q.top-a.top, w:q.width, h:q.height }; }
+  g.fire=st.querySelector('#lcdFire');   
   const sp=st.querySelector('.lcd-ship'); if(sp){ g.ship=sp; g.sp={ x:(185.77*g.u)+g.x, y:(49.35*g.u)+g.y, w:15.37*g.u, h:33.3*g.u }; }   
   return g; }
 function lcdRender(cv, tms){ const st=LCD.el; if(!st) return; const g=LCD.geo || (LCD.geo=lcdGeo(st)); if(!g) return;
@@ -1017733,18 +1017772,18 @@ function lcdRender(cv, tms){ const st=LCD.el; if(!st) return; const g=LCD.geo ||
     else { const cw=w*1.5, ch=cw*256/200, b=lcdBaked('crate', lcdCrateURI, cw, ch, dpr); if(b) ctx.drawImage(b, x-cw/2, y-ch, cw, ch); }
     ctx.restore(); }
   
-  const br=lcdBreathAt(tms);
-  if(br>0 && g.dg && !RM){ const G=(BDH_ART && BDH_ART.geo)||{}, lp=G.lips||[0.83,0.62], dr=G.dir||[0.9,0.44], mx=g.dg.x+g.dg.w*lp[0], my=g.dg.y+g.dg.h*lp[1], dl=Math.hypot(dr[0],dr[1])||1, k=Math.sin(Math.min(1,br)*Math.PI);
-    lcdFlame(ctx, mx, my, dr[0]/dl, dr[1]/dl*0.55, u*16*k, u*3.6*k, tms, 1); }
+  try{ lcdFire(g, tms, dpr); }catch(e){ LCD.err++; }
   
   const lap=RM? 0.03 : (t/LCD.LAP)%1, P=lcdLap(lap), px=g.x+P.x*u, py=g.y+P.y*u, vl=Math.hypot(P.vx,P.vy)||1, vx=P.vx/vl, vy=P.vy/vl, pw=u*24, phh=pw*66/124;
   if(!RM){ for(let i=1; i<=9; i++){ const q=lcdLap(lap-i*0.0075), a=0.42*(1-i/10); ctx.globalAlpha=a; ctx.fillStyle='#FFF8E8'; ctx.beginPath(); ctx.arc(g.x+q.x*u-q.vx/(Math.hypot(q.vx,q.vy)||1)*pw*0.42, g.y+q.y*u-q.vy/(Math.hypot(q.vx,q.vy)||1)*pw*0.42+u*0.6, u*(0.55+i*0.16), 0, 7); ctx.fill(); } ctx.globalAlpha=1; }
   const pb=lcdBaked('plane', lcdPlaneURI, pw, phh, dpr), sx=Math.max(-1, Math.min(1, vx*2.6)), ang=Math.atan2(vy, Math.abs(vx)+0.45)*0.85;
   if(yard){ ctx.fillStyle='rgba(10,30,8,0.2)'; ctx.beginPath(); ctx.ellipse(px+u*4, py+u*9, pw*0.36*Math.max(0.25,Math.abs(sx)), pw*0.07, 0, 0, 7); ctx.fill(); }
   if(pb){ ctx.save(); ctx.translate(px, py); ctx.scale(Math.abs(sx)<0.12? (sx<0? -0.12 : 0.12) : sx, 1); ctx.rotate(ang); ctx.drawImage(pb, -pw/2, -phh/2, pw, phh);
-    if(!RM){ const k=pw/124; ctx.globalAlpha=0.28+0.12*Math.sin(tms/17); ctx.fillStyle='#F4EBD6'; ctx.beginPath(); ctx.ellipse(49.5*k, 2*k, 3.2*k, 15*k, 0, 0, 7); ctx.fill(); ctx.globalAlpha=1; } ctx.restore(); }
+    lcdProp(ctx, pw/124, tms, RM); ctx.restore(); }   
   LCD.lastLap={ x:px, y:py, sx:+sx.toFixed(3), ang:+ang.toFixed(3), lap:+lap.toFixed(4) }; }
-function lcdBreathAt(tms){ if(lcdRM()) return 0; const t=(tms-LCD.t0)%LCD.BREATH, a=LCD.BREATH-LCD.PUFF-600; return (t>=a && t<a+LCD.PUFF)? (t-a)/LCD.PUFF+0.0001 : 0; }
+function lcdBreath(tms){ if(lcdRM()) return null; const W=LCD.TELL+LCD.PUFF+100, t=(tms-LCD.t0)%LCD.BREATH-(LCD.BREATH-W-600); if(!(t>=0 && t<W)) return null;   
+  return { t, p:t/W+0.0001, tell:t<LCD.TELL? t/LCD.TELL : -1, jet:(t>=LCD.TELL && t<LCD.TELL+LCD.PUFF)? t-LCD.TELL : -1 }; }
+function lcdBreathAt(tms){ const b=lcdBreath(tms); return b? b.p : 0; }
 function lcdTick(tms){ const st=LCD.el; if(!st) return;   
   const left=lcdLeft(), p=lcdParts(left), tx=[p.d,p.h,p.m,p.s].map(n=>String(n).padStart(2,'0')), key=tx.join(':');
   if(key!==LCD.last){ const was=LCD.last? LCD.last.split(':') : []; LCD.last=key; for(let i=0; i<4; i++){ const el=st.querySelector('#lcdN'+i); if(!el) continue; if(el.textContent!==tx[i]){ el.textContent=tx[i]; if(was.length && LCD.T==null && !lcdRM()){ const c=el.parentNode; c.classList.remove('tk'); void c.offsetWidth; c.classList.add('tk'); } } } }
@@ -1017755,15 +1017794,15 @@ function lcdFrame(){ const cv=document.getElementById('lcdCanvas'); if(!cv || !L
 
 function lcdLocalLine(){ try{ if(new Date(LCD.AT).getTimezoneOffset()===300) return ''; const loc=(typeof LANG==='string' && LANG!=='en')? LANG : undefined;   
     return tf('YOUR TIME: %1', new Date(LCD.AT).toLocaleString(loc, { weekday:'short', month:'short', day:'numeric', hour:'numeric', minute:'2-digit' })); }catch(e){ return ''; } }
-function lcdSayLine(){ let s=t('Thank you for joining the cause, Commander!'); try{ s=commNoDash(s); }catch(e){} return s; }
+function lcdSayLine(){ let s=t('Thank you for joining the cause!'); try{ s=commNoDash(s); }catch(e){} return s; }
 function lcdCell(i, w){ return '<span class="lcd-cell"><b id="lcdN'+i+'" data-notr>00</b><small>'+escH(t(w))+'</small></span>'; }
 function lcdStageHTML(look){ let port=''; try{ port=sprURI('sarge', dyeHex()||undefined, COMM_PORT_VB); }catch(e){}
   const loc=lcdLocalLine(), yard=look==='yard', dg0=lcdDragonURI('blackdragon'), dg1=lcdDragonURI('blackdragonbreath')||dg0;   
   return (yard? lcdYardHTML() : lcdSiteSVG())
     +'<div class="lcd-frame" data-notr>'
       +(yard? '' : lcdPadSVG()+'<img class="lcd-ship" alt="" src="'+lcdURI(lcdShipSVG())+'">')
-      +'<div class="lcd-prize"><span class="lcd-dgw">'+(dg0? '<img class="lcd-dragon" alt="" src="'+dg0+'">' : '')+(dg1? '<img class="lcd-dragon b" alt="" src="'+dg1+'">' : '')+'</span></div>'
-      +'<span class="lcd-chip">'+escH(t('EXCLUSIVE'))+'</span><span class="lcd-pname">'+escH(t('THE DARK DRAGON'))+'</span>'
+      +'<div class="lcd-prize"><span class="lcd-dgw">'+(dg0? '<img class="lcd-dragon" alt="" src="'+dg0+'">' : '')+(dg1? '<img class="lcd-dragon b" alt="" src="'+dg1+'">' : '')+'<canvas id="lcdFire" class="lcd-fire" data-notr></canvas></span></div>'
+      +'<span class="lcd-chip">'+escH(t('EXCLUSIVE'))+'</span><span class="lcd-pname">'+escH(t('DARK DRAGON'))+'</span><span class="lcd-psub">'+escH(t('JOINS YOUR ARMY FREE AT LAUNCH!'))+'</span>'
       +'<div class="lcd-board"><span class="lcd-t1">'+escH(t('COUNTDOWN TO LAUNCH'))+'</span><span class="lcd-date">'+escH(t('NOVEMBER 25, 2026 · 9:00 AM EST'))+'</span>'
         +'<div class="lcd-clock">'+lcdCell(0,'DAYS')+'<i class="lcd-col"></i>'+lcdCell(1,'HRS')+'<i class="lcd-col"></i>'+lcdCell(2,'MIN')+'<i class="lcd-col"></i>'+lcdCell(3,'SEC')+'</div>'
         +(loc? '<span class="lcd-local">'+escH(loc)+'</span>' : '')+'</div>'
@@ -1017775,7 +1017814,7 @@ function lcdStageHTML(look){ let port=''; try{ port=sprURI('sarge', dyeHex()||un
     +'<canvas id="lcdCanvas" class="lcd-cv" data-notr></canvas>'
     +'<button type="button" class="lcd-x" aria-label="close" onclick="lcdClose(\'x\')">\u2715</button>'; }
 function lcdFit(st){   
-  for(const e of st.querySelectorAll('.lcd-t1,.lcd-date,.lcd-local,.lcd-p1,.lcd-p2,.lcd-pname,.lcd-go,.lcd-chip,.lcd-cell small')){ e.style.fontSize=''; for(let i=0; i<7; i++){ const box=e.clientWidth, w=e.scrollWidth; if(!(box>0) || w<=box+0.5) break; const f=parseFloat(getComputedStyle(e).fontSize); e.style.fontSize=(f*Math.max(0.6, box/w)*.97).toFixed(2)+'px'; } }   
+  for(const e of st.querySelectorAll('.lcd-t1,.lcd-date,.lcd-local,.lcd-p1,.lcd-p2,.lcd-pname,.lcd-psub,.lcd-go,.lcd-chip,.lcd-cell small')){ e.style.fontSize=''; for(let i=0; i<7; i++){ const box=e.clientWidth, w=e.scrollWidth; if(!(box>0) || w<=box+0.5) break; const f=parseFloat(getComputedStyle(e).fontSize); e.style.fontSize=(f*Math.max(0.6, box/w)*.97).toFixed(2)+'px'; } }   
   const tx=st.querySelector('#lcdTxt'); if(tx){ tx.style.fontSize=''; const full=lcdSayLine(), was=tx.textContent; tx.textContent=full; for(let i=0; i<8 && tx.scrollHeight>tx.clientHeight+1; i++){ const f=parseFloat(getComputedStyle(tx).fontSize); tx.style.fontSize=(f*.93).toFixed(2)+'px'; } tx.textContent=was; } }
 function lcdType(st){ const el=st.querySelector('#lcdTxt'); if(!el) return; const full=lcdSayLine(); clearTimeout(LCD.typeT); if(lcdRM() || LCD.T!=null){ el.textContent=full; return; } el.textContent=''; let i=0;   
   const tick=()=>{ if(!el.isConnected) return; i++; el.textContent=full.slice(0,i); const ch=full.charAt(i-1); try{ if(COMM_SKIP.indexOf(ch)<0) commBlip(full.charCodeAt(i-1)); }catch(e){} if(i<full.length) LCD.typeT=setTimeout(tick, (ch===','||ch==='\u3001')? COMM_TYPE*7 : (ch==='.'||ch==='\u3002'||ch==='!'||ch==='\uFF01')? COMM_TYPE*10 : COMM_TYPE); };
@@ -1017796,7 +1017835,7 @@ function lcdDeal(force){
   LCD.dealt++; lcdNote(force? 'look' : 'dealt');
   if(!LCD.run){ LCD.run=1; if(LCD.T==null) requestAnimationFrame(lcdFrame); }
   return true; }
-function lcdDown(why, fade){ const st=LCD.el; if(!st) return; LCD.el=null; clearTimeout(LCD.typeT); removeEventListener('resize', lcdRefit); LCD.bake={};
+function lcdDown(why, fade){ const st=LCD.el; if(!st) return; LCD.el=null; clearTimeout(LCD.typeT); removeEventListener('resize', lcdRefit); LCD.bake={}; LCD.geo=null;   
   if(fade){ st.classList.add('out'); setTimeout(()=>{ try{ st.remove(); }catch(e){} }, 240); } else { try{ st.remove(); }catch(e){} } }
 function lcdClose(why){ if(!LCD.el) return; if(why!=='rig' && Date.now()-(LCD.bornAt||0)<LCD.GUARD) return;   
   try{ audio(); SFX.blip(); }catch(e){} LCD.shut++; if(why==='yes'){ LCD.yes++; try{ META.lcdYes=(META.lcdYes|0)+1; saveMeta(); }catch(e){} } lcdNote(why||'x');
@@ -1017815,7 +1017854,7 @@ function lcdCss(){ if(document.getElementById('lcdCss')) return; const css=docum
   '#lcdStage .lcd-veil{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse 62% 70% at 50% 50%, rgba(12,34,10,.5) 0%, rgba(12,34,10,.3) 60%, rgba(12,34,10,.12) 100%)}',
   '#lcdStage .lcd-frame{position:absolute;left:calc(50% - '+U(108.5)+');top:calc(50% - '+U(50)+');width:'+U(217)+';height:'+U(100)+'}',    
   '#lcdStage canvas.lcd-cv{position:absolute;z-index:2;inset:0;width:100%;height:100%;display:block;pointer-events:none}',
-  '#lcdStage .lcd-pad,#lcdStage .lcd-ship,#lcdStage .lcd-prize,#lcdStage .lcd-chip,#lcdStage .lcd-pname,#lcdStage .lcd-board,#lcdStage .lcd-promise,#lcdStage .lcd-row{z-index:3}',
+  '#lcdStage .lcd-pad,#lcdStage .lcd-ship,#lcdStage .lcd-prize,#lcdStage .lcd-chip,#lcdStage .lcd-pname,#lcdStage .lcd-psub,#lcdStage .lcd-board,#lcdStage .lcd-promise,#lcdStage .lcd-row{z-index:3}',
   
   '#lcdStage .lcd-pad{position:absolute;left:'+U(171.5)+';top:'+U(37.5)+';width:'+U(36.6)+';height:'+U(56.5)+';overflow:visible;pointer-events:none}',
   '#lcdStage .lcd-ship{position:absolute;left:'+U(185.77)+';top:'+U(49.35)+';width:'+U(15.37)+';height:'+U(33.3)+';pointer-events:none;will-change:transform}',
@@ -1017823,8 +1017862,10 @@ function lcdCss(){ if(document.getElementById('lcdCss')) return; const css=docum
   '#lcdStage .lcd-prize{position:absolute;left:'+U(2.5)+';top:'+U(42.4)+';width:'+U(54)+';height:'+U(45.25)+';pointer-events:none}',
   '#lcdStage .lcd-dgw{position:absolute;left:0;top:0;width:'+U(54)+';height:'+U(45.25)+';transform-origin:50% 100%;animation:lcdBob 3.4s ease-in-out infinite alternate}@keyframes lcdBob{from{transform:scale(1,1)}to{transform:scale(1.012,1.022)}}',
   '#lcdStage .lcd-dragon{position:absolute;inset:0;width:100%;height:100%;filter:drop-shadow(0 '+U(.8)+' '+U(1)+' rgba(10,20,10,.35))}#lcdStage .lcd-dragon.b{opacity:0}#lcdStage .lcd-dgw.breath .lcd-dragon{opacity:0}#lcdStage .lcd-dgw.breath .lcd-dragon.b{opacity:1}',
+  '#lcdStage .lcd-fire{position:absolute;left:'+U(LCD_FIRE[0])+';top:'+U(LCD_FIRE[1])+';width:'+U(LCD_FIRE[2])+';height:'+U(LCD_FIRE[3])+';pointer-events:none}','#lcdStage .lcd-prize{z-index:4}',    
   '#lcdStage .lcd-chip{position:absolute;left:'+U(4)+';top:'+U(40)+';max-width:'+U(34)+';padding:'+U(.7)+' '+U(2.2)+' '+U(.5)+';border-radius:'+U(1)+';background:linear-gradient(180deg,#D2533F,#9C2C20);border:'+U(.35)+' solid #F1D9B8;color:#FFF6DC;font-size:'+U(3)+';line-height:1.1;letter-spacing:.14em;white-space:nowrap;overflow:hidden;transform:rotate(-5deg);box-shadow:0 '+U(.5)+' 0 rgba(40,10,10,.45)}',
-  '#lcdStage .lcd-pname{position:absolute;left:'+U(1.5)+';width:'+U(56)+';top:'+U(87.6)+';text-align:center;font-family:var(--uii);font-weight:normal;font-size:'+U(6.2)+';line-height:1;letter-spacing:.03em;white-space:nowrap;overflow:hidden;color:#FFD24A;text-shadow:0 '+U(.3)+' 0 #B4661A,0 '+U(.6)+' 0 #7A3F12,0 '+U(1)+' '+U(1.4)+' rgba(20,10,40,.55)}',
+  '#lcdStage .lcd-pname{position:absolute;left:'+U(1.5)+';width:'+U(56)+';top:'+U(85.5)+';text-align:center;font-family:var(--uii);font-weight:normal;font-size:'+U(6)+';line-height:1;letter-spacing:.03em;white-space:nowrap;overflow:hidden;color:#FFD24A;text-shadow:0 '+U(.3)+' 0 #B4661A,0 '+U(.6)+' 0 #7A3F12,0 '+U(1)+' '+U(1.4)+' rgba(20,10,40,.55)}',
+  '#lcdStage .lcd-psub{position:absolute;left:'+U(1.5)+';width:'+U(56)+';top:'+U(91.7)+';text-align:center;font-family:var(--uii);font-weight:normal;font-size:'+U(3.5)+';line-height:1.1;letter-spacing:.05em;white-space:nowrap;overflow:hidden;color:#FFF6DC;text-shadow:0 '+U(.25)+' 0 #7A3F12,0 '+U(.5)+' 0 #4A260A,0 '+U(.8)+' '+U(1.2)+' rgba(20,10,40,.6);pointer-events:none;animation:lcdPop .36s cubic-bezier(.2,1.5,.4,1) .95s both}',    
   
   '#lcdStage .lcd-board{position:absolute;left:'+U(57.5)+';top:'+U(19.5)+';width:'+U(102)+';display:flex;flex-direction:column;align-items:center;pointer-events:none}',
   '#lcdStage .lcd-t1{display:block;width:100%;text-align:center;white-space:nowrap;overflow:hidden;font-family:var(--uii);font-weight:normal;font-size:'+U(9.6)+';height:'+U(9.8)+';line-height:'+U(9.8)+';letter-spacing:.03em;color:#FFD24A;text-shadow:0 '+U(.3)+' 0 #E89A1E,0 '+U(.6)+' 0 #B4661A,0 '+U(.95)+' 0 #7A3F12,0 '+U(1.4)+' '+U(1.6)+' rgba(20,10,40,.5);animation:lcdSlam .5s cubic-bezier(.2,1.5,.4,1) .12s both;transform-origin:50% 60%}@keyframes lcdSlam{from{opacity:0;transform:scale(1.4)}to{opacity:1;transform:scale(1)}}',
@@ -1017854,7 +1017895,7 @@ function lcdCss(){ if(document.getElementById('lcdCss')) return; const css=docum
   '#lcdStage .lcd-go:active{transform:translateY('+U(.6)+');box-shadow:0 '+U(.3)+' 0 #7A5412}',
   '#lcdStage .lcd-x{position:absolute;z-index:6;top:calc(env(safe-area-inset-top,0px) + '+U(2.2)+');right:calc(env(safe-area-inset-right,0px) + '+U(3)+');width:max(40px,'+U(10.5)+');height:max(40px,'+U(10.5)+');padding:0;border-radius:50%;border:3px solid #f1d9b8;background:radial-gradient(circle at 40% 35%,#d2533f,#9c2c20);color:#fff;font-family:var(--uih);font-size:max(20px,'+U(5.6)+');line-height:1;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 0 rgba(0,0,0,.4);cursor:pointer}',
   '#lcdStage.zero .lcd-t1{color:#FFF6DC}',
-  '#lcdStage.wide .lcd-t1,#lcdStage.wide .lcd-pname,#lcdStage.wide .lcd-go{font-weight:900}',    
+  '#lcdStage.wide .lcd-t1,#lcdStage.wide .lcd-pname,#lcdStage.wide .lcd-psub,#lcdStage.wide .lcd-go{font-weight:900}',    
   '#lcdStage.ar *{letter-spacing:0!important}#lcdStage.ar .lcd-say{direction:rtl}',    
   '#lcdStage.rm,#lcdStage.rm *,#lcdStage.pin,#lcdStage.pin *{animation:none!important;transition:none!important}',
   '@media (prefers-reduced-motion: reduce){#lcdStage,#lcdStage *{animation:none!important;transition:none!important}}'
@@ -1115306,7 +1115347,7 @@ let BFQ=null;
 
 
 
-let GVT_CV='33.68';
+let GVT_CV='33.69';
 let NX_CAP_MUL=4;
 
 
@@ -1648411,6 +1648452,13 @@ try{ if(window.GVT && !GVT.upd) GVT.upd=updRead; }catch(e){}
 
 
 
+
+
+
+
+
+
+
 const LCD_LIVE=1;
 const LCD=(function(){
   let sw=-1, look='site';
@@ -1648419,7 +1648467,7 @@ const LCD=(function(){
   return { on:(sw===1 || (sw!==0 && !!LCD_LIVE))? 1 : 0, sw, live:LCD_LIVE,
     AT:Date.UTC(2026,10,25,14,0,0),   
     PRICE:'$14.99', EVERY:1, look,     
-    LAP:17000, BREATH:7000, PUFF:900, GUARD:450,   
+    LAP:17000, BREATH:7000, TELL:500, PUFF:1120, JET:[15,0.1,3.3], GUARD:450,   
     el:null, T:null, NOW:null, run:0, t0:0, zeroT:null, img:{}, bake:{}, geo:null, last:'', typeT:0, dealt:0, shut:0, yes:0, err:0, log:[] };
 })();
 window.GVT_LCD=LCD;
@@ -1648553,6 +1648601,40 @@ const LCD_MEN=['rifleman','bazooka','radioman','flame','commando','mortar','mine
 
 
 const LCD_LAP=[[30,6],[108,5.6],[186,6.6],[206,17],[196,29],[179,22.5],[161,13.6],[108,12.6],[57,13.4],[39,22],[21,30],[10,18]];
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const LCD_FIRE=[36,15,38,30];
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1648728,13 +1648810,13 @@ if(LCD.on){
   if(typeof fsiBusy==='function'){ const _fsi=fsiBusy; fsiBusy=function(){ try{ if(document.getElementById('lcdStage')) return true; }catch(e){} return _fsi.apply(this, arguments); }; }
   const _hide=hideAllOverlays; hideAllOverlays=function(){ try{ if(LCD.el) lcdDown('nav', false); }catch(e){} return _hide.apply(this, arguments); };   
 }
-try{ Object.assign(TR.es||(TR.es={}), { "COUNTDOWN TO LAUNCH":"CUENTA ATRÁS AL LANZAMIENTO", "NOVEMBER 25, 2026 · 9:00 AM EST":"25 DE NOVIEMBRE DE 2026 · 9:00 EST", "YOUR TIME: %1":"TU HORA: %1", "DAYS":"DÍAS", "HRS":"H", "MIN":"MIN", "SEC":"S", "THE DARK DRAGON":"EL DRAGÓN OSCURO", "EXCLUSIVE":"EXCLUSIVO", "FREE FOR EVERY ACTIVE PLAYER":"GRATIS PARA CADA JUGADOR ACTIVO", "WHEN THE CLOCK HITS ZERO!":"¡CUANDO EL RELOJ LLEGUE A CERO!", "%1 AFTER LAUNCH":"%1 TRAS EL LANZAMIENTO", "Thank you for joining the cause, Commander!":"¡Gracias por unirte a la causa, Comandante!", "I'M IN!":"¡ME APUNTO!", "LIFT-OFF!":"¡DESPEGUE!" });
-  Object.assign(TR.de||(TR.de={}), { "COUNTDOWN TO LAUNCH":"COUNTDOWN ZUM START", "NOVEMBER 25, 2026 · 9:00 AM EST":"25. NOVEMBER 2026 · 9:00 UHR EST", "YOUR TIME: %1":"DEINE ZEIT: %1", "DAYS":"TAGE", "HRS":"STD", "MIN":"MIN", "SEC":"SEK", "THE DARK DRAGON":"DER DUNKLE DRACHE", "EXCLUSIVE":"EXKLUSIV", "FREE FOR EVERY ACTIVE PLAYER":"GRATIS FÜR JEDEN AKTIVEN SPIELER", "WHEN THE CLOCK HITS ZERO!":"WENN DIE UHR AUF NULL STEHT!", "%1 AFTER LAUNCH":"%1 NACH DEM START", "Thank you for joining the cause, Commander!":"Danke, dass du dabei bist, Kommandant!", "I'M IN!":"ICH BIN DABEI!", "LIFT-OFF!":"ABHEBEN!" });
-  Object.assign(TR.ru||(TR.ru={}), { "COUNTDOWN TO LAUNCH":"\u041E\u0422\u0421\u0427\u0401\u0422 \u0414\u041E \u0417\u0410\u041F\u0423\u0421\u041A\u0410", "NOVEMBER 25, 2026 · 9:00 AM EST":"25 \u041D\u041E\u042F\u0411\u0420\u042F 2026 · 9:00 EST", "YOUR TIME: %1":"\u0422\u0412\u041E\u0401 \u0412\u0420\u0415\u041C\u042F: %1", "DAYS":"\u0414\u041D\u0418", "HRS":"\u0427", "MIN":"\u041C\u0418\u041D", "SEC":"\u0421\u0415\u041A", "THE DARK DRAGON":"\u0422\u0401\u041C\u041D\u042B\u0419 \u0414\u0420\u0410\u041A\u041E\u041D", "EXCLUSIVE":"\u042D\u041A\u0421\u041A\u041B\u042E\u0417\u0418\u0412", "FREE FOR EVERY ACTIVE PLAYER":"\u0411\u0415\u0421\u041F\u041B\u0410\u0422\u041D\u041E \u041A\u0410\u0416\u0414\u041E\u041C\u0423 \u0410\u041A\u0422\u0418\u0412\u041D\u041E\u041C\u0423 \u0418\u0413\u0420\u041E\u041A\u0423", "WHEN THE CLOCK HITS ZERO!":"\u041A\u041E\u0413\u0414\u0410 \u0427\u0410\u0421\u042B \u0414\u041E\u0419\u0414\u0423\u0422 \u0414\u041E \u041D\u0423\u041B\u042F!", "%1 AFTER LAUNCH":"%1 \u041F\u041E\u0421\u041B\u0415 \u0417\u0410\u041F\u0423\u0421\u041A\u0410", "Thank you for joining the cause, Commander!":"\u0421\u043F\u0430\u0441\u0438\u0431\u043E, \u0447\u0442\u043E \u0442\u044B \u0441 \u043D\u0430\u043C\u0438, \u041A\u043E\u043C\u0430\u043D\u0434\u0438\u0440!", "I'M IN!":"\u042F \u0412 \u0414\u0415\u041B\u0415!", "LIFT-OFF!":"\u041F\u0423\u0421\u041A!" });
-  Object.assign(TR.ja||(TR.ja={}), { "COUNTDOWN TO LAUNCH":"\u30ED\u30FC\u30F3\u30C1\u307E\u3067 \u30AB\u30A6\u30F3\u30C8\u30C0\u30A6\u30F3", "NOVEMBER 25, 2026 · 9:00 AM EST":"2026\u306D\u3093 11\u304C\u3064 25\u306B\u3061 · \u3054\u305C\u3093 9:00 EST", "YOUR TIME: %1":"\u304D\u307F\u306E \u3058\u304B\u3093: %1", "DAYS":"\u306B\u3061", "HRS":"\u3058\u304B\u3093", "MIN":"\u3075\u3093", "SEC":"\u3073\u3087\u3046", "THE DARK DRAGON":"\u30C0\u30FC\u30AF\u30C9\u30E9\u30B4\u30F3", "EXCLUSIVE":"\u3052\u3093\u3066\u3044", "FREE FOR EVERY ACTIVE PLAYER":"\u3042\u305D\u3093\u3067\u3044\u308B \u307F\u3093\u306A\u306B \u3080\u308A\u3087\u3046", "WHEN THE CLOCK HITS ZERO!":"\u3068\u3051\u3044\u304C \u30BC\u30ED\u306B \u306A\u3063\u305F\u3089\uFF01", "%1 AFTER LAUNCH":"\u30ED\u30FC\u30F3\u30C1\u3054 %1", "Thank you for joining the cause, Commander!":"\u306A\u304B\u307E\u306B \u306A\u3063\u3066\u304F\u308C\u3066 \u3042\u308A\u304C\u3068\u3046\u3001\u3057\u308C\u3044\u304B\u3093\uFF01", "I'M IN!":"\u3055\u3093\u304B\u3059\u308B\uFF01", "LIFT-OFF!":"\u306F\u3063\u3057\u3083\uFF01" });
-  Object.assign(TR.ko||(TR.ko={}), { "COUNTDOWN TO LAUNCH":"\uCD9C\uC2DC \uCE74\uC6B4\uD2B8\uB2E4\uC6B4", "NOVEMBER 25, 2026 · 9:00 AM EST":"2026\uB144 11\uC6D4 25\uC77C · \uC624\uC804 9:00 EST", "YOUR TIME: %1":"\uB0B4 \uC2DC\uAC04: %1", "DAYS":"\uC77C", "HRS":"\uC2DC\uAC04", "MIN":"\uBD84", "SEC":"\uCD08", "THE DARK DRAGON":"\uB2E4\uD06C \uB4DC\uB798\uACE4", "EXCLUSIVE":"\uD55C\uC815", "FREE FOR EVERY ACTIVE PLAYER":"\uD65C\uB3D9 \uC911\uC778 \uBAA8\uB4E0 \uD50C\uB808\uC774\uC5B4\uC5D0\uAC8C \uBB34\uB8CC", "WHEN THE CLOCK HITS ZERO!":"\uC2DC\uACC4\uAC00 0\uC774 \uB418\uBA74!", "%1 AFTER LAUNCH":"\uCD9C\uC2DC \uD6C4 %1", "Thank you for joining the cause, Commander!":"\uD568\uAED8\uD574 \uC918\uC11C \uACE0\uB9D9\uB2E4, \uC0AC\uB839\uAD00!", "I'M IN!":"\uCC38\uAC00!", "LIFT-OFF!":"\uBC1C\uC0AC!" });
-  Object.assign(TR['zh-Hans']||(TR['zh-Hans']={}), { "COUNTDOWN TO LAUNCH":"\u4E0A\u7EBF\u5012\u8BA1\u65F6", "NOVEMBER 25, 2026 · 9:00 AM EST":"2026\u5E7411\u670825\u65E5 · \u4E0A\u53489:00 EST", "YOUR TIME: %1":"\u4F60\u7684\u65F6\u95F4\uFF1A%1", "DAYS":"\u5929", "HRS":"\u65F6", "MIN":"\u5206", "SEC":"\u79D2", "THE DARK DRAGON":"\u6697\u9ED1\u5DE8\u9F99", "EXCLUSIVE":"\u9650\u5B9A", "FREE FOR EVERY ACTIVE PLAYER":"\u6240\u6709\u6D3B\u8DC3\u73A9\u5BB6\u514D\u8D39\u83B7\u5F97", "WHEN THE CLOCK HITS ZERO!":"\u5012\u8BA1\u65F6\u5F52\u96F6\u65F6\uFF01", "%1 AFTER LAUNCH":"\u4E0A\u7EBF\u540E %1", "Thank you for joining the cause, Commander!":"\u611F\u8C22\u4F60\u52A0\u5165\u6211\u4EEC\uFF0C\u6307\u6325\u5B98\uFF01", "I'M IN!":"\u6211\u53C2\u52A0\uFF01", "LIFT-OFF!":"\u53D1\u5C04\uFF01" });
-  Object.assign(TR.ar||(TR.ar={}), { "COUNTDOWN TO LAUNCH":"\u0627\u0644\u0639\u062F \u0627\u0644\u062A\u0646\u0627\u0632\u0644\u064A \u0644\u0644\u0625\u0637\u0644\u0627\u0642", "NOVEMBER 25, 2026 · 9:00 AM EST":"25 \u0646\u0648\u0641\u0645\u0628\u0631 2026 · 9:00 \u0635\u0628\u0627\u062D\u064B\u0627 EST", "YOUR TIME: %1":"\u0628\u062A\u0648\u0642\u064A\u062A\u0643: %1", "DAYS":"\u0623\u064A\u0627\u0645", "HRS":"\u0633\u0627\u0639\u0627\u062A", "MIN":"\u062F\u0642\u0627\u0626\u0642", "SEC":"\u062B\u0648\u0627\u0646\u064D", "THE DARK DRAGON":"\u0627\u0644\u062A\u0646\u064A\u0646 \u0627\u0644\u0645\u0638\u0644\u0645", "EXCLUSIVE":"\u062D\u0635\u0631\u064A", "FREE FOR EVERY ACTIVE PLAYER":"\u0645\u062C\u0627\u0646\u064B\u0627 \u0644\u0643\u0644 \u0644\u0627\u0639\u0628 \u0646\u0634\u0637", "WHEN THE CLOCK HITS ZERO!":"\u0639\u0646\u062F\u0645\u0627 \u064A\u0635\u0644 \u0627\u0644\u0639\u062F\u0627\u062F \u0625\u0644\u0649 \u0627\u0644\u0635\u0641\u0631!", "%1 AFTER LAUNCH":"%1 \u0628\u0639\u062F \u0627\u0644\u0625\u0637\u0644\u0627\u0642", "Thank you for joining the cause, Commander!":"\u0634\u0643\u0631\u064B\u0627 \u0644\u0627\u0646\u0636\u0645\u0627\u0645\u0643 \u0625\u0644\u0649 \u0627\u0644\u0642\u0636\u064A\u0629 \u0623\u064A\u0647\u0627 \u0627\u0644\u0642\u0627\u0626\u062F!", "I'M IN!":"\u0623\u0646\u0627 \u0645\u0639\u0643\u0645!", "LIFT-OFF!":"\u0627\u0646\u0637\u0644\u0627\u0642!" });
+try{ Object.assign(TR.es||(TR.es={}), { "COUNTDOWN TO LAUNCH":"CUENTA ATRÁS AL LANZAMIENTO", "NOVEMBER 25, 2026 · 9:00 AM EST":"25 DE NOVIEMBRE DE 2026 · 9:00 EST", "YOUR TIME: %1":"TU HORA: %1", "DAYS":"DÍAS", "HRS":"H", "MIN":"MIN", "SEC":"S", "DARK DRAGON":"DRAGÓN OSCURO", "JOINS YOUR ARMY FREE AT LAUNCH!":"¡SE UNE GRATIS A TU EJÉRCITO!", "EXCLUSIVE":"EXCLUSIVO", "FREE FOR EVERY ACTIVE PLAYER":"GRATIS PARA CADA JUGADOR ACTIVO", "WHEN THE CLOCK HITS ZERO!":"¡CUANDO EL RELOJ LLEGUE A CERO!", "%1 AFTER LAUNCH":"%1 TRAS EL LANZAMIENTO", "Thank you for joining the cause!":"¡Gracias por unirte a la causa!", "I'M IN!":"¡ME APUNTO!", "LIFT-OFF!":"¡DESPEGUE!" });
+  Object.assign(TR.de||(TR.de={}), { "COUNTDOWN TO LAUNCH":"COUNTDOWN ZUM START", "NOVEMBER 25, 2026 · 9:00 AM EST":"25. NOVEMBER 2026 · 9:00 UHR EST", "YOUR TIME: %1":"DEINE ZEIT: %1", "DAYS":"TAGE", "HRS":"STD", "MIN":"MIN", "SEC":"SEK", "DARK DRAGON":"DUNKLER DRACHE", "JOINS YOUR ARMY FREE AT LAUNCH!":"ZUM START GRATIS IN DEINER ARMEE!", "EXCLUSIVE":"EXKLUSIV", "FREE FOR EVERY ACTIVE PLAYER":"GRATIS FÜR JEDEN AKTIVEN SPIELER", "WHEN THE CLOCK HITS ZERO!":"WENN DIE UHR AUF NULL STEHT!", "%1 AFTER LAUNCH":"%1 NACH DEM START", "Thank you for joining the cause!":"Danke, dass du dabei bist!", "I'M IN!":"ICH BIN DABEI!", "LIFT-OFF!":"ABHEBEN!" });
+  Object.assign(TR.ru||(TR.ru={}), { "COUNTDOWN TO LAUNCH":"\u041E\u0422\u0421\u0427\u0401\u0422 \u0414\u041E \u0417\u0410\u041F\u0423\u0421\u041A\u0410", "NOVEMBER 25, 2026 · 9:00 AM EST":"25 \u041D\u041E\u042F\u0411\u0420\u042F 2026 · 9:00 EST", "YOUR TIME: %1":"\u0422\u0412\u041E\u0401 \u0412\u0420\u0415\u041C\u042F: %1", "DAYS":"\u0414\u041D\u0418", "HRS":"\u0427", "MIN":"\u041C\u0418\u041D", "SEC":"\u0421\u0415\u041A", "DARK DRAGON":"\u0422\u0401\u041C\u041D\u042B\u0419 \u0414\u0420\u0410\u041A\u041E\u041D", "JOINS YOUR ARMY FREE AT LAUNCH!":"\u0411\u0415\u0421\u041F\u041B\u0410\u0422\u041D\u041E \u0412 \u0422\u0412\u041E\u0415\u0419 \u0410\u0420\u041C\u0418\u0418 \u0421 \u0417\u0410\u041F\u0423\u0421\u041A\u0410!", "EXCLUSIVE":"\u042D\u041A\u0421\u041A\u041B\u042E\u0417\u0418\u0412", "FREE FOR EVERY ACTIVE PLAYER":"\u0411\u0415\u0421\u041F\u041B\u0410\u0422\u041D\u041E \u041A\u0410\u0416\u0414\u041E\u041C\u0423 \u0410\u041A\u0422\u0418\u0412\u041D\u041E\u041C\u0423 \u0418\u0413\u0420\u041E\u041A\u0423", "WHEN THE CLOCK HITS ZERO!":"\u041A\u041E\u0413\u0414\u0410 \u0427\u0410\u0421\u042B \u0414\u041E\u0419\u0414\u0423\u0422 \u0414\u041E \u041D\u0423\u041B\u042F!", "%1 AFTER LAUNCH":"%1 \u041F\u041E\u0421\u041B\u0415 \u0417\u0410\u041F\u0423\u0421\u041A\u0410", "Thank you for joining the cause!":"\u0421\u043F\u0430\u0441\u0438\u0431\u043E, \u0447\u0442\u043E \u0442\u044B \u0441 \u043D\u0430\u043C\u0438!", "I'M IN!":"\u042F \u0412 \u0414\u0415\u041B\u0415!", "LIFT-OFF!":"\u041F\u0423\u0421\u041A!" });
+  Object.assign(TR.ja||(TR.ja={}), { "COUNTDOWN TO LAUNCH":"\u30ED\u30FC\u30F3\u30C1\u307E\u3067 \u30AB\u30A6\u30F3\u30C8\u30C0\u30A6\u30F3", "NOVEMBER 25, 2026 · 9:00 AM EST":"2026\u306D\u3093 11\u304C\u3064 25\u306B\u3061 · \u3054\u305C\u3093 9:00 EST", "YOUR TIME: %1":"\u304D\u307F\u306E \u3058\u304B\u3093: %1", "DAYS":"\u306B\u3061", "HRS":"\u3058\u304B\u3093", "MIN":"\u3075\u3093", "SEC":"\u3073\u3087\u3046", "DARK DRAGON":"\u30C0\u30FC\u30AF\u30C9\u30E9\u30B4\u30F3", "JOINS YOUR ARMY FREE AT LAUNCH!":"\u30ED\u30FC\u30F3\u30C1\u3067 \u3080\u308A\u3087\u3046\u3067 \u306A\u304B\u307E\u306B\uFF01", "EXCLUSIVE":"\u3052\u3093\u3066\u3044", "FREE FOR EVERY ACTIVE PLAYER":"\u3042\u305D\u3093\u3067\u3044\u308B \u307F\u3093\u306A\u306B \u3080\u308A\u3087\u3046", "WHEN THE CLOCK HITS ZERO!":"\u3068\u3051\u3044\u304C \u30BC\u30ED\u306B \u306A\u3063\u305F\u3089\uFF01", "%1 AFTER LAUNCH":"\u30ED\u30FC\u30F3\u30C1\u3054 %1", "Thank you for joining the cause!":"\u306A\u304B\u307E\u306B \u306A\u3063\u3066\u304F\u308C\u3066 \u3042\u308A\u304C\u3068\u3046\uFF01", "I'M IN!":"\u3055\u3093\u304B\u3059\u308B\uFF01", "LIFT-OFF!":"\u306F\u3063\u3057\u3083\uFF01" });
+  Object.assign(TR.ko||(TR.ko={}), { "COUNTDOWN TO LAUNCH":"\uCD9C\uC2DC \uCE74\uC6B4\uD2B8\uB2E4\uC6B4", "NOVEMBER 25, 2026 · 9:00 AM EST":"2026\uB144 11\uC6D4 25\uC77C · \uC624\uC804 9:00 EST", "YOUR TIME: %1":"\uB0B4 \uC2DC\uAC04: %1", "DAYS":"\uC77C", "HRS":"\uC2DC\uAC04", "MIN":"\uBD84", "SEC":"\uCD08", "DARK DRAGON":"\uB2E4\uD06C \uB4DC\uB798\uACE4", "JOINS YOUR ARMY FREE AT LAUNCH!":"\uCD9C\uC2DC\uC640 \uD568\uAED8 \uBB34\uB8CC\uB85C \uB124 \uAD70\uB300\uC5D0 \uD569\uB958!", "EXCLUSIVE":"\uD55C\uC815", "FREE FOR EVERY ACTIVE PLAYER":"\uD65C\uB3D9 \uC911\uC778 \uBAA8\uB4E0 \uD50C\uB808\uC774\uC5B4\uC5D0\uAC8C \uBB34\uB8CC", "WHEN THE CLOCK HITS ZERO!":"\uC2DC\uACC4\uAC00 0\uC774 \uB418\uBA74!", "%1 AFTER LAUNCH":"\uCD9C\uC2DC \uD6C4 %1", "Thank you for joining the cause!":"\uD568\uAED8\uD574 \uC918\uC11C \uACE0\uB9D9\uB2E4!", "I'M IN!":"\uCC38\uAC00!", "LIFT-OFF!":"\uBC1C\uC0AC!" });
+  Object.assign(TR['zh-Hans']||(TR['zh-Hans']={}), { "COUNTDOWN TO LAUNCH":"\u4E0A\u7EBF\u5012\u8BA1\u65F6", "NOVEMBER 25, 2026 · 9:00 AM EST":"2026\u5E7411\u670825\u65E5 · \u4E0A\u53489:00 EST", "YOUR TIME: %1":"\u4F60\u7684\u65F6\u95F4\uFF1A%1", "DAYS":"\u5929", "HRS":"\u65F6", "MIN":"\u5206", "SEC":"\u79D2", "DARK DRAGON":"\u6697\u9ED1\u5DE8\u9F99", "JOINS YOUR ARMY FREE AT LAUNCH!":"\u4E0A\u7EBF\u65F6\u514D\u8D39\u52A0\u5165\u4F60\u7684\u519B\u961F\uFF01", "EXCLUSIVE":"\u9650\u5B9A", "FREE FOR EVERY ACTIVE PLAYER":"\u6240\u6709\u6D3B\u8DC3\u73A9\u5BB6\u514D\u8D39\u83B7\u5F97", "WHEN THE CLOCK HITS ZERO!":"\u5012\u8BA1\u65F6\u5F52\u96F6\u65F6\uFF01", "%1 AFTER LAUNCH":"\u4E0A\u7EBF\u540E %1", "Thank you for joining the cause!":"\u611F\u8C22\u4F60\u52A0\u5165\u6211\u4EEC\uFF01", "I'M IN!":"\u6211\u53C2\u52A0\uFF01", "LIFT-OFF!":"\u53D1\u5C04\uFF01" });
+  Object.assign(TR.ar||(TR.ar={}), { "COUNTDOWN TO LAUNCH":"\u0627\u0644\u0639\u062F \u0627\u0644\u062A\u0646\u0627\u0632\u0644\u064A \u0644\u0644\u0625\u0637\u0644\u0627\u0642", "NOVEMBER 25, 2026 · 9:00 AM EST":"25 \u0646\u0648\u0641\u0645\u0628\u0631 2026 · 9:00 \u0635\u0628\u0627\u062D\u064B\u0627 EST", "YOUR TIME: %1":"\u0628\u062A\u0648\u0642\u064A\u062A\u0643: %1", "DAYS":"\u0623\u064A\u0627\u0645", "HRS":"\u0633\u0627\u0639\u0627\u062A", "MIN":"\u062F\u0642\u0627\u0626\u0642", "SEC":"\u062B\u0648\u0627\u0646\u064D", "DARK DRAGON":"\u0627\u0644\u062A\u0646\u064A\u0646 \u0627\u0644\u0645\u0638\u0644\u0645", "JOINS YOUR ARMY FREE AT LAUNCH!":"\u064A\u0646\u0636\u0645 \u0625\u0644\u0649 \u062C\u064A\u0634\u0643 \u0645\u062C\u0627\u0646\u064B\u0627 \u0639\u0646\u062F \u0627\u0644\u0625\u0637\u0644\u0627\u0642!", "EXCLUSIVE":"\u062D\u0635\u0631\u064A", "FREE FOR EVERY ACTIVE PLAYER":"\u0645\u062C\u0627\u0646\u064B\u0627 \u0644\u0643\u0644 \u0644\u0627\u0639\u0628 \u0646\u0634\u0637", "WHEN THE CLOCK HITS ZERO!":"\u0639\u0646\u062F\u0645\u0627 \u064A\u0635\u0644 \u0627\u0644\u0639\u062F\u0627\u062F \u0625\u0644\u0649 \u0627\u0644\u0635\u0641\u0631!", "%1 AFTER LAUNCH":"%1 \u0628\u0639\u062F \u0627\u0644\u0625\u0637\u0644\u0627\u0642", "Thank you for joining the cause!":"\u0634\u0643\u0631\u064B\u0627 \u0644\u0627\u0646\u0636\u0645\u0627\u0645\u0643 \u0625\u0644\u0649 \u0627\u0644\u0642\u0636\u064A\u0629!", "I'M IN!":"\u0623\u0646\u0627 \u0645\u0639\u0643\u0645!", "LIFT-OFF!":"\u0627\u0646\u0637\u0644\u0627\u0642!" });
 }catch(e){}
 (function(){ const door=function(o){ o=o||{};   
     if(o.T!==undefined) LCD.T=o.T; if(o.now!==undefined) LCD.NOW=o.now; if(o.look){ LCD.look=o.look; } if(o.every!=null) LCD.EVERY=o.every;
@@ -1648743,7 +1648825,7 @@ try{ Object.assign(TR.es||(TR.es={}), { "COUNTDOWN TO LAUNCH":"CUENTA ATRÁS AL 
     const st=document.getElementById('lcdStage'), q=s=>{ const e=st && st.querySelector(s); return e? e.textContent : null; };
     return { on:LCD.on, sw:LCD.sw, live:LCD.live, up:!!st, look:st? st.getAttribute('data-look') : LCD.look, why:lcdWhy(), at:LCD.AT, left:lcdLeft(), parts:lcdParts(lcdLeft()), day:lcdDay(), lcdDay:META.lcdDay||'', lcdN:META.lcdN|0, lcdIn:META.lcdIn||'', lcdYes:META.lcdYes|0,
       dealt:LCD.dealt, shut:LCD.shut, yes:LCD.yes, err:LCD.err, zero:LCD.zeroT!=null, run:LCD.run, every:LCD.EVERY, price:LCD.PRICE,
-      clock:st? [0,1,2,3].map(i=>q('#lcdN'+i)) : null, title:q('.lcd-t1'), date:q('.lcd-date'), local:q('.lcd-local'), p1:q('.lcd-p1'), p2:q('.lcd-p2'), priceLine:q('.lcd-price'), name:q('.lcd-pname'), chip:q('.lcd-chip'), say:q('#lcdTxt'), nm:q('.lcd-nm'), go:q('.lcd-go'),
+      clock:st? [0,1,2,3].map(i=>q('#lcdN'+i)) : null, title:q('.lcd-t1'), date:q('.lcd-date'), local:q('.lcd-local'), p1:q('.lcd-p1'), p2:q('.lcd-p2'), priceLine:q('.lcd-price'), name:q('.lcd-pname'), sub:q('.lcd-psub'), prop:LCD.lastProp||null, jet:LCD.lastJet||null, lcw:1, chip:q('.lcd-chip'), say:q('#lcdTxt'), nm:q('.lcd-nm'), go:q('.lcd-go'),
       yardPlane:LCD.yardPlane|0, baked:Object.keys(LCD.bake), imgs:Object.keys(LCD.img).filter(k=>LCD.img[k] && LCD.img[k].complete && LCD.img[k].naturalWidth).length, imgN:Object.keys(LCD.img).length, lap:LCD.lastLap||null, breath:st? lcdBreathAt(lcdT()) : 0, log:LCD.log.slice() }; };
   try{ if(window.GVT && !GVT.lcd) GVT.lcd=door; }catch(e){} setTimeout(function(){ try{ if(window.GVT && !GVT.lcd) GVT.lcd=door; }catch(e){} }, 0); })();
 
