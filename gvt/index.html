@@ -1273432,6 +1273432,19 @@ function fsrRead(){ let note=null, key=null; try{ key=localStorage.getItem('gvt_
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
 function pesField(){ try{ return !!((typeof lbwl20Fight==='function' && lbwl20Fight()) || (typeof lbwcOn==='function' && lbwcOn())); }catch(e){ PES.err++; return false; } }
 function pesOn(){ return !!(PES.on && !PES_OFF && pesField()); }
 function pesFoe(f){ return !!(f && f.type==='tansniper' && !f.boss && !f.dead); }
@@ -1368695,7 +1368708,7 @@ let BFQ=null;
 
 
 
-let GVT_CV='34.05';
+let GVT_CV='34.06';
 let NX_CAP_MUL=4;
 
 
@@ -1907405,13 +1907418,15 @@ setTimeout(function(){ try{ if(window.GVT && !GVT.fsr) GVT.fsr=fsrRead; }catch(e
 
 
 (function () {
-  const ON = (function () { try { const q = /[?&]blv=([01])(?:&|$)/.exec(location.search || ''); if (q) localStorage.setItem('gvt_blv', q[1]); return localStorage.getItem('gvt_blv') !== '0'; } catch (e) { return true; } })();
+  
+  
+  const ON = (function () { try { const q = /[?&]blv=([01])(?:&|$)/.exec(location.search || ''); if (q) localStorage.setItem('gvt_blv', q[1]); const v = localStorage.getItem('gvt_blv'); if (v === '0') return false; if (v === '1') return true; try { return !!(META && META.battleCode); } catch (e) { return false; } } catch (e) { return false; } })();
   const BLV = window.BLV = { on: ON, mode: 'lobby', board: 0, tabs0: null, tab0: null, err: '' };
   
   
   
   const TABS = [{ id: 'bf1', lab: '1v1' }, { id: 'bf2', lab: '2v2' }, { id: 'bf3', lab: '3v3' }, { id: 'squad', lab: 'SQUAD' }, { id: 'torch', lab: 'THE GAUNTLET' }];
-  if (!ON) return;
+  BLV.install = function () { if (BLV.inst) return; BLV.inst = 1; BLV.on = true;   
   const need = ['openWarTable', 'renderWarTable', 'closeWarTable', 'openWorldRank', 'closeWorldRank', 'wrList', 'renderWorldRank', 'hqClose', 'gaTileHTML', 'roomSVG', 'sprURI', 'sargeWepURI', 'partyLive'];
   const miss = need.filter(n => typeof window[n] !== 'function');
   if (miss.length || typeof UI !== 'object' || !UI || typeof WR_TABS === 'undefined' || !window.BLV_UI || !window.BL7) { BLV.on = false; BLV.err = 'missing: ' + miss.join(',') || 'UI/WR_TABS/BLV_UI/BL7'; return; }
@@ -1907422,7 +1907437,7 @@ setTimeout(function(){ try{ if(window.GVT && !GVT.fsr) GVT.fsr=fsrRead; }catch(e
   function unX() { if (BLV.mode !== 'un') return; const x = document.querySelector('#wartable .wt-x'); if (x) { x.setAttribute('onclick', 'UI.blvLobby()'); x.classList.add('blv-back'); } }   
   function table() { BLV.mode = 'un'; BLV_UI.hide(); renderWarTable(); }   
   function failSafe(e) { BLV.err = String(e && e.message || e).slice(0, 200); try { BLV_UI.hide(); } catch (x) {} BLV.mode = 'lobby'; try { oRender(); } catch (x) {} }   
-  window.openWarTable = function () { try { BLV_UI.hide(); } catch (e) {} BLV.mode = 'lobby'; const r = oOpen.apply(this, arguments); try { BLV_UI.show(); } catch (e) { failSafe(e); } return r; };
+  window.openWarTable = function () { if (!BLV.on) return oOpen.apply(this, arguments);     try { BLV_UI.hide(); } catch (e) {} BLV.mode = 'lobby'; const r = oOpen.apply(this, arguments); try { BLV_UI.show(); } catch (e) { failSafe(e); } return r; };
   window.renderWarTable = function () { if (BLV_UI.isOpen() && document.getElementById('bflobby3')) { try { BLV_UI.refresh(); } catch (e) {} return; } const r = oRender.apply(this, arguments); try { unX(); } catch (e) {} return r; };
   window.closeWarTable = function () { try { BLV_UI.hide(); } catch (e) {} BLV.mode = 'lobby'; return oClose.apply(this, arguments); };
   if (typeof window.fsiArea === 'function') { const oFsi = window.fsiArea; window.fsiArea = function () { const a = oFsi.apply(this, arguments); return (a && a[0] === 'battlefield' && BLV_UI.isOpen()) ? null : a; }; }   
@@ -1907432,7 +1907447,7 @@ setTimeout(function(){ try{ if(window.GVT && !GVT.fsr) GVT.fsr=fsrRead; }catch(e
   window.renderWorldRank = function () { try { if (BLV.board && !TABS.some(t => t.id === WR.tab)) { const keep = WR.tab; tabsBack(); WR.tab = keep; } } catch (e) {} return oRWR.apply(this, arguments); };   
   window.wrList = function (tab) { if (tab === 'bf3') { const d = WR.data; return ((d && d.bf3) || []).map((r, i) => ({ uid: r.uid, name: r.name, val: (r.w || 0) + 'W', color: r.color, you: !!r.you, rank: r.rank || i + 1, tier: tierName(r.stars || 0), stars: r.stars || 0, w: r.w || 0, l: r.l || 0 })); } return oList.apply(this, arguments); };
   UI.wrAct = function () { if (BLV.board && WR.tab === 'bf3') { audio(); SFX.blip(); closeWorldRank(); table(); UI.wtPlay(3); return; } return oAct.apply(this, arguments); };
-  UI.wtRank = function () { if (typeof oRank !== 'function') return; UI.blvBoard(); };   
+  UI.wtRank = function () { if (typeof oRank !== 'function') return; if (!BLV.on) return oRank.apply(this, arguments);     UI.blvBoard(); };   
   Object.assign(UI, {
     blvBoard() { try { audio(); SFX.blip(); } catch (e) {}
       if (!BLV.board) { BLV.tabs0 = WR_TABS.slice(); BLV.tab0 = WR.tab; WR_TABS.length = 0; TABS.forEach(t => WR_TABS.push(t)); BLV.board = 1; }
@@ -1907452,6 +1907467,17 @@ setTimeout(function(){ try{ if(window.GVT && !GVT.fsr) GVT.fsr=fsrRead; }catch(e
     blvLobby() { try { SFX.clack(); } catch (e) {} BLV.mode = 'lobby'; try { BLV_UI.show(); } catch (e) { failSafe(e); } },
     blvInvite() { try { grpTap(); } catch (e) {} },
   });
+  };   
+  if (ON) BLV.install();   
+  
+  
+  if (typeof codeRedeem === 'function') { const c0 = codeRedeem; codeRedeem = function () { try { const inp = document.getElementById('shCodeIn'); const word = inp ? codeNorm(inp.value) : '';
+      if (word === 'BATTLE' || word === 'CODEBATTLE') { inp.value = ''; try { inp.blur(); } catch (e) {}
+        const was = !!BLV.on; let msg;
+        if (was) { try { localStorage.setItem('gvt_blv', '0'); } catch (e) {} try { META.battleCode = 0; saveMeta(); } catch (e) {} try { BLV_UI.hide(); } catch (e) {} BLV.mode = 'lobby'; BLV.on = false; msg = 'THE BATTLEFIELDS ARE AS BEFORE'; }
+        else { try { localStorage.setItem('gvt_blv', '1'); } catch (e) {} try { META.battleCode = 1; saveMeta(); } catch (e) {} BLV.install(); BLV.on = String(BLV.err || '').indexOf('missing') !== 0; msg = 'THE NEW BATTLEFIELDS ARE OPEN. GO TO THE BATTLEFIELDS DOOR.'; }
+        codeSay(t(msg), 'yes'); try { SFX.fanfare(); } catch (e) {} codeShut(1); try { if (S.mode === 'menu') renderMenu(); } catch (e) {} try { evToast(t(msg)); } catch (e) {} return; } } catch (e) {}
+    return c0.apply(this, arguments); }; }
 })();
 
 
