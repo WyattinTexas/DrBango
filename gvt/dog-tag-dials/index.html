@@ -53,7 +53,7 @@ details.pet>summary img{width:64px;height:64px;object-fit:contain;flex:none}
 .curve .dot{fill:var(--card);stroke:var(--green);stroke-width:2.5;pointer-events:none}.curve .dot.end{stroke-width:4.5}.curve .dot.ch{fill:var(--tan);stroke:var(--tan)}
 .curve .band{fill:var(--tan);opacity:.55}.curve .hit{fill:transparent;cursor:ns-resize;touch-action:none}
 .curve .cs{margin:4px 0 0;font-size:14.5px;color:var(--mute)}.curve .cs b{color:var(--ink)}
-.bal{padding:12px 16px}.bal h2{margin:0 0 6px}.bal ul{margin:6px 0;padding-left:20px}.bal li{margin:6px 0}
+.okd{background:var(--hi);color:var(--hiInk);border-radius:10px;padding:10px 14px;margin:6px 0 8px}.bal{padding:12px 16px}.bal h2{margin:0 0 6px}.bal ul{margin:6px 0;padding-left:20px}.bal li{margin:6px 0}
 .glance{width:100%;border-collapse:collapse;font-size:15px;margin-top:8px}.glance th,.glance td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
 .glance th{color:var(--mute);font-size:12.5px;font-weight:600}.glance td:nth-child(-n+3),.glance th:nth-child(-n+3){text-align:left}.glance tr[data-k]{cursor:pointer}.glance tr.ch td{background:var(--hi);color:var(--hiInk)}
 .glance .vb{color:var(--mute);font-size:13px;margin-left:6px}.glance .up{color:var(--green);font-weight:800}.glance .dn{color:var(--red);font-weight:800}.glance tr.ch .up,.glance tr.ch .dn{color:inherit}
@@ -96,7 +96,7 @@ function changesText(){
   for(const i of Object.keys(ROWS)){ if(!(i in ST.v)) continue; const r=ROWS[i]; add(r.where,'- '+r.row.label+(r.row.code?' ['+r.row.code+']':'')+': '+fmt(r.base)+' -> '+fmt(ST.v[i])); }
   const notes=Object.keys(ST.n).filter(k=>ST.n[k]&&ST.n[k].trim()), n=nEdits();
   const L=[(DATA.kind==='pets'?'PET CHANGES':'DOG TAG CHANGES')+' · Green vs Tan v'+DATA.cv+' · '+n+' change'+(n===1?'':'s')];
-  if(DATA.kind==='pets') L.push('On top of the proposed balance of '+DATA.bal+' (every line not listed here stays as proposed).');
+  if(DATA.kind==='pets') L.push('On top of the balance of '+DATA.bal+' (every line not listed here stays as it is).');
   for(const w of order){ L.push(''); L.push(w); for(const l of G[w]) L.push(l); }
   for(const k of notes){ L.push(''); L.push('NOTE · '+k+': '+ST.n[k].trim()); }
   return L.join('\n');
@@ -113,15 +113,15 @@ $('#copy').addEventListener('click',async()=>{ const t=changesText(); $('#outbox
 let armed=0; $('#reset').addEventListener('click',()=>{ const b=$('#reset'); if(!armed){ armed=1; b.textContent='TAP AGAIN TO RESET'; setTimeout(()=>{ armed=0; b.textContent='RESET ALL'; },3000); return; }
   armed=0; b.textContent='RESET ALL'; ST={v:{},n:{},c:{}}; save(); for(const g of CUR) g.sync(); for(const i in ROWS){ if(ROWS[i].input) ROWS[i].input.value=fmt(ROWS[i].base); paint(i); } document.querySelectorAll('.note textarea').forEach(t=>t.value=''); refresh(); });
 
-const BAND={heavy:[100,150],medium:[70,120],light:[20,45],burn:[20,45]}, START={heavy:1.5,medium:1,light:1,burn:2}, CLS={heavy:'HEAVY',medium:'MEDIUM',light:'LIGHT'}, CUR=[];
-const r1=v=>{ v=+v; if(!isFinite(v)) return 0; return Math.abs(v)<10? Math.round(v*10)/10 : Math.round(v); };
+const BAND=DATA.band||{heavy:[100,150],medium:[70,120],light:[20,45],burn:[20,45]}, START={heavy:1.5,medium:1,light:1,burn:2}, CLS={heavy:'HEAVY',medium:'MEDIUM',light:'LIGHT'}, CUR=[];
+const r1=v=>{ v=+v; if(!isFinite(v)) return 0; return Math.abs(v)<100? Math.round(v*10)/10 : Math.round(v); };
 const nice=v=>{ if(!(v>0)) return 2; const e=Math.pow(10,Math.floor(Math.log10(v))), m=v/e-1e-9; for(const k of [1,1.2,1.6,2,2.4,3.2,4,6,8,10]) if(m<=k) return +(k*e).toPrecision(3); return 10*e; };
 function mkCurve(p,c){
   const cid=p.k+'|'+c.id, LV=c.lv, N=LV.length, line=c.a!=null, pick=line&&c.cls!=='burn', NS='http://www.w3.org/2000/svg', T=26, Bm=26, L=44, R=22;
   const ed=()=>ST.c[cid]||{}, E=()=>ST.c[cid]||(ST.c[cid]={});
   const tidy=()=>{ const e=ST.c[cid]; if(!e) return; if(e.o&&!Object.keys(e.o).length) delete e.o; if(!Object.keys(e).length) delete ST.c[cid]; };
   const cls=()=>ed().cls||c.cls;
-  const defB=k=>{ if(k===c.cls) return c.b; const b=BAND[k]; return Math.max(b[0],Math.min(b[1],Math.round((c.raw||b[0])/5)*5)); }, defA=k=>k===c.cls? c.a : START[k];
+  const defB=k=>{ if(k===c.cls) return c.b; const b=BAND[k]; return Math.max(b[0],Math.min(b[1],Math.round((c.raw||b[0])/2.5)*2.5)); }, defA=k=>k===c.cls? c.a : START[k];
   const A=()=>ed().a!=null? ed().a : defA(cls()), B=()=>ed().b!=null? ed().b : defB(cls()), SH=()=>ed().s!=null? ed().s : c.s;
   const f=(a,b,s,l)=>r1(a+(b-a)*Math.pow((l-1)/99,s));
   const onLine=i=>line? f(A(),B(),SH(),LV[i]) : c.base[i], prop=i=>line? f(c.a,c.b,c.s,LV[i]) : c.base[i];
@@ -185,7 +185,7 @@ function mkCurve(p,c){
     inA.addEventListener('input',()=>{ setK('a',parseFloat(inA.value),defA(cls())); done(inA); }); inB.addEventListener('input',()=>{ setK('b',parseFloat(inB.value),defB(cls())); done(inB); });
     const l=el('label','cn','GROWS <input type="range" min="0.5" max="3" step="0.1" aria-label="How it grows"> <span></span>'); cc.appendChild(l); inS=$('input',l); sw=$('span',l); inS.value=SH();
     inS.addEventListener('input',()=>{ setK('s',+inS.value,c.s); done(); }); }
-  const bBig=el('button','mini big','BIGGER'), bRs=el('button','mini','↺ '+(line?'THE PROPOSED LINE':'PUT IT BACK')); cc.appendChild(bBig); cc.appendChild(bRs); bRs.disabled=true;
+  const bBig=el('button','mini big','BIGGER'), bRs=el('button','mini','↺ '+(line?'THE APPROVED LINE':'PUT IT BACK')); cc.appendChild(bBig); cc.appendChild(bRs); bRs.disabled=true;
   bBig.addEventListener('click',()=>{ big=!big; bBig.textContent=big?'SMALLER':'BIGGER'; build(); }); bRs.addEventListener('click',()=>{ delete ST.c[cid]; done(); });
   cs.innerHTML=note();
   g.build=build; g.sync=()=>{ if(selC) selC.value=cls(); if(g.built){ ymax=fit(); paint(); } };
@@ -197,18 +197,18 @@ function glance(){ const t=$('#glance'); if(!t) return; const ar=(a,b)=>{ const 
 function goPet(k){ const d=$('#p-'+k); if(!d) return; d.open=true; d.scrollIntoView({block:'start'}); window.scrollBy(0,-($('.bar').offsetHeight+8)); }
 const app=$('#app'); $('#h1').textContent=DATA.title.toUpperCase();
 if(DATA.kind==='pets'){
-  $('#lead').innerHTML='All '+DATA.pets.length+' pets, read from the game as it is today (v'+esc(DATA.cv)+'). Every damage graph opens on the <b>proposed balance</b>: drag it, or change any number under it, and it is saved on this device. Nothing changes in the game until you press <b>COPY MY CHANGES</b> and paste it in Discord. Distances are the game\'s own: <b>28 = one metre</b>. Times are seconds.';
+  $('#lead').innerHTML='All '+DATA.pets.length+' pets, read from the game as it is today (v'+esc(DATA.cv)+'). Every damage graph opens on the <b>approved balance</b>: drag it, or change any number under it, and it is saved on this device. Nothing changes in the game until you press <b>COPY MY CHANGES</b> and paste it in Discord. Distances are the game\'s own: <b>28 = one metre</b>. Times are seconds.';
   const tools=$('#tools'); tools.innerHTML='<select id="jump" aria-label="Go to a pet"><option value="">Go to a pet…</option>'+DATA.pets.map(p=>'<option value="'+p.k+'">'+esc(p.name)+'</option>').join('')+'</select> <button class="btn ghost" id="openall">OPEN ALL</button>';
   const G=[['damage','DAMAGE'],['health','HEALTH AND HEALING'],['effects','EFFECTS: reach, timing, slows, the upgraded steps']];
-  const bal=el('div','card bal'); bal.innerHTML='<h2>THE NEW BALANCE, AS PROPOSED</h2><ul>'+
-    '<li>Every hit starts near <b>1 at level 1</b> and ends in your band at level 100: a <b>HEAVY</b> hit 100 to 150, a <b>MEDIUM</b> hit 70 to 120, a <b>LIGHT</b> hit 20 to 45.</li>'+
+  const bal=el('div','card bal'); bal.innerHTML='<h2>THE NEW BALANCE, AS APPROVED</h2><p class="okd">Wyatt, 11/24: "looks good. Half everyone\'s damage and we\'re good to go." Every level-100 number below is <b>half of the first proposal</b>. <b>It is not in the game yet:</b> the build is queued as card '+esc(DATA.card)+', behind the new dog tags and Emperor Bear.</p><ul>'+
+    '<li>Every hit starts near <b>1 at level 1</b> and ends at half your band at level 100: a <b>HEAVY</b> hit '+BAND.heavy.join(' to ')+', a <b>MEDIUM</b> hit '+BAND.medium.join(' to ')+', a <b>LIGHT</b> hit '+BAND.light.join(' to ')+'. Level 1 was kept at about 1, your first rule: say if it should be halved too.</li>'+
     '<li>Which band a pet sits in is my call, from how his hit looks and how often he lands it. Change it with the picker on his graph.</li>'+
-    '<li>Inside the band he is set to about <b>'+DATA.pace+' damage a second</b> at level 100. That is one 100-health man every second and a half, about the pace the 11/3 pet audit measured Sharky swallowing men at.</li>'+
+    '<li>Inside the band he is set to about <b>'+DATA.pace+' damage a second</b> at level 100 (65 before the halving).</li>'+
     '<li>Between level 1 and 100 the line bends the way Henry\'s puck already does in the game: slow early, steep late. The GROWS slider straightens it or bends it more.</li>'+
     '<li>Fire and poison that burn by the second (Merlin, the Witch, Tiptoe) sit in the light band, by the second.</li>'+
     '<li><b>Not changed:</b> Sharky (the model), and all health and healing. You gave bands for damage only, so those graphs start at today\'s numbers and stretch as far as you drag them.</li>'+
-    (DATA.cuts.length? '<li><b>Lower than today</b>, on the "around 1 at level 1" rule: '+DATA.cuts.map(esc).join('; ')+'. Drag the first dot back up to keep any of them.</li>' : '')+
-    '<li><b>Nothing here is in the game.</b> Today a Tan rifleman has about 4 to 10 health (the rugs of the 11/3 pet audit), so on these lines a high-level pet fells him in one hit. Enemy health has to rise with it, and that is not on this page yet.</li></ul>'+
+    (DATA.cuts.length? '<li><b>Lower than today at some levels:</b> '+DATA.cuts.map(esc).join('; ')+'. Say if any of them should keep today\'s numbers.</li>' : '')+
+    '<li><b>Enemy health is not changed</b> by that card. Today a Tan rifleman has about 4 to 10 health (the rugs of the 11/3 pet audit), so a high-level pet will fell him in one hit.</li></ul>'+
     '<p class="key"><b>On a graph:</b> drag the first dot or the last dot and the whole line follows. Drag a middle dot to pull just that level off the line; double-tap it to drop it back. Drag past the top and the graph grows.<br><i></i>the new line<i class="t"></i>today<i class="b"></i>your band at level 100</p>'+
     '<div class="wrap"><table class="glance" id="glance"></table></div>';
   app.appendChild(bal); $('#glance').addEventListener('click',e=>{ const tr=e.target.closest('tr[data-k]'); if(tr) goPet(tr.dataset.k); });
